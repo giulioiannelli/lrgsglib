@@ -1,0 +1,37 @@
+# paths
+data/
+src/lrgsglib.egg-info/
+src/lrgsglib/Ccore/bin/
+src/lrgsglib/Ccore/statsys/signedRw/Lattices/build/
+# Explicitly ignore everything in data and data/plot, except the paper directory
+data/*/
+src/lrgsglib.egg-info/*
+data/plot/*/
+!data/plot/paper/
+.vscode/*
+# extensions
+*.bin
+*.cpython-39.pyc
+*.egg
+*.egg-info
+*.err
+*.log
+*.mp4
+*.o
+*.out
+*.pdf
+*.pickle
+*.pkl
+*.png
+*.pyc
+*.so
+*.tar
+*.zip
+# files
+.DS_Store
+.codegpt
+.env
+/tools/bash/config_env.sh
+/tools/bash/unconfig_env.sh
+/src/lrgsglib/config/lrgsg_env.py
+

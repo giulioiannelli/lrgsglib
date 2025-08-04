@@ -1,0 +1,3 @@
+[submodule "src/lrgsglib/Ccore/SFMT"]
+	path = src/lrgsglib/Ccore/SFMT
+	url = https://github.com/MersenneTwister-Lab/SFMT
