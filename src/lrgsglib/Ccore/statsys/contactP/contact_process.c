@@ -1,11 +1,12 @@
 #include "LRGSG_utils.h"
-#include <math.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
+#include "LRGSG_customs.h"
+#include "sfmtrng.h"
+#include "LRGSG_rbim.h"
 
-static double infection_rate(size_t j, spin_tp s, size_tp nlen, NodeEdges ne) {
+sfmt_t sfmt; // Global SFMT random number generator state
+
+static double infection_rate(size_t j, spin_tp s, size_t nlen, NodeEdges ne) {
+    (void)j; // suppress unused parameter warning
     double r = 0.0;
     for (size_t k = 0; k < nlen; k++) {
         size_t i = ne.neighbors[k];
@@ -16,8 +17,9 @@ static double infection_rate(size_t j, spin_tp s, size_tp nlen, NodeEdges ne) {
     return r;
 }
 
-static double recovery_rate(size_t j, double mu, spin_tp s, size_tp nlen,
+static double recovery_rate(size_t j, double mu, spin_tp s, size_t nlen,
                             NodeEdges ne) {
+    (void)j; // suppress unused parameter warning
     double r = mu;
     for (size_t k = 0; k < nlen; k++) {
         size_t i = ne.neighbors[k];
