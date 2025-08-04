@@ -1,0 +1,5 @@
+phelp_mode = "Save mode for reconstruction. Options: 'statistic', 'full'."
+phelp_save_frequency = "Frequency of saving results."
+phelp_max_factor = "Maximum factor for progressive reconstruction."
+phelp_basis_step = "Step size for basis reconstruction."
+phelp_start_idx_basis = "Starting index for basis reconstruction."

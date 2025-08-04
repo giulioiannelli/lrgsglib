@@ -1,0 +1,3 @@
+DEFAULT_GEO = 'squared'
+DEFAULT_SIDE1_LIST = [16, 32, 64]
+DEFAULT_COMPUTE = 'energy_cupy'
