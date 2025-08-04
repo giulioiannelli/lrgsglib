@@ -30,26 +30,29 @@ c-make: $(PROGS)
 all: full-config c-make 
 
 $(LRGSG_CCORE_BIN)/IsingSimulator%: $(LRGSG_RBIM_SIMC)/IsingSimulator%.c \
-                                    $(PATH_SRCC_FILES) \
-                                    $(PATH_SRCC_RBIM) \
-                                    $(PATH_SFMT_FILES) \
-                                    $(PATH_SRCC_BINDYNSYS)
+									$(PATH_SRCC_FILES) \
+									$(PATH_SRCC_RBIM) \
+									$(PATH_SFMT_FILES) \
+									$(PATH_SRCC_BINDYNSYS)
 	@printf "Compiling IsingSimulator%s...\n" "$*"
 	$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
 
 # special rule for voter_model
 $(LRGSG_CCORE_BIN)/voter_model: $(LRGSG_STATSYS_VM)/voter_model.c \
-                               $(PATH_SRCC_FILES) \
-                               $(PATH_SRCC_VM) \
-                               $(PATH_SFMT_FILES) \
-                               $(PATH_SRCC_BINDYNSYS)
-        @printf "Compiling voter_model...\n"
-        $(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+							$(PATH_SRCC_FILES) \
+							$(PATH_SRCC_VM) \
+							$(PATH_SFMT_FILES) \
+							$(PATH_SRCC_BINDYNSYS)
+		@printf "Compiling voter_model...\n"
+		$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
 
 # special rule for contact_process
-$(LRGSG_CCORE_BIN)/contact_process: $(LRGSG_CCORE_STATSYS)/contactP/contact_process.c
-        @printf "Compiling contact_process...\n"
-        $(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+$(LRGSG_CCORE_BIN)/contact_process: $(LRGSG_CCORE_STATSYS)/contactP/contact_process.c\
+							$(PATH_SRCC_FILES) \
+							$(PATH_SFMT_FILES) \
+							$(PATH_SRCC_BINDYNSYS)
+		@printf "Compiling contact_process...\n"
+		$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
 
 rootp-file:
 	@echo "Creating .isrootf file..."
