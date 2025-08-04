@@ -1,0 +1,34 @@
+name: lrgsgenv
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - graph-tool
+  - lmfit
+  - matplotlib
+  - networkx
+  - numpy
+  - powerlaw
+  - python=3.12
+  - scipy
+  - tqdm
+  - pandas
+  - ipykernel
+  - boost
+  - boost-cpp
+  - libboost
+  - pybind11
+  - plotly
+  - nbformat
+  - ipywidgets
+  - gcc_linux-64
+  - gxx_linux-64
+  - black
+  - notebook
+  - python-dotenv
+  - scikit-learn
+  - ipympl
+  - gcc
+  - cupy
+  - nilearn
+  - emd
