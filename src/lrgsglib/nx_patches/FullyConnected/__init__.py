@@ -1,1 +1,1 @@
-from .FullyConnected import SignedGraph
+from .FullyConnected import FullyConnected

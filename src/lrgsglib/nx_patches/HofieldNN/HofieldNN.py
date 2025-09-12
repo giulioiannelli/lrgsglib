@@ -1,10 +1,10 @@
 from ..common import *
 from ..funcs import *
-from ..FullyConnected import SignedGraph
+from ..FullyConnected import FullyConnected
 from .patterns import init_mnist_patterns
 
 
-class HofieldNN(SignedGraph):
+class HofieldNN(FullyConnected):
     """
     HofieldNN is a Hopfield-like neural network that inherits from FullyConnected.
     It uses the fully connected graph structure from FullyConnected and implements

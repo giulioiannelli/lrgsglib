@@ -56,12 +56,26 @@ class SignedGraph:
         self._verify_pflip(pflip)
         self.__init_randomness__(seed)
         #
+        # Ensure std_fname exists: topology wrapper classes normally set
+        # `self.std_fname` (e.g. 'fc', 'er', ...). When SignedGraph is
+        # instantiated directly from a networkx.Graph, this attribute may be
+        # missing. Provide a safe default before calling __init_paths__.
+        if not hasattr(self, 'std_fname'):
+            # use a short identifier for SignedGraph when none provided
+            self.std_fname = 'sg'
+
         self.__init_paths__(path_data, path_plot, make_dir_tree)
         #
         self.on_g = on_g
         self.init_weights_val = init_weights_val
         self.load_g = imported
         self.init_nw_dict = init_nw_dict
+        # Ensure only_const_mode exists; topology wrappers usually set this.
+        if not hasattr(self, 'only_const_mode'):
+            self.only_const_mode = False
+
+        # Compose a standard filename using available components. join_non_empty
+        # handles empty pieces; we guard against missing attributes above.
         self.std_fname = join_non_empty('_', self.std_fname, self.peq_str)
         #
         self.G = self.__load_graph__(import_fname, import_mode) \
@@ -181,6 +195,23 @@ class SignedGraph:
         self.path_plot = path_plot or PATHPLOT
         self.path_sgdata = self.path_data / Path(self.sgpathn)
         #
+        # Ensure syshapePth exists. Many topology subclasses set `self.syshapePth`
+        # during their own initialization. When SignedGraph is created directly
+        # from a networkx.Graph (without those wrappers) this attribute may be
+        # missing and would raise an AttributeError below. Provide sensible
+        # fallbacks: prefer an existing `self.syshape` integer, otherwise use
+        # the number of nodes if `self.G` is already present, or a generic
+        # placeholder.
+        if not hasattr(self, 'syshapePth'):
+            if hasattr(self, 'syshape') and isinstance(self.syshape, (int,)):
+                self.syshapePth = f"N={self.syshape}"
+            else:
+                try:
+                    # If G was passed in, it might be available here
+                    self.syshapePth = f"N={len(self.G)}"
+                except Exception:
+                    self.syshapePth = "N=unknown"
+
         self.subpath_list = []
         for p in PATHN_LIST:
             pfname = Path(p, self.syshapePth)

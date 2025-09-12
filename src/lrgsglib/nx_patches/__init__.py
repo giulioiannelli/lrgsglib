@@ -1,6 +1,6 @@
 from .SignedGraph.SignedGraph import SignedGraph
 from .ErdosRenyi import ErdosRenyi
-from .FullyConnected import SignedGraph
+from .FullyConnected import FullyConnected
 from .HofieldNN import HofieldNN
 from .DGMgraph import DGMgraph
 from .Lattice2D import Lattice2D, load_or_compute_Lattice2D
