@@ -202,12 +202,61 @@ def compute_mse_from_basis(patterns,
 
     return mse_matrix
 #
-def ultrametric_matrix_distance(D1, D2, metric='euclidean'):
-    # Flatten upper triangle (excluding diagonal)
-    triu_idx = np.triu_indices_find_exactfrom(D1, k=1)
+def ultrametric_matrix_distance(
+        D1: NDArray, 
+        D2: NDArray, 
+        metric: str = 'euclidean'
+) -> float:
+    """
+    Compute the distance between two symmetric matrices using their upper 
+    triangular elements.
+
+    This function extracts the upper triangular elements (excluding the 
+    diagonal) from both matrices and computes the distance between these 
+    flattened vectors using the specified metric. This is particularly useful 
+    for comparing distance matrices or correlation matrices where only the 
+    upper triangle contains unique information.
+
+    Parameters
+    ----------
+    D1 : NDArray
+        First symmetric matrix of shape (N, N).
+    D2 : NDArray
+        Second symmetric matrix of shape (N, N). Must have the same shape as D1.
+    metric : str, optional
+        Distance metric to use for comparing the flattened upper triangular 
+        elements. Any metric supported by scipy.spatial.distance.cdist can be 
+        used (e.g., 'euclidean', 'manhattan', 'cosine', 'correlation'). 
+        Default is 'euclidean'.
+
+    Returns
+    -------
+    float
+        The distance between the two matrices based on their upper triangular 
+        elements.
+
+    Notes
+    -----
+    The function assumes both matrices are symmetric and only uses the upper 
+    triangular portion (k=1, excluding diagonal) for comparison. This reduces 
+    computational cost and avoids redundant comparisons for symmetric matrices.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> D1 = np.array([[0, 1, 2], [1, 0, 3], [2, 3, 0]])
+    >>> D2 = np.array([[0, 1.5, 2.1], [1.5, 0, 2.9], [2.1, 2.9, 0]])
+    >>> distance = ultrametric_matrix_distance(D1, D2)
+    >>> print(f"Euclidean distance: {distance:.3f}")
+    """
+    # Extract upper triangular indices (excluding diagonal)
+    triu_idx = np.triu_indices_from(D1, k=1)
+    
+    # Flatten upper triangle elements
     v1 = D1[triu_idx]
     v2 = D2[triu_idx]
-    # Compute distance
+    
+    # Compute distance between flattened vectors
     return cdist([v1], [v2], metric=metric)[0, 0]
 #
 def is_orthonormal(basis: NDArray, axis: int = 0) -> bool:
