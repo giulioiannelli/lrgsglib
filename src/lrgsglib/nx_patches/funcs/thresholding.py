@@ -24,7 +24,11 @@ def compute_threshold_stats(
     """Return threshold values and connectivity statistics for ``G0``."""
     edges_data = [(u, v, data["weight"]) for u, v, data in G0.edges(data=True)]
     weights = np.array([w for _, _, w in edges_data])
-    min_weight = weights.min()
+    # Use minimum positive weight to avoid log of non-positive values
+    positive_weights = weights[weights > 0]
+    if len(positive_weights) == 0:
+        raise ValueError("No positive weights found in graph. Cannot compute threshold statistics.")
+    min_weight = positive_weights.min()
     max_weight = weights.max()
 
     n_points = n_points or G0.number_of_nodes()
@@ -76,8 +80,13 @@ def compute_threshold_stats_fast(
     node_to_idx = {node: i for i, node in enumerate(nodes)}
     n_nodes = len(nodes)
 
+    # Use minimum positive weight to avoid log of non-positive values
+    positive_weights = weights[weights > 0]
+    if len(positive_weights) == 0:
+        raise ValueError("No positive weights found in graph. Cannot compute threshold statistics.")
+    
     n_points = n_points or n_nodes
-    Th = np.logspace(np.log10(weights.min()), np.log10(weights.max()), n_points)
+    Th = np.logspace(np.log10(positive_weights.min()), np.log10(weights.max()), n_points)
     Pinf = np.zeros(len(Th))
     Einf = np.zeros(len(Th))
 
