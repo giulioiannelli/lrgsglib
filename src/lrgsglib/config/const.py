@@ -196,8 +196,23 @@ L3D_GEO_LIST = [L3D_GEO_SC,
 L3D_GEO_SHRT_LIST = [L3D_GEO_SC_SHRT, 
                         L3D_GEO_BCC_SHRT, 
                         L3D_GEO_FCC_SHRT]
-L3D_GEO_DICT = {a: g for a,g in 
+L3D_GEO_DICT = {a: g for a,g in
                  zip(L3D_GEO_SHRT_LIST+L3D_GEO_LIST, L3D_GEO_LIST*2)}
+
+# Multispectral graph default values
+MSG_DEFAULT_TYPE = "multiplicative_cascade"
+MSG_P1 = 0.8
+MSG_P2 = 0.6
+MSG_P3 = 0.6
+MSG_P4 = 0.8
+MSG_ITERATIONS = 7
+MSG_FRACTION = 0.4
+MSG_STDFN = ""
+MSG_SGPATH = ""
+MSG_ONLY_CONST_MODE = False
+MSG_PHTABB = "msg_"
+MSG_PATH = "msg_multiplicative_cascade"
+MSG_PATHS = {MSG_DEFAULT_TYPE: MSG_PATH}
 L3D_PATH_DICT = {a: L3D_PHTABB + g for a,g in 
                  zip(L3D_GEO_SHRT_LIST+L3D_GEO_LIST, L3D_GEO_LIST*2)}
 #
@@ -223,5 +238,4 @@ DEFAULT_P_FSTR_FMT = '.3g'
 DEFAULT_MAX_DIGITS_ROUND_SIGFIG = 18
 
 COUNT_XERR_PATTERNS = True
-
 

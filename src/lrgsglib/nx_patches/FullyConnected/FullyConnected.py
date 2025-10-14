@@ -9,7 +9,7 @@ from typing import Union, Callable
 class FullyConnected(SignedGraph):
     #
     def __init__(
-        self,
+        self, 
         N: int = FC_N,
         with_positions: bool = False,
         mode_positions: Union[str, Callable] = "circular",
