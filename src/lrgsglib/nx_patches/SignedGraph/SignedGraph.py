@@ -12,7 +12,7 @@ import numpy as np
 import pickle as pk
 
 from networkx import Graph
-from typing import Any, Union, List, Dict
+from typing import Any, Union, List, Dict, Tuple, Optional
 from matplotlib.pyplot import get_cmap
 from numpy.typing import NDArray
 from scipy.sparse import spdiags
@@ -23,8 +23,9 @@ from ...config.const import *
 from ...config.errwar import NflipError, NoClustError, SignedGraphWarning
 from ...utils.basic import is_in_range, join_non_empty,\
     flip_to_positive_majority_adapted, bin_sign, flip_to_positive_majority,\
-    generate_random_id, normalize_array
+    generate_random_id, normalize_array, dtype_numerical_precision
 from ...utils.lrg import compute_ising_pairwise_energy
+from ...utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 from ...utils.tools import NestedDict, ConditionalPartitioning
 #
 logger = logging.getLogger(__name__)
@@ -789,6 +790,23 @@ class SignedGraph:
                                          transpose: bool = True, 
                                          with_routine: str = 'numpy'):
         logger.info("Computing eigenvectors for the signed graph Laplacian.")
+        cached_eigv = getattr(self, "eigv", None)
+        cached_eigV = getattr(self, "eigV", None)
+        cached_ready = (
+            cached_eigv is not None
+            and cached_eigV is not None
+            and len(cached_eigv) == self.N
+            and cached_eigV.shape == (self.N, self.N)
+        )
+        if cached_ready:
+            logger.debug("Using cached signed Laplacian spectrum.")
+            eigv_transposed = getattr(self, "_eigV_is_transposed", False)
+            if transpose and not eigv_transposed:
+                self.make_eigV_transposed()
+            elif not transpose and eigv_transposed:
+                self.make_eigV_column_major()
+            return
+
         match with_routine:                
             case 'cupy':
                 slp = cp.asarray(self.slp.astype(typf).toarray())
@@ -797,6 +815,8 @@ class SignedGraph:
             case 'numpy' | _:
                 slp = self.slp.astype(typf).toarray()
                 self.eigv, self.eigV = np.linalg.eigh(slp)
+
+        self._eigV_is_transposed = False
         if transpose:
             self.make_eigV_transposed()
     #
@@ -811,7 +831,133 @@ class SignedGraph:
                 self.slp.astype(typf), k=k, which=which, mode=mode
             )
 
+            self._eigV_is_transposed = False
             self.make_eigV_transposed()
+    #
+    def compute_signed_laplacian_entropy(
+        self,
+        steps: int = 600,
+        t1: int = -2,
+        t2: int = 5,
+        w_thresh: float = None,
+        typf: type = np.float64,
+        with_routine: str = 'numpy',
+        transpose: Optional[bool] = None,
+    ) -> None:
+        """
+        Compute entropy-related observables for the signed Laplacian spectrum.
+
+        Parameters
+        ----------
+        steps : int, optional
+            Number of logarithmic time samples (default 600).
+        t1 : int, optional
+            Lower exponent for the log-spaced time grid (default -2).
+        t2 : int, optional
+            Upper exponent for the log-spaced time grid (default 5).
+        w_thresh : float, optional
+            Magnitude threshold below which eigenvalues are treated as zero.
+            Defaults to the machine precision of `typf`.
+        typf : type, optional
+            Floating type used for spectral computations (default np.float64).
+        with_routine : str, optional
+            Backend for eigen-decomposition ('numpy', 'cupy', ...).
+        transpose : bool or None, optional
+            Desired storage layout for eigenvectors. If None, keeps the current
+            layout or uses the default when recomputing.
+        store : bool, optional
+            When True, cache the results on the instance for later reuse.
+
+        Returns
+        -------
+        None
+        """
+        if steps < 1:
+            raise ValueError("steps must be at least 1 to build the entropy profile.")
+
+        desired_transpose = (
+            transpose
+            if transpose is not None
+            else getattr(self, "_eigV_is_transposed", True)
+        )
+
+        spectrum_missing = (
+            not hasattr(self, "eigv")
+            or self.eigv is None
+            or len(self.eigv) != self.N
+        )
+
+        if spectrum_missing:
+            self.compute_laplacian_spectrum_weigV(
+                typf=typf,
+                transpose=desired_transpose,
+                with_routine=with_routine,
+            )
+        else:
+            current_transposed = getattr(self, "_eigV_is_transposed", False)
+            if transpose is not None:
+                if transpose and not current_transposed:
+                    self.make_eigV_transposed()
+                elif not transpose and current_transposed:
+                    self.make_eigV_column_major()
+
+        eigenvalues = np.asarray(self.eigv, dtype=typf)
+        threshold = w_thresh if w_thresh is not None else dtype_numerical_precision(typf)
+
+        normalized_entropy, entropy_derivative, variance_profile, time_grid = (
+            compute_entropy_observables_from_eigenvalues(
+                eigenvalues=eigenvalues,
+                num_nodes=self.N,
+                steps=steps,
+                t1=t1,
+                t2=t2,
+                typf=typf,
+                threshold=threshold,
+                pad_last=False,
+            )
+        )
+
+        self.entropy = normalized_entropy
+        self.entropy_derivative = entropy_derivative
+        self.specific_heat = variance_profile
+        self.tauscale = time_grid
+        self.entropy_params = {
+            "steps": steps,
+            "t1": t1,
+            "t2": t2,
+            "w_thresh": threshold,
+            "typf": typf,
+            "with_routine": with_routine,
+            "transpose": transpose,
+        }
+    #
+    def get_entropy(self) -> NDArray:
+        """
+        Return the cached normalized entropy profile. Computes it first if missing.
+
+        Returns
+        -------
+        NDArray
+            Normalized entropy values.
+        """
+        if not hasattr(self, "entropy") or self.entropy is None:
+            self.compute_signed_laplacian_entropy()
+        return self.entropy
+
+    def get_specific_heat(self) -> NDArray:
+        """
+        Return the entropy derivative (:math:`d(1 - S) / d\\log\\tau`).
+
+        Returns
+        -------
+        NDArray
+            Entropy derivative values. When `compute_signed_laplacian_entropy`
+            used `steps = m`, this array has length `m - 1`.
+        """
+        if not hasattr(self, "entropy_derivative") or self.entropy_derivative is None:
+            self.compute_signed_laplacian_entropy()
+
+        return self.entropy_derivative
     #
     def compute_pinf(self, which: int = 0, on_g: str = SG_GRAPH_REPR):
         clustd = np.array(self.get_bineigV_cluster_sizes(which, on_g))
@@ -859,7 +1005,16 @@ class SignedGraph:
     # make methods
     #
     def make_eigV_transposed(self):
+        if getattr(self, "_eigV_is_transposed", False):
+            return
         self.eigV = self.eigV.T
+        self._eigV_is_transposed = True
+
+    def make_eigV_column_major(self):
+        if not getattr(self, "_eigV_is_transposed", False):
+            return
+        self.eigV = self.eigV.T
+        self._eigV_is_transposed = False
     #
     def make_rescaled_signed_laplacian(self, MODE: str = 'field'):
         if MODE == 'field':
