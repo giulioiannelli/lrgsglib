@@ -312,7 +312,13 @@ class SignedGraph:
                 self.get_random_links(self.Ne_flips, on_g=on_g)
             )
             self.lfeset[on_g] = self.eset[on_g].difference(self.fleset[on_g])
-            self.__init_weights__(init_weights_val)
+            # Only initialize weights if they don't already exist on the graph
+            # Check if any edge has a 'weight' attribute
+            edges_with_weights = any(
+                'weight' in data for _, _, data in self.gr[on_g].edges(data=True)
+            )
+            if not edges_with_weights:
+                self.__init_weights__(init_weights_val)
         self.upd_GraphRepr_All(on_g)
         self.upd_graph_matrices()
     #
@@ -580,14 +586,28 @@ class SignedGraph:
         return self.gr[on_g].subgraph(list_of_nodes)
     #
     def get_nodes_subgraph_by_kv(self, k, val, on_g: str = SG_GRAPH_REPR):
+        """
+        Optimized version: partition nodes first, then create subgraphs.
+        This avoids copying the entire graph and removing nodes one by one.
+        """
         G = self.gr[on_g]
-        G_yes, G_no = G.copy(), G.copy()
         predicate = val if callable(val) else lambda x: x == val
+        
+        # Partition nodes into two sets based on predicate
+        nodes_no = []  # nodes where predicate is True
+        nodes_yes = []  # nodes where predicate is False
+        
         for node, v in G.nodes(data=k):
             if predicate(v):
-                G_yes.remove_node(node)
+                nodes_no.append(node)
             else:
-                G_no.remove_node(node)
+                nodes_yes.append(node)
+        
+        # Create subgraphs using .subgraph() which is much faster
+        # Note: subgraph() returns a view, use .copy() if you need independent graphs
+        G_yes = G.subgraph(nodes_yes).copy()
+        G_no = G.subgraph(nodes_no).copy()
+        
         return G_yes, G_no
     #
     def get_bineigV_cluster_sizes(self, which: int = 0, 
@@ -976,6 +996,66 @@ class SignedGraph:
             self.energy_eigV_RBIM = {}
         self.energy_eigV_RBIM[which] = compute_ising_pairwise_energy(spins, edges, use_gpu=use_gpu)
     #
+    def compute_sksph_energy_eigV(self, which: int = 0, use_gpu: bool = False, on_g: str = SG_GRAPH_REPR):
+        """
+        Compute the spherical SK-model energy for the given eigenstate index.
+
+        This uses the raw (continuous) eigenvector entries without binarisation.
+        The energy is computed as the negative weighted sum over edges:
+            E = -sum_{(u,v,w) in E} w * s[u] * s[v]
+
+        Parameters
+        ----------
+        which : int, default 0
+            Index of the eigenvector to evaluate.
+        use_gpu : bool, default False
+            If True, compute using CuPy when available.
+        on_g : str, default SG_GRAPH_REPR
+            Graph representation key to take edges from.
+        """
+        # Use continuous eigenvector (no binarization)
+        state = self.get_eigV_check(which, binarize=False)
+        edges = list(self.gr[on_g].edges(data='weight'))
+        if not hasattr(self, "energy_eigV_SKSPH"):
+            self.energy_eigV_SKSPH = {}
+        self.energy_eigV_SKSPH[which] = compute_ising_pairwise_energy(state, edges, use_gpu=use_gpu)
+    #
+    def compute_sksph_energy_eigV_all(self, on_g: str = SG_GRAPH_REPR, **kw_laplspect):
+        """
+        Compute spherical SK energies for all currently available eigenvectors.
+
+        If eigenvectors are not yet computed, compute them first using the
+        Laplacian spectrum method with the provided kwargs.
+        """
+        if not hasattr(self, "eigV"):
+            self.compute_laplacian_spectrum_weigV(**kw_laplspect)
+        if not hasattr(self, "energy_eigV_SKSPH"):
+            self.energy_eigV_SKSPH = {}
+        for which in range(len(self.eigV)):
+            if which not in self.energy_eigV_SKSPH:
+                # keep argument names explicit to avoid mis-ordering
+                self.compute_sksph_energy_eigV(which, on_g=on_g)
+    #
+    def get_sksph_energy_eigV(self, which: int = 0):
+        """
+        Return cached spherical SK energy for eigenvector `which`,
+        computing it on first access.
+        """
+        if not hasattr(self, "energy_eigV_SKSPH") or which not in getattr(self, "energy_eigV_SKSPH", {}):
+            self.compute_sksph_energy_eigV(which)
+        return self.energy_eigV_SKSPH[which]
+    #
+    def get_all_sksph_energy_eigV(self, as_dict: bool = False, on_g: str = SG_GRAPH_REPR, **kw_laplspect):
+        """
+        Return spherical SK energies for all eigenvectors, as dict or array.
+        """
+        if not hasattr(self, "energy_eigV_SKSPH"):
+            self.compute_sksph_energy_eigV_all(on_g, **kw_laplspect)
+        if as_dict:
+            return self.energy_eigV_SKSPH
+        else:
+            return np.array(list(self.energy_eigV_SKSPH.values()))
+    #
     def compute_rbim_energy_eigV_all(self, on_g: str = SG_GRAPH_REPR,
                                      **kw_laplspect):
         if not hasattr(self, "eigV"):
@@ -1038,8 +1118,14 @@ class SignedGraph:
             self.make_graphYN(k, val, on_g)
             graphY, graphN = self.graph_clustering_utility[k][val.key][on_g]
         #
-        self.clustersY = list(nx.connected_components(graphY))
-        self.clustersN = list(nx.connected_components(graphN))
+        # Use generators and avoid redundant operations
+        clustersY_gen = nx.connected_components(graphY)
+        clustersN_gen = nx.connected_components(graphN)
+        
+        # Process clustersY: convert to list and sort in one pass
+        self.clustersY = sorted(clustersY_gen, key=len, reverse=True)
+        # Process clustersN: just convert to list
+        self.clustersN = list(clustersN_gen)
         #
         self.numClustersY = len(self.clustersY)
         self.numClustersN = len(self.clustersN)
@@ -1051,10 +1137,11 @@ class SignedGraph:
             self.gc = None  # Set to None or a default value
             return
         #
-        self.biggestClSet = sorted(self.clustersY, key=len, reverse=True)
+        # clustersY is already sorted, so biggestClSet is just a reference
+        self.biggestClSet = self.clustersY
         self.numClustersBig = len(self.biggestClSet)
-
-        self.gc = max(self.biggestClSet, key=len)
+        # Largest component is first after sorting
+        self.gc = self.clustersY[0]
     #
     #
     def make_eigVclustersYN(self, val: ConditionalPartitioning, which: int = 0, 

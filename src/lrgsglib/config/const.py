@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Union, Tuple
 from numpy import integer as np_int
 from numpy import pi as np_pi
@@ -25,7 +26,7 @@ XML = ".xml"
 # paths
 load_dotenv()
 #
-PATHNLLIB = 'lrgsglib'
+PATHNLLIB: str = Path(LRGSG_LLIB).name
 #
 PATHDATA = Path(LRGSG_DATA)#
 #
@@ -238,4 +239,3 @@ DEFAULT_P_FSTR_FMT = '.3g'
 DEFAULT_MAX_DIGITS_ROUND_SIGFIG = 18
 
 COUNT_XERR_PATTERNS = True
-
