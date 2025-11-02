@@ -502,7 +502,7 @@ class SignedGraph:
     #
     def get_eigV_binarized(self, which: int = 0):
         eigV = bin_sign(self.eigV[which].squeeze())
-        return flip_to_positive_majority(eigV).squeeze()
+        return flip_to_positive_majority_adapted(eigV).squeeze()
     #
     def get_eigV_bin_check(self, which: int = 0, reshaped: bool = False):
         if not hasattr(self, f"eigV") or which >= len(self.eigV):
