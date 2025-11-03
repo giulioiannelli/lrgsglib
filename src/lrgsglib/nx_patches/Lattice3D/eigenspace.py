@@ -100,13 +100,13 @@ def load_or_compute_Lattice3D(
         match compute:
             case _ if compute.startswith('spectrum'):
                 routine = compute.split('_')[-1] if '_' in compute else 'cupy'
-                lattice.compute_laplacian_spectrum_weigV(with_routine=routine)
+                lattice.compute_laplacian_spectrum_weigV(backend=routine)
             case _ if compute.startswith('energy'):
                 routine = compute.split('_')[-1] if '_' in compute else 'cupy'
-                lattice.compute_rbim_energy_eigV_all(with_routine=routine)
+                lattice.compute_rbim_energy_eigV_all(backend=routine)
             case _ if compute.startswith('eigV'):
                 routine = compute.split('_')[-1] if '_' in compute else 'cupy'
-                lattice.compute_k_eigvV(k=howmany, with_routine=routine)
+                lattice.compute_k_eigvV(k=howmany, backend=routine)
             case _:
                 raise ValueError(f"Unknown compute option '{compute}'.")
         if save:

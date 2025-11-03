@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 from ..FullyConnected import FullyConnected
-from .generators import generate_scs_generalized_graph
+from .generators_scs import generate_scs_generalized_graph
 
 
 class SCSGeneralizedNN(FullyConnected):

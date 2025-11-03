@@ -4,7 +4,7 @@ import numpy as np
 import pickle as pk
 import networkx as nx
 #
-from typing import Union, Callable, Any
+from typing import Union, Callable, Any, TYPE_CHECKING
 from pathlib import Path
 from functools import partial
 #
@@ -12,7 +12,11 @@ from ...config.const import *
 from ...config.funcs import build_p_fname
 from ...utils.basic import join_non_empty
 #
-def __export_graph__(self, file_name: str = '', export_mode: str = SG_EXPORT_M):
+if TYPE_CHECKING:
+    from .SignedGraph import SignedGraph
+
+
+def __export_graph__(self: "SignedGraph", file_name: str = '', export_mode: str = SG_EXPORT_M):
     match export_mode:
         case 'pkl'|'pk'|'pickle':
             fname = file_name or self.std_fname + PKL 
@@ -75,6 +79,31 @@ def _export_eigV(
             raise ValueError(f"Unsupported format: {ext}. Supported formats\
                               are: .bin, .txt, .npz, .pkl")
 #
+def export_ising_clust(
+        self,
+        NoClust: int = 1,
+        exName: str = ''
+) -> None:
+    """Export indices of Ising clusters to binary files.
+
+    Files are named using the standard convention via `build_p_fname`,
+    e.g., `cl{i}_peq{...}[_{exName}].bin` and written under `self.path_ising`.
+
+    Parameters
+    ----------
+    NoClust : int
+        Number of clusters to export (from `self.biggestClSet`).
+    exName : str
+        Optional suffix appended in the generated filename.
+    """
+    self.clPname = []
+    for i in range(NoClust):
+        fname = build_p_fname(f"cl{i}", self.pflip, out_suffix=exName, ext=BIN)
+        path = self.path_ising / fname
+        self.clPname.append(path)
+        with open(path, "wb") as f:
+            np.array(list(self.biggestClSet[i])).astype(int).tofile(f)
+#
 def export_eigV_all(
     self, 
     exName: str = '', 
@@ -95,7 +124,7 @@ def _export_edgel_bin(
         self,
         exName: str = '',
         mode: str = 'numpy',
-        on_g: str = SG_GRAPH_REPR
+        on_g: str = SG_REPR
 ) -> None:
     fname = build_p_fname('edgelist', self.pflip, out_suffix=exName, ext=BIN)
     self.path_exp_edgl = self.path_graph / fname
@@ -149,5 +178,4 @@ def _export_edgel_bin(
 #         outarr = self.get_eigV_bin_check_list(asarray=True).astype("int8")
 #     else:
 #         outarr = self.eigV.astype("float64")
-
 

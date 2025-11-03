@@ -15,7 +15,7 @@ from ...utils.basic.numeric import is_positive_int
 from ...utils.basic.functions import compose
 from ..funcs import LatticeND_graph_FastPatch, remove_edges
 from ..SignedGraph.SignedGraph import SignedGraph
-from .generators import *
+from .generators_3d import *
 
 class Lattice3D(SignedGraph):
     def __init__(

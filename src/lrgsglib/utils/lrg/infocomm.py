@@ -224,20 +224,5 @@ def compute_entropy_observables_from_eigenvalues(
 
     normalized_entropy = 1 - entropy_profile
 
-    if steps > 1:
-        entropy_derivative_core = np.asarray(
-            log_N * np.diff(normalized_entropy) / np.diff(np.log(time_grid)),
-            dtype=typf,
-        )
-        if pad_last:
-            entropy_derivative = np.empty_like(time_grid, dtype=typf)
-            entropy_derivative[:-1] = entropy_derivative_core
-            entropy_derivative[-1] = entropy_derivative_core[-1]
-        else:
-            entropy_derivative = entropy_derivative_core
-    else:
-        entropy_derivative = (
-            np.zeros_like(time_grid, dtype=typf) if pad_last else np.empty(0, dtype=typf)
-        )
-
+    entropy_derivative = log_N * np.gradient(normalized_entropy, np.log(time_grid))
     return normalized_entropy, entropy_derivative, variance_profile, time_grid

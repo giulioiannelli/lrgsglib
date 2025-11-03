@@ -57,7 +57,7 @@ class SignedLaplacianAnalysis:
             self.__initSpectrum__()
     #
     def __initSpectrum__(self):
-        self.sg.compute_k_eigvV(with_routine="numpy")
+        self.sg.compute_k_eigvV(backend="numpy")
     #
     def computeS(self) -> None:
         w =  self.sg.eigv
@@ -721,7 +721,7 @@ def flip_random_fract_edges(G: Graph, p: float):
 def eigV_for_lattice2D(side, mode='scipy', howmany=1, **kwargs) -> NDArray:
     l = Lattice2D(side, **kwargs)
     l.flip_random_fract_edges()
-    l.compute_k_eigvV(with_routine=mode, k=howmany)
+    l.compute_k_eigvV(backend=mode, k=howmany)
     return l.eigV
 
 def adjust_eigV_for_lattice2D(leigV: NDArray) -> NDArray:

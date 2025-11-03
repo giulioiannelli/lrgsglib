@@ -75,7 +75,7 @@ class FullyConnected(SignedGraph):
 
     #
     def set_hopfield_edges(
-        self, on_g: str = SG_GRAPH_REPR, **kwcompute_hopf_edges
+        self, on_g: str = SG_REPR, **kwcompute_hopf_edges
     ) -> None:
         if not hasattr(self, "hopfield_edges"):
             self.compute_hopfield_edges(**kwcompute_hopf_edges)
