@@ -6,3 +6,4 @@ from .Lattice3D import *
 from .IsingDynamics import *
 from .SlaplSpect import *
 from .Recon import *
+from .TransCluster import *
