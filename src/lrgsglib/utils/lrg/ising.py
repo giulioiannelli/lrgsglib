@@ -364,3 +364,6 @@ def compute_spin_match_series(spin_vector: np.ndarray,
         )
         for i in range(len(basis) - 1)
     ])
+
+def ising_spinglass_pmJ_2D_Tcrit(L):
+    return L ** (-1.0 / 2)

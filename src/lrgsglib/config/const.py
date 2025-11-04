@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Union, Tuple
 from numpy import integer as np_int
 from numpy import pi as np_pi
@@ -25,7 +26,7 @@ XML = ".xml"
 # paths
 load_dotenv()
 #
-PATHNLLIB = 'lrgsglib'
+PATHNLLIB: str = Path(LRGSG_LLIB).name
 #
 PATHDATA = Path(LRGSG_DATA)#
 #
@@ -61,7 +62,8 @@ BSP_RUN_MODE = BSP_RUN_MODE_PYTHON
 BSP_RUN_MODES_C_LIST = [BSP_RUN_MODE_C, "c"]
 BSP_RUN_MODES_C_DICT = {bsp: BSP_RUN_MODE_C for bsp in BSP_RUN_MODES_C_LIST}
 BSP_RUN_MODES_PY_LIST = [BSP_RUN_MODE_PYTHON, "py", "Py", "PY", "Python"]
-BSP_RUN_MODES_PY_DICT = {bsp: BSP_RUN_MODE_PYTHON for bsp in BSP_RUN_MODES_PY_LIST}
+BSP_RUN_MODES_PY_DICT = {bsp: BSP_RUN_MODE_PYTHON 
+                         for bsp in BSP_RUN_MODES_PY_LIST}
 BSP_RUN_MODES = BSP_RUN_MODES_PY_LIST + BSP_RUN_MODES_C_LIST
 BSP_RUN_MODES_DICT = {**BSP_RUN_MODES_PY_DICT, **BSP_RUN_MODES_C_DICT}
 # Signed Graph default values
@@ -73,16 +75,18 @@ SG_INIT_WVAL = 1.0
 SG_EXPORT_M = 'pk'
 SG_LOAD_M = 'pk'
 SG_LIST_REPR = ['H']
-SG_GRAPH_REPR = 'G'
-SG_GRAPHINT_REPR = SG_GRAPH_REPR
+SG_REPR = 'G'
+SG_GRAPHINT_REPR = SG_REPR
 SG_GRAPHGEO_REPR = 'H'
 SG_ERRMSG_MAXEIGVIDX = """The maximum eigenvalue index is out of bounds."""
 SG_ERRMSG_NW_DICT = f"Inheriting class must have attribute 'nwContainer'"
 SG_ERRMSG_NFLIP = """The probability of flipping an edge times the 
-                             number of edges is < 1, then no edges would be
-                             flipped. No flip will be performed."""
-SG_ERRMSG_PFLIP = f""" pflip must be between {LB_PFLIP} and {UB_PFLIP}, inclusive."""
-SG_ERRMSG_NOCLUST_GTR_NCB = """Requested number of Cluster files is bigger than the one in selected topology."""
+    number of edges is < 1, then no edges would be
+    flipped. No flip will be performed."""
+SG_ERRMSG_PFLIP = f""" pflip must be between {LB_PFLIP} and {UB_PFLIP},
+    inclusive."""
+SG_ERRMSG_NOCLUST_GTR_NCB = """Requested number of Cluster files is bigger than 
+    the one in selected topology."""
 SG_ERRMSG_ZEROCLUST = """No clusters were found."""
 SG_WARNMSG_HASATTR = """The object does not has attribute."""
 SG_WARNMSG_NOCLUST = """No clusters were found in the graph."""
@@ -164,8 +168,11 @@ L2D_ZIP_GEO_SHRT = list(zip(L2D_GEO_SHRT_LIST, L2D_GEO_LIST))
 L2D_GEO_SHRT_DICT = {s: a for a,s in L2D_ZIP_GEO_SHRT}
 L2D_SHRT_GEO_DICT = {a: s for a,s in L2D_ZIP_GEO_SHRT}
 #
-L2D_WARNMSG_GEO = """The selected geometry of the 2D lattice is not available. Setting it to 'squared' for a 2d regular grid."""
-L2D_ERRMSG_GEO = """Invalid side value for hexagonal lattice. In order to implement PBC on hexagonal lattice you need to provide an even value for side1 and side2."""
+L2D_WARNMSG_GEO = """The selected geometry of the 2D lattice is not available. 
+    Setting it to 'squared' for a 2d regular grid."""
+L2D_ERRMSG_GEO = """Invalid side value for hexagonal lattice. In order to 
+    implement PBC on hexagonal lattice you need to provide an even value 
+    for side1 and side2."""
 #
 L3D_DIM0 = 16
 L3D_DIM = tuple(L3D_DIM0 for _ in range(3))
@@ -220,7 +227,8 @@ L3D_ZIP_GEO_SHRT = list(zip(L3D_GEO_SHRT_LIST, L3D_GEO_LIST))
 L3D_GEO_SHRT_DICT = {s: a for a,s in L3D_ZIP_GEO_SHRT}
 L3D_SHRT_GEO_DICT = {a: s for a,s in L3D_ZIP_GEO_SHRT}
 #
-L3D_WARNMSG_GEO = """The selected geometry of the 3D lattice is not available. Setting it to 'sc' for a 3d regular grid."""
+L3D_WARNMSG_GEO = """The selected geometry of the 3D lattice is not available. 
+    Setting it to 'sc' for a 3d regular grid."""
 #
 DEFAULT_RECURSION_LIMIT = 1024**2
 LRSG_ENTROPY_STEP = 1000
@@ -238,4 +246,3 @@ DEFAULT_P_FSTR_FMT = '.3g'
 DEFAULT_MAX_DIGITS_ROUND_SIGFIG = 18
 
 COUNT_XERR_PATTERNS = True
-

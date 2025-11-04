@@ -48,7 +48,7 @@ class IsingDynamics(BinDynSys):
     def neigh_ene(self, neigh: list) -> float:
         return np.sum(neigh) / len(neigh)
     #
-    def neigh_wghtmagn(self, node: int,on_g: str = SG_GRAPH_REPR) -> list:
+    def neigh_wghtmagn(self, node: int,on_g: str = SG_REPR) -> list:
         nd = dict(self.sg.gr[on_g][node])
         return [w["weight"] * self.s[nn] for nn, w in nd.items()]
     #

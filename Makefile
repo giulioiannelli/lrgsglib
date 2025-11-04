@@ -62,6 +62,7 @@ dotenv-file:
 	@echo "Generating .env file..."
 	@printf "%s\n" \
 	  $(foreach V,$(LIST),LRGSG_$(V)=$(LRGSG_$(V))) \
+	  LRGSG_LLIB=$(LRGSG_LLIB) \
 	> $(ENV_FILE)
 
 py-env-file:
@@ -90,4 +91,3 @@ clean-activations:
 	@rm -rf $(ACTIVATE_D) $(DEACTIVATE_D)
 
 clean: clean-progs clean-subdirs clean-files clean-activations
-

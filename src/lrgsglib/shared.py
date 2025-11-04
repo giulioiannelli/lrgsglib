@@ -10,6 +10,7 @@ import os
 import powerlaw
 import random
 import re
+import scipy
 import string
 import struct
 import subprocess

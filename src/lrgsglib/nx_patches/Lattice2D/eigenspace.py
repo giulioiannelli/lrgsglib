@@ -16,7 +16,7 @@ def create_lattice_with_eigenspace(
     side: int,
     disorder_struct: str = 'random',
     *,
-    with_routine: str = 'scipy',
+    backend: str = 'scipy',
     k: int = 1,
     **kwargs: Any
 ) -> Lattice2D:
@@ -31,7 +31,7 @@ def create_lattice_with_eigenspace(
         Name of the disorder structure to apply. If 'random', a random fraction
         of edges will be flipped. Otherwise, must be a key in
         `l.nwDict[disorder_struct]` to select a predefined pattern.
-    with_routine : str, keyword-only, default 'scipy'
+    backend : str, keyword-only, default 'scipy'
         Backend routine to compute eigenvalues/vectors (e.g., 'scipy', 'numpy').
     k : int, keyword-only, default 1
         Number of lowest-magnitude eigenvalues (and corresponding eigenvectors)
@@ -71,7 +71,7 @@ def create_lattice_with_eigenspace(
         lattice.flip_sel_edges(pattern)
 
     # Compute the lowest-k eigenpairs
-    lattice.compute_k_eigvV(with_routine=with_routine, k=k)
+    lattice.compute_k_eigvV(backend=backend, k=k)
     return lattice
 
 def load_or_compute_Lattice2D(
@@ -167,10 +167,10 @@ def load_or_compute_Lattice2D(
         match compute:
             case _ if compute.startswith('spectrum'):
                 routine = compute.split('_')[1] if '_' in compute else 'numpy'
-                lattice.compute_laplacian_spectrum_weigV(with_routine=routine)
+                lattice.compute_laplacian_spectrum_weigV(backend=routine)
             case _ if compute.startswith('energy'):
                 routine = compute.split('_')[1] if '_' in compute else 'numpy'
-                lattice.compute_rbim_energy_eigV_all(with_routine=routine)
+                lattice.compute_rbim_energy_eigV_all(backend=routine)
             case _:
                 raise ValueError(f"Unknown compute option '{compute}'.")
         if save:

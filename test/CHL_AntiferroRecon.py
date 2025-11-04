@@ -19,7 +19,7 @@ def main():
     # Lattice and basis setup
     ltmp = Lattice2D(**kwargs_TriL2D)
     ltmp.flip_random_fract_edges()
-    ltmp.compute_k_eigvV(with_routine='numpy')
+    ltmp.compute_k_eigvV(backend='numpy')
 
     basis = np.array([
         ltmp.get_eigV_check(i, reshaped=False)

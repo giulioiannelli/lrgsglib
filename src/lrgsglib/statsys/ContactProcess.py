@@ -26,7 +26,7 @@ class ContactProcess(BinDynSys):
             case _:
                 raise ValueError("Invalid initial condition.")
 
-    def infection_rate(self, j: int, on_g: str = SG_GRAPH_REPR) -> float:
+    def infection_rate(self, j: int, on_g: str = SG_REPR) -> float:
         neigh = (
             self.sg.gr[on_g].predecessors(j)
             if hasattr(self.sg.gr[on_g], "predecessors")
@@ -38,7 +38,7 @@ class ContactProcess(BinDynSys):
             rate += self.s[i] * max(w, 0.0)
         return rate
 
-    def recovery_rate(self, j: int, on_g: str = SG_GRAPH_REPR) -> float:
+    def recovery_rate(self, j: int, on_g: str = SG_REPR) -> float:
         neigh = (
             self.sg.gr[on_g].predecessors(j)
             if hasattr(self.sg.gr[on_g], "predecessors")

@@ -1,7 +1,7 @@
 from ..common import *
 from ..funcs import *
 from ..SignedGraph.SignedGraph import SignedGraph
-from .generators import *
+from .generators_2d import *
 #
 class Lattice2D(SignedGraph):
     eta_c = 1.128

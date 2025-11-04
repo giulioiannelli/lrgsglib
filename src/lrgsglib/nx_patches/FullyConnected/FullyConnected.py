@@ -6,7 +6,7 @@ from .animation import make_animation as fc_make_animation
 from typing import Union, Callable
 
 
-class SignedGraph(SignedGraph):
+class FullyConnected(SignedGraph):
     #
     def __init__(
         self, 
@@ -21,13 +21,14 @@ class SignedGraph(SignedGraph):
         self.with_positions = with_positions
         self.mode_positions = mode_positions
         self.only_const_mode = only_const_mode
+        self.syshape = N
+        self.syshapePth = f"N={N}"
+        self.std_fname = f"fc"
         if not only_const_mode:
             self.__init_fullyconnected__()
         else:
-            self.syshape = N
-            self.syshapePth = f"N={N}"
             self.G = nx.Graph()
-        super(SignedGraph, self).__init__(self.G, **kwargs)
+        super(FullyConnected, self).__init__(self.G, **kwargs)
         self.animation_graph_embedding = anigemb
 
     #
@@ -74,7 +75,7 @@ class SignedGraph(SignedGraph):
 
     #
     def set_hopfield_edges(
-        self, on_g: str = SG_GRAPH_REPR, **kwcompute_hopf_edges
+        self, on_g: str = SG_REPR, **kwcompute_hopf_edges
     ) -> None:
         if not hasattr(self, "hopfield_edges"):
             self.compute_hopfield_edges(**kwcompute_hopf_edges)

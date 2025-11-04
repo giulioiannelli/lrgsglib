@@ -1,7 +1,7 @@
 from ..common import *
 from ..funcs import *
 from ..SignedGraph.SignedGraph import SignedGraph
-from .generators import dorogovtsev_goltsev_mendes_graph_FastPatch
+from .generators_dgm import dorogovtsev_goltsev_mendes_graph_FastPatch
 
 
 class DGMgraph(SignedGraph):

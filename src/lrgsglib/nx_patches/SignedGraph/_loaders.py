@@ -1,14 +1,19 @@
 import networkx as nx
 import numpy as np
 import pickle as pk
+import struct
 #
 from functools import partial
-from typing import Callable, Any
+from typing import Callable, Any, TYPE_CHECKING
 #
 from ...config.const import *
 from ...config.funcs import build_p_fname
 
 #
+if TYPE_CHECKING:
+    from .SignedGraph import SignedGraph
+
+
 def __load_graph__(
         self,
         file_name: str = '',
@@ -83,12 +88,14 @@ def load_eigV_all(
     Parameters
     ----------
     exName : str, optional
-        The name of the file to import the eigenvalues from. If not provided,
-        it defaults to an empty string.
+        The name of the file to import the eigenvalues from. 
+        If not provided, it defaults to an empty string.
     ext : str, optional
-        The format of the file to import the eigenvalues from. Defaults to '.bin'.
+        The format of the file to import the eigenvalues from. 
+        Defaults to '.bin'.
     binarize : bool, optional
-        If True, the eigenvalues will be binarized before being stored. Defaults to True.
+        If True, the eigenvalues will be binarized before being stored. 
+        Defaults to True.
                 
     Raises
     ------
@@ -105,4 +112,55 @@ def load_eigV_all(
     )
     if reshape:
         self.eigV = self.eigV.reshape(-1, self.N)
+#
+def set_edgel_from_bin(
+        self, 
+        file_path, 
+        mode='numpy', 
+        on_g: str = SG_REPR
+):
+    """
+    Load edge list from binary file and add to graph.
+    
+    Parameters
+    ----------
+    file_path : str or Path
+        Path to the binary file containing edge data.
+    mode : str, default 'numpy'
+        Loading mode: 'numpy' or 'struct'.
+    on_g : str, default SG_REPR
+        Graph representation to update.
+        
+    Notes
+    -----
+    The 'numpy' mode expects a structured array with fields 'i', 'j', 
+    and 'w_ij'.
+    The 'struct' mode reads raw binary data (uint64, uint64, float64).
+    """
+    match mode:
+        case 'numpy':
+            dtype = np.dtype([
+                ('i', np.uint64), 
+                ('j', np.uint64), 
+                ('w_ij', np.float64)
+            ])
+            edge_array = np.fromfile(file_path, dtype=dtype)
+            edges = [
+                (int(edge['i']), int(edge['j']), float(edge['w_ij'])) 
+                for edge in edge_array
+            ]
+        case 'struct':
+            edges = []
+            with open(file_path, "rb") as f:
+                # 2 * uint64 (8 bytes each) + 1 * float64 (8 bytes)
+                # = 24 bytes total
+                while chunk := f.read(24):
+                    i, j, w_ij = struct.unpack("QQd", chunk)
+                    edges.append((i, j, w_ij))
+        case _:
+            raise ValueError("Invalid mode. Choose 'numpy' or 'struct'.")
+    self.gr[on_g].add_weighted_edges_from(edges)
+    self.upd_edge_sets(on_g)
+    self.upd_GraphRepr_All(on_g)
+    self.upd_graph_matrices(on_g)
 #

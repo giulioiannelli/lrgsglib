@@ -57,7 +57,7 @@ class SignedLaplacianAnalysis:
             self.__initSpectrum__()
     #
     def __initSpectrum__(self):
-        self.sg.compute_k_eigvV(with_routine="numpy")
+        self.sg.compute_k_eigvV(backend="numpy")
     #
     def computeS(self) -> None:
         w =  self.sg.eigv
@@ -683,8 +683,6 @@ class SignedLaplacianAnalysis:
 #     return I_i
 
 
-def ising_spinglass_pmJ_2D_Tcrit(L):
-    return L ** (-1.0 / 2)
 
 
 
@@ -716,30 +714,4 @@ def flip_random_fract_edges(G: Graph, p: float):
     #
     nx.set_edge_attributes(G, values=1, name="weight")
     nx.set_edge_attributes(G, values=neg_weights, name="weight")
-
-
-def eigV_for_lattice2D(side, mode='scipy', howmany=1, **kwargs) -> NDArray:
-    l = Lattice2D(side, **kwargs)
-    l.flip_random_fract_edges()
-    l.compute_k_eigvV(with_routine=mode, k=howmany)
-    return l.eigV
-
-def adjust_eigV_for_lattice2D(leigV: NDArray) -> NDArray:
-    for i,leV in enumerate(leigV):
-        leigV[i] = flip_to_positive_majority(leV)
-    return leigV
-
-def eigV_for_lattice2D_ptch(**kwargs) -> NDArray:
-    return adjust_eigV_for_lattice2D(eigV_for_lattice2D(**kwargs))
-
-def eigv_for_lattice2D(side, mode: str = "full", **kwargs) -> NDArray:
-    l = Lattice2D(side, **kwargs)
-    l.flip_random_fract_edges()
-    match mode:
-        case "full":
-            l.compute_laplacian_spectrum_weigV()
-        case _ if mode.startswith("some"):
-            k = int(mode.split("_")[-1])
-            l.compute_k_eigvV(k=k)
-    return l.eigv
 

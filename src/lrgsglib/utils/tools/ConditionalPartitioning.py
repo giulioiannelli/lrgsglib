@@ -1,6 +1,8 @@
-from ...shared import *
+from typing import Any, Callable, Union
+import operator
+from numbers import Number
 
-
+__all__ = ["ConditionalPartitioning"]
 
 class ConditionalPartitioning:
     def __init__(self, condition: Union[Callable[[Any], bool], str, Any]):

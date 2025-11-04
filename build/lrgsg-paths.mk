@@ -1,5 +1,7 @@
 # project root
 LRGSG_ROOT := $(shell pwd)
+# default library base directory (overridable via `make LRGSG_LLIB=/custom/path`)
+LRGSG_LLIB ?= $(LRGSG_ROOT)
 # define every LRGSG_<NAME> := $(LRGSG_<PARENT>)/<dirname> 
 LRGSG_PATHS := \
 	BUILD:build:ROOT \
@@ -42,6 +44,7 @@ LIST := $(foreach P,$(LRGSG_PATHS),$(word 1,$(subst :, ,$(P))))
 echo-paths: $(ALL_PATHS)
 	@echo "LRGSG_ROOT = $(LRGSG_ROOT)"
 	@$(foreach V,$(LIST),echo LRGSG_$(V) = $(LRGSG_$(V));)
+	@echo "LRGSG_LLIB = $(LRGSG_LLIB)"
 #
 LRGSG_OBJ_DIRS := $(LRGSG_GT_PATCHES_CPP) \
            $(LRGSG_SRW_LATT) \
