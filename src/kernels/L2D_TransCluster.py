@@ -190,7 +190,7 @@ def run_ordparam_mode(
             geo=args.geometry,
             with_positions=True,
             init_nw_dict=True,
-            sgpathn=args.outdir,
+            sgpathn=args.workdir,
         )
         lattice.flip_sel_edges(geometry_func(lattice))
         lattice.compute_k_eigvV(typf=typf)
@@ -280,7 +280,7 @@ def run_transcluster(args) -> None:
     ext = resolve_mode_extension(args.mode)
     geometry_func = get_geometry_func(args.cell_type)
 
-    test_lattice = Lattice2D(args.L, pflip=args.p, geo=args.geometry, sgpathn=args.outdir)
+    test_lattice = Lattice2D(args.L, pflip=args.p, geo=args.geometry, sgpathn=args.workdir)
     base_path = {
         "pCluster": test_lattice.path_lrgsg,
         "ordParam": test_lattice.path_phtra.name,

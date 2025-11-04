@@ -5,8 +5,8 @@ from .Lattice2D import *
 
 L2D_TransCluster_progName = 'L2D_TransCluster'
 L2D_TransCluster_progNameShrt = 'L2DTC'
-L2D_TransCluster_description = """
-    Transient cluster analysis utilities for 2D signed lattices: {L2D_TransCluster_progName}.py
+L2D_TransCluster_description = f"""
+    Transition and cluster analysis utilities for 2D signed lattices: {L2D_TransCluster_progName}.py
 """
 
 L2D_TransCluster_args = {**L2D_args}
