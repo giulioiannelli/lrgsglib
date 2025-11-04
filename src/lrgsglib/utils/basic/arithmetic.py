@@ -150,7 +150,9 @@ def flip_to_positive_majority(arr):
         arr = arr * -1
     return arr
 
-def flip_to_positive_majority_adapted(arr: NDArray) -> NDArray:
+def flip_to_positive_majority_adapted(
+    arr: NDArray, axis: Optional[int] = None
+) -> NDArray:
     """
     Flips the elements of an array to ensure a majority of positive components.
     
@@ -168,6 +170,10 @@ def flip_to_positive_majority_adapted(arr: NDArray) -> NDArray:
         The input array containing numerical data. This array can be a list, 
         tuple, or any array-like object convertible to a NumPy array. The 
         function is optimized for NumPy arrays for performance reasons.
+    axis : int, optional
+        Axis along which to count positive/negative values and apply flipping.
+        If None (default), operates on the flattened array (1D behavior).
+        For 2D arrays: axis=0 flips along columns, axis=1 flips along rows.
 
     Returns:
     --------
@@ -187,12 +193,26 @@ def flip_to_positive_majority_adapted(arr: NDArray) -> NDArray:
     >>> arr = np.array([-1, 2, 3])
     >>> flip_to_positive_majority_adapted(arr)
     array([-1, 2, 3])
+    
+    >>> arr = np.array([[1, -2, -3], [-4, -5, 6]])
+    >>> flip_to_positive_majority_adapted(arr, axis=1)
+    array([[-1,  2,  3], [ 4,  5, -6]])
     """
-    num_negatives = np.sum(arr < 0)
-    num_positives = np.sum(arr > 0)
-
-    if num_negatives > num_positives:
-        arr = arr * -1
+    if axis is None:
+        # Original behavior: operate on flattened array
+        num_negatives = np.sum(arr < 0)
+        num_positives = np.sum(arr > 0)
+        if num_negatives > num_positives:
+            arr = arr * -1
+    else:
+        # Count along specified axis
+        num_negatives = np.sum(arr < 0, axis=axis, keepdims=True)
+        num_positives = np.sum(arr > 0, axis=axis, keepdims=True)
+        # Create mask for rows/columns that need flipping
+        flip_mask = num_negatives > num_positives
+        # Apply flipping only to rows/columns where negatives dominate
+        arr = np.where(flip_mask, -arr, arr)
+    
     return arr
 
 def is_in_range(number, range_start, range_end):

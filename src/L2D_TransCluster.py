@@ -24,10 +24,8 @@ match typf:
 #
 match mode:
     case 'pCluster':
-        
         extout = PKL
     case 'ordParam':
-
         extout = TXT
     case _:
         raise ValueError("Invalid mode specified")
@@ -128,56 +126,12 @@ match mode:
             avg1 += 1
             neglinks += l.Ne_n
             #
-            # Pinf.append(l.Pinf)
-            # Pinf_var.append(l.Pinf_var)
-            # l.make_clustersYN("eigV0", +1)
-            # # print(l.clustersY)
-            # # print(list(map(len, l.clustersY)))
-            # nodelist_clust = list(sorted(map(len, l.clustersY), reverse=True))
-            #
             l.load_eigV_on_graph(binarize=True)
             l.make_clustersYN("eigV0", +1)
             if len(l.clustersY) > 1:
                 smax2 = len(max(l.clustersY, key=len)) / (1.0 * l.N)
             else:
                 smax2 = 1.0
-            # largest_component_subG = max(nx.connected_components(subG), key=len)
-            # largest_component_clustersY = max(l.clustersY, key=len)
-            # if set(largest_component_subG) != set(largest_component_clustersY) or avg == 1:
-            #     print("Discrepancy found!")
-            #     print(smax, smax2)
-            #     print("pablo:", sorted(list(largest_component_subG)))
-            #     print("giulio:", sorted(list(largest_component_clustersY)))
-            #     plt.figure(figsize=(18, 5))
-            #     # Plot 1: Network with labels and eigenstate overlay
-            #     plt.subplot(1, 4, 1)
-            #     node_colors = [l.G.nodes[node].get("eigV0", 0) for node in l.G.nodes]  # Use eigV0 attribute if it exists, otherwise 0
-            #     nx.draw(l.G, pos=l.get_node_attributes(), node_color=node_colors, cmap=plt.cm.viridis, with_labels=True)
-            #     plt.title("Network with Node Labels and Eigenstate Overlay")
-
-            #     # Plot 2: Network colored with attribute `eigV0` of each node
-            #     plt.subplot(1, 4, 2)
-            #     giant_component_nodes = set(largest_component_clustersY)  # The largest connected component from `giulio`
-            #     node_colors_giant = ["red" if node in giant_component_nodes else "blue" for node in l.G.nodes]
-            #     nx.draw(l.G, pos=l.get_node_attributes(), node_color=node_colors_giant, cmap=plt.cm.viridis, with_labels=False)
-            #     plt.title("Network Colored by Attribute `eigV0`")
-
-            #     # Plot 3: Network with subgraph colored differently
-            #     plt.subplot(1, 4, 3)
-            #     subG = l.get_subgraph_from_nodes(largest_component_subG)  # Assuming this extracts the required subgraph
-            #     subgraph_nodes = set(subG.nodes())
-            #     full_node_colors = ["red" if node in subgraph_nodes else "blue" for node in l.G.nodes]
-            #     nx.draw(l.G, pos=l.get_node_attributes(), node_color=full_node_colors, with_labels=False)
-            #     plt.title("Network with Subgraph in Red and Rest in Blue")
-
-            #     # Plot 2: Network colored with attribute `eigV0` of each node
-            #     plt.subplot(1, 4, 4)
-
-            #     nx.draw(l.G, pos=l.get_node_attributes(), node_color=list(l.get_node_attributes('eigV0').values()), cmap=plt.cm.viridis, with_labels=False)
-            #     plt.title("Network Colored by Attribute `eigV0`")
-
-            #     plt.tight_layout()
-            #     plt.show()
             #             #
             Pinf.append(smax2)
             Pinf_var.append(smax2)

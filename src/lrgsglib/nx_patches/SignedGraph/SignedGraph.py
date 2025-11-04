@@ -778,6 +778,7 @@ class SignedGraph:
     from ._ongraph import unflip_all
     from ._ongraph import set_edges_random_normal
     from ._ongraph import load_vec_on_nodes
+    from ._ongraph import load_eigV_on_graph
     from ._ongraph import set_node_attributes
     #
     # graph representations (imported from ._representations)
@@ -817,7 +818,6 @@ class SignedGraph:
     from ._spectral import get_eigV_bin_check
     from ._spectral import get_eigV_bin_check_list
     from ._spectral import get_sgspect_basis
-    from ._spectral import load_eigV_on_graph
     from ._spectral import compute_laplacian_spectrum
     from ._spectral import compute_laplacian_spectrum_weigV
     from ._spectral import compute_k_eigvV

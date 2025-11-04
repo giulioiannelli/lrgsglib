@@ -1,9 +1,14 @@
 from typing import Any
-from lrgsglib import Lattice2D, load_or_compute_Lattice2D
+from numpy.typing import NDArray
+from lrgsglib import Lattice2D, load_or_compute_Lattice2D, flip_to_positive_majority
 
 __all__ = [
     "initialize_l2d_dict_args",
-    "prepare_lattice"
+    "prepare_lattice",
+    "eigV_for_lattice2D",
+    "adjust_eigV_for_lattice2D",
+    "eigV_for_lattice2D_ptch",
+    "eigv_for_lattice2D",
 ]
 
 def initialize_l2d_dict_args(args: Any) -> dict:
@@ -52,4 +57,32 @@ def prepare_lattice(args: Any, **kwargs) -> Any:
         **kwargs
     )
     return lattice
+
+
+
+
+def eigV_for_lattice2D(side, mode='scipy', howmany=1, **kwargs) -> NDArray:
+    l = Lattice2D(side, **kwargs)
+    l.flip_random_fract_edges()
+    l.compute_k_eigvV(backend=mode, k=howmany)
+    return l.eigV
+
+def adjust_eigV_for_lattice2D(leigV: NDArray) -> NDArray:
+    for i,leV in enumerate(leigV):
+        leigV[i] = flip_to_positive_majority(leV)
+    return leigV
+
+def eigV_for_lattice2D_ptch(**kwargs) -> NDArray:
+    return adjust_eigV_for_lattice2D(eigV_for_lattice2D(**kwargs))
+
+def eigv_for_lattice2D(side, mode: str = "full", **kwargs) -> NDArray:
+    l = Lattice2D(side, **kwargs)
+    l.flip_random_fract_edges()
+    match mode:
+        case "full":
+            l.compute_laplacian_spectrum_weigV()
+        case _ if mode.startswith("some"):
+            k = int(mode.split("_")[-1])
+            l.compute_k_eigvV(k=k)
+    return l.eigv
 

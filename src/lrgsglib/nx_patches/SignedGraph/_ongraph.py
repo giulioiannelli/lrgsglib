@@ -91,6 +91,26 @@ def load_vec_on_nodes(
     nx.set_node_attributes(self.gr[on_g], values=vecNodeAttr, name=attr)
 
 
+def load_eigV_on_graph(
+        self: "SignedGraph",
+        which: int = 0,
+        on_g: str = SG_REPR,
+        binarize: bool = False
+):
+    from . import _spectral
+
+    if binarize:
+        eigV = _spectral.get_eigV_bin_check(self, which=which)
+    else:
+        try:
+            eigV = self.eigV[which]
+        except (IndexError, AttributeError):
+            _spectral.compute_k_eigvV(self, k=which + 1)
+            eigV = self.eigV[which]
+
+    load_vec_on_nodes(self, eigV, f"eigV{which}", on_g)
+
+
 def set_node_attributes(
         self: "SignedGraph",
         values: Any, 
