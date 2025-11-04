@@ -13,6 +13,7 @@ import pickle as pk
 
 from networkx import Graph
 from typing import Any, Union, List, Dict, Tuple, Optional
+from numbers import Number
 from matplotlib.pyplot import get_cmap
 from numpy.typing import NDArray
 from scipy.sparse import spdiags
@@ -897,7 +898,7 @@ class SignedGraph:
     #
     #
     def compute_pinf(self, which: int = 0, 
-                     val: ConditionalPartitioning = None,
+                     val: Union[ConditionalPartitioning, Number, None] = None,
                      on_g: str = SG_REPR):
         """
         Compute the infinite cluster probability for a given eigenvector.
@@ -906,9 +907,9 @@ class SignedGraph:
         ----------
         which : int, default 0
             Index of the eigenvector to analyze.
-        val : ConditionalPartitioning, optional
-            Conditional partitioning object for clustering. 
-            If None, defaults to +1.
+        val : Union[ConditionalPartitioning, Number, None], optional
+            Conditional partitioning object for clustering, or a number (which will be
+            automatically converted to ConditionalPartitioning). If None, defaults to +1.
         on_g : str, default SG_REPR
             Graph representation to use.
         """

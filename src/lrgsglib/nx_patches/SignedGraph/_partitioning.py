@@ -1,13 +1,14 @@
 import logging
 import warnings
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Union
+from numbers import Number
 
 import numpy as np
 import networkx as nx
 
 from ...config.const import SG_REPR, SG_WARNMSG_NOCLUST
 from ...config.errwar import NoClustError, SignedGraphWarning
-from ...utils.tools import ConditionalPartitioning
+from ...utils.tools import ConditionalPartitioning, _normalize_conditional_partitioning
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def get_eigV_cluster_sizes(
         self: "SignedGraph",
         which: int = 0, 
         binarize: bool = True, 
-        val: ConditionalPartitioning = None,
+        val: Union[ConditionalPartitioning, Number, None] = None,
         on_g: str = SG_REPR, 
         backend: str = 'nx'
 ):
@@ -73,9 +74,9 @@ def get_eigV_cluster_sizes(
         Index of the eigenvector to analyze.
     binarize : bool, default True
         Whether to binarize the eigenvector values.
-    val : ConditionalPartitioning, optional
-        Conditional partitioning object for clustering. 
-        Defaults to +1.
+    val : Union[ConditionalPartitioning, Number, None], optional
+        Conditional partitioning object for clustering, or a number (which will be
+        automatically converted to ConditionalPartitioning). Defaults to +1.
     on_g : str, default SG_REPR
         Graph representation to use.
     backend : str, default 'nx'
@@ -94,12 +95,12 @@ def get_eigV_cluster_sizes(
     if not node_has_attr:
         self.load_eigV_on_graph(which, on_g, binarize)
     
+    # Normalize val to ConditionalPartitioning
+    val = _normalize_conditional_partitioning(val)
+    
     # Default to +1 if val not provided
     if val is None:
-        val = ConditionalPartitioning(
-            key="+1", 
-            cond_func=lambda x: x == +1
-        )
+        val = ConditionalPartitioning(1)
     
     if not hasattr(self, "clustersY"):
         make_clustersYN(self, f"eigV{which}", val, on_g, backend)
@@ -112,7 +113,7 @@ def get_cluster_distribution(
         which: int = 0, 
         on_g: str = SG_REPR,
         binarize: bool = True,
-        val: ConditionalPartitioning = None
+        val: Union[ConditionalPartitioning, Number, None] = None
 ):
     """
     Get distribution of cluster sizes for a given eigenvector.
@@ -125,15 +126,18 @@ def get_cluster_distribution(
         Graph representation to use.
     binarize : bool, default True
         Whether to binarize the eigenvector values.
-    val : ConditionalPartitioning, optional
-        Conditional partitioning object for clustering. If None, defaults 
-        to +1.
+    val : Union[ConditionalPartitioning, Number, None], optional
+        Conditional partitioning object for clustering, or a number (which will be
+        automatically converted to ConditionalPartitioning). If None, defaults to +1.
         
     Returns
     -------
     dict
         Dictionary mapping cluster sizes to their frequency.
     """
+    # Normalize val to ConditionalPartitioning (handled in get_eigV_cluster_sizes)
+    val = _normalize_conditional_partitioning(val)
+    
     cl_len = get_eigV_cluster_sizes(
         self, which, binarize, val, on_g
     )
@@ -163,9 +167,12 @@ def get_ferroAntiferro_regions(
 def make_graphYN(
     self: "SignedGraph",
     k,
-    val: ConditionalPartitioning,
+    val: Union[ConditionalPartitioning, Number],
     on_g: str = SG_REPR
 ):
+    # Normalize val to ConditionalPartitioning
+    val = _normalize_conditional_partitioning(val)
+    
     subgraph_result = self.get_nodes_subgraph_by_kv(k, val.cond_func, on_g)
     self.graph_clustering_utility[k][val.key][on_g] = subgraph_result
 
@@ -173,11 +180,14 @@ def make_graphYN(
 def make_clustersYN(
     self: "SignedGraph",
     k,
-    val: ConditionalPartitioning,
+    val: Union[ConditionalPartitioning, Number],
     on_g: str = SG_REPR,
     backend: str = 'nx',
 ):
     """Populate Y/N clusters, optionally using SciPy or CuPy connected components."""
+    # Normalize val to ConditionalPartitioning
+    val = _normalize_conditional_partitioning(val)
+    
     try:
         graphY, graphN = self.graph_clustering_utility[k][val.key][on_g]
     except Exception as e:
@@ -250,12 +260,15 @@ def make_clustersYN(
 
 def make_eigVclustersYN(
     self: "SignedGraph",
-    val: ConditionalPartitioning,
+    val: Union[ConditionalPartitioning, Number],
     which: int = 0,
     on_g: str = SG_REPR,
     binarize: bool = True,
     backend: str = 'nx',
 ):
+    # Normalize val to ConditionalPartitioning
+    val = _normalize_conditional_partitioning(val)
+    
     self.load_eigV_on_graph(which, on_g, binarize)
     make_clustersYN(self, f'eigV{which}', val, on_g, backend=backend)
 
