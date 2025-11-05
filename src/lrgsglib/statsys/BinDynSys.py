@@ -1,6 +1,7 @@
 import random
 import time
 import os
+from pathlib import Path
 
 import numpy as np
 
@@ -40,13 +41,15 @@ class BinDynSys:
         self.rndStr = rndStr
         self.run_id = join_non_empty(
             '_',
-            id_string, 
+            id_string,
             self.rand_str if rndStr else ''
         )
         self.out_suffix = out_suffix
         self.pflip_id = peq_fstr(self.sg.pflip)
         self.field =  field if field is not None else ZERO_FIELD(self.N)
         self.simtime = simpref * self.N
+        base_dynpath = getattr(self.sg, "path_ising", getattr(self.sg, "path_data", Path.cwd()))
+        self.dynpath = Path(base_dynpath)
     
     @property
     def N(self) -> int:
@@ -132,10 +135,10 @@ class BinDynSys:
         raise NotImplementedError("Subclasses must implement this method")
     #
     def export_s_init(self):
-        self.sfout = self.sg.path_ising / self.sg.get_p_fname('s', self.run_id)
+        self.sfout = self.dynpath / self.sg.get_p_fname('s', self.run_id)
         self.s.astype('int8').tofile(open(self.sfout, 'wb'))
         self.s_0 = self.s.copy()
     #
     def export_hfield(self):
-        self.hfout =  self.sg.path_ising /  self.sg.get_p_fname('h', self.run_id)
+        self.hfout =  self.dynpath /  self.sg.get_p_fname('h', self.run_id)
         self.field.astype('float64').tofile(open(self.hfout, 'wb'))
