@@ -9,6 +9,28 @@ if TYPE_CHECKING:
     from .SignedGraph import SignedGraph
 
 
+
+
+def get_adjacency_matrix_for(self, on_g: str = SG_REPR):
+    """Get the adjacency matrix for a specific graph representation."""
+    return self.adjacency_matrices.get(on_g)
+
+def get_degree_matrix_for(self, on_g: str = SG_REPR):
+    """Get the degree matrix for a specific graph representation."""
+    return self.degree_matrices.get(on_g)
+
+def get_laplacian_matrix_for(self, on_g: str = SG_REPR):
+    """Get the Laplacian matrix for a specific graph representation."""
+    return self.laplacian_matrices.get(on_g)
+
+def get_signed_degree_matrix_for(self, on_g: str = SG_REPR):
+    """Get the signed degree matrix for a specific graph representation."""
+    return self.signed_degree_matrices.get(on_g)
+
+def get_signed_laplacian_matrix_for(self, on_g: str = SG_REPR):
+    """Get the signed Laplacian matrix for a specific graph representation."""
+    return self.signed_laplacian_matrices.get(on_g)
+
 def get_laplacian(self: "SignedGraph"):
     return self.degm - self.adj
 

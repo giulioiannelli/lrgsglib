@@ -12,12 +12,12 @@ def upd_graph_matrices(
     format: str = 'csr',
     on_g: str = SG_REPR
 ):
-    self.adjacency_matrix = self.get_adjacency_matrix(on_g=on_g)
-
-    self.degree_matrix = self.get_degree_matrix()
-    self.signed_degree_matrix = self.get_abs_degree_matrix()
-    self.laplacian_matrix = self.get_laplacian()
-    self.signed_laplacian_matrix = self.get_signed_laplacian()
+    # Store matrices in dictionaries keyed by graph representation
+    self.adjacency_matrices[on_g] = self.get_adjacency_matrix(on_g=on_g)
+    self.degree_matrices[on_g] = self.get_degree_matrix()
+    self.signed_degree_matrices[on_g] = self.get_abs_degree_matrix()
+    self.laplacian_matrices[on_g] = self.get_laplacian()
+    self.signed_laplacian_matrices[on_g] = self.get_signed_laplacian()
     self.upd_Degree(on_g)
 
 
