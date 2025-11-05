@@ -785,7 +785,8 @@ class SignedGraph:
     #
     from ._exports import __export_graph__
     from ._exports import _export_edgel_bin
-    from ._exports import _export_eigV 
+    from ._exports import export_adj_bin
+    from ._exports import _export_eigV
     from ._exports import export_eigV_all
     from ._exports import export_ising_clust
     #
@@ -882,6 +883,7 @@ class SignedGraph:
     #
     from ._cleaners import remove_ising_clust_files
     from ._cleaners import remove_edgl_file
+    from ._cleaners import remove_adj_file
     from ._cleaners import remove_eigV_file
     from ._cleaners import remove_exported_files
     from ._cleaners import clean_gclutil

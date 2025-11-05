@@ -15,9 +15,14 @@ def remove_edgl_file(self: "SignedGraph"):
 def remove_eigV_file(self: "SignedGraph"):
     os.remove(self.eigVPname)
 
+def remove_adj_file(self: "SignedGraph"):
+    os.remove(self.path_exp_adj)
+
 def remove_exported_files(self: "SignedGraph"):
     if hasattr(self, "path_exp_edgl"):
         self.remove_edgl_file()
+    if hasattr(self, "path_exp_adj"):
+        self.remove_adj_file()
     if hasattr(self, "eigVPname"):
         self.remove_eigV_file()
     if hasattr(self, "clPname"):

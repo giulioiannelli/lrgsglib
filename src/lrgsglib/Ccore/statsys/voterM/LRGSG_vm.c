@@ -8,10 +8,15 @@
  * 
  * @return
  */
-void voter_model_1step(size_t nd, spin_tp s, size_tp nlen, size_tp *neighs, double_p *edgl) {
-    size_t sel_neigh_n = (size_t) (RNG_u64() % *(nlen + nd));
-    size_t sel_neigh = *(*(neighs + nd) + sel_neigh_n);
-    *(s + nd) = *(*(edgl + nd) + sel_neigh_n) * *(s + sel_neigh);
+void voter_model_1step(size_t nd, spin_tp s, size_tp nlen, NodesEdges node_edges) {
+    size_t degree = *(nlen + nd);
+    if (!degree)
+        return;
+    size_t sel = (size_t)(RNG_u64() % degree);
+    size_t neighbour = node_edges[nd].neighbors[sel];
+    double weight = node_edges[nd].weights[sel];
+    int sign = (weight < 0.0) ? -1 : 1;
+    *(s + nd) = (int8_t)(sign * *(s + neighbour));
 }
 
 /** 
@@ -21,7 +26,7 @@ void voter_model_1step(size_t nd, spin_tp s, size_tp nlen, size_tp *neighs, doub
  * 
  * @return
  */
-void voter_model_Nstep(size_t N, spin_tp s, size_tp nlen, size_tp *neighs, double_p *edgl) {
-    for (size_t i = 0; i < N; i++) 
-        voter_model_1step((size_t) (RNG_u64() % N), s, nlen, neighs, edgl);
+void voter_model_Nstep(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges) {
+    for (size_t i = 0; i < N; i++)
+        voter_model_1step((size_t)(RNG_u64() % N), s, nlen, node_edges);
 }
