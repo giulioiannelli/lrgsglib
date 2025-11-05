@@ -20,7 +20,6 @@ from kernels.SCS_TransCluster import run_transcluster
 #   Main Program Logic
 # ##############################################################################
 
-
 def main() -> None:
     """Parse CLI arguments and dispatch the transient cluster computation."""
     args = parse_arguments(parser)

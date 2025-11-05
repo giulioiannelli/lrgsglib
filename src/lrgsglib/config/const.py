@@ -95,8 +95,15 @@ WS_PHTABB = "ws"
 WS_ONREP = 'G'
 WS_STDFN = ""
 WS_SGPATH = ""
-#
+# fully connected default values
 FC_N = 100
+FC_PHTABB = "fc"
+FC_STDFN = ""
+FC_SGPATH = ""
+# scs generalized nn default values  
+SCS_PHTABB = "scs_nn"
+SCS_STDFN = ""
+SCS_SGPATH = ""
 # erdos renyi default values
 ER_PHTABB = "er"
 ER_ONREP = 'G'
