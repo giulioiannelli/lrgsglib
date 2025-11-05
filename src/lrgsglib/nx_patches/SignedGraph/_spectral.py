@@ -114,7 +114,7 @@ def compute_k_eigvV(
     """
     if (backend in ['numpy', 'cupy']) or k > self.N // 2:
         compute_laplacian_spectrum_weigV(
-            self, typf, transpose, backend, flip_to_pos
+            self, backend, transpose, flip_to_pos, typf
         )
     elif backend.startswith('scipy'):
         mode = backend.split('_')
