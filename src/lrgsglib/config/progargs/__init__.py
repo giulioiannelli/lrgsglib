@@ -7,4 +7,4 @@ from .IsingDynamics import *
 from .SlaplSpect import *
 from .Recon import *
 from .TransCluster import *
-from .SCSGeneralized import *
+from .SCSNN import *

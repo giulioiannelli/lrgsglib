@@ -1,6 +1,6 @@
 from .common import *
-from .phelp.SCSGeneralized import *
-from .defs.SCSGeneralized import *
+from .phelp.SCSNN import *
+from .defs.SCSNN import *
 
 SCSGeneralized_args = {
     'N': {
@@ -17,22 +17,22 @@ SCSGeneralized_optional_args_dict = {
     tuple(['--J']): {
         'help': phelp_scs_J,
         'type': float,
-        'default': DEFAULT_SCS_GENERALIZED_J,
+        'default': DEFAULT_SCS_NN_J,
     },
     tuple(['--g']): {
         'help': phelp_scs_g,
         'type': float,
-        'default': DEFAULT_SCS_GENERALIZED_G,
+        'default': DEFAULT_SCS_NN_G,
     },
     tuple(['--diagonal']): {
         'help': phelp_scs_diagonal,
         'type': str,
-        'default': DEFAULT_SCS_GENERALIZED_DIAGONAL,
+        'default': DEFAULT_SCS_NN_DIAGONAL,
     },
     tuple(['-wd', '--workdir']): {
         'help': phelp_scs_workdir,
         'type': str,
-        'default': DEFAULT_SCS_GENERALIZED_WORKDIR,
+        'default': DEFAULT_SCS_NN_WORKDIR,
     },
     tuple(['--seed']): {
         'help': phelp_scs_seed,

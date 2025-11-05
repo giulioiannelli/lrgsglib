@@ -12,14 +12,12 @@
 """Entry-point for the generalized SCS transient cluster analysis program."""
 
 from parsers.SCS_TransCluster import *  # noqa: F401,F403
-from parsers.shared import parse_arguments
 from kernels.SCS_TransCluster import run_transcluster
 
 
 # ##############################################################################
 #   Main Program Logic
 # ##############################################################################
-
 
 def main() -> None:
     """Parse CLI arguments and dispatch the transient cluster computation."""

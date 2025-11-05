@@ -11,6 +11,8 @@ class FullyConnected(SignedGraph):
     def __init__(
         self, 
         N: int = FC_N,
+        sgpathn: str = FC_SGPATH,
+        stdFnameSFFX: str = FC_STDFN,
         with_positions: bool = False,
         mode_positions: Union[str, Callable] = "circular",
         anigemb: str = "sle",
@@ -18,18 +20,23 @@ class FullyConnected(SignedGraph):
         **kwargs,
     ) -> None:
         self._N = N
+        self.sgpathn = FC_PHTABB if not sgpathn else sgpathn
         self.with_positions = with_positions
         self.mode_positions = mode_positions
         self.only_const_mode = only_const_mode
         self.syshape = N
         self.syshapePth = f"N={N}"
-        self.std_fname = f"fc"
+        self.__init_stdFname__(stdFnameSFFX)
         if not only_const_mode:
             self.__init_fullyconnected__()
         else:
             self.G = nx.Graph()
         super(FullyConnected, self).__init__(self.G, **kwargs)
         self.animation_graph_embedding = anigemb
+    
+    #
+    def __init_stdFname__(self, SFFX: str = "") -> None:
+        self.std_fname = FC_PHTABB + SFFX
 
     #
     def __init_fullyconnected__(self) -> None:

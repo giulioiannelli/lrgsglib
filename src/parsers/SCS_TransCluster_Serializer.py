@@ -7,7 +7,7 @@ from lrgsglib.config.progargs import *
 
 DEFAULT_SCS_TC_SERIALISER_N_LIST: Sequence[int] = (500,)
 DEFAULT_SCS_TC_SERIALISER_GAMMA_LIST: Sequence[float] = (1.0,)
-DEFAULT_SCS_TC_SERIALISER_J0_LIST: Sequence[float] = (DEFAULT_SCS_GENERALIZED_J0,)
+DEFAULT_SCS_TC_SERIALISER_J0_LIST: Sequence[float] = (DEFAULT_SCS_NN_J0,)
 
 _description = f"""
     Serialiser for {SCS_TransCluster_progName}.py
@@ -38,22 +38,22 @@ _scalar_args = {
     ("--J",): {
         "help": phelp_scs_J,
         "type": float,
-        "default": DEFAULT_SCS_GENERALIZED_J,
+        "default": DEFAULT_SCS_NN_J,
     },
     ("--g",): {
         "help": phelp_scs_g,
         "type": float,
-        "default": DEFAULT_SCS_GENERALIZED_G,
+        "default": DEFAULT_SCS_NN_G,
     },
     ("--diagonal",): {
         "help": phelp_scs_diagonal,
         "type": str,
-        "default": DEFAULT_SCS_GENERALIZED_DIAGONAL,
+        "default": DEFAULT_SCS_NN_DIAGONAL,
     },
     ("-wd", "--workdir"): {
         "help": phelp_scs_workdir,
         "type": str,
-        "default": DEFAULT_SCS_GENERALIZED_WORKDIR,
+        "default": DEFAULT_SCS_NN_WORKDIR,
     },
     ("-na", "--number_of_averages"): {
         "help": phelp_navg,

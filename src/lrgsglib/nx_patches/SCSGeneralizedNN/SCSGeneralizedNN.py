@@ -24,6 +24,8 @@ class SCSGeneralizedNN(FullyConnected):
         J: float = 1.0,
         g: float = 1.0,
         diagonal=None,
+        sgpathn: str = None,
+        stdFnameSFFX: str = None,
         only_const_mode: bool = False,
         **kwargs,
     ):
@@ -38,7 +40,22 @@ class SCSGeneralizedNN(FullyConnected):
         seed = kwargs.get('seed', None)
         self._rng = np.random.default_rng(seed)
         
-        super().__init__(N=N, only_const_mode=only_const_mode, **kwargs)
+        # Set sgpathn before calling parent __init__
+        # Use parent's FC_SGPATH if sgpathn not provided, or SCS-specific path
+        from ...config.const import SCS_SGPATH, SCS_PHTABB, FC_SGPATH
+        if sgpathn is None:
+            sgpathn = SCS_SGPATH if SCS_SGPATH else FC_SGPATH
+        
+        # Store sgpathn before parent init, but don't pass it (parent will set it)
+        _sgpathn = SCS_PHTABB if not sgpathn else sgpathn
+        
+        super().__init__(
+            N=N, 
+            sgpathn=_sgpathn,
+            stdFnameSFFX=stdFnameSFFX if stdFnameSFFX is not None else "",
+            only_const_mode=only_const_mode, 
+            **kwargs
+        )
         base_fname = f"scs_nn_N={self._N}_gamma={self.gamma:.3f}"
         suffix = getattr(self, "peq_str", "")
         self.std_fname = f"{base_fname}_{suffix}" if suffix else base_fname
