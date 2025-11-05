@@ -54,7 +54,7 @@ SCS_TransCluster_optional_args_dict = {
     tuple(['--J0']): {
         'help': phelp_scs_j0,
         'type': float,
-        'default': DEFAULT_SCS_GENERALIZED_J0,
+        'default': DEFAULT_SCS_NN_J0,
     },
     tuple(['-na', '--number_of_averages']): {
         'help': phelp_navg,
