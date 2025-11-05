@@ -30,13 +30,17 @@ class VoterModel(BinDynSys):
         eqSTEP: int = 20,
         save_magnetization: bool = False,
         upd_mode: str = "asynchronous",
+        freq: int = 10,
+        nSampleLog: int = 100,
         **kwargs: Any,
     ) -> None:
-        super().__init__(sg, **kwargs)
+        dynpath = getattr(sg, 'path_voter', None)
+        super().__init__(sg, dynpath=dynpath, **kwargs)
         self.eqSTEP = int(eqSTEP)
         self.save_magnetization = save_magnetization
         self.upd_mode = upd_mode
-        self.dynpath = Path(getattr(self.sg, "path_voter", self.dynpath))
+        self.freq = freq
+        self.nSampleLog = nSampleLog
         self.reset_observables()
         self.sini: np.ndarray | None = None
         self.stderr_path: Path | None = None
@@ -112,7 +116,7 @@ class VoterModel(BinDynSys):
     # C backend integration
     # ------------------------------------------------------------------
     def build_cprogram_command(self) -> None:
-        self.CbaseName = "voter_model"
+        self.CbaseName = f"VoterSimulator{self.runlang[-1]}"
         try:
             datdir = self.sg.path_sgdata.relative_to(Path.cwd())
         except ValueError:
@@ -120,8 +124,9 @@ class VoterModel(BinDynSys):
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
         self.out_id = self.out_suffix
         self.magn_path = self.dynpath / self.sg.get_p_fname('m', self.out_id)
-        self.cprogram = [
-            LRGSG_CCORE_BIN / self.CbaseName,
+        
+        # Base arguments common to all simulators
+        arglist = [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
             f"{self.eqSTEP}",
@@ -130,11 +135,17 @@ class VoterModel(BinDynSys):
             self.run_id,
             self.out_id,
         ]
+        
+        # Add extra arguments for VoterSimulator1 and above
+        if self.runlang[-1] != "0":
+            arglist.append(f"{self.nSampleLog}")
+        
+        self.cprogram = [LRGSG_CCORE_BIN / self.CbaseName] + arglist
 
     def setup_stderr_logging(self) -> None:
         fname = join_non_empty(
             '_',
-            "errVoterModel",
+            f"err{self.CbaseName}",
             f"{self.N}",
             self.run_id,
             self.out_suffix,
@@ -168,8 +179,6 @@ class VoterModel(BinDynSys):
         self.s = state.copy()
         if self.magn_path and self.magn_path.exists():
             self.magn = np.fromfile(self.magn_path, dtype=np.float64).tolist()
-
-    def _remove_sfout(self) -> None:
         try:
             self.sfout.unlink()
         except FileNotFoundError:

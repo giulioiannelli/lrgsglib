@@ -34,7 +34,8 @@ class IsingDynamics(BinDynSys):
         upd_mode: str = "asynchronous",
         **kwargs
     ) -> None:
-        super(IsingDynamics, self).__init__(sg, **kwargs)
+        dynpath = getattr(sg, 'path_ising', None)
+        super(IsingDynamics, self).__init__(sg, dynpath=dynpath, **kwargs)
         self.T = T
         self.nstepsIsing = nstepsIsing
         self.thrmSTEP = thrmSTEP

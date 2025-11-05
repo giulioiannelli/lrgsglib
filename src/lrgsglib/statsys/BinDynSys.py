@@ -32,6 +32,7 @@ class BinDynSys:
         rndStr: bool = False,
         id_string: str = "",
         out_suffix: str = "",
+        dynpath: Path = None,
     ):
         self.__init_randomness__(seed)
         self.sg = sg
@@ -48,8 +49,11 @@ class BinDynSys:
         self.pflip_id = peq_fstr(self.sg.pflip)
         self.field =  field if field is not None else ZERO_FIELD(self.N)
         self.simtime = simpref * self.N
-        base_dynpath = getattr(self.sg, "path_ising", getattr(self.sg, "path_data", Path.cwd()))
-        self.dynpath = Path(base_dynpath)
+        if dynpath is None:
+            base_dynpath = getattr(self.sg, "path_data", Path.cwd())
+            self.dynpath = Path(base_dynpath)
+        else:
+            self.dynpath = Path(dynpath)
     
     @property
     def N(self) -> int:

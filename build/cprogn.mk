@@ -5,7 +5,8 @@ FN_RBIMSIM2 = IsingSimulator2
 FN_RBIMSIM3 = IsingSimulator3
 FN_RBIMSIM4 = IsingSimulator4
 FN_RBIMSIM5 = IsingSimulator5
-FN_VMSIM0   = voter_model
+FN_VMSIM0   = VoterSimulator0
+FN_VMSIM1   = VoterSimulator1
 FN_CPSIM0   = contact_process
 FN_LRGSGLIB = LRGSG_utils sfmtrng 
 SRC_BINDYNSYS = LRGSG_bindynsys
@@ -15,7 +16,7 @@ SFMTSRC     = SFMT
 #
 FNS := $(FN_RBIMSIM0) $(FN_RBIMSIM1) $(FN_RBIMSIM2) \
        $(FN_RBIMSIM3) $(FN_RBIMSIM4) $(FN_RBIMSIM5) \
-       $(FN_VMSIM0) $(FN_CPSIM0)
+       $(FN_VMSIM0) $(FN_VMSIM1) $(FN_CPSIM0)
 # only these go into PROGS
 PROGS := $(addprefix $(LRGSG_CCORE_BIN)/, $(FNS))
 # #
