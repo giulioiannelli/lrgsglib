@@ -1,6 +1,6 @@
 from .common import *
-from .phelp.SCSGeneralized import *
-from .defs.SCSGeneralized import *
+from .phelp.SCSNN import *
+from .defs.SCSNN import *
 
 SCSGeneralized_args = {
     'N': {

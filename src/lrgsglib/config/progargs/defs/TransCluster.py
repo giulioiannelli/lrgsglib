@@ -1,4 +1,4 @@
-from .SCSGeneralized import *
+from .SCSNN import *
 
 DEFAULT_L2D_TRANSCLUSTER_MODE = 'ordParam'
 DEFAULT_L2D_TRANSCLUSTER_FLOAT_TYPE = 'float64'

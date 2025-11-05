@@ -2,7 +2,7 @@ from .common import *
 from .phelp.TransCluster import *
 from .defs.TransCluster import *
 from .Lattice2D import *
-from .SCSGeneralized import *
+from .SCSNN import *
 
 L2D_TransCluster_progName = 'L2D_TransCluster'
 L2D_TransCluster_progNameShrt = 'L2DTC'
