@@ -141,6 +141,34 @@ def _export_edgel_bin(
                 for edge in edges:
                     assert len(edge) == 3, "Edge must be: (i, j, w_ij)"
                     f.write(struct.pack("QQd", *edge))
+
+
+def export_adj_bin(
+        self,
+        exName: str = '',
+        *,
+        on_g: str = SG_REPR,
+        upper_triangle: bool = True,
+) -> None:
+    """Export the adjacency matrix of the active graph representation."""
+
+    adj_matrix = self.get_adjacency_matrix(on_g=on_g)
+    if adj_matrix is None:
+        self.upd_graph_matrices(on_g=on_g)
+        adj_matrix = self.get_adjacency_matrix(on_g=on_g)
+    if adj_matrix is None:
+        raise RuntimeError("Adjacency matrix is not available for export.")
+
+    dense_adj = adj_matrix.toarray() if hasattr(adj_matrix, "toarray") else np.asarray(adj_matrix)
+    dense_adj = np.asarray(dense_adj, dtype=np.float64)
+    self.path_exp_adj = self.path_graph / self.get_p_fname('adj', out_suffix=exName)
+
+    with open(self.path_exp_adj, "wb") as f:
+        if upper_triangle:
+            for i in range(dense_adj.shape[0]):
+                dense_adj[i, i:].tofile(f)
+        else:
+            dense_adj.tofile(f)
 #
 # def export_adj_bin(self, verbose: bool = False) -> None:
 #     rowarr = [row[i:] for i, row in enumerate(self.adjacency_matrix.toarray())]
