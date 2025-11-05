@@ -2,6 +2,8 @@
 #include "LRGSG_utils.h"
 #include "sfmtrng.h"
 
+#define EXPECTED_ARGC (7 + 1)
+
 int main(int argc, char *argv[]) {
     if (argc < EXPECTED_ARGC) {
         fprintf(stderr, "Usage: %s N p eqSTEP datdir syshape run_id out_id\n", argv[0]);

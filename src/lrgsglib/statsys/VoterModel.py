@@ -179,6 +179,8 @@ class VoterModel(BinDynSys):
         self.s = state.copy()
         if self.magn_path and self.magn_path.exists():
             self.magn = np.fromfile(self.magn_path, dtype=np.float64).tolist()
+
+    def _remove_sfout(self) -> None:
         try:
             self.sfout.unlink()
         except FileNotFoundError:

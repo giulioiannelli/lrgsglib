@@ -3,8 +3,6 @@
 #ifndef __LRGSGVMLIB_H_INC__
 #define __LRGSGVMLIB_H_INC__
 
-#define EXPECTED_ARGC (7 + 1)
-
 #define VTR_DIR "%s/voter/%s/"
 #define SINI_FNAME VTR_DIR "s_" PSTR "%s" BINX
 #define MAGN_FNAME VTR_DIR "m_" PSTR "%s" BINX
