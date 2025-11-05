@@ -12,7 +12,7 @@ import numpy as np
 import pickle as pk
 
 from networkx import Graph
-from typing import Any, Union, List, Dict, Tuple, Optional
+from typing import Any, Union, List, Dict, Tuple, Optional, Type, Callable
 from numbers import Number
 from matplotlib.pyplot import get_cmap
 from numpy.typing import NDArray
@@ -82,6 +82,9 @@ class SignedGraph:
         Dictionary mapping graph representations to sets of negative edges.
     lfeset : dict
         Dictionary mapping graph representations to sets of positive edges.
+    nwContainer : Type[Any], optional
+        Network container class to be defined by subclasses. If defined and 
+        init_nw_dict is True, an instance will be created and stored in nwDict.
     
     Methods
     -------
@@ -218,15 +221,18 @@ class SignedGraph:
            of spin-glasses." Physical Review B, 17(11), 4384.
     """
     sgpathn = "signed_graph"
+    
+    # Optional class-level attributes that can be overridden by subclasses
+    nwContainer: Optional[Type[Any]] = None  # Network container class for subclasses
     #
     def __init__(
         self,
         G: Graph, 
         pflip: float = SG_PFLIP,
         on_g: str = SG_REPR,
-        seed: int = None,
-        path_data: Path = None,
-        path_plot: Path = None,
+        seed: Optional[int] = None,
+        path_data: Optional[Path] = None,
+        path_plot: Optional[Path] = None,
         init_nw_dict: bool = SG_INIT_NW_DICT,
         init_weights_val: Union[float, dict] = SG_INIT_WVAL,
         export_mode: str = SG_EXPORT_M,
@@ -291,6 +297,13 @@ class SignedGraph:
         self.fleset = {}
         self.lfeset = {}
         
+        # Initialize matrix dictionaries (keyed by graph representation)
+        self.adjacency_matrices = {}
+        self.degree_matrices = {}
+        self.signed_degree_matrices = {}
+        self.laplacian_matrices = {}
+        self.signed_laplacian_matrices = {}
+        
         # Validate pflip and initialize randomness
         self._verify_pflip(pflip)
         self.__init_randomness__(seed)
@@ -329,7 +342,7 @@ class SignedGraph:
             
             # Initialize network dictionary if requested
             if self.init_nw_dict:
-                if hasattr(self, 'nwContainer'):
+                if self.nwContainer is not None:
                     self.nwDict = self.nwContainer(self)
                 else:
                     raise AttributeError(SG_ERRMSG_NW_DICT)
@@ -339,13 +352,13 @@ class SignedGraph:
     #
     @property
     def adj(self):
-        """Adjacency matrix of the signed graph."""
-        return self.adjacency_matrix
+        """Adjacency matrix of the signed graph for the current graph representation."""
+        return self.adjacency_matrices.get(self.on_g)
     
     @property
     def degm(self):
-        """Degree matrix of the graph."""
-        return self.degree_matrix
+        """Degree matrix of the graph for the current graph representation."""
+        return self.degree_matrices.get(self.on_g)
     
     @property
     def gr(self):
@@ -359,18 +372,18 @@ class SignedGraph:
     
     @property
     def lap(self):
-        """Standard Laplacian matrix (D - A)."""
-        return self.laplacian_matrix
+        """Standard Laplacian matrix (D - A) for the current graph representation."""
+        return self.laplacian_matrices.get(self.on_g)
     
     @property
     def sdeg(self):
-        """Signed degree matrix (absolute degree values)."""
-        return self.signed_degree_matrix
+        """Signed degree matrix (absolute degree values) for the current graph representation."""
+        return self.signed_degree_matrices.get(self.on_g)
     
     @property
     def slp(self):
-        """Signed Laplacian matrix (D_s - A)."""
-        return self.signed_laplacian_matrix
+        """Signed Laplacian matrix (D_s - A) for the current graph representation."""
+        return self.signed_laplacian_matrices.get(self.on_g)
     
     @property
     def N(self):
@@ -404,6 +417,11 @@ class SignedGraph:
             'lfeset': {},
             'map_node': {},
             'map_edge': {},
+            'adjacency_matrices': {},
+            'degree_matrices': {},
+            'signed_degree_matrices': {},
+            'laplacian_matrices': {},
+            'signed_laplacian_matrices': {},
             # Will be initialized later if needed
             'graph_clustering_utility': None
         }
@@ -412,7 +430,7 @@ class SignedGraph:
             if not hasattr(self, attr_name):
                 setattr(self, attr_name, default_value)
     #
-    def __init_randomness__(self, seed: int = None) -> None:
+    def __init_randomness__(self, seed: Optional[int] = None) -> None:
         """
         Initialize random number generators with a reproducible seed.
         
@@ -518,8 +536,8 @@ class SignedGraph:
     #
     def __init_paths__(
             self,
-            path_data: Path = None, 
-            path_plot: Path = None,
+            path_data: Optional[Path] = None, 
+            path_plot: Optional[Path] = None,
             make_dir_tree: bool = True,
             exist_ok: bool = True
     ) -> None:
@@ -694,8 +712,8 @@ class SignedGraph:
     #
     def __init_loaded_graph__(
         self,
-        path_data: Path = None, 
-        path_plot: Path = None,
+        path_data: Optional[Path] = None, 
+        path_plot: Optional[Path] = None,
         on_g: str = SG_REPR
     ) -> None:
         """
@@ -810,6 +828,11 @@ class SignedGraph:
     from ._topology import get_adjacency_matrix
     from ._topology import get_degree_matrix
     from ._topology import get_abs_degree_matrix
+    from ._topology import get_adjacency_matrix_for
+    from ._topology import get_degree_matrix_for
+    from ._topology import get_signed_degree_matrix_for
+    from ._topology import get_laplacian_matrix_for
+    from ._topology import get_signed_laplacian_matrix_for
     #
     # spectral tools (imported from ._spectral)
     #
@@ -870,7 +893,7 @@ class SignedGraph:
         who: str, 
         out_suffix: str = '', 
         ext: str = BIN, 
-    ) -> str:
+    ) -> str | Path:
         """Get the file name for exporting or importing graph data."""
         return build_p_fname(who, self.pflip, out_suffix=out_suffix, ext=ext)
     #
