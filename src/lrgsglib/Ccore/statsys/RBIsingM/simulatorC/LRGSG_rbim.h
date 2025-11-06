@@ -1,7 +1,4 @@
-#include "LRGSG_customs.h"
-#include "sfmtrng.h"
-#include <math.h>
-#include <sys/types.h>
+#include "LRGSG_binsys.h"
 //
 #ifndef __LRGSGRBIMLIB_H_INC__
 #define __LRGSGRBIMLIB_H_INC__
@@ -11,7 +8,6 @@
 #define T_EQ_STEP (size_t)(eqSTEP * N)
 #define T_STEPS (T_THERM_STEP + T_EQ_STEP)
 //
-#define PSTR "p=%.3g"
 #define TSTR "T=%.3g"
 #define PSTR_TSTR PSTR "_" TSTR
 //
@@ -27,10 +23,8 @@
 #define MAGN_FNAME ISNG_DIR     "m_"        PSTR_TSTR   "%s" BINX
 #define MAGNF_FNAME ISNG_DIR    "m_"        PSTR_TSTR   "%s" TXTX
 //
-#define GRPH_DIR "%s/graph/%s/"
-#define EDGL_FNAME GRPH_DIR "edgelist_" PSTR "%s" BINX
-#define EIGV_FNAME GRPH_DIR "eigV%d_"   PSTR "%s" BINX
 #define ADJ_FNAME GRPH_DIR "adj_"       PSTR "%s" BINX
+#define EIGV_FNAME GRPH_DIR "eigV%d_"   PSTR "%s" BINX
 /* * Glauber–Metropolis kernels (T > 0)
  *  ----------------------------------------------------
  *

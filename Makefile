@@ -37,13 +37,22 @@ $(LRGSG_CCORE_BIN)/IsingSimulator%: $(LRGSG_RBIM_SIMC)/IsingSimulator%.c \
 	@printf "Compiling IsingSimulator%s...\n" "$*"
 	$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
 
-# special rule for voter_model
-$(LRGSG_CCORE_BIN)/voter_model: $(LRGSG_STATSYS_VM)/voter_model.c \
+# special rule for VoterSimulator0
+$(LRGSG_CCORE_BIN)/VoterSimulator0: $(LRGSG_STATSYS_VM)/VoterSimulator0.c \
 							$(PATH_SRCC_FILES) \
 							$(PATH_SRCC_VM) \
 							$(PATH_SFMT_FILES) \
 							$(PATH_SRCC_BINDYNSYS)
-		@printf "Compiling voter_model...\n"
+		@printf "Compiling VoterSimulator0...\n"
+		$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+
+# pattern rule for VoterSimulator variants
+$(LRGSG_CCORE_BIN)/VoterSimulator%: $(LRGSG_STATSYS_VM)/VoterSimulator%.c \
+							$(PATH_SRCC_FILES) \
+							$(PATH_SRCC_VM) \
+							$(PATH_SFMT_FILES) \
+							$(PATH_SRCC_BINDYNSYS)
+		@printf "Compiling VoterSimulator%s...\n" "$*"
 		$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
 
 # special rule for contact_process

@@ -4,13 +4,6 @@
 
 #define EXPECTED_ARGC (7 + 1)
 
-#define PSTR "p=%.3g"
-#define VTR_DIR "%s/voter/%s/"
-#define SINI_FNAME VTR_DIR "s_" PSTR "%s" BINX
-#define MAGN_FNAME VTR_DIR "m_" PSTR "%s" BINX
-#define GRPH_DIR "%s/graph/%s/"
-#define EDGL_FNAME GRPH_DIR "edgelist_" PSTR "%s" BINX
-
 int main(int argc, char *argv[]) {
     if (argc < EXPECTED_ARGC) {
         fprintf(stderr, "Usage: %s N p eqSTEP datdir syshape run_id out_id\n", argv[0]);
