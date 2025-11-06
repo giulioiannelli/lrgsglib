@@ -2,3 +2,7 @@ phelp_transcluster_mode = "Simulation mode: 'ordParam' for order parameter or 'p
 phelp_prew = "Rewiring probability applied before running the simulation"
 phelp_float_type = "Floating-point precision used in spectral computations"
 phelp_out_suffix = "Suffix appended to generated output filenames"
+phelp_pdil = "Dilution probability applied before constructing the lattice"
+phelp_mu = "Mean of the normal distribution for random edge weights"
+phelp_sigma = "Standard deviation of the normal distribution for random edge weights"
+phelp_edge_weight = "Edge weight mode: 'flip' or 'normal' for Gaussian weights"
