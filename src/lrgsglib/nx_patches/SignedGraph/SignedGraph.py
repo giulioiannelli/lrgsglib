@@ -457,27 +457,20 @@ class SignedGraph:
         ----------
         seed : int, optional
             Random seed value. If None, generates a seed from:
-            `(time_ms + process_id) mod (2^32 - 1)` to ensure uniqueness 
-            across concurrent runs.
+            `(time_us + process_id + object_id) mod (2^32 - 1)` to ensure 
+            uniqueness across concurrent runs.
             
         Notes
         -----
-        The seed is only generated when `pflip` is within the valid range 
-        (LB_PFLIP < pflip < UB_PFLIP). For edge cases (pflip=0 or pflip=1), 
-        the seed is set to 0 as no randomness is needed.
-        
         A random string identifier (`rand_str`) is also generated for 
         creating unique temporary filenames or identifiers.
         
         If CuPy is unavailable or fails to initialize, a warning is issued 
         but execution continues without GPU-accelerated random operations.
         """
-        if LB_PFLIP < self.pflip and self.pflip < UB_PFLIP:
-            self.seed = seed or (
-                (int(time.time() * 1000) + os.getpid()) % (2**32 - 1)
-            )
-        else:
-            self.seed = 0
+        self.seed = seed or (
+            (int(time.time() * 1_000_000) + os.getpid() + id(self)) % (2**32 - 1)
+        )
         random.seed(self.seed)
         try:
             cp.random.seed(self.seed)
@@ -488,8 +481,6 @@ class SignedGraph:
         np.random.seed(self.seed)
         #
         self.rand_str = generate_random_id()
-        #
-        logger.info(f"Random seed set to {self.seed}")
     #
     def __init_dirs__(self, exist_ok: bool = True):
         """
@@ -811,6 +802,7 @@ class SignedGraph:
     #
     from ._ongraph import check_Ne_flips
     from ._ongraph import flip_sel_edges
+    from ._ongraph import get_random_edges_from_set
     from ._ongraph import flip_random_fract_edges
     from ._ongraph import unflip_all
     from ._ongraph import set_edges_random_normal
@@ -946,14 +938,14 @@ class SignedGraph:
         """
         match only_in:
             case ''|'all':
-                return random.sample(tuple(self.eset[on_g]), n)
+                return self.get_random_edges_from_set(n, self.eset[on_g], on_g)
             case '+'|'positive'|'+1'|'plus':
-                return random.sample(tuple(self.lfeset[on_g]), n)
+                return self.get_random_edges_from_set(n, self.lfeset[on_g], on_g)
             case '-'|'negative'|'-1'|'minus':
-                return random.sample(tuple(self.fleset[on_g]), n)
+                return self.get_random_edges_from_set(n, self.fleset[on_g], on_g)
             case _:
                 # Default to all edges if unknown filter
-                return random.sample(tuple(self.eset[on_g]), n)
+                return self.get_random_edges_from_set(n, self.eset[on_g], on_g)
     #
     # computations
     #
@@ -988,7 +980,14 @@ class SignedGraph:
         clustd = np.array(self.get_eigV_cluster_sizes(which, True, val, on_g))
         mclust = clustd[0]
         self.Pinf = mclust / self.N
-        self.Pinf_var = np.sum(clustd@clustd-mclust**2)/(np.sum(clustd)-mclust)
+        
+        # Avoid division by zero in variance calculation
+        denominator = np.sum(clustd) - mclust
+        if denominator > 0:
+            self.Pinf_var = np.sum(clustd@clustd - mclust**2) / denominator
+        else:
+            self.Pinf_var = 0.0
+        
         if hasattr(self, "Pinf_dict"):
             self.Pinf_dict[which] = (self.Pinf, self.Pinf_var)
         else:
