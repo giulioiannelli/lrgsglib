@@ -307,6 +307,13 @@ def make_clustersYN(
     self.numClustersBig = len(clustersY)
     self.gc = clustersY[0]
 
+    # Store graphs in the clustering utility structure
+    if k not in self.graph_clustering_utility:
+        self.graph_clustering_utility[k] = {}
+    if val.key not in self.graph_clustering_utility[k]:
+        self.graph_clustering_utility[k][val.key] = {}
+    self.graph_clustering_utility[k][val.key][on_g] = (graphY, graphN)
+
 
 def make_eigVclustersYN(
     self: "SignedGraph",

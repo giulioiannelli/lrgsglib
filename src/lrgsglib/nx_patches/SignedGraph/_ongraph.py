@@ -42,9 +42,9 @@ def flip_sel_edges(
 
 
 def flip_random_fract_edges(
-    self: "SignedGraph",
-    pflip: float = None, 
-    on_g: str = SG_REPR
+        self: "SignedGraph",
+        pflip: float = 0.0, 
+        on_g: str = SG_REPR
 ) -> None:
     try:
         if pflip:
@@ -78,7 +78,11 @@ def set_edges_random_normal(
         edge: random.normalvariate(mu, sigma) 
         for edge in self.gr[on_g].edges()
     }
-    self.set_edge_weights_wij(weights, on_g)
+    nx.set_edge_attributes(
+        self.gr[on_g], 
+        values=weights, 
+        name='weight'
+    )
 
 
 def load_vec_on_nodes(
@@ -103,12 +107,18 @@ def load_eigV_on_graph(
         eigV = _spectral.get_eigV_bin_check(self, which=which)
     else:
         try:
-            eigV = self.eigV[which]
+            eigV = getattr(self, 'eigV', None)
+            if eigV is None:
+                raise AttributeError
+            eigV = eigV[which]
         except (IndexError, AttributeError):
             _spectral.compute_k_eigvV(self, k=which + 1)
-            eigV = self.eigV[which]
+            eigV = getattr(self, 'eigV', None)
+            if eigV is not None:
+                eigV = eigV[which]
 
-    load_vec_on_nodes(self, eigV, f"eigV{which}", on_g)
+    if eigV is not None:
+        load_vec_on_nodes(self, eigV, f"eigV{which}", on_g)
 
 
 def set_node_attributes(
