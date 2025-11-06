@@ -1,7 +1,8 @@
 import logging
 import random
 import networkx as nx
-from typing import Any, TYPE_CHECKING
+import numpy as np
+from typing import Any, Optional, TYPE_CHECKING
 from numpy.typing import NDArray
 
 from ...config.const import SG_REPR, SG_ERRMSG_NFLIP
@@ -41,9 +42,55 @@ def flip_sel_edges(
     self.upd_graph_matrices(on_g)
 
 
+def get_random_edges_from_set(
+        self: "SignedGraph",
+        n: int = 1,
+        edge_set: Optional[set] = None,
+        on_g: str = SG_REPR
+) -> list:
+    """
+    Get n random edges from a specified edge set efficiently.
+    
+    This method uses NumPy's random choice for efficient sampling from large
+    edge sets without replacement. For large graphs, this is significantly
+    faster than converting to list and using random.sample().
+    
+    Performance:
+    - O(n) for conversion to array
+    - O(k) for random selection where k is the sample size
+    - Much faster than random.sample() for large edge sets
+    
+    Parameters
+    ----------
+    n : int, default 1
+        Number of random edges to return.
+    edge_set : set, optional
+        The set of edges to sample from. If None, uses all edges (self.eset).
+    on_g : str, default SG_REPR
+        Graph representation to use.
+        
+    Returns
+    -------
+    list
+        List of randomly selected edges as tuples.
+    """
+    if edge_set is None:
+        edge_set = self.eset[on_g]
+    
+    # Convert set to numpy array for efficient indexing
+    edge_array = np.array(list(edge_set), dtype=object)
+    
+    # Use numpy's random choice for efficient sampling without replacement
+    # This is faster than random.sample for large sets
+    indices = np.random.choice(len(edge_array), size=n, replace=False)
+    
+    # Return as list of tuples
+    return [tuple(edge_array[i]) for i in indices]
+
+
 def flip_random_fract_edges(
         self: "SignedGraph",
-        pflip: float = 0.0, 
+        pflip: Optional[float] = None, 
         on_g: str = SG_REPR
 ) -> None:
     try:
@@ -51,10 +98,13 @@ def flip_random_fract_edges(
             self.pflip = pflip
             self.Ne_flips = int(self.pflip * self.Ne)
             self.check_Ne_flips()
-            self.flip_sel_edges(
-                self.get_random_links(self.Ne_flips, on_g), 
-                on_g=on_g
+            # Use the new method to get random edges
+            edges_to_flip = self.get_random_edges_from_set(
+                self.Ne_flips, 
+                self.eset[on_g], 
+                on_g
             )
+            self.flip_sel_edges(edges_to_flip, on_g=on_g)
         else:
             self.Ne_flips = int(self.pflip * self.Ne)
             self.check_Ne_flips()

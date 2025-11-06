@@ -64,14 +64,14 @@ def get_nodes_subgraph_by_kv(
         predicate = lambda x: x == predicate_value
     
     # Partition nodes into two sets based on predicate
-    nodes_no = []  # nodes where predicate is True
-    nodes_yes = []  # nodes where predicate is False
+    nodes_yes = []  # nodes where predicate is True
+    nodes_no = []  # nodes where predicate is False
     
     for node, v in G.nodes(data=k):
         if predicate(v):
-            nodes_no.append(node)
-        else:
             nodes_yes.append(node)
+        else:
+            nodes_no.append(node)
     
     # Create subgraphs using .subgraph() which is much faster
     # Note: subgraph() returns a view, use .copy() if you need 
@@ -123,14 +123,11 @@ def get_eigV_cluster_sizes(
     # Normalize val to ConditionalPartitioning
     val = _normalize_conditional_partitioning(val)
     
-    if not hasattr(self, "clustersY"):
+    if not self.clustersY:
         make_clustersYN(self, f"eigV{which}", val, on_g, backend)
     
     # Ensure clustersY exists and has valid data
-    clustersY = getattr(self, "clustersY", None)
-    if clustersY is None:
-        return []
-    cl_len = sorted(map(len, clustersY), reverse=True)
+    cl_len = sorted(map(len, self.clustersY), reverse=True)
     return cl_len
 
 def get_cluster_distribution(
