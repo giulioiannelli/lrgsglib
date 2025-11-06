@@ -63,6 +63,10 @@ class Lattice3D(SignedGraph):
                 self.syshapePth = f"{dim_part}_N={total_nodes}"
             self.G = Graph()
         super(Lattice3D, self).__init__(self.G, **kwargs)
+        
+        # Set positions after SignedGraph initialization to preserve them
+        if not only_const_mode and self.with_positions:
+            self._set_positions()
     #
     def __init_dim__(self, dim: Union[int, Tuple[int, int, int]]) -> None:
         if is_positive_int(dim):
@@ -122,17 +126,27 @@ class Lattice3D(SignedGraph):
         self.H = nxfunc(self.dim, periodic=self.pbc)
         self.G = convert_node_labels_to_integers(self.H)
 
-        if self.with_positions:
-            self._set_positions()
-
     def get_expected_num_nodes(self) -> int:
         """Return the expected number of nodes for the 3D lattice."""
         return int(self.node_multiplier * np.prod(self.dim))
     #
     def _set_positions(self):
-        pos = {node: project_3d_to_2d(*node, self.theta, self.phi)
-               for node in self.H.nodes()}
-        set_node_attributes(self.H, pos, 'pos')
+        """Set 2D projected positions on both H and G graphs."""
+        # Set positions on H (tuple-labeled graph)
+        pos_H = {node: project_3d_to_2d(*node, self.theta, self.phi)
+                 for node in self.H.nodes()}
+        set_node_attributes(self.H, pos_H, 'pos')
+        
+        # Also set positions on G (integer-labeled graph) using the node mapping
+        # The mapping is stored in self.map_node after SignedGraph initialization
+        if hasattr(self, 'map_node') and 'G' in self.map_node and 'H' in self.map_node['G']:
+            node_mapping = self.map_node['G']['H']  # Maps H nodes -> G nodes
+            pos_G = {node_mapping[h_node]: position 
+                     for h_node, position in pos_H.items()}
+            set_node_attributes(self.G, pos_G, 'pos')
+            # Update the graph representation dictionary to reflect the changes
+            self.gr['G'] = self.G
+            self.gr['H'] = self.H
 
 
     def get_central_edge(self, on_g: str = L3D_ONREP):

@@ -22,6 +22,15 @@ from .TransClusters import (
 
 __all__ = ["run_transcluster"]
 
+# Debug flag - set to True to enable debug prints, False to disable
+DEBUG = False
+
+
+def _debug_print(*args, **kwargs):
+    """Print debug messages only if DEBUG is enabled."""
+    if DEBUG:
+        print("[DEBUG]", *args, **kwargs)
+
 
 def _probability_token(edge_weight: str, p_value: float, mu: float, sigma: float) -> str:
     if edge_weight == "flip":
