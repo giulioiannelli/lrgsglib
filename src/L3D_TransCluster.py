@@ -84,7 +84,7 @@ def process_ordParam(lattice, geometry_func, navg, sfreq, mpath, mode):
 
 args = parse_args()
 side, p, pdil, mu, sigma, edge_weight, geo, cell, mode, navg, sfreq, outsx, typf = (
-    args.L, args.p, args.pdil, args.mu, args.sigma, args.edge_weight, args.geometry, args.cell_type, args.mode, args.number_of_averages, args.save_frequency if args.save_frequency else args.number_of_averages // 20, args.out_suffix, args.float_type
+    args.L, args.p, args.pdil, args.mu, args.sigma, args.edge_weight, args.geometry, args.cell_type, args.mode, args.number_of_averages, args.save_frequency if args.save_frequency else max(1, args.number_of_averages // 20), args.out_suffix, args.float_type
 )
 
 if mode == 'pCluster':
@@ -95,7 +95,7 @@ else:
     raise ValueError("Invalid mode specified")
 geometry_func = get_geometry_func(cell)
 lattice = Lattice3D(dim=tuple(side for _ in range(3)), pflip=p, geo=geo)
-mpath = {'pCluster': lattice.path_lrgsg, 'ordParam': lattice.path_phtra.name}[mode]
+mpath = {'pCluster': lattice.path_lrgsg, 'ordParam': lattice.path_phtra}[mode]
 filename = get_file_path(mpath, mode, p, navg, outsx, cell, extout, pdil, mu, sigma, edge_weight)
 
 if os.path.exists(filename):
