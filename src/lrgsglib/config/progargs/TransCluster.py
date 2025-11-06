@@ -2,6 +2,7 @@ from .common import *
 from .phelp.TransCluster import *
 from .defs.TransCluster import *
 from .Lattice2D import *
+from .Lattice3D import *
 from .SCSNN import *
 
 L2D_TransCluster_progName = 'L2D_TransCluster'
@@ -41,6 +42,65 @@ L2D_TransCluster_optional_args_dict = {
 }
 
 L2D_TransCluster_action_args_dict = {**action_args_dict}
+
+L3D_TransCluster_progName = 'L3D_TransCluster'
+L3D_TransCluster_progNameShrt = 'L3DTC'
+L3D_TransCluster_description = f"""
+    Transition and cluster analysis utilities for 3D signed lattices: {L3D_TransCluster_progName}.py
+"""
+
+L3D_TransCluster_args = {**L3D_args}
+
+L3D_TransCluster_optional_args_dict = {
+    **L3D_opt_args,
+    tuple(['--pdil']): {
+        'help': phelp_pdil,
+        'type': float,
+        'default': DEFAULT_L3D_TRANSCLUSTER_PDIL,
+    },
+    tuple(['--mu']): {
+        'help': phelp_mu,
+        'type': float,
+        'default': DEFAULT_L3D_TRANSCLUSTER_MU,
+    },
+    tuple(['--sigma']): {
+        'help': phelp_sigma,
+        'type': float,
+        'default': DEFAULT_L3D_TRANSCLUSTER_SIGMA,
+    },
+    tuple(['--edge_weight']): {
+        'help': phelp_edge_weight,
+        'type': str,
+        'default': DEFAULT_L3D_TRANSCLUSTER_EDGE_WEIGHT,
+    },
+    tuple(['-m', '--mode']): {
+        'help': phelp_transcluster_mode,
+        'type': str,
+        'default': DEFAULT_L3D_TRANSCLUSTER_MODE,
+    },
+    tuple(['-sf', '--save_frequency']): {
+        'help': phelp_data_save_freq,
+        'type': int,
+        'default': DEFAULT_L3D_TRANSCLUSTER_SAVE_FREQUENCY,
+    },
+    tuple(['-o', '--out_suffix']): {
+        'help': phelp_out_suffix,
+        'type': str,
+        'default': DEFAULT_L3D_TRANSCLUSTER_OUT_SUFFIX,
+    },
+    tuple(['-t', '--float_type']): {
+        'help': phelp_float_type,
+        'type': str,
+        'default': DEFAULT_L3D_TRANSCLUSTER_FLOAT_TYPE,
+    },
+    tuple(['-na', '--number_of_averages']): {
+        'help': phelp_navg,
+        'type': int,
+        'default': DEFAULT_L3D_TRANSCLUSTER_NAVG,
+    },
+}
+
+L3D_TransCluster_action_args_dict = {**action_args_dict}
 
 SCS_TransCluster_progName = 'SCS_TransCluster'
 SCS_TransCluster_progNameShrt = 'SCSTC'

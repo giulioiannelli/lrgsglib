@@ -1,61 +1,69 @@
+"""Helper utilities for working with :mod:`lrgsglib.Lattice3D`."""
+
+from __future__ import annotations
+
 from typing import Any
+
 from lrgsglib import Lattice3D, load_or_compute_Lattice3D
 
 __all__ = [
-        "initialize_l3d_dict_args",
-        "prepare_lattice"]
+    "initialize_l3d_dict_args",
+    "make_transcluster_lattice",
+    "prepare_lattice",
+]
 
-def initialize_l3d_dict_args(args: Any) -> dict:
-    """
-    Generate a dictionary of arguments for initializing a Lattice3D object.
 
-    This function processes the input arguments to create a dictionary
-    containing the necessary parameters for initializing a Lattice3D instance.
+def _normalize_dimension(dim: Any) -> Any:
+    """Coerce the lattice dimension argument into the expected representation."""
 
-    Parameters
-    ----------
-    args : Any
-        Argument object containing lattice configuration, including dimensions,
-        geometry, working directory, and flipping probability.
+    if isinstance(dim, list):
+        if len(dim) == 1:
+            return dim[0]
+        if len(dim) == 3:
+            return tuple(dim)
+        raise ValueError("L must contain either 1 or 3 integers for Lattice3D")
+    return dim
 
-    Returns
-    -------
-    dict
-        A dictionary with keys and values required for Lattice3D initialization.
-    """
-    argdict = dict(dim=args.L, geo=args.geometry, sgpathn=args.workdir, 
-                    pflip=args.p)
-    match args.cell_type:
-        case 'rand':
-            pass
-        case _:
-            argdict |= dict(init_nw_dict=True)
-    return argdict
 
-def prepare_lattice(args: Any, **kwargs) -> Any:
-    """
-    Initialize and configure a 3D lattice structure based on the provided 
-    arguments. This function creates a Lattice3D object, applies modifications 
-    to its edges, and optionally computes its Laplacian spectrum with 
-    eigenvalues.
+def initialize_l3d_dict_args(args: Any) -> dict[str, Any]:
+    """Generate keyword arguments for building :class:`~lrgsglib.Lattice3D`."""
 
-    Parameters
-    ----------
-    args : Any
-        Argument object containing lattice configuration, including dimensions,
-        geometry, and other properties.
-    with_eigV : bool, optional
-        If True, computes the Laplacian spectrum with eigenvalues for the
-        lattice (default is True).
+    dim = _normalize_dimension(getattr(args, "L"))
+    argdict: dict[str, Any] = {
+        "dim": dim,
+        "geo": getattr(args, "geometry", None),
+        "sgpathn": getattr(args, "workdir", None),
+        "pflip": getattr(args, "p", None),
+    }
+    if hasattr(args, "pdil"):
+        argdict["pdil"] = getattr(args, "pdil")
+    return {key: value for key, value in argdict.items() if value is not None}
 
-    Returns
-    -------
-    Any
-        A configured Lattice3D instance with applied modifications.
-    """
-    lattice = load_or_compute_Lattice3D(
-        **initialize_l3d_dict_args(args), 
-        cell_type=args.cell_type,
-        **kwargs
-    )
-    return lattice
+
+def make_transcluster_lattice(
+    args: Any,
+    *,
+    init_nw_dict: bool,
+    with_positions: bool = False,
+    only_const_mode: bool | None = None,
+) -> Lattice3D:
+    """Instantiate a :class:`Lattice3D` tailored for transient cluster runs."""
+
+    kwargs = initialize_l3d_dict_args(args)
+    kwargs.update({
+        "init_nw_dict": init_nw_dict,
+        "with_positions": with_positions,
+    })
+    if only_const_mode is not None:
+        kwargs["only_const_mode"] = only_const_mode
+    return Lattice3D(**kwargs)
+
+
+def prepare_lattice(args: Any, **kwargs: Any) -> Lattice3D:
+    """Return a cached or freshly generated :class:`Lattice3D` instance."""
+
+    base_kwargs = initialize_l3d_dict_args(args)
+    cell_type = getattr(args, "cell_type", None)
+    if cell_type is not None:
+        base_kwargs["cell_type"] = cell_type
+    return load_or_compute_Lattice3D(**base_kwargs, **kwargs)
