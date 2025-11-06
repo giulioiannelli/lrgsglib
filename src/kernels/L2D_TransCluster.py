@@ -201,7 +201,7 @@ def run_ordparam_mode(
 
         lattice.load_eigV_on_graph(binarize=True)
         lattice.make_clustersYN("eigV0", +1)
-        if len(lattice.clustersY) > 1:
+        if lattice.clustersY is not None and len(lattice.clustersY) > 1:
             smax2 = len(max(lattice.clustersY, key=len)) / (1.0 * lattice.N)
         else:
             smax2 = 1.0
@@ -283,8 +283,8 @@ def run_transcluster(args) -> None:
 
     test_lattice = Lattice2D(args.L, pflip=args.p, geo=args.geometry, sgpathn=args.workdir)
     base_path = {
-        "pCluster": test_lattice.path_lrgsg,
-        "ordParam": test_lattice.path_phtra.name,
+        "pCluster": getattr(test_lattice, "path_lrgsg"),
+        "ordParam": getattr(test_lattice, "path_phtra"),
     }[args.mode]
 
     filename = file_path_maker(
