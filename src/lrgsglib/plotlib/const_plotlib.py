@@ -14,15 +14,19 @@ from matplotlib.colors import Colormap, ListedColormap, BoundaryNorm, \
     rgb2hex, to_hex
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
-from matplotlib.patches import Circle, Rectangle, Ellipse, PathPatch, ConnectionPatch,RegularPolygon, Polygon
+from matplotlib.patches import Circle, Rectangle, Ellipse, PathPatch, \
+    ConnectionPatch,RegularPolygon, Polygon
 from matplotlib.text import Text
 from matplotlib.ticker import ScalarFormatter, MultipleLocator, \
-    SymmetricalLogLocator, LogLocator,LogFormatterMathtext
+    SymmetricalLogLocator, LogLocator, LogFormatterMathtext, FixedLocator, \
+        FuncFormatter
+
 from matplotlib.transforms import blended_transform_factory
 #
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.axes_grid1.axes_divider import AxesDivider
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset, zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset, \
+    zoomed_inset_axes
 from mpl_toolkits.mplot3d import Axes3D
 #
 from ..utils.basic import linspace
