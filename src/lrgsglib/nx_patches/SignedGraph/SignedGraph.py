@@ -29,6 +29,7 @@ from ...utils.basic import is_in_range, join_non_empty,\
 from ...utils.lrg import compute_ising_pairwise_energy
 from ...utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 from ...utils.tools import NestedDict, ConditionalPartitioning
+from ...utils.tools.ConditionalPartitioning import ConditionalPartitioningInput
 #
 logger = logging.getLogger(__name__)
 
@@ -224,6 +225,8 @@ class SignedGraph:
     
     # Optional class-level attributes that can be overridden by subclasses
     nwContainer: Optional[Type[Any]] = None  # Network container class for subclasses
+    syshape: Optional[int] = None  # System shape (set by topology subclasses)
+    syshapePth: Optional[str] = None  # System shape path string
     #
     def __init__(
         self,
@@ -303,6 +306,17 @@ class SignedGraph:
         self.signed_degree_matrices = {}
         self.laplacian_matrices = {}
         self.signed_laplacian_matrices = {}
+        
+        # Initialize clustering-related attributes
+        self.clustersY: Optional[list[set]] = None
+        self.clustersN: Optional[list[set]] = None
+        self.numClustersY: int = 0
+        self.numClustersN: int = 0
+        self.biggestClSet: list[set] = []
+        self.numClustersBig: int = 0
+        self.gc: Optional[set] = None
+        self.largest_cc: Optional[set] = None
+        self.largest_cc_subgraph: Optional[Graph] = None
         
         # Validate pflip and initialize randomness
         self._verify_pflip(pflip)
@@ -576,13 +590,16 @@ class SignedGraph:
         self.path_plot = path_plot or PATHPLOT
         self.path_sgdata = self.path_data / Path(self.sgpathn)
         #
-        if not hasattr(self, 'syshapePth'):
-            if hasattr(self, 'syshape') and isinstance(self.syshape, (int,)):
+        if not hasattr(self, 'syshapePth') or self.syshapePth is None:
+            if hasattr(self, 'syshape') and isinstance(self.syshape, int):
                 self.syshapePth = f"N={self.syshape}"
             else:
                 try:
                     # If G was passed in, it might be available here
-                    self.syshapePth = f"N={len(self.G)}"
+                    if self.G is not None:
+                        self.syshapePth = f"N={len(self.G)}"
+                    else:
+                        self.syshapePth = "N=unknown"
                 except Exception:
                     self.syshapePth = "N=unknown"
 
@@ -621,7 +638,7 @@ class SignedGraph:
     def __init_weights__(
         self, 
         values: Union[float, dict] = 1., 
-        on_g: str = None
+        on_g: Optional[str] = None
     ) -> None:
         """
         Initialize edge weights for the graph.
@@ -646,7 +663,7 @@ class SignedGraph:
         to ensure all graph representations remain synchronized.
         """
         on_g = on_g or self.on_g
-        nx.set_edge_attributes(self.gr[on_g], values, 'weight')
+        nx.set_edge_attributes(self.gr[on_g], values, 'weight')  # type: ignore[call-overload]
         self.upd_GraphRepr_All(on_g)
     #
     def __init_sgraph__(
@@ -907,7 +924,26 @@ class SignedGraph:
             "Subclasses must implement `get_expected_num_nodes`." )
     #
     def get_random_links(self, n: int = 1, only_in: str = '',
-                         on_g: str = SG_REPR):
+                         on_g: str = SG_REPR) -> list:
+        """
+        Get random edges from the graph.
+        
+        Parameters
+        ----------
+        n : int, default 1
+            Number of random edges to return.
+        only_in : str, default ''
+            Filter for edge type: '', 'all' (all edges), '+', 'positive', '+1', 
+            'plus' (positive edges only), or '-', 'negative', '-1', 'minus' 
+            (negative edges only).
+        on_g : str, default SG_REPR
+            Graph representation to use.
+            
+        Returns
+        -------
+        list
+            List of randomly selected edges.
+        """
         match only_in:
             case ''|'all':
                 return random.sample(tuple(self.eset[on_g]), n)
@@ -915,6 +951,9 @@ class SignedGraph:
                 return random.sample(tuple(self.lfeset[on_g]), n)
             case '-'|'negative'|'-1'|'minus':
                 return random.sample(tuple(self.fleset[on_g]), n)
+            case _:
+                # Default to all edges if unknown filter
+                return random.sample(tuple(self.eset[on_g]), n)
     #
     # computations
     #
@@ -922,9 +961,12 @@ class SignedGraph:
     #
     #
     #
-    def compute_pinf(self, which: int = 0, 
-                     val: Union[ConditionalPartitioning, Number, None] = None,
-                     on_g: str = SG_REPR):
+    def compute_pinf(
+            self,
+            which: int = 0, 
+            val: ConditionalPartitioningInput = 1,
+            on_g: str = SG_REPR
+    ) -> None:
         """
         Compute the infinite cluster probability for a given eigenvector.
         
@@ -932,12 +974,17 @@ class SignedGraph:
         ----------
         which : int, default 0
             Index of the eigenvector to analyze.
-        val : Union[ConditionalPartitioning, Number, None], optional
-            Conditional partitioning object for clustering, or a number (which will be
-            automatically converted to ConditionalPartitioning). If None, defaults to +1.
+        val : Optional[ConditionalPartitioningInput], optional
+            Conditional partitioning specification for clustering. Can be a 
+            ConditionalPartitioning object, a number, a string (e.g., '>0'), 
+            or a callable. If None, defaults to +1.
         on_g : str, default SG_REPR
             Graph representation to use.
         """
+        # Default to +1 if no value provided
+        if val is None:
+            val = 1
+        
         clustd = np.array(self.get_eigV_cluster_sizes(which, True, val, on_g))
         mclust = clustd[0]
         self.Pinf = mclust / self.N

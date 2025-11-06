@@ -19,8 +19,9 @@ def convert_to_RGB(color: ColorType) -> tuple[int, int, int]:
     ----------
     color : ColorType
         The input color, which can be a string (e.g., 'red', '#FF0000'),
-        a tuple of three integers (R, G, B) in the range 0-255, or a tuple
-        of three floats (R, G, B) in the range 0.0-1.0.
+        a tuple of three integers (R, G, B) in the range 0-255, a tuple
+        of three floats (R, G, B) in the range 0.0-1.0, or a tuple of
+        four values (R, G, B, A) where the alpha channel is ignored.
 
     Returns
     -------
@@ -36,18 +37,25 @@ def convert_to_RGB(color: ColorType) -> tuple[int, int, int]:
     (128, 128, 128)
     >>> convert_to_rgb((255, 0, 0))
     (255, 0, 0)
+    >>> convert_to_rgb((255, 0, 0, 0.5))
+    (255, 0, 0)
     """
     if isinstance(color, str):
         rgb = to_rgb(color)
-        return tuple(int(c * 255) for c in rgb)
-    elif isinstance(color, tuple) and len(color) == 3:
+        r, g, b = rgb
+        return (int(r * 255), int(g * 255), int(b * 255))
+    elif isinstance(color, tuple):
+        # Handle RGBA by taking only first 3 values
+        if len(color) == 4:
+            color = color[:3]
         if all(isinstance(c, int) for c in color):
-            return color
+            return (int(color[0]), int(color[1]), int(color[2]))
         elif all(isinstance(c, float) for c in color):
-            return tuple(int(c * 255) for c in color)
+            r, g, b = color
+            return (int(r * 255), int(g * 255), int(b * 255))
     raise ValueError(
         "Invalid color format. Must be a string, a tuple of three integers, "
-        "or a tuple of three floats."
+        "a tuple of three floats, or a tuple of four values (RGBA)."
     )
 #
 def convert_to_rgb(color: ColorType) -> tuple[float, float, float]:
@@ -77,7 +85,7 @@ def convert_to_rgb(color: ColorType) -> tuple[float, float, float]:
     (0.5, 0.5, 0.5)
     """
     rgb = convert_to_RGB(color)
-    return tuple(c / 255 for c in rgb)
+    return (rgb[0] / 255, rgb[1] / 255, rgb[2] / 255)
 #
 
 def get_opposite_color(
@@ -155,9 +163,9 @@ def get_opposite_color(
     # Return the opposite color in the desired output format
     if col_type == 'hex':
         return (
-            to_hex(opposite_rgb)
+            to_hex(tuple(opposite_rgb))
             if alpha is None
-            else to_hex(opposite_rgb) + f"{int(alpha * 255):02x}"
+            else to_hex(tuple(opposite_rgb)) + f"{int(alpha * 255):02x}"
         )
     elif col_type == 'rgb':
         return (
@@ -198,7 +206,7 @@ def set_alpha_tocolor(
     >>> set_alpha_tocolor((0.5, 0.5, 0.5), 0.8)
     (128, 128, 128, 0.8)
     """
-    rgb = convert_to_rgb(color)
+    rgb = convert_to_RGB(color)
     return set_alpha_torgb(rgb, alpha)
 #
 

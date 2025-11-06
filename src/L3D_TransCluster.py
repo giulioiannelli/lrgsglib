@@ -26,7 +26,8 @@ def load_existing_data(filename):
         fnameExists = glob.glob(f"{filename}*")[0]
         merged_dict = pk.load(open(fnameExists, 'rb'))
         avgIdx = -2 if outsx else -1
-        nAvgDone = int(re.search(r'\d+', os.path.splitext(fnameExists.split('_')[avgIdx])[0]).group())
+        match = re.search(r'\d+', os.path.splitext(fnameExists.split('_')[avgIdx])[0])
+        nAvgDone = int(match.group()) if match else 0
         return merged_dict, nAvgDone, fnameExists
     except:
         return Counter(), 0, filename
@@ -95,7 +96,7 @@ else:
     raise ValueError("Invalid mode specified")
 geometry_func = get_geometry_func(cell)
 lattice = Lattice3D(dim=tuple(side for _ in range(3)), pflip=p, geo=geo)
-mpath = {'pCluster': lattice.path_lrgsg, 'ordParam': lattice.path_phtra}[mode]
+mpath = getattr(lattice, 'path_lrgsg' if mode == 'pCluster' else 'path_phtra', './output')
 filename = get_file_path(mpath, mode, p, navg, outsx, cell, extout, pdil, mu, sigma, edge_weight)
 
 if os.path.exists(filename):

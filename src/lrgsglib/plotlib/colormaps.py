@@ -1,5 +1,5 @@
 from .const_plotlib import *
-from .color import convert_to_RGB, to_hex
+from .color import convert_to_rgb, to_hex
 #
 __all__ = [
     'create_custom_colormap',
@@ -37,8 +37,8 @@ def create_custom_colormap(
     >>> custom_cmap = create_custom_colormap(c1="red", c2="blue", nc=10)
     >>> custom_cmap = create_custom_colormap(c1=(255, 0, 0), c2=(0, 0, 255))
     """
-    start_color = to_hex(convert_to_RGB(c1))
-    end_color = to_hex(convert_to_RGB(c2))
+    start_color = to_hex(convert_to_rgb(c1))
+    end_color = to_hex(convert_to_rgb(c2))
     colors = [start_color, end_color]
     nocol = dict(N=nc) if nc else dict()
 

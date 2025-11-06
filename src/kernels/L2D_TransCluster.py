@@ -94,7 +94,8 @@ def load_existing_pcluster_state(
 
     avg_idx = -2 if has_suffix else -1
     avg_token = os.path.splitext(fname_exists.split("_")[avg_idx])[0]
-    n_avg_done = int(re.search(r"\d+", avg_token).group())
+    match = re.search(r"\d+", avg_token)
+    n_avg_done = int(match.group()) if match else 0
     return merged_dict, n_avg_done, fname_exists
 
 
