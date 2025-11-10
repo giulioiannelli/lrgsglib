@@ -53,6 +53,7 @@ def main() -> None:
             "python",
             str(Path("src") / f"{SCS_TransCluster_progName}.py"),
             str(N),
+            "--gamma",
             f"{gamma:.12g}",
             "--J0",
             f"{j0:.12g}",

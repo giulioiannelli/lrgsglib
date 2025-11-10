@@ -55,8 +55,7 @@ def _write_results(path: Path, data: Iterable[Iterable[float]]) -> None:
     array = np.asarray(list(data), dtype=float)
     if array.size == 0:
         return
-    header = "J0 gap Smax SmaxSq energy_diff"
-    np.savetxt(path, array, fmt="%.7g", header=header)
+    np.savetxt(path, array, fmt="%.7g")
 
 
 def run_transcluster(args) -> None:
