@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Literal, cast
 
 import numpy as np
 import tqdm
@@ -28,14 +28,24 @@ class ContactProcess(BinDynSys):
         sg: SignedGraph,
         mu: float = 1.0,
         *,
+        gamma: float | None = None,
+        activation: Literal["tanh", "relu"] = "tanh",
         save_density: bool = False,
+        state_type: Literal["binary", "bipolar"] | None = None,
         **kwargs: Any,
     ) -> None:
         dynpath = getattr(sg, "path_contact", None)
         if dynpath is None:
             dynpath = getattr(sg, "path_lrgsg", getattr(sg, "path_data", Path.cwd()))
-        super().__init__(sg, dynpath=dynpath, **kwargs)
+        super().__init__(
+            sg,
+            dynpath=dynpath,
+            state_type=state_type or "binary",
+            **kwargs,
+        )
         self.mu = float(mu)
+        self.gamma = float(gamma) if gamma is not None else None
+        self.activation = self._validate_activation(activation)
         self.save_density = save_density
         self.reset_observables()
         self.sini: np.ndarray | None = None
@@ -72,7 +82,7 @@ class ContactProcess(BinDynSys):
         """Initialise the state and export data if required."""
 
         self.reset_observables()
-        self.init_state(custom)
+        self.init_s(custom)
         self.s = self.s.astype(np.int8, copy=False)
         if self.runlang.startswith("C"):
             self.build_cprogram_command()
@@ -81,23 +91,9 @@ class ContactProcess(BinDynSys):
             if self.rndStr and not exName:
                 exName = self.run_id
             self.sg._export_edgel_bin(exName=self.run_id)
+            if self._c_program_key() == "C1":
+                self.sg.export_adj_bin(exName=self.run_id)
         self.sini = self.s.copy()
-
-    def init_state(self, custom: Any = None) -> None:
-        match self.ic:
-            case "uniform" | "random" | "rand":
-                self.s = np.random.choice([0, 1], size=self.sg.N).astype(np.int8)
-            case "homogeneous" | "homo":
-                self.s = np.ones(self.sg.N, dtype=np.int8)
-            case "delta":
-                self.s = np.zeros(self.sg.N, dtype=np.int8)
-                self.s[np.random.randint(self.sg.N)] = 1
-            case "custom":
-                if custom is None:
-                    raise ValueError("A custom state must be provided for 'custom' initial condition.")
-                self.s = np.asarray(custom, dtype=np.int8)
-            case _:
-                raise ValueError("Invalid initial condition for ContactProcess.")
 
     def check_attribute(self) -> None:
         try:
@@ -149,15 +145,37 @@ class ContactProcess(BinDynSys):
     # ------------------------------------------------------------------
     # C backend integration
     # ------------------------------------------------------------------
-    def build_cprogram_command(self) -> None:
-        self.CbaseName = f"ContactSimulator{self.runlang[-1]}"
+    def _c_program_key(self) -> str:
+        if not self.runlang or not self.runlang.upper().startswith("C"):
+            raise ValueError("C backend requested but runlang is not a C variant.")
+        suffix = self.runlang[1:]
+        return "C0" if suffix == "" else f"C{suffix}"
+
+    def _validate_activation(self, activation: str) -> Literal["tanh", "relu"]:
+        normalized = activation.lower()
+        if normalized not in {"tanh", "relu"}:
+            raise ValueError("activation must be either 'tanh' or 'relu'.")
+        return cast(Literal["tanh", "relu"], normalized)
+
+    def _build_c_arglist(self) -> list[str]:
+        builders = {
+            "C0": self._build_c_arglist_c0,
+            "C1": self._build_c_arglist_c1,
+        }
+        key = self._c_program_key()
+        try:
+            return builders[key]()
+        except KeyError as exc:
+            raise ValueError(f"Unsupported C program key '{key}'.") from exc
+
+    def _build_c_arglist_c0(self) -> list[str]:
         try:
             datdir = self.sg.path_sgdata.relative_to(Path.cwd())
         except ValueError:
             datdir = self.sg.path_sgdata
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
         self.out_id = self.out_suffix
-        arglist = [
+        return [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
             f"{self.mu:.12g}",
@@ -167,6 +185,32 @@ class ContactProcess(BinDynSys):
             self.run_id,
             self.out_id,
         ]
+
+    def _build_c_arglist_c1(self) -> list[str]:
+        if self.gamma is None:
+            raise ValueError("gamma must be provided when using runlang 'C1'.")
+        try:
+            datdir = self.sg.path_sgdata.relative_to(Path.cwd())
+        except ValueError:
+            datdir = self.sg.path_sgdata
+        syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
+        self.out_id = self.out_suffix
+        return [
+            f"{self.N}",
+            f"{self.sg.pflip:.12g}",
+            f"{self.gamma:.12g}",
+            f"{self.simtime}",
+            str(datdir),
+            syshape,
+            self.run_id,
+            self.out_id,
+            self.activation,
+        ]
+
+    def build_cprogram_command(self) -> None:
+        c_key = self._c_program_key()
+        self.CbaseName = f"ContactSimulator{c_key[-1]}"
+        arglist = self._build_c_arglist()
         self.cprogram = [LRGSG_CCORE_BIN / self.CbaseName] + arglist
 
     def setup_stderr_logging(self) -> None:
