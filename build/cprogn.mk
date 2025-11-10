@@ -7,11 +7,12 @@ FN_RBIMSIM4 = IsingSimulator4
 FN_RBIMSIM5 = IsingSimulator5
 FN_VMSIM0   = VoterSimulator0
 FN_VMSIM1   = VoterSimulator1
-FN_CPSIM0   = contact_process
-FN_LRGSGLIB = LRGSG_utils sfmtrng 
+FN_CPSIM0   = ContactSimulator0
+FN_LRGSGLIB = LRGSG_utils sfmtrng
 SRC_BINDYNSYS = LRGSG_bindynsys
 SRC_RBIM    = LRGSG_rbim
 SRC_VM      = LRGSG_vm
+SRC_CP      = LRGSG_cp
 SFMTSRC     = SFMT
 #
 FNS := $(FN_RBIMSIM0) $(FN_RBIMSIM1) $(FN_RBIMSIM2) \
@@ -24,6 +25,7 @@ SRCCFILES.c     = $(addsuffix .c, $(FN_LRGSGLIB))
 SRCCFILESBINDYNSYS.c = $(addsuffix .c, $(SRC_BINDYNSYS))
 SRCCFILESRBIM.c = $(addsuffix .c, $(SRC_RBIM))
 SRCCFILESVM.c   = $(addsuffix .c, $(SRC_VM))
+SRCCFILESCP.c   = $(addsuffix .c, $(SRC_CP))
 SFMTFILES.c     = $(addsuffix .c, $(SFMTSRC))
 # #
 PATH_SRCC_FILES = $(addprefix $(LRGSG_LIB_CCORE)/, $(SRCCFILES.c))
@@ -31,4 +33,5 @@ PATH_SRCC_BINDYNSYS = $(addprefix $(LRGSG_CCORE_STATSYS)/, $(SRCCFILESBINDYNSYS.
 PATH_SRCC_RBIM  = $(addprefix $(LRGSG_RBIM_SIMC)/, $(SRCCFILESRBIM.c))
 PATH_SFMT_FILES = $(addprefix $(LRGSG_CCORE_SFMT)/, $(SFMTFILES.c))
 PATH_SRCC_VM    = $(addprefix $(LRGSG_STATSYS_VM)/, $(SRCCFILESVM.c))
+PATH_SRCC_CP    = $(addprefix $(LRGSG_STATSYS_CP)/, $(SRCCFILESCP.c))
 #
