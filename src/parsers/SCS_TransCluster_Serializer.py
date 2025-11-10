@@ -6,7 +6,7 @@ from typing import Sequence
 from lrgsglib.config.progargs import *
 
 DEFAULT_SCS_TC_SERIALISER_N_LIST: Sequence[int] = (500,)
-DEFAULT_SCS_TC_SERIALISER_GAMMA_LIST: Sequence[float] = (1.0,)
+DEFAULT_SCS_TC_SERIALISER_GAMMA_LIST: Sequence[float] = (DEFAULT_SCS_NN_GAMMA,)
 DEFAULT_SCS_TC_SERIALISER_J0_LIST: Sequence[float] = (DEFAULT_SCS_NN_J0,)
 
 _description = f"""
