@@ -1,6 +1,6 @@
 # TODO List
 
-### 1. Implement Different Dynamics for Ising Model
+### Implement Different Dynamics for Ising Model
 - [ ] Add alternative update rules beyond Glauber dynamics
   - [ ] Metropolis-Hastings dynamics
   - [ ] Heat-bath (Gibbs) dynamics
@@ -11,13 +11,16 @@
 - [ ] Update C/C++ backend implementations if needed
 - [ ] Add tests for each dynamics type
 - [ ] Document performance characteristics of each method
+  
+### Restyle Serializer
+- [ ] Use the L3D_Recon_srun as template.
 
-### 2. Documentation
+### Documentation
 - [ ] Add more examples to docstrings
 - [ ] Create tutorial notebooks for common workflows
 - [ ] Document all dynamics options once implemented
 
-### 3. Testing
+### Testing
 - [ ] Performance benchmarking suite
 
 ---
