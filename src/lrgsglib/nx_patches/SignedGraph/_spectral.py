@@ -133,6 +133,67 @@ def compute_k_eigvV(
         self._eigV_is_transposed = False
         if transpose:
             make_eigV_transposed(self)
+
+
+def compute_k_adj_eigvV(
+    self: "SignedGraph",
+    k: int = 1,
+    backend: str = 'scipy',
+    transpose: bool = True,
+    flip_to_pos: bool = True,
+    typf: type = np.float64,
+    which: str = 'LM'
+):
+    """
+    Compute k eigenvectors of the adjacency matrix with sparse/dense backends.
+
+    Parameters
+    ----------
+    k : int, default 1
+        Number of eigenvectors to compute.
+    backend : str, default 'scipy'
+        Backend to use: 'scipy', 'numpy', or 'cupy'.
+    transpose : bool, default True
+        If True, eigenvectors stored as row-major (M×N) where M is number of
+        eigenvectors and N is vector length. If False, stored as column-major.
+    flip_to_pos : bool, default True
+        If True, flip each eigenvector to have positive majority.
+    typf : type, default np.float64
+        Data type for computation.
+    which : str, default 'LM'
+        Which eigenvalues to find ('LM' = largest magnitude by default).
+    """
+    if getattr(self, "adj", None) is None:
+        raise ValueError(
+            "Adjacency matrix is not initialized; build it before computing "
+            "adjacency eigenpairs."
+        )
+
+    if (backend in ['numpy', 'cupy']) or k > self.N // 2:
+        compute_adjacency_spectrum_weigV(
+            self, backend=backend, transpose=transpose,
+            flip_to_pos=flip_to_pos, typf=typf
+        )
+        return
+
+    if not backend.startswith('scipy'):
+        raise ValueError(
+            f"Unsupported backend '{backend}' for sparse adjacency eigensolver. "
+            "Use a scipy backend or fall back to dense computation."
+        )
+
+    mode = backend.split('_')
+    mode = mode[-1] if len(mode) > 1 else 'caley'
+    self.adj_eigv, self.adj_eigV = scsp_eigsh(
+        self.adj.astype(typf), k=k, which=which, mode=mode
+    )
+
+    if flip_to_pos:
+        self.adj_eigV = flip_to_positive_majority_adapted(self.adj_eigV, axis=0)
+
+    self._adj_eigV_is_transposed = False
+    if transpose:
+        make_adj_eigV_transposed(self)
 #
 def compute_laplacian_spectrum_weigV(
     self: "SignedGraph",
@@ -271,6 +332,83 @@ def compute_laplacian_spectrum_weigV(
     self._eigV_is_transposed = False
     if transpose:
         make_eigV_transposed(self)
+
+
+def compute_adjacency_spectrum_weigV(
+    self: "SignedGraph",
+    backend: str = 'numpy',
+    transpose: bool = True,
+    flip_to_pos: bool = True,
+    typf: type = np.float64
+):
+    """
+    Compute the full eigendecomposition of the adjacency matrix.
+
+    Parameters
+    ----------
+    backend : str, default 'numpy'
+        Backend to use for computation: 'numpy' or 'cupy'.
+    transpose : bool, default True
+        If True, eigenvectors stored as row-major (M×N). If False, column-major.
+    flip_to_pos : bool, default True
+        If True, flip each eigenvector to have positive majority.
+    typf : type, default np.float64
+        Data type for computation.
+    """
+    if getattr(self, "adj", None) is None:
+        raise ValueError(
+            "Adjacency matrix is not initialized; build it before computing "
+            "adjacency eigenpairs."
+        )
+
+    logger.info("Computing eigenvectors for the adjacency matrix.")
+
+    cached_eigv = getattr(self, "adj_eigv", None)
+    cached_eigV = getattr(self, "adj_eigV", None)
+    cached_ready = (
+        cached_eigv is not None
+        and cached_eigV is not None
+        and cached_eigV.shape[0] == self.N
+        and cached_eigV.shape[1] == self.N
+    )
+
+    if cached_ready:
+        logger.debug("Using cached adjacency spectrum.")
+        eigv_transposed = getattr(self, "_adj_eigV_is_transposed", False)
+        if transpose and not eigv_transposed:
+            make_adj_eigV_transposed(self)
+        elif not transpose and eigv_transposed:
+            make_adj_eigV_column_major(self)
+        return
+
+    def _dense_adj():
+        adj_matrix = self.adj.astype(typf)
+        return adj_matrix.toarray() if hasattr(adj_matrix, "toarray") else np.asarray(adj_matrix, dtype=typf)
+
+    match backend:
+        case 'cupy':
+            try:
+                import cupy as cp
+                dense_adj = _dense_adj()
+                adj_gpu = cp.asarray(dense_adj)
+                eigv, eigV = cp.linalg.eigh(adj_gpu)
+                self.adj_eigv, self.adj_eigV = eigv.get(), eigV.get()
+            except ImportError:
+                logger.warning(
+                    "cupy not available, falling back to numpy backend for adjacency spectrum."
+                )
+                dense_adj = _dense_adj()
+                self.adj_eigv, self.adj_eigV = np.linalg.eigh(dense_adj)
+        case 'numpy' | _:
+            dense_adj = _dense_adj()
+            self.adj_eigv, self.adj_eigV = np.linalg.eigh(dense_adj)
+
+    if flip_to_pos:
+        self.adj_eigV = flip_to_positive_majority_adapted(self.adj_eigV, axis=0)
+
+    self._adj_eigV_is_transposed = False
+    if transpose:
+        make_adj_eigV_transposed(self)
 #
 # get methods
 #
@@ -900,5 +1038,15 @@ def make_eigV_transposed(self: "SignedGraph"):
 def make_eigV_column_major(self: "SignedGraph"):
     self.eigV = self.eigV.T
     self._eigV_is_transposed = False
+
+
+def make_adj_eigV_transposed(self: "SignedGraph"):
+    self.adj_eigV = self.adj_eigV.T
+    self._adj_eigV_is_transposed = True
+
+
+def make_adj_eigV_column_major(self: "SignedGraph"):
+    self.adj_eigV = self.adj_eigV.T
+    self._adj_eigV_is_transposed = False
 
     

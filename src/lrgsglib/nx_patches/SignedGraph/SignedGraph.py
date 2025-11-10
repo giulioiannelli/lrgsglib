@@ -855,8 +855,12 @@ class SignedGraph:
     from ._spectral import compute_laplacian_spectrum
     from ._spectral import compute_laplacian_spectrum_weigV
     from ._spectral import compute_k_eigvV
+    from ._spectral import compute_k_adj_eigvV
+    from ._spectral import compute_adjacency_spectrum_weigV
     from ._spectral import make_eigV_transposed
     from ._spectral import make_eigV_column_major
+    from ._spectral import make_adj_eigV_transposed
+    from ._spectral import make_adj_eigV_column_major
     #
     # information theory tools (imported from ._infotheory)
     #
