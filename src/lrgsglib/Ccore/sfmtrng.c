@@ -3,6 +3,10 @@
 #include <inttypes.h>
 #include "sfmtrng.h"
 #include "SFMT/SFMT.h"
+
+/* Global SFMT state */
+sfmt_t sfmt;
+
 /*////////////////////////////////////////////////////////////////////// RNGS */
 //
 /** generate and return 64-bit pseudorandom number. init_gen_rand or

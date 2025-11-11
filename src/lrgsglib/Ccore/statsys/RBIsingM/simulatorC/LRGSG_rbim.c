@@ -2,7 +2,6 @@
 #include "LRGSG_rbim.h"
 #include "sfmtrng.h"
 
-sfmt_t sfmt;
 uint32_t *seed_rand;
 double thSTEP;
 double eqSTEP;

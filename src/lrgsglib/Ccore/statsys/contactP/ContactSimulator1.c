@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     for (size_t t = 0; t < steps; ++t) {
         for (size_t sweep = 0; sweep < N; ++sweep) {
             size_t node = (size_t)(RNG_u64() % N);
-            size_tp degree = neigh_len[node];
+            size_t degree = neigh_len[node];
             NodeEdges edges_node = node_edges[node];
             double lambda = cp_linear_input(gamma, state, degree, edges_node);
             double prob = cp_activation_probability(lambda, activation);

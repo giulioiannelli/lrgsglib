@@ -3,7 +3,7 @@
 #include <math.h>
 #include <strings.h>
 
-double cp_infection_rate(size_t node, spin_tp state, size_tp degree, NodeEdges edges) {
+double cp_infection_rate(size_t node, spin_tp state, size_t degree, NodeEdges edges) {
     (void)node;
     double rate = 0.0;
     for (size_t idx = 0; idx < degree; ++idx) {
@@ -26,7 +26,7 @@ cp_activation_t cp_activation_from_string(const char *name) {
     return CP_ACTIVATION_TANH;
 }
 
-double cp_linear_input(double gamma, spin_tp state, size_tp degree, NodeEdges edges) {
+double cp_linear_input(double gamma, spin_tp state, size_t degree, NodeEdges edges) {
     double total = 0.0;
     for (size_t idx = 0; idx < degree; ++idx) {
         size_t neighbour = edges.neighbors[idx];
@@ -55,7 +55,7 @@ double cp_activation_probability(double lambda, cp_activation_t activation) {
     return prob;
 }
 
-double cp_recovery_rate(size_t node, double mu, spin_tp state, size_tp degree, NodeEdges edges) {
+double cp_recovery_rate(size_t node, double mu, spin_tp state, size_t degree, NodeEdges edges) {
     (void)node;
     double rate = mu;
     for (size_t idx = 0; idx < degree; ++idx) {

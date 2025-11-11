@@ -5,11 +5,8 @@ import types
 import unittest
 from pathlib import Path
 
-import pytest
-
-np = pytest.importorskip("numpy")
-nx = pytest.importorskip("networkx")
-
+import networkx as nx
+import numpy as np
 
 class TestContactProcess(unittest.TestCase):
     @classmethod

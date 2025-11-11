@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     for (size_t t = 0; t < steps; ++t) {
         for (size_t sweep = 0; sweep < N; ++sweep) {
             size_t node = (size_t)(RNG_u64() % N);
-            size_tp degree = neigh_len[node];
+            size_t degree = neigh_len[node];
             NodeEdges edges_node = node_edges[node];
             if (state[node]) {
                 double rate = cp_recovery_rate(node, mu, state, degree, edges_node);
