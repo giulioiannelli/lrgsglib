@@ -53,26 +53,6 @@ L3D_TransCluster_args = {**L3D_args}
 
 L3D_TransCluster_optional_args_dict = {
     **L3D_opt_args,
-    tuple(['--pdil']): {
-        'help': phelp_pdil,
-        'type': float,
-        'default': DEFAULT_L3D_TRANSCLUSTER_PDIL,
-    },
-    tuple(['--mu']): {
-        'help': phelp_mu,
-        'type': float,
-        'default': DEFAULT_L3D_TRANSCLUSTER_MU,
-    },
-    tuple(['--sigma']): {
-        'help': phelp_sigma,
-        'type': float,
-        'default': DEFAULT_L3D_TRANSCLUSTER_SIGMA,
-    },
-    tuple(['--edge_weight']): {
-        'help': phelp_edge_weight,
-        'type': str,
-        'default': DEFAULT_L3D_TRANSCLUSTER_EDGE_WEIGHT,
-    },
     tuple(['-m', '--mode']): {
         'help': phelp_transcluster_mode,
         'type': str,
@@ -93,14 +73,66 @@ L3D_TransCluster_optional_args_dict = {
         'type': str,
         'default': DEFAULT_L3D_TRANSCLUSTER_FLOAT_TYPE,
     },
-    tuple(['-na', '--number_of_averages']): {
-        'help': phelp_navg,
-        'type': int,
-        'default': DEFAULT_L3D_TRANSCLUSTER_NAVG,
-    },
 }
 
 L3D_TransCluster_action_args_dict = {**action_args_dict}
+
+L3D_TransCluster_srun_description = f"""Serialiser for {L3D_TransCluster_progName}.py"""
+
+L3D_TransCluster_srun_optional_args_dict = {
+    tuple(["-m", "--mode"]): {
+        "help": "Execution mode: 'pCluster', 'ordParam', 'slanzarv_pCluster', or 'slanzarv_ordParam'. "
+                "If 'slanzarv_' prefix is present, jobs will be submitted via slanzarv.",
+        "type": str,
+        "choices": ["pCluster", "ordParam", "slanzarv_pCluster", "slanzarv_ordParam"],
+        "default": "slanzarv_ordParam",
+    },
+    tuple(["--L-list"]): {
+        "help": f"List of lattice sizes | default={list(DEFAULT_L3D_TRANSCLUSTER_SRUN_L_LIST)}",
+        "type": int,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--L-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for lattice sizes",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--p-list"]): {
+        "help": "Explicit probabilities for flipped edges",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--p-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for flipped-edge probabilities",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--mu-list"]): {
+        "help": "Explicit mu values for normal edge weights (triggers normal mode)",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--mu-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for mu values (triggers normal mode)",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--sigma-list"]): {
+        "help": "Explicit sigma values for normal edge weights (triggers normal mode)",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--sigma-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for sigma values (triggers normal mode)",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    **srun_opt_args,
+}
 
 SCS_TransCluster_progName = 'SCS_TransCluster'
 SCS_TransCluster_progNameShrt = 'SCSTC'
@@ -119,38 +151,90 @@ SCS_TransCluster_optional_args_dict = {
     tuple(['-na', '--number_of_averages']): {
         'help': phelp_navg,
         'type': int,
-        'default': DEFAULT_SCS_TRANSCLUSTER_NAVG,
+        'default': DEFAULT_SCS_NN_NAVG,
     },
     tuple(['-m', '--mode']): {
         'help': phelp_transcluster_mode,
         'type': str,
-        'default': DEFAULT_SCS_TRANSCLUSTER_MODE,
+        'default': DEFAULT_SCS_NN_MODE,
     },
     tuple(['-sf', '--save_frequency']): {
         'help': phelp_scs_save_frequency,
         'type': int,
-        'default': DEFAULT_SCS_TRANSCLUSTER_SAVE_FREQUENCY,
+        'default': DEFAULT_SCS_NN_SAVE_FREQUENCY,
     },
     tuple(['-o', '--out_suffix']): {
         'help': phelp_out_suffix,
         'type': str,
-        'default': DEFAULT_SCS_TRANSCLUSTER_OUT_SUFFIX,
+        'default': DEFAULT_SCS_NN_OUT_SUFFIX,
     },
     tuple(['-t', '--float_type']): {
         'help': phelp_scs_float_type,
         'type': str,
-        'default': DEFAULT_SCS_TRANSCLUSTER_FLOAT_TYPE,
+        'default': DEFAULT_SCS_NN_FLOAT_TYPE,
     },
     tuple(['--backend']): {
         'help': phelp_scs_backend,
         'type': str,
-        'default': DEFAULT_SCS_TRANSCLUSTER_BACKEND,
+        'default': DEFAULT_SCS_NN_BACKEND,
     },
     tuple(['--partition-rule']): {
         'help': phelp_scs_partition_rule,
         'type': str,
-        'default': DEFAULT_SCS_TRANSCLUSTER_PARTITION_RULE,
+        'default': DEFAULT_SCS_NN_PARTITION_RULE,
     },
 }
 
 SCS_TransCluster_action_args_dict = {**SCSGeneralized_action_args_dict}
+
+SCS_TransCluster_srun_description = f"""Serialiser for {SCS_TransCluster_progName}.py"""
+
+SCS_TransCluster_srun_optional_args_dict = {
+    tuple(["--N-list"]): {
+        "help": f"List of network sizes N | default={list(DEFAULT_SCS_NN_SRUN_N_LIST)}",
+        "type": int,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--gamma-list"]): {
+        "help": f"List of gamma values | default={list(DEFAULT_SCS_NN_SRUN_GAMMA_LIST)}",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--J0-list"]): {
+        "help": f"List of J0 values | default={list(DEFAULT_SCS_NN_SRUN_J0_LIST)}",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--J-list"]): {
+        "help": "List of J coupling values",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--J-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for J values",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--g-list"]): {
+        "help": "List of g coupling values",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--g-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for g values",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--diagonal-list"]): {
+        "help": f"List of diagonal values | default={list(DEFAULT_SCS_NN_SRUN_DIAGONAL_LIST)}",
+        "type": str,
+        "nargs": "+",
+        "default": None,
+    },
+    **srun_opt_args,
+}
