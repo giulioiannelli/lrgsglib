@@ -4,8 +4,9 @@
 #include "LRGSG_binsys.h"
 
 #define CP_DIR "%s/lrgsg/%s/"
-#define SINI_FNAME CP_DIR "s_" PSTR "%s" BINX
-#define SOUT_FNAME CP_DIR "sout_" PSTR "%s" BINX
+#define SINI_FNAME CP_DIR "s_" PSTR "_%s" BINX
+#define SOUT_FNAME CP_DIR "sout_" PSTR "_%s" BINX
+#define DENS_FNAME CP_DIR "dens_" PSTR "_%s" BINX
 
 /* Contact-process helper routines */
 double cp_infection_rate(size_t node, spin_tp state, size_t degree, NodeEdges edges);

@@ -82,6 +82,8 @@ class ContactProcess(BinDynSys):
         """Initialise the state and export data if required."""
 
         self.reset_observables()
+        if custom is not None:
+            self.ic = "custom"
         self.init_s(custom)
         self.s = self.s.astype(np.int8, copy=False)
         if self.runlang.startswith("C"):
