@@ -1,12 +1,13 @@
 #include "LRGSG_cp.h"
 #include "LRGSG_utils.h"
 #include "sfmtrng.h"
+#include <math.h>
 
 #define EXPECTED_ARGC (10 + 1)
 
 int main(int argc, char *argv[]) {
     if (argc < EXPECTED_ARGC) {
-        fprintf(stderr, "Usage: %s N p gamma steps datdir syshape run_id out_id activation nSampleLog\n", argv[0]);
+        fprintf(stderr, "Usage: %s N p gamma steps datdir syshape run_id out_id activation num_log_samples\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -22,7 +23,7 @@ int main(int argc, char *argv[]) {
     const char *run_id = argv[7];
     const char *out_id = argv[8];
     const char *activation_name = argv[9];
-    int nSampleLog = atoi(argv[10]);
+    size_t num_log_samples = strtozu(argv[10]);
 
     cp_activation_t activation = cp_activation_from_string(activation_name);
 
@@ -43,35 +44,35 @@ int main(int argc, char *argv[]) {
     sprintf(buf, EDGL_FNAME, datdir, syshape, p, run_id);
     process_edges(buf, N, &edges, &node_edges, &neigh_len);
 
-    /* Generate logarithmically spaced time points */
-    int* logspc = logspace_int(log10((double)steps), &nSampleLog);
+    /* Allocate density array - will be filled by Python's log-spaced indices */
+    double *density = __chCalloc(num_log_samples, sizeof(double));
 
-    /* Open output file for snapshots */
-    FILE *f_sout;
-    sprintf(buf, SOUT_FNAME, datdir, syshape, p, out_id);
-    __fopen(&f_sout, buf, "wb");
+    /* Open output file for density time series */
+    FILE *f_dens;
+    sprintf(buf, DENS_FNAME, datdir, syshape, p, out_id);
+    __fopen(&f_dens, buf, "wb");
+
+    /* Calculate initial density */
+    size_t sum = 0;
+    for (size_t i = 0; i < N; ++i) {
+        sum += state[i];
+    }
+    
+    size_t sample_idx = 0;
+    density[sample_idx++] = (double)sum / (double)N;
+    
+    fprintf(stderr, "Initial density: %.6f, will save %zu samples\n", density[0], num_log_samples);
 
     /* Get activation function pointer once */
     cp_activation_func_t activation_func = cp_get_activation_function(activation);
 
-    /* Simulation loop with log-spaced snapshots */
-    int next_sample_idx = 0;
+    /* Simulation loop - save density every step */
     size_t t;
     for (t = 0; t < steps; ++t) {
         /* Check for absorbing state - early termination */
-        size_t sum = 0;
-        for (size_t i = 0; i < N; ++i) {
-            sum += state[i];
-        }
         if (sum == 0) {
             fprintf(stderr, "Absorbing state reached at step %zu/%zu\n", t, steps);
             break;
-        }
-
-        /* Save snapshot at logarithmically spaced intervals */
-        if (next_sample_idx < nSampleLog && t == (size_t)logspc[next_sample_idx]) {
-            fwrite(state, sizeof(*state), N, f_sout);
-            next_sample_idx++;
         }
 
         /* Monte Carlo sweep */
@@ -81,17 +82,37 @@ int main(int argc, char *argv[]) {
             NodeEdges edges_node = node_edges[node];
             double lambda = cp_linear_input(gamma, state, degree, edges_node);
             double prob = activation_func(lambda);
+            int8_t old_state = state[node];
             state[node] = (int8_t)(RNG_dbl() < prob);
+            // Update sum efficiently
+            sum += (state[node] - old_state);
+        }
+        
+        /* Save density at every step (Python will subsample) */
+        if (sample_idx < num_log_samples) {
+            density[sample_idx++] = (double)sum / (double)N;
         }
     }
+    
+    /* Fill remaining samples with final density if simulation ended early */
+    double final_density = (double)sum / (double)N;
+    while (sample_idx < num_log_samples) {
+        density[sample_idx++] = final_density;
+    }
+    
+    fprintf(stderr, "Simulation complete: %zu steps, final density=%.6f, saved %zu samples\n", 
+            t, final_density, sample_idx);
+
+    /* Write density values as simple array */
+    fwrite(density, sizeof(double), num_log_samples, f_dens);
+    fclose(f_dens);
 
     /* Write final state to stdout */
     fwrite(state, sizeof(*state), N, stdout);
     fflush(stdout);
 
     /* Cleanup */
-    fclose(f_sout);
-    free(logspc);
+    free(density);
     free(edges);
     for (size_t i = 0; i < N; ++i) {
         if (neigh_len[i]) {

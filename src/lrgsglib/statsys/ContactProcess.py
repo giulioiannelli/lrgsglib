@@ -32,9 +32,10 @@ class ContactProcess(BinDynSys):
         activation: Literal["tanh", "relu"] = "tanh",
         save_density: bool = False,
         state_type: Literal["binary", "bipolar"] | None = None,
+        num_log_samples: int = 1000,
         **kwargs: Any,
     ) -> None:
-        dynpath = getattr(sg, "path_contact", None)
+        dynpath = getattr(sg, "path_cntct", None)
         if dynpath is None:
             dynpath = getattr(sg, "path_lrgsg", getattr(sg, "path_data", Path.cwd()))
         super().__init__(
@@ -45,8 +46,15 @@ class ContactProcess(BinDynSys):
         )
         self.mu = float(mu)
         self.gamma = float(gamma) if gamma is not None else None
+        # Rescale gamma by average degree k = M/N
+        if self.gamma is not None:
+            k = sg.Ne / sg.N  # Average degree
+            self.gamma_eff = self.gamma / k
+        else:
+            self.gamma_eff = None
         self.activation = self._validate_activation(activation)
         self.save_density = save_density
+        self.num_log_samples = int(num_log_samples)
         self.reset_observables()
         self.sini: np.ndarray | None = None
         self.stderr_path: Path | None = None
@@ -93,8 +101,6 @@ class ContactProcess(BinDynSys):
             if self.rndStr and not exName:
                 exName = self.run_id
             self.sg._export_edgel_bin(exName=self.run_id)
-            if self._c_program_key() == "C1":
-                self.sg.export_adj_bin(exName=self.run_id)
         self.sini = self.s.copy()
 
     def check_attribute(self) -> None:
@@ -151,7 +157,7 @@ class ContactProcess(BinDynSys):
         if not self.runlang or not self.runlang.upper().startswith("C"):
             raise ValueError("C backend requested but runlang is not a C variant.")
         suffix = self.runlang[1:]
-        return "C0" if suffix == "" else f"C{suffix}"
+        return "C0" if suffix == "" else f"C{suffix.upper()}"
 
     def _validate_activation(self, activation: str) -> Literal["tanh", "relu"]:
         normalized = activation.lower()
@@ -159,59 +165,75 @@ class ContactProcess(BinDynSys):
             raise ValueError("activation must be either 'tanh' or 'relu'.")
         return cast(Literal["tanh", "relu"], normalized)
 
+    def _build_c_arglist_base(self) -> list[str]:
+        """Build base argument list common to all ContactSimulator variants."""
+        try:
+            datdir = self.sg.path_sgdata.relative_to(Path.cwd())
+        except ValueError:
+            datdir = self.sg.path_sgdata
+        syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
+        self.out_id = self.out_suffix
+        return [
+            f"{self.N}",
+            f"{self.sg.pflip:.12g}",
+            str(datdir),
+            syshape,
+            self.run_id,
+            self.out_id,
+        ]
+
     def _build_c_arglist(self) -> list[str]:
-        builders = {
-            "C0": self._build_c_arglist_c0,
-            "C1": self._build_c_arglist_c1,
-        }
+        """Build complete argument list based on C program variant."""
         key = self._c_program_key()
-        try:
-            return builders[key]()
-        except KeyError as exc:
-            raise ValueError(f"Unsupported C program key '{key}'.") from exc
-
-    def _build_c_arglist_c0(self) -> list[str]:
-        try:
-            datdir = self.sg.path_sgdata.relative_to(Path.cwd())
-        except ValueError:
-            datdir = self.sg.path_sgdata
-        syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
-        self.out_id = self.out_suffix
-        return [
-            f"{self.N}",
-            f"{self.sg.pflip:.12g}",
-            f"{self.mu:.12g}",
-            f"{self.simtime}",
-            str(datdir),
-            syshape,
-            self.run_id,
-            self.out_id,
-        ]
-
-    def _build_c_arglist_c1(self) -> list[str]:
-        if self.gamma is None:
-            raise ValueError("gamma must be provided when using runlang 'C1'.")
-        try:
-            datdir = self.sg.path_sgdata.relative_to(Path.cwd())
-        except ValueError:
-            datdir = self.sg.path_sgdata
-        syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
-        self.out_id = self.out_suffix
-        return [
-            f"{self.N}",
-            f"{self.sg.pflip:.12g}",
-            f"{self.gamma:.12g}",
-            f"{self.simtime}",
-            str(datdir),
-            syshape,
-            self.run_id,
-            self.out_id,
-            self.activation,
-        ]
+        base_args = self._build_c_arglist_base()
+        
+        if key == "C0":
+            # C0: N p mu steps datdir syshape run_id out_id
+            return [
+                base_args[0],  # N
+                base_args[1],  # p
+                f"{self.mu:.12g}",
+                f"{self.simtime}",
+            ] + base_args[2:]  # datdir, syshape, run_id, out_id
+        
+        elif key in ("C1", "C1A", "C1B", "C1C"):
+            # C1 variants: N p gamma steps datdir syshape run_id out_id activation [nSampleLog or num_log_samples]
+            if self.gamma is None:
+                raise ValueError(f"gamma must be provided when using runlang '{self.runlang}'.")
+            
+            args = [
+                base_args[0],  # N
+                base_args[1],  # p
+                f"{self.gamma_eff:.12g}",  # Use rescaled gamma_eff
+                f"{self.simtime}",
+            ] + base_args[2:] + [  # datdir, syshape, run_id, out_id
+                self.activation,
+            ]
+            
+            # C1a and C1c need extra sampling parameter
+            if key == "C1A":
+                nSampleLog = getattr(self, 'nSampleLog', 100)
+                args.append(f"{nSampleLog}")
+            elif key == "C1C":
+                args.append(f"{self.num_log_samples}")
+            
+            return args
+        
+        else:
+            raise ValueError(f"Unsupported C program key '{key}'.")
 
     def build_cprogram_command(self) -> None:
         c_key = self._c_program_key()
-        self.CbaseName = f"ContactSimulator{c_key[-1]}"
+        # Map C keys to program names
+        # Handle C1A→1a, C1B→1b, C1C→1c, C1→1, C0→0
+        if c_key == "C0":
+            program_suffix = "0"
+        elif c_key == "C1":
+            program_suffix = "1"
+        else:
+            # C1A, C1B, C1C, etc.
+            program_suffix = c_key[1:].lower()
+        self.CbaseName = f"ContactSimulator{program_suffix}"
         arglist = self._build_c_arglist()
         self.cprogram = [LRGSG_CCORE_BIN / self.CbaseName] + arglist
 
@@ -286,6 +308,8 @@ class ContactProcess(BinDynSys):
         self.check_attribute()
         self.initialize_run_parameters(steps)
         if self.runlang.startswith("C"):
+            # Rebuild C program command with updated simtime
+            self.build_cprogram_command()
             self.run_cprogram(verbose)
             if clean_export:
                 self.remove_run_c_files()

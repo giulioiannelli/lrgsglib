@@ -40,13 +40,16 @@ int main(int argc, char *argv[]) {
     sprintf(buf, EDGL_FNAME, datdir, syshape, p, run_id);
     process_edges(buf, N, &edges, &node_edges, &neigh_len);
 
+    /* Get activation function pointer once */
+    cp_activation_func_t activation_func = cp_get_activation_function(activation);
+
     for (size_t t = 0; t < steps; ++t) {
         for (size_t sweep = 0; sweep < N; ++sweep) {
             size_t node = (size_t)(RNG_u64() % N);
             size_t degree = neigh_len[node];
             NodeEdges edges_node = node_edges[node];
             double lambda = cp_linear_input(gamma, state, degree, edges_node);
-            double prob = cp_activation_probability(lambda, activation);
+            double prob = activation_func(lambda);
             state[node] = (int8_t)(RNG_dbl() < prob);
         }
     }
