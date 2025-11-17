@@ -557,7 +557,7 @@ class SignedGraph:
         path_plot : Path, optional
             The base path for plot storage. Defaults to the global PATHPLOT.
         make_dir_tree : bool, optional
-            If True, creates the necessary directory structure.
+            If True, creates the necessary directory structure for graph data.
         exist_ok : bool, optional
             If True, existing directories will not raise an error.
 
@@ -568,6 +568,11 @@ class SignedGraph:
         
         Notes
         -----
+        This method creates directories only for graph-related data (graph, lrgsg,
+        phtra, spect). Dynamics-specific directories (ising, voter, contact) are
+        defined but not created until their respective dynamics classes 
+        (IsingDynamics, VoterModel, ContactProcess) are instantiated.
+        
         Ensures syshapePth exists. Many topology subclasses set 
         `self.syshapePth` during their own initialization. When SignedGraph 
         is created directly from a networkx.Graph (without those wrappers) 
@@ -594,11 +599,19 @@ class SignedGraph:
                 except Exception:
                     self.syshapePth = "N=unknown"
 
+        # Create paths for graph-related subdirectories only
+        # Dynamics-specific paths (ising, voter, contact) are created 
+        # by their respective dynamics classes when instantiated
         self.subpath_list = []
-        for p in PATHN_LIST:
+        for p in PATHN_GRAPH_LIST:
             pfname = Path(p, self.syshapePth)
             setattr(self, f"path_{p}", self.path_sgdata / pfname)
             self.subpath_list.append(getattr(self, f"path_{p}"))
+        
+        # Initialize dynamics paths as None (will be set by dynamics classes)
+        for p in PATHN_DYNAMICS_LIST:
+            pfname = Path(p, self.syshapePth)
+            setattr(self, f"path_{p}", self.path_sgdata / pfname)
         #
         if make_dir_tree: self.__init_dirs__(exist_ok)
     #

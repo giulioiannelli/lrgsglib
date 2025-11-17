@@ -22,6 +22,27 @@ StateType = Literal["bipolar", "binary"]
 
 
 class BinDynSys:
+    """Base class for binary dynamical systems on signed graphs.
+    
+    This class provides the foundation for implementing dynamics where nodes
+    can take binary states (either bipolar: {-1, +1} or binary: {0, 1}).
+    
+    Directory Management
+    --------------------
+    When a BinDynSys subclass (IsingDynamics, VoterModel, ContactProcess) is
+    instantiated, it automatically creates its dynamics-specific directory
+    (ising/, voter/, or contact/) within the graph's data hierarchy. This
+    ensures that dynamics data is only created when actually needed.
+    
+    Attributes
+    ----------
+    s_t : list[np.ndarray]
+        Time series of state configurations.
+    dynpath : Path
+        Path to the dynamics-specific data directory.
+    run_id : str
+        Unique identifier for this simulation run.
+    """
     s_t: list[np.ndarray] = []
     dynpath: Path | str = ""
     run_id: str = ""
@@ -62,12 +83,22 @@ class BinDynSys:
             self.dynpath = Path(base_dynpath)
         else:
             self.dynpath = Path(dynpath)
+        # Ensure the dynamics directory exists
+        self._ensure_dynpath_exists()
         self._set_state_type(state_type)
         self.s: np.ndarray = np.zeros(self.N, dtype=np.int8)
     
     @property
     def N(self) -> int:
         return self.sg.N
+
+    def _ensure_dynpath_exists(self) -> None:
+        """
+        Ensure the dynamics directory exists. Creates it if necessary.
+        This is called during initialization to set up the directory
+        structure for dynamics-specific data.
+        """
+        self.dynpath.mkdir(parents=True, exist_ok=True)
 
     def _set_state_type(self, state_type: StateType) -> None:
         if state_type not in {"bipolar", "binary"}:
