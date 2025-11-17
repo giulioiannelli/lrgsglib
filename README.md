@@ -19,8 +19,31 @@ The C sources for the performance critical parts live in `src/lrgsglib/Ccore` an
    conda activate lrgsgenv
    ```
 3. **Build the project**
+   
+   **Standalone usage:**
    ```bash
    make all
+   ```
+   
+   **Submodule usage** (e.g., in `lrgsglib-ipynb`): 
+   Configure paths relative to the outer project instead of the `lrgsglib` subdirectory:
+   ```bash
+   # From the lrgsglib subdirectory
+   make all LRGSG_LLIB=$(pwd)/.. CONDA_ENV_NAME=your_env_name
+   ```
+   
+   **What this does:**
+   - Sets `LRGSG_LLIB` to the outer project root
+   - Configures data folder as `outer-project/data` (instead of `lrgsglib/data`)
+   - Configures notebooks as `outer-project/ipynb` (instead of `lrgsglib/ipynb`)
+   - Configures logs as `outer-project/.log` (instead of `lrgsglib/.log`)
+   - Keeps all library source code paths relative to `lrgsglib/`
+   - Uses your custom conda environment name instead of the default `lrgsgenv`
+   
+   **Example for lrgsglib-ipynb:**
+   ```bash
+   cd lrgsglib
+   make all LRGSG_LLIB=$(pwd)/.. CONDA_ENV_NAME=lrgsgnb
    ```
 4. **Install in editable mode**
    ```bash
