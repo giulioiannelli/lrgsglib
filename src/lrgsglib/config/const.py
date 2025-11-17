@@ -42,8 +42,13 @@ PATHNPHTR = 'phtra'
 PATHNPLOT = 'plot'
 PATHNSPEC = 'spect'
 PATHNVM = 'voter'
-PATHNCP = 'contact_process'
-PATHN_LIST = [PATHNGRPH, PATHNISNG, PATHNLRGS, PATHNPHTR, PATHNSPEC, PATHNVM, PATHNCP]
+PATHNCP = 'cntct'
+# Graph-related paths (created by SignedGraph)
+PATHN_GRAPH_LIST = [PATHNGRPH, PATHNLRGS, PATHNPHTR, PATHNSPEC]
+# Dynamics-related paths (created by respective dynamics classes)
+PATHN_DYNAMICS_LIST = [PATHNISNG, PATHNVM, PATHNCP]
+# All paths (for backward compatibility)
+PATHN_LIST = PATHN_GRAPH_LIST + PATHN_DYNAMICS_LIST
 #
 PATHPLOT =  PATHDATA / Path(PATHNPLOT)
 PATHPAPER = PATHPLOT / Path(PATHNPAPR)
