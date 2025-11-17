@@ -18,7 +18,6 @@ __all__ = [
     "build_geometry_selector",
     "compose_output_path",
     "load_pcluster_state",
-    "resolve_float_type",
     "resolve_mode_extension",
 ]
 
@@ -28,17 +27,6 @@ class SupportsNetworkDict(Protocol):
 
     nwDict: Any
 
-
-def resolve_float_type(float_type: str) -> type[np.floating]:
-    """Map a float type string to the corresponding NumPy floating type."""
-
-    match float_type:
-        case "float32":
-            return np.float32
-        case "float64":
-            return np.float64
-        case _:
-            raise ValueError(f"Invalid float type specified: {float_type}")
 
 
 def resolve_mode_extension(mode: str) -> str:

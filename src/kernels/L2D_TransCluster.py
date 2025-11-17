@@ -15,9 +15,9 @@ from .TransClusters import (
     build_geometry_selector,
     compose_output_path,
     load_pcluster_state,
-    resolve_float_type,
     resolve_mode_extension,
 )
+from .generic import resolve_float_type
 
 __all__ = ["run_transcluster"]
 

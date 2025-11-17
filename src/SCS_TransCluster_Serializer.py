@@ -6,40 +6,15 @@ from typing import Callable, Iterable, Sequence
 
 import numpy as np
 
-from kernels.Serializer import build_jobname, build_memory_function
-from parsers.SCS_TransCluster_Serializer import parser, SCS_TransCluster_progName, SCS_TransCluster_progNameShrt
-from lrgsglib.config.progargs import (
-    DEFAULT_SCS_NN_SRUN_N_LIST,
-    DEFAULT_SCS_NN_SRUN_GAMMA_LIST,
-    DEFAULT_SCS_NN_SRUN_J0_LIST,
-    DEFAULT_SCS_NN_SRUN_J_LIST,
-    DEFAULT_SCS_NN_SRUN_G_LIST,
-    DEFAULT_SCS_NN_SRUN_DIAGONAL_LIST,
+from kernels.Serializer import (
+    build_jobname,
+    build_memory_function,
+    _determine_precision,
+    _format_value_consistently,
+    _collect_values,
+    _collect_values_typed,
 )
-
-
-def _collect_values(
-    explicit: Iterable[float] | None,
-    linspace_values,
-    default_values: Sequence[float],
-) -> list[float]:
-    return _collect_values_typed(explicit, linspace_values, default_values, float)
-
-
-def _collect_values_typed(
-    explicit: Iterable[float] | None,
-    linspace_values,
-    default_values: Sequence[float],
-    caster: Callable[[float], float],
-) -> list[float]:
-    values: list[float] = []
-    if explicit:
-        values.extend(caster(v) for v in explicit)
-    if linspace_values is not None:
-        values.extend(caster(v) for v in np.asarray(linspace_values, dtype=float))
-    if not values:
-        values.extend(caster(v) for v in default_values)
-    return values
+from parsers.SCS_TransCluster_Serializer import parser, SCS_TransCluster_progName, SCS_TransCluster_progNameShrt
 
 
 def main() -> None:
@@ -51,41 +26,38 @@ def main() -> None:
     N_values = _collect_values_typed(
         args.N_list,
         None,  # No linspace for N
-        DEFAULT_SCS_NN_SRUN_N_LIST,
         int,
     )
 
     gamma_values = _collect_values_typed(
         args.gamma_list,
         None,  # No linspace for gamma
-        DEFAULT_SCS_NN_SRUN_GAMMA_LIST,
         float,
     )
 
     j0_values = _collect_values(
         args.J0_list,
         None,  # No linspace for J0
-        DEFAULT_SCS_NN_SRUN_J0_LIST,
     )
 
     J_values = _collect_values(
         args.J_list,
         args.J_linsp,
-        DEFAULT_SCS_NN_SRUN_J_LIST,
     )
 
     g_values = _collect_values(
         args.g_list,
         args.g_linsp,
-        DEFAULT_SCS_NN_SRUN_G_LIST,
     )
 
-    # Diagonal values are strings
-    diagonal_values: list[str] = []
-    if args.diagonal_list:
-        diagonal_values.extend(str(v) for v in args.diagonal_list)
-    if not diagonal_values:
-        diagonal_values.extend(str(v) for v in DEFAULT_SCS_NN_SRUN_DIAGONAL_LIST)
+    # Diagonal values are strings (use explicit values from argparse, which include defaults)
+    diagonal_values: list[str] = [str(v) for v in args.diagonal_list]
+
+    # Calculate precision needed for consistent formatting in jobnames
+    gamma_precision = _determine_precision(gamma_values)
+    j0_precision = _determine_precision(j0_values)
+    J_precision = _determine_precision(J_values)
+    g_precision = _determine_precision(g_values)
 
     memoryfunc = build_memory_function(args.slanzarv_minMB, args.slanzarv_maxMB, N_values)
     script_path = Path("src") / f"{SCS_TransCluster_progName}.py"
@@ -100,13 +72,13 @@ def main() -> None:
         prog_args = [
             str(N),
             "--gamma",
-            f"{gamma:.12g}",
+            _format_value_consistently(gamma, gamma_precision),
             "--J0",
-            f"{j0:.12g}",
+            _format_value_consistently(j0, j0_precision),
             "--J",
-            f"{J_value:.12g}",
+            _format_value_consistently(J_value, J_precision),
             "--g",
-            f"{g_value:.12g}",
+            _format_value_consistently(g_value, g_precision),
             "--diagonal",
             diagonal,
         ]
@@ -122,12 +94,13 @@ def main() -> None:
             slanz_opts.extend(["--time", str(args.moretime)])
 
         # Build jobname from N, gamma, J, g, j0, diagonal
+        # Use consistent formatting based on calculated precision
         jobname_tokens = [
             f"N{N}",
-            f"g{gamma:.3g}",
-            f"J{J_value:.3g}",
-            f"gcpl{g_value:.3g}",
-            f"J0{j0:.3g}",
+            f"g{_format_value_consistently(gamma, gamma_precision)}",
+            f"J{_format_value_consistently(J_value, J_precision)}",
+            f"gcpl{_format_value_consistently(g_value, g_precision)}",
+            f"J0{_format_value_consistently(j0, j0_precision)}",
             f"diag{diagonal}",
         ]
         jobname = build_jobname(

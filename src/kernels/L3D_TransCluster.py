@@ -16,9 +16,10 @@ from .TransClusters import (
     build_geometry_selector,
     compose_output_path,
     load_pcluster_state,
-    resolve_float_type,
+    # resolve_float_type,  # Commented out to remove from SCS
     resolve_mode_extension,
 )
+from .generic import resolve_float_type
 
 __all__ = ["run_transcluster"]
 
@@ -220,10 +221,10 @@ def run_ordparam_mode(
 
         avg_count = avg_idx + 1
         if pinf:
-            pinf_mean = float(np.mean(pinf))
-            pinf_sq_mean = float(np.mean(pinf_sq))
+            pinf_mean = np.mean(pinf)
+            pinf_sq_mean = np.mean(pinf_sq)
             pinf_var = max(pinf_sq_mean - pinf_mean**2, 0.0)
-            pinf_std = float(np.sqrt(pinf_var))
+            pinf_std = np.std(pinf)
         else:
             pinf_mean = pinf_sq_mean = pinf_std = 0.0
 
@@ -234,6 +235,7 @@ def run_ordparam_mode(
             pinf_mean,
             pinf_sq_mean,
             pinf_std,
+            pinf_var,
         ]
         last_data = data
 

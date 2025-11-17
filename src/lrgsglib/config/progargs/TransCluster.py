@@ -191,28 +191,28 @@ SCS_TransCluster_srun_description = f"""Serialiser for {SCS_TransCluster_progNam
 
 SCS_TransCluster_srun_optional_args_dict = {
     tuple(["--N-list"]): {
-        "help": f"List of network sizes N | default={list(DEFAULT_SCS_NN_SRUN_N_LIST)}",
+        "help": "List of network sizes N",
         "type": int,
         "nargs": "+",
-        "default": None,
+        "default": list(DEFAULT_SCS_NN_SRUN_N_LIST),
     },
     tuple(["--gamma-list"]): {
-        "help": f"List of gamma values | default={list(DEFAULT_SCS_NN_SRUN_GAMMA_LIST)}",
+        "help": "List of gamma values",
         "type": float,
         "nargs": "+",
-        "default": None,
+        "default": list(DEFAULT_SCS_NN_SRUN_GAMMA_LIST),
     },
     tuple(["--J0-list"]): {
-        "help": f"List of J0 values | default={list(DEFAULT_SCS_NN_SRUN_J0_LIST)}",
+        "help": "List of J0 values",
         "type": float,
         "nargs": "+",
-        "default": None,
+        "default": list(DEFAULT_SCS_NN_SRUN_J0_LIST),
     },
     tuple(["--J-list"]): {
         "help": "List of J coupling values",
         "type": float,
         "nargs": "+",
-        "default": None,
+        "default": list(DEFAULT_SCS_NN_SRUN_J_LIST),
     },
     tuple(["--J-linsp"]): {
         "help": "Semicolon-separated linspace tuples for J values",
@@ -223,7 +223,7 @@ SCS_TransCluster_srun_optional_args_dict = {
         "help": "List of g coupling values",
         "type": float,
         "nargs": "+",
-        "default": None,
+        "default": list(DEFAULT_SCS_NN_SRUN_G_LIST),
     },
     tuple(["--g-linsp"]): {
         "help": "Semicolon-separated linspace tuples for g values",
@@ -231,10 +231,10 @@ SCS_TransCluster_srun_optional_args_dict = {
         "default": None,
     },
     tuple(["--diagonal-list"]): {
-        "help": f"List of diagonal values | default={list(DEFAULT_SCS_NN_SRUN_DIAGONAL_LIST)}",
+        "help": "List of diagonal values",
         "type": str,
         "nargs": "+",
-        "default": None,
+        "default": list(DEFAULT_SCS_NN_SRUN_DIAGONAL_LIST),
     },
     **srun_opt_args,
 }

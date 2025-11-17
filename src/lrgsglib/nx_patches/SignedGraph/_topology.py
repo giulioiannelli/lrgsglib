@@ -126,8 +126,11 @@ def get_edge_color(
     def map_values(value):
         if continuous:
             # Normalize value to [0, 1]
-            norm_value = (value - min_val) / (max_val - min_val)
-            return get_cmap(cmap)(norm_value)  # Get color from cmap
+            if max_val != min_val:
+                norm_value = (value - min_val) / (max_val - min_val)
+            else:
+                norm_value = 0.5  # If all values are the same, use middle of colormap
+            return norm_value  # Return normalized value, not RGBA
         return nec if value == -1 else pec if value == 1 else value
     
     arr = nx.get_edge_attributes(self.gr[on_g], thedata)

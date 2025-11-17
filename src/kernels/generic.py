@@ -1,12 +1,43 @@
 import logging
 import os
-#
+import numpy as np
 from pathlib import Path
 from typing import Optional, Any
-#
 from lrgsglib.loglib import setup_custom_logger
-#
-__all__ = ["setup_logger", "initialize_custom_logger"]
+
+__all__ = [
+    "setup_logger",
+    "initialize_custom_logger",
+    "resolve_backend",
+    "resolve_float_type",
+]
+
+# Valid backends and float types
+_VALID_BACKENDS = {"numpy", "cupy"}
+_VALID_FLOAT_TYPES = {"float32": np.float32, "float64": np.float64}
+
+def resolve_backend(backend: str) -> str:
+    """Validate and normalise the backend identifier."""
+    backend_norm = backend.lower()
+    if backend_norm not in _VALID_BACKENDS:
+        raise ValueError(f"Unsupported backend '{backend}'. Expected one of {_VALID_BACKENDS}.")
+    if backend_norm == "cupy":
+        try:
+            import cupy  # noqa: F401
+        except ImportError as exc:  # pragma: no cover - informative failure path
+            raise RuntimeError(
+                "Backend 'cupy' requested but CuPy is not available. Install cupy or choose 'numpy'."
+            ) from exc
+    return backend_norm
+
+def resolve_float_type(float_type: str) -> type:
+    """Map a float type string to the corresponding NumPy dtype."""
+    try:
+        return _VALID_FLOAT_TYPES[float_type]
+    except KeyError as exc:
+        raise ValueError(
+            f"Unsupported float type '{float_type}'. Expected one of {tuple(_VALID_FLOAT_TYPES)}."
+        ) from exc
 #
 def setup_logger(loglogger: Optional[Any]) -> Any:
     """
