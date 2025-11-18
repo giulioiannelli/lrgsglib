@@ -8,5 +8,5 @@ phelp_num_log_samples = "Number of logarithmic sampling points required by the C
 phelp_simpref = "Simulation time multiplier, i.e. total steps = simpref × number of nodes."
 phelp_ic_contact = "Initial condition for the ContactProcess (e.g. 'uniform', 'ground_state')."
 phelp_runlang_contact = "Execution backend for the ContactProcess (py, C0, C1, C1a, C1b, C1c)."
-phelp_rnd_str_contact = "Append a random string to the run identifier for unique exports."
+phelp_randstr_contact = "Append a random string to the run identifier for unique exports."
 phelp_outsuffix_contact = "Optional suffix appended to output/export file names."

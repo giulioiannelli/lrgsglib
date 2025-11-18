@@ -47,10 +47,10 @@ IsDyn_opt_args = {
         'type': str,
         'default': DEFAULT_VAL
     },
-    tuple(['-rnds', '--rnd_str']): {
-        'help': phelp_rnd_str,
-        'type': bool,
-        'default': DEFAULT_RND_STR
+    tuple(['-rnds', '--randstr']): {
+        'help': phelp_randstr_ising,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_randstr,
     },
 }
 IsDyn_srun_list_args = {

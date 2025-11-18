@@ -66,10 +66,10 @@ Contact_opt_args = {
         'type': str,
         'default': DEFAULT_OUTSFFX,
     },
-    tuple(['-rnds', '--rnd_str']): {
-        'help': phelp_rnd_str_contact,
-        'type': bool,
-        'default': DEFAULT_RND_STR,
+    tuple(['-rnds', '--randstr']): {
+        'help': phelp_randstr_contact,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_randstr,
     },
 }
 

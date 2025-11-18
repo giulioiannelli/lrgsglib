@@ -132,6 +132,9 @@ def _export_edgel_bin(
         on_g: str = SG_REPR
 ) -> None:
     fname = build_p_fname('edgelist', self.pflip, out_suffix=exName, ext=BIN)
+    # if exName is empty, C backends expect a trailing underscore before run_id
+    if not exName:
+        fname = Path(fname.stem + '_' + fname.suffix)
     self.path_exp_edgl = self.path_graph / fname
     #
     edges = self.gr[on_g].edges(data='weight')
