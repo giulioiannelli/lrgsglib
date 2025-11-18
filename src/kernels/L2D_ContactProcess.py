@@ -14,6 +14,13 @@ def _prepare_lattice(args):
 
 
 def run_simulation(args):
+    dynamics = args.dynamics.upper()
+    runlang = args.runlang.upper()
+    if dynamics == "EI" and runlang != "C1C":
+        raise NotImplementedError("Only the C1c backend is currently wired for EI dynamics in L2D_ContactProcess.")
+    if dynamics == "SIR":
+        raise NotImplementedError("SIR-like contact-process wiring will be implemented in a dedicated subprogram.")
+
     for _ in range(args.number_of_averages):
         lattice = _prepare_lattice(args)
         run_contact_process(args, lattice)
