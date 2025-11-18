@@ -1,12 +1,16 @@
 import os
 import sys
+import subprocess
 import tempfile
 import types
 import unittest
 from pathlib import Path
 
-import networkx as nx
-import numpy as np
+import pytest
+
+nx = pytest.importorskip("networkx")
+np = pytest.importorskip("numpy")
+from unittest import mock
 
 class TestContactProcess(unittest.TestCase):
     @classmethod
@@ -32,10 +36,11 @@ class TestContactProcess(unittest.TestCase):
         sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
         from lrgsglib.nx_patches import SignedGraph
-        from lrgsglib.statsys.ContactProcess import ContactProcess
+        from lrgsglib.statsys.ContactProcess import ContactProcessEI, ContactProcessSIR
 
         cls.SignedGraph = SignedGraph
-        cls.ContactProcess = ContactProcess
+        cls.ContactProcessSIR = ContactProcessSIR
+        cls.ContactProcessEI = ContactProcessEI
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -63,7 +68,13 @@ class TestContactProcess(unittest.TestCase):
 
     def test_init_contact_dynamics_uses_binary_state(self):
         sg = self._make_graph()
-        model = self.ContactProcess(sg, runlang="py", ic="uniform", seed=123, simpref=1)
+        model = self.ContactProcessSIR(
+            sg,
+            runlang="py",
+            ic="uniform",
+            seed=123,
+            simpref=1,
+        )
         model.init_contact_dynamics()
         try:
             unique = np.unique(model.s)
@@ -72,31 +83,95 @@ class TestContactProcess(unittest.TestCase):
             model.reset_observables()
 
     def test_c1_builder_exports_and_arguments(self):
-        sg = self._make_graph()
-        model = self.ContactProcess(
+        path_graph = nx.path_graph(3)
+        for u, v in path_graph.edges:
+            path_graph[u][v]["weight"] = 1.0
+        sg = self.SignedGraph(
+            path_graph,
+            pflip=0.0,
+            init_nw_dict=False,
+            path_data=self.data_dir,
+            path_plot=self.log_dir,
+        )
+        model = self.ContactProcessEI(
             sg,
-            runlang="C1",
-            gamma=0.5,
+            runlang="C1c",
+            gamma=0.6,
             activation="relu",
+            num_log_samples=25,
             seed=0,
             simpref=1,
         )
+        model.simtime = 42
         model.init_contact_dynamics()
         try:
             self.assertTrue(model.sfout.exists())
             self.assertTrue(hasattr(model.sg, "path_exp_edgl") and model.sg.path_exp_edgl.exists())
             self.assertTrue(hasattr(model.sg, "path_exp_adj") and model.sg.path_exp_adj.exists())
-            expected_binary = self.ccore_dir / "ContactSimulator1"
+            expected_binary = self.ccore_dir / "ContactSimulator1c"
             self.assertEqual(Path(model.cprogram[0]), expected_binary)
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
-            self.assertEqual(model.cprogram[3], f"{model.gamma:.12g}")
-            self.assertEqual(model.cprogram[-1], model.activation)
+            self.assertNotEqual(model.gamma_eff, model.gamma)
+            self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
+            self.assertEqual(model.cprogram[4], f"{model.simtime}")
+            self.assertEqual(model.cprogram[-2], model.activation)
+            self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
         finally:
             if model.stderr_fopen and not model.stderr_fopen.closed:
                 model.stderr_fopen.close()
             model.remove_run_c_files(remove_stderr=True)
             model.sg.remove_exported_files()
+
+    def test_sir_step_recovery_and_infection(self):
+        sg = self._make_graph()
+        model = self.ContactProcessSIR(
+            sg,
+            runlang="py",
+            mu=5.0,
+            simpref=1,
+            seed=0,
+        )
+
+        # Force deterministic random draws
+        random_calls = mock.Mock(side_effect=[0.0, 0.0])
+        with mock.patch("numpy.random.random", random_calls):
+            model.s = np.array([1, 0, 0, 0], dtype=np.int8)
+            model.ds1step(0)  # high mu => deactivate
+            self.assertEqual(model.s[0], 0)
+
+            model.s = np.array([1, 0, 0, 0], dtype=np.int8)
+            # Activate node 1 due to strong positive neighbour
+            sg.gr[sg.on_g][0][1]["weight"] = 10.0
+            model.ds1step(1)
+            self.assertEqual(model.s[1], 1)
+
+    def test_ei_run_requires_c_backend(self):
+        sg = self._make_graph()
+        model = self.ContactProcessEI(sg, gamma=0.4, runlang="py")
+        with self.assertRaises(NotImplementedError):
+            model.run()
+
+    def test_c_backend_run_reads_stdout_state(self):
+        sg = self._make_graph()
+        model = self.ContactProcessSIR(sg, mu=0.2, runlang="C0", simpref=1, seed=0)
+        model.simtime = 5
+
+        fake_binary = self.ccore_dir / "ContactSimulator0"
+        fake_binary.write_text("#!/bin/sh\n")
+
+        stdout_state = np.ones(model.N, dtype=np.int8)
+
+        with mock.patch("subprocess.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=[str(fake_binary)], returncode=0, stdout=stdout_state.tobytes()
+            )
+            model.init_contact_dynamics()
+            model.run(verbose=False, clean_export=False)
+
+        np.testing.assert_array_equal(model.s, stdout_state)
+        model.remove_run_c_files(remove_stderr=True)
+        model.sg.remove_exported_files()
 
 
 if __name__ == "__main__":  # pragma: no cover
