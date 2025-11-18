@@ -121,6 +121,7 @@ class TestContactProcess(unittest.TestCase):
             self.assertNotEqual(model.gamma_eff, model.gamma)
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
             self.assertEqual(model.cprogram[4], f"{model.simtime}")
+            self.assertEqual(model.cprogram[8], model.out_id)
             self.assertEqual(model.cprogram[-2], model.activation)
             self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
         finally:
@@ -205,7 +206,7 @@ class TestContactProcess(unittest.TestCase):
             init_cond="uniform",
             runlang="py",
             simpref=1,
-            rnd_str=False,
+            randstr=False,
             out_suffix="",
         )
         with self.assertRaises(ValueError):
@@ -218,6 +219,33 @@ class TestContactProcess(unittest.TestCase):
         )
         with self.assertRaises(NotImplementedError):
             self.cp_kernel.run_simulation(args)
+
+    def test_simpref_controls_total_steps(self):
+        sg = self._make_graph()
+        model = self.ContactProcessEI(sg, gamma=0.5, simpref=5)
+        self.assertEqual(model.simpref, 5)
+        self.assertEqual(model.simtime, 5 * model.N)
+
+    def test_out_id_includes_gamma_and_random_suffix(self):
+        sg = self._make_graph()
+        model = self.ContactProcessEI(
+            sg,
+            gamma=0.499,
+            runlang="C1c",
+            simpref=2,
+            rndStr=True,
+            out_suffix="uniform_rand",
+        )
+        model.init_contact_dynamics()
+        try:
+            self.assertTrue(model.run_id)
+            self.assertIn("gamma=0.499", model.out_id)
+            self.assertTrue(model.out_id.endswith(model.run_id))
+        finally:
+            if model.stderr_fopen and not model.stderr_fopen.closed:
+                model.stderr_fopen.close()
+            model.remove_run_c_files(remove_stderr=True)
+            model.sg.remove_exported_files()
 
 
 if __name__ == "__main__":  # pragma: no cover

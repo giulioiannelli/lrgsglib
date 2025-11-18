@@ -77,7 +77,11 @@ class BinDynSys:
         self.out_suffix = out_suffix
         self.pflip_id = peq_fstr(self.sg.pflip)
         self.field = field if field is not None else ZERO_FIELD(self.N)
-        self.simtime = simpref * self.N
+        simpref_int = 1 if simpref is None else int(simpref)
+        if simpref_int < 1:
+            raise ValueError("simpref must be a positive integer.")
+        self.simpref = simpref_int
+        self.simtime = self.simpref * self.N
         if dynpath is None:
             base_dynpath = getattr(self.sg, "path_data", Path.cwd())
             self.dynpath = Path(base_dynpath)

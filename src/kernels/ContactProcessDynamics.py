@@ -35,7 +35,7 @@ def initialize_contact_process_dict_args(args: Any, out_suffix: str) -> dict[str
         ic=args.init_cond,
         runlang=args.runlang,
         simpref=args.simpref,
-        rndStr=args.rnd_str,
+        rndStr=args.randstr,
         out_suffix=out_suffix,
     )
 

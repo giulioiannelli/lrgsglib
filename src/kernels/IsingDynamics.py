@@ -9,7 +9,7 @@ def initialize_ising_dict_args(args, out_suffix, NoClust):
         ic=args.init_cond, 
         runlang=args.runlang, 
         NoClust=NoClust, 
-        rndStr=args.rnd_str,
+        rndStr=args.randstr,
         freq=args.freq,
         out_suffix=out_suffix,
         thrmSTEP=args.thrmsteps

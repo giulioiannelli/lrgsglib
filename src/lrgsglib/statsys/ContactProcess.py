@@ -176,6 +176,20 @@ class ContactProcessBase(BinDynSys):
             raise ValueError("activation must be either 'tanh' or 'relu'.")
         return cast(Literal["tanh", "relu"], normalized)
 
+    def _dynamics_out_label(self) -> str:
+        gamma = getattr(self, "gamma", None)
+        if gamma is not None:
+            return f"gamma={float(gamma):.12g}"
+        mu = getattr(self, "mu", None)
+        if mu is not None:
+            return f"mu={float(mu):.12g}"
+        return ""
+
+    def _build_out_id(self) -> str:
+        """Build identifier used by C backends for output files."""
+
+        return join_non_empty("_", self._dynamics_out_label(), self.out_suffix, self.run_id)
+
     def _build_c_arglist_base(self) -> list[str]:
         """Build base argument list common to all ContactSimulator variants."""
 
@@ -184,7 +198,7 @@ class ContactProcessBase(BinDynSys):
         except ValueError:
             datdir = self.sg.path_sgdata
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
-        self.out_id = self.out_suffix
+        self.out_id = self._build_out_id()
         return [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
@@ -431,4 +445,3 @@ class ContactProcessEI(ContactProcessBase):
 
 # Backwards compatibility alias
 ContactProcess = ContactProcessSIR
-
