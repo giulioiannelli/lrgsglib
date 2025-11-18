@@ -1,4 +1,30 @@
-"""Contact process dynamics for signed graphs."""
+"""Contact process dynamics for signed graphs.
+
+This module provides two flavours of contact-process dynamics:
+
+* :class:`ContactProcessSIR` implements the infection/recovery process
+  parameterised by an infection rate ``mu``. Use this class with the pure
+  Python backend (``runlang="py"``) or the ``C0`` runlang to mirror the
+  ``ContactSimulator0`` C kernel.
+* :class:`ContactProcessEI` implements excitation-inhibition dynamics driven
+  by ``gamma`` and activation choice, mapping to the ``ContactSimulator1*``
+  kernels (``runlang`` values ``C1``, ``C1a``, ``C1b``, ``C1c``). This path
+  encapsulates the degree rescaling expected by the C implementations.
+
+Examples
+--------
+Run the infection/recovery process in Python:
+
+>>> cp = ContactProcessSIR(signed_graph, mu=0.2, runlang="py")
+>>> cp.init_contact_dynamics()
+>>> cp.run(steps=10, tqdm_on=False)
+
+Use the excitation-inhibition C backend (requires compiled C cores):
+
+>>> cp = ContactProcessEI(signed_graph, gamma=1.5, runlang="C1c")
+>>> cp.init_contact_dynamics()
+>>> cp.run(verbose=False)
+"""
 
 from __future__ import annotations
 
@@ -16,45 +42,45 @@ from ..utils.basic.strings import join_non_empty
 from ..utils.tools.chronometer import time_function_accumulate
 
 
-class ContactProcess(BinDynSys):
-    """Simple contact process dynamics on a weighted signed graph."""
+class ContactProcessBase(BinDynSys):
+    """Shared utilities for contact-process dynamics.
+
+    Parameters
+    ----------
+    sg : SignedGraph
+        Target graph for the simulation.
+    save_density : bool, optional
+        Whether to record the active-state density at each time step.
+    state_type : {"binary", "bipolar"}, optional
+        State encoding passed through to :class:`BinDynSys`.
+    **kwargs : Any
+        Additional arguments forwarded to :class:`BinDynSys`.
+    """
 
     dyn_UVclass = "contact_process"
     density: list[float] = []
     s_t: list[np.ndarray] = []
+    _allowed_c_keys: tuple[str, ...] = ()
 
     def __init__(
         self,
         sg: SignedGraph,
-        mu: float = 1.0,
         *,
-        gamma: float | None = None,
-        activation: Literal["tanh", "relu"] = "tanh",
         save_density: bool = False,
         state_type: Literal["binary", "bipolar"] | None = None,
-        num_log_samples: int = 1000,
         **kwargs: Any,
     ) -> None:
         dynpath = getattr(sg, "path_cntct", None)
         if dynpath is None:
             dynpath = getattr(sg, "path_lrgsg", getattr(sg, "path_data", Path.cwd()))
+
         super().__init__(
             sg,
             dynpath=dynpath,
             state_type=state_type or "binary",
             **kwargs,
         )
-        self.mu = float(mu)
-        self.gamma = float(gamma) if gamma is not None else None
-        # Rescale gamma by average degree k = M/N
-        if self.gamma is not None:
-            k = sg.Ne / sg.N  # Average degree
-            self.gamma_eff = self.gamma / k
-        else:
-            self.gamma_eff = None
-        self.activation = self._validate_activation(activation)
         self.save_density = save_density
-        self.num_log_samples = int(num_log_samples)
         self.reset_observables()
         self.sini: np.ndarray | None = None
         self.stderr_path: Path | None = None
@@ -116,25 +142,6 @@ class ContactProcess(BinDynSys):
     # ------------------------------------------------------------------
     # Python dynamics
     # ------------------------------------------------------------------
-    def ds1step(self, node: int) -> None:
-        neighbours = list(self._iter_neighbour_data(node))
-        if self.s[node]:
-            rate = self.mu
-            for neighbour, weight in neighbours:
-                if weight < 0.0 and self.s[neighbour]:
-                    rate += -weight
-            prob = 1.0 - np.exp(-rate)
-            if prob > 0.0 and np.random.random() < prob:
-                self.s[node] = np.int8(0)
-        else:
-            rate = 0.0
-            for neighbour, weight in neighbours:
-                if weight > 0.0 and self.s[neighbour]:
-                    rate += weight
-            prob = 1.0 - np.exp(-rate)
-            if prob > 0.0 and np.random.random() < prob:
-                self.s[node] = np.int8(1)
-
     def contact_sampling(self, tqdm_on: bool) -> None:
         dsNstep = self.dsNstep()
         nodes = np.arange(self.N)
@@ -157,9 +164,13 @@ class ContactProcess(BinDynSys):
         if not self.runlang or not self.runlang.upper().startswith("C"):
             raise ValueError("C backend requested but runlang is not a C variant.")
         suffix = self.runlang[1:]
-        return "C0" if suffix == "" else f"C{suffix.upper()}"
+        key = "C0" if suffix == "" else f"C{suffix.upper()}"
+        if self._allowed_c_keys and key not in self._allowed_c_keys:
+            raise ValueError(f"runlang '{self.runlang}' not supported for {self.__class__.__name__}.")
+        return key
 
-    def _validate_activation(self, activation: str) -> Literal["tanh", "relu"]:
+    @staticmethod
+    def _validate_activation(activation: str) -> Literal["tanh", "relu"]:
         normalized = activation.lower()
         if normalized not in {"tanh", "relu"}:
             raise ValueError("activation must be either 'tanh' or 'relu'.")
@@ -167,6 +178,7 @@ class ContactProcess(BinDynSys):
 
     def _build_c_arglist_base(self) -> list[str]:
         """Build base argument list common to all ContactSimulator variants."""
+
         try:
             datdir = self.sg.path_sgdata.relative_to(Path.cwd())
         except ValueError:
@@ -183,55 +195,15 @@ class ContactProcess(BinDynSys):
         ]
 
     def _build_c_arglist(self) -> list[str]:
-        """Build complete argument list based on C program variant."""
-        key = self._c_program_key()
-        base_args = self._build_c_arglist_base()
-        
-        if key == "C0":
-            # C0: N p mu steps datdir syshape run_id out_id
-            return [
-                base_args[0],  # N
-                base_args[1],  # p
-                f"{self.mu:.12g}",
-                f"{self.simtime}",
-            ] + base_args[2:]  # datdir, syshape, run_id, out_id
-        
-        elif key in ("C1", "C1A", "C1B", "C1C"):
-            # C1 variants: N p gamma steps datdir syshape run_id out_id activation [nSampleLog or num_log_samples]
-            if self.gamma is None:
-                raise ValueError(f"gamma must be provided when using runlang '{self.runlang}'.")
-            
-            args = [
-                base_args[0],  # N
-                base_args[1],  # p
-                f"{self.gamma_eff:.12g}",  # Use rescaled gamma_eff
-                f"{self.simtime}",
-            ] + base_args[2:] + [  # datdir, syshape, run_id, out_id
-                self.activation,
-            ]
-            
-            # C1a and C1c need extra sampling parameter
-            if key == "C1A":
-                nSampleLog = getattr(self, 'nSampleLog', 100)
-                args.append(f"{nSampleLog}")
-            elif key == "C1C":
-                args.append(f"{self.num_log_samples}")
-            
-            return args
-        
-        else:
-            raise ValueError(f"Unsupported C program key '{key}'.")
+        raise NotImplementedError("Subclasses must provide C argument lists.")
 
     def build_cprogram_command(self) -> None:
         c_key = self._c_program_key()
-        # Map C keys to program names
-        # Handle C1A→1a, C1B→1b, C1C→1c, C1→1, C0→0
         if c_key == "C0":
             program_suffix = "0"
         elif c_key == "C1":
             program_suffix = "1"
         else:
-            # C1A, C1B, C1C, etc.
             program_suffix = c_key[1:].lower()
         self.CbaseName = f"ContactSimulator{program_suffix}"
         arglist = self._build_c_arglist()
@@ -308,7 +280,6 @@ class ContactProcess(BinDynSys):
         self.check_attribute()
         self.initialize_run_parameters(steps)
         if self.runlang.startswith("C"):
-            # Rebuild C program command with updated simtime
             self.build_cprogram_command()
             self.run_cprogram(verbose)
             if clean_export:
@@ -316,3 +287,148 @@ class ContactProcess(BinDynSys):
                 self.sg.remove_exported_files()
         else:
             self.contact_sampling(tqdm_on)
+
+
+class ContactProcessSIR(ContactProcessBase):
+    """Infection-rate contact process (SIR-style) driven by ``mu``.
+
+    Use this class for the standard infection/recovery dynamics. The Python
+    backend (``runlang="py"``) mirrors the logic in :meth:`ds1step`, while the
+    ``C0`` runlang targets the ``ContactSimulator0`` executable.
+    """
+
+    _allowed_c_keys = ("C0",)
+
+    def __init__(
+        self,
+        sg: SignedGraph,
+        mu: float = 1.0,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(sg, **kwargs)
+        self.mu = float(mu)
+
+    # ------------------------------------------------------------------
+    # Python dynamics
+    # ------------------------------------------------------------------
+    def ds1step(self, node: int) -> None:
+        neighbours = list(self._iter_neighbour_data(node))
+        if self.s[node]:
+            rate = self.mu
+            for neighbour, weight in neighbours:
+                if weight < 0.0 and self.s[neighbour]:
+                    rate += -weight
+            prob = 1.0 - np.exp(-rate)
+            if prob > 0.0 and np.random.random() < prob:
+                self.s[node] = np.int8(0)
+        else:
+            rate = 0.0
+            for neighbour, weight in neighbours:
+                if weight > 0.0 and self.s[neighbour]:
+                    rate += weight
+            prob = 1.0 - np.exp(-rate)
+            if prob > 0.0 and np.random.random() < prob:
+                self.s[node] = np.int8(1)
+
+    # ------------------------------------------------------------------
+    # C backend integration
+    # ------------------------------------------------------------------
+    def _build_c_arglist(self) -> list[str]:
+        base_args = self._build_c_arglist_base()
+        return [
+            base_args[0],  # N
+            base_args[1],  # p
+            f"{self.mu:.12g}",
+            f"{self.simtime}",
+        ] + base_args[2:]
+
+
+class ContactProcessEI(ContactProcessBase):
+    """Excitation-inhibition contact process targeting ``C1`` kernels.
+
+    Parameters
+    ----------
+    gamma : float
+        Excitation strength (rescaled internally by the average degree to match
+        the original ``ContactSimulator1*`` interfaces).
+    activation : {"tanh", "relu"}, optional
+        Non-linearity used by the C1 kernels; ignored by other backends.
+    num_log_samples : int, optional
+        Number of log samples used by the ``C1c`` variant.
+
+    Notes
+    -----
+    This class is intended for the C backends (``runlang`` starting with
+    ``C1``). Python dynamics are not provided for the excitation-inhibition
+    path.
+    """
+
+    _allowed_c_keys = ("C1", "C1A", "C1B", "C1C")
+
+    def __init__(
+        self,
+        sg: SignedGraph,
+        *,
+        gamma: float,
+        activation: Literal["tanh", "relu"] = "tanh",
+        num_log_samples: int = 1000,
+        runlang: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        if runlang is not None:
+            kwargs.setdefault("runlang", runlang)
+        else:
+            kwargs.setdefault("runlang", "C1")
+        super().__init__(sg, **kwargs)
+        self.gamma = float(gamma)
+        k = sg.Ne / sg.N
+        self.gamma_eff = self.gamma / k
+        self.activation = self._validate_activation(activation)
+        self.num_log_samples = int(num_log_samples)
+
+    # ------------------------------------------------------------------
+    # Python dynamics
+    # ------------------------------------------------------------------
+    def ds1step(self, node: int) -> None:  # pragma: no cover - not used
+        raise NotImplementedError(
+            "ContactProcessEI provides only C backends; Python dynamics are not implemented."
+        )
+
+    # ------------------------------------------------------------------
+    # C backend integration
+    # ------------------------------------------------------------------
+    def _build_c_arglist(self) -> list[str]:
+        base_args = self._build_c_arglist_base()
+        key = self._c_program_key()
+        args = [
+            base_args[0],  # N
+            base_args[1],  # p
+            f"{self.gamma_eff:.12g}",
+            f"{self.simtime}",
+        ] + base_args[2:] + [
+            self.activation,
+        ]
+
+        if key == "C1A":
+            nSampleLog = getattr(self, "nSampleLog", 100)
+            args.append(f"{nSampleLog}")
+        elif key == "C1C":
+            args.append(f"{self.num_log_samples}")
+
+        return args
+
+    def run(
+        self,
+        tqdm_on: bool = True,
+        steps: int | None = None,
+        verbose: bool = False,
+        clean_export: bool = True,
+    ) -> None:
+        if not self.runlang.upper().startswith("C1"):
+            raise NotImplementedError("ContactProcessEI supports only C1* backends.")
+        super().run(tqdm_on=tqdm_on, steps=steps, verbose=verbose, clean_export=clean_export)
+
+
+# Backwards compatibility alias
+ContactProcess = ContactProcessSIR
+

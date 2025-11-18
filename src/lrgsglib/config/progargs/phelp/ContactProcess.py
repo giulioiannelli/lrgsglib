@@ -1,3 +1,4 @@
+phelp_dynamics = "Dynamics flavour: 'EI' for excitation/inhibition (C1* backends) or 'SIR' for infection/recovery."
 phelp_mu = "Infection rate μ used by the ContactProcess (only for pure Python/C0 runs)."
 phelp_gamma = "Coupling γ for C1 backends; rescaled internally by the average degree."
 phelp_activation = "Activation function passed to the nonlinear C1 programs."

@@ -7,14 +7,20 @@ from .phelp.ContactProcess import *
 from .defs.ContactProcess import *
 
 Contact_args = {
-    'mu': {
-        'help': phelp_mu,
-        'type': float,
-        'default': DEFAULT_MU,
+    tuple(['-dy', '--dynamics']): {
+        'help': phelp_dynamics,
+        'type': str,
+        'choices': ["EI", "SIR"],
+        'default': DEFAULT_DYNAMICS,
     },
 }
 
 Contact_opt_args = {
+    tuple(['-mu', '--mu']): {
+        'help': phelp_mu,
+        'type': float,
+        'default': DEFAULT_MU,
+    },
     tuple(['-ga', '--gamma']): {
         'help': phelp_gamma,
         'type': float,
