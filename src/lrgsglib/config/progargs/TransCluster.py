@@ -208,6 +208,11 @@ SCS_TransCluster_srun_optional_args_dict = {
         "nargs": "+",
         "default": list(DEFAULT_SCS_NN_SRUN_J0_LIST),
     },
+    tuple(["--J0-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for J0 values",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
     tuple(["--J-list"]): {
         "help": "List of J coupling values",
         "type": float,

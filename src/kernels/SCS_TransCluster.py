@@ -20,31 +20,24 @@ from .generic import resolve_backend, resolve_float_type
 __all__ = ["run_transcluster"]
 
 
-def _largest_cluster_fraction(graph: SCSGeneralizedNN) -> float:
-    clusters: Sequence[Sequence[int]] = getattr(graph, "clustersY", [])
-    if not clusters:
-        return 0.0
-    largest = max(clusters, key=len)
-    return len(largest) / float(graph.N)
-
-
 def _compute_order_parameters(
     params: SCSParameters,
     *,
-    j0: float,
     backend: str,
     float_type: type,
     partitioner: ConditionalPartitioning,
-    seed: int | None,
 ) -> tuple[float, float, float]:
-    kwargs = build_scs_kwargs(params, J0_value=j0, make_dir_tree=False, seed=seed)
+    # `params` is expected to contain the model parameter `J0` and optionally `seed`.
+    # build_scs_kwargs will use `params.seed` if present.
+    kwargs = build_scs_kwargs(params, make_dir_tree=False)
     scs = SCSGeneralizedNN(**kwargs)
     scs.compute_laplacian_spectrum_weigV(backend=backend, typf=float_type)
     scs.load_eigV_on_graph(which=0, binarize=False)
     scs.make_eigVclustersYN(val=partitioner, which=0, binarize=True)
+    scs.compute_pinf(which=0, val=partitioner)
 
     gap = (scs.eigv[1] - scs.eigv[0]) / scs.eigv[-1]
-    cluster_fraction = _largest_cluster_fraction(scs)
+    cluster_fraction = scs.Pinf
     energy0 = scs.get_sksph_energy_eigV(0)
     energy1 = scs.get_sksph_energy_eigV(1)
     return gap, cluster_fraction, energy0 - energy1
@@ -197,6 +190,7 @@ def run_transcluster(args) -> None:
 
     params = SCSParameters(
         N=args.N,
+        J0=j0_value,
         gamma=args.gamma,
         J=args.J,
         g=args.g,
@@ -204,8 +198,7 @@ def run_transcluster(args) -> None:
         workdir=args.workdir,
         seed=args.seed,
     )
-
-    probe = probe_output_graph(params, base_J0=j0_value)
+    probe = probe_output_graph(params)
     base_dir = probe.path_phtra
 
     suffix_tokens = [
@@ -260,13 +253,23 @@ def run_transcluster(args) -> None:
     for avg_idx in range(remaining_averages):
         sample_seed = _gen_sample_seed(rng)
 
+        # create a params copy for this iteration with the sampled seed (if any)
+        params_iter = SCSParameters(
+            N=params.N,
+            J0=params.J0,
+            gamma=params.gamma,
+            J=params.J,
+            g=params.g,
+            diagonal=params.diagonal,
+            workdir=params.workdir,
+            seed=sample_seed,
+        )
+
         gap, smax, energy_diff = _compute_order_parameters(
-            params,
-            j0=j0_value,
+            params_iter,
             backend=backend,
             float_type=float_type,
             partitioner=partitioner,
-            seed=sample_seed,
         )
 
         # update running averages using incremental formula

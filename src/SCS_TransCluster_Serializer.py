@@ -37,7 +37,7 @@ def main() -> None:
 
     j0_values = _collect_values(
         args.J0_list,
-        None,  # No linspace for J0
+        args.J0_linsp,
     )
 
     J_values = _collect_values(
