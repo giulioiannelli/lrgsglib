@@ -23,6 +23,7 @@ class SCSParameters:
     """Container gathering the user supplied SCS model parameters."""
 
     N: int
+    J0: float
     gamma: float
     J: float
     g: float
@@ -72,17 +73,19 @@ def normalize_diagonal_argument(value: Any, *, size: int | None = None) -> float
 def build_scs_kwargs(
     params: SCSParameters,
     *,
-    J0_value: float,
     make_dir_tree: bool = True,
     seed: int | None = None,
 ) -> dict[str, Any]:
-    """Compose keyword arguments for :class:`SCSGeneralizedNN` construction."""
+    """Compose keyword arguments for :class:`SCSGeneralizedNN` construction.
+
+    The model parameter `J0` is taken from `params.J0`.
+    """
 
     diagonal = normalize_diagonal_argument(params.diagonal, size=params.N)
     kwargs: dict[str, Any] = {
         "N": params.N,
         "gamma": params.gamma,
-        "J0": float(J0_value),
+        "J0": float(params.J0),
         "J": params.J,
         "g": params.g,
         "diagonal": diagonal,
@@ -98,10 +101,11 @@ def build_scs_kwargs(
 
 def probe_output_graph(
     params: SCSParameters,
-    *,
-    base_J0: float,
 ) -> SCSGeneralizedNN:
-    """Instantiate a minimal SCS graph to initialise filesystem paths."""
+    """Instantiate a minimal SCS graph to initialise filesystem paths.
 
-    kwargs = build_scs_kwargs(params, J0_value=base_J0, make_dir_tree=True)
+    Uses `params.J0` as the `J0` value for graph construction.
+    """
+
+    kwargs = build_scs_kwargs(params, make_dir_tree=True)
     return SCSGeneralizedNN(only_const_mode=True, **kwargs)
