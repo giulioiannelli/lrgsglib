@@ -1,6 +1,7 @@
 import numpy as np
 
 from typing import Optional, TYPE_CHECKING
+from lrgsglib.config.const import SG_REPR
 
 
 if TYPE_CHECKING:
@@ -111,7 +112,7 @@ def compute_pinf(
     self: "SignedGraph",
     which: int = 0,
     val: Optional[object] = 1,
-    on_g: str = None,
+    on_g: str = SG_REPR,
 ) -> None:
     """Compute the infinite-cluster probability (Pinf) for `self`.
 
