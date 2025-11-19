@@ -914,7 +914,12 @@ class SignedGraph:
     from ._cleaners import remove_exported_files
     from ._cleaners import clean_gclutil
     #
-    # get methods
+    # order-parameter helpers (moved to _ordparams)
+    from ._ordparams import compute_gap
+    from ._ordparams import get_gap
+    from ._ordparams import compute_pinf
+    from ._ordparams import compute_gap_between
+
     #
     def get_p_fname(
         self, 
@@ -970,47 +975,46 @@ class SignedGraph:
     #
     #
     #
-    def compute_pinf(
-            self,
-            which: int = 0, 
-            val: ConditionalPartitioningInput = 1,
-            on_g: str = SG_REPR
-    ) -> None:
-        """
-        Compute the infinite cluster probability for a given eigenvector.
+    # def compute_pinf(
+    #         self,
+    #         which: int = 0, 
+    #         val: ConditionalPartitioningInput = 1,
+    #         on_g: str = SG_REPR
+    # ) -> None:
+    #     """
+    #     Compute the infinite cluster probability for a given eigenvector.
         
-        Parameters
-        ----------
-        which : int, default 0
-            Index of the eigenvector to analyze.
-        val : Optional[ConditionalPartitioningInput], optional
-            Conditional partitioning specification for clustering. Can be a 
-            ConditionalPartitioning object, a number, a string (e.g., '>0'), 
-            or a callable. If None, defaults to +1.
-        on_g : str, default SG_REPR
-            Graph representation to use.
-        """
-        # Default to +1 if no value provided
-        if val is None:
-            val = 1
+    #     Parameters
+    #     ----------
+    #     which : int, default 0
+    #         Index of the eigenvector to analyze.
+    #     val : Optional[ConditionalPartitioningInput], optional
+    #         Conditional partitioning specification for clustering. Can be a 
+    #         ConditionalPartitioning object, a number, a string (e.g., '>0'), 
+    #         or a callable. If None, defaults to +1.
+    #     on_g : str, default SG_REPR
+    #         Graph representation to use.
+    #     """
+    #     # Default to +1 if no value provided
+    #     if val is None:
+    #         val = 1
         
-        clustd = np.array(self.get_eigV_cluster_sizes(which, True, val, on_g))
-        mclust = clustd[0]
-        self.Pinf = mclust / self.N
+    #     clustd = np.array(self.get_eigV_cluster_sizes(which, True, val, on_g))
+    #     self.Pinf = clustd[0] / self.N
         
-        # Avoid division by zero in variance calculation
-        denominator = np.sum(clustd) - mclust
-        if denominator > 0:
-            self.Pinf_var = np.sum(clustd@clustd - mclust**2) / denominator
-        else:
-            self.Pinf_var = 0.0
+    #     # Avoid division by zero in variance calculation
+    #     denominator = np.sum(clustd) - clustd[0]
+    #     if denominator > 0:
+    #         self.Pinf_var = np.sum(clustd@clustd - clustd[0]**2) / denominator
+    #     else:
+    #         self.Pinf_var = 0.0
         
-        if hasattr(self, "Pinf_dict"):
-            self.Pinf_dict[which] = (self.Pinf, self.Pinf_var)
-        else:
-            self.Pinf_dict = {which: (self.Pinf, self.Pinf_var)}
-    #
-    #
-    #
-    #
+    #     if hasattr(self, "Pinf_dict"):
+    #         self.Pinf_dict[which] = (self.Pinf, self.Pinf_var)
+    #     else:
+    #         self.Pinf_dict = {which: (self.Pinf, self.Pinf_var)}
+    # #
+    # #
+    # #
+    # #
     
