@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
-
-import numpy as np
 
 from kernels.Serializer import (
     build_jobname,
@@ -15,6 +12,13 @@ from kernels.Serializer import (
     _collect_values_typed,
 )
 from parsers.SCS_TransCluster_Serializer import parser, SCS_TransCluster_progName, SCS_TransCluster_progNameShrt
+from lrgsglib.config.progargs import (
+    DEFAULT_SCS_TRANSCLUSTER_SRUN_N_LIST,
+    DEFAULT_SCS_TRANSCLUSTER_SRUN_GAMMA_LIST,
+    DEFAULT_SCS_TRANSCLUSTER_SRUN_J0_LIST,
+    DEFAULT_SCS_TRANSCLUSTER_SRUN_J_LIST,
+    DEFAULT_SCS_TRANSCLUSTER_SRUN_G_LIST,
+)
 
 
 def main() -> None:
@@ -26,29 +30,35 @@ def main() -> None:
     N_values = _collect_values_typed(
         args.N_list,
         None,  # No linspace for N
+        DEFAULT_SCS_TRANSCLUSTER_SRUN_N_LIST,
         int,
     )
 
     gamma_values = _collect_values_typed(
         args.gamma_list,
         None,  # No linspace for gamma
+        DEFAULT_SCS_TRANSCLUSTER_SRUN_GAMMA_LIST,
         float,
     )
 
     j0_values = _collect_values(
         args.J0_list,
         args.J0_linsp,
+        DEFAULT_SCS_TRANSCLUSTER_SRUN_J0_LIST,
     )
 
     J_values = _collect_values(
         args.J_list,
         args.J_linsp,
+        DEFAULT_SCS_TRANSCLUSTER_SRUN_J_LIST,
     )
 
     g_values = _collect_values(
         args.g_list,
         args.g_linsp,
+        DEFAULT_SCS_TRANSCLUSTER_SRUN_G_LIST,
     )
+
 
     # Diagonal values are strings (use explicit values from argparse, which include defaults)
     diagonal_values: list[str] = [str(v) for v in args.diagonal_list]

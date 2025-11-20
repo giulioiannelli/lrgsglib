@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 
 from lrgsglib.config.progargs import (
     SCS_TransCluster_srun_description,
@@ -14,46 +13,14 @@ from lrgsglib.config.progargs import (
     SCS_TransCluster_optional_args_dict,
     SCS_TransCluster_action_args_dict,
 )
+from parsers.shared import CustomHelpAction
 
 
-class CustomHelpAction(argparse.Action):
-    """Custom help action that shows both serializer and inner program options."""
-    
-    def __init__(self, option_strings, dest=argparse.SUPPRESS, default=argparse.SUPPRESS, help=None):
-        super().__init__(option_strings=option_strings, dest=dest, default=default, nargs=0, help=help)
-    
-    def __call__(self, parser, namespace, values, option_string=None):
-        # Print serializer help
-        parser.print_help()
-        
-        # Print inner program options
-        print(f"\n{SCS_TransCluster_progName}.py options:")
-        print(f"  Additional options passed to the inner {SCS_TransCluster_progName}.py program.")
-        print(f"  These are not parsed by the serializer but passed through directly.\n")
-        
-        # Create a temporary parser for the inner program to display its help
-        inner_parser = argparse.ArgumentParser(
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            add_help=False,
-        )
-        
-        # Add positional arguments
-        for key, opts in SCSGeneralized_args.items():
-            inner_parser.add_argument(key, **opts)
-        
-        # Add optional arguments
-        inner_optional_args = {
-            **SCSGeneralized_optional_args_dict,
-            **SCS_TransCluster_optional_args_dict,
-            **SCS_TransCluster_action_args_dict,
-        }
-        for key, opts in inner_optional_args.items():
-            inner_parser.add_argument(*key, **opts)
-        
-        # Print the inner program's help (just the arguments section)
-        inner_parser.print_help()
-        
-        sys.exit(0)
+inner_optional_args = {
+    **SCSGeneralized_optional_args_dict,
+    **SCS_TransCluster_optional_args_dict,
+    **SCS_TransCluster_action_args_dict,
+}
 
 
 parser = argparse.ArgumentParser(
@@ -63,10 +30,13 @@ parser = argparse.ArgumentParser(
     add_help=False,  # We'll add custom help
 )
 
-# Add custom help argument
+# Add custom help argument that includes the inner program options
 parser.add_argument(
     '-h', '--help',
     action=CustomHelpAction,
+    inner_prog_name=SCS_TransCluster_progName,
+    inner_positional_args=SCSGeneralized_args,
+    inner_optional_args=inner_optional_args,
     help='show this help message and exit'
 )
 

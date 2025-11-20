@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
 
-import numpy as np
-
-from kernels.Serializer import build_jobname, build_memory_function
+from kernels.Serializer import (
+    build_jobname,
+    build_memory_function,
+    _collect_values,
+    _collect_values_typed,
+)
 from parsers.L3D_TransCluster_Serialiser import parser, L3D_TransCluster_progName, L3D_TransCluster_progNameShrt
 from lrgsglib.config.progargs import (
     DEFAULT_L3D_TRANSCLUSTER_SRUN_L_LIST,
@@ -14,30 +16,6 @@ from lrgsglib.config.progargs import (
     DEFAULT_L3D_TRANSCLUSTER_SRUN_MU_LIST,
     DEFAULT_L3D_TRANSCLUSTER_SRUN_SIGMA_LIST,
 )
-
-
-def _collect_values(
-    explicit: Iterable[float] | None,
-    linspace_values,
-    default_values: Sequence[float],
-) -> list[float]:
-    return _collect_values_typed(explicit, linspace_values, default_values, float)
-
-
-def _collect_values_typed(
-    explicit: Iterable[float] | None,
-    linspace_values,
-    default_values: Sequence[float],
-    caster: Callable[[float], float],
-) -> list[float]:
-    values: list[float] = []
-    if explicit:
-        values.extend(caster(v) for v in explicit)
-    if linspace_values is not None:
-        values.extend(caster(v) for v in np.asarray(linspace_values, dtype=float))
-    if not values:
-        values.extend(caster(v) for v in default_values)
-    return values
 
 
 def main() -> None:

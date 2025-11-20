@@ -104,13 +104,14 @@ def _collect_values(
 def _collect_values_typed(
     explicit: Iterable[float] | None,
     linspace_values,
+    default_values: Sequence[float],
     caster: Callable[[float], float],
 ) -> list[float]:
     values: list[float] = []
-    if linspace_values is not None:
-        # If linspace is provided, use only linspace values
-        values.extend(caster(v) for v in np.asarray(linspace_values, dtype=float))
-    elif explicit:
-        # Otherwise, use explicit values (which may be defaults from argparse)
+    if explicit:
         values.extend(caster(v) for v in explicit)
+    if linspace_values is not None:
+        values.extend(caster(v) for v in np.asarray(linspace_values, dtype=float))
+    if not values:
+        values.extend(caster(v) for v in default_values)
     return values
