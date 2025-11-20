@@ -83,3 +83,64 @@ L2D_CPROC_description = f"""
 L2D_CPROC_args = {**L2D_args, **Contact_args}
 L2D_CPROC_opt_args = {**L2D_opt_args, **Contact_opt_args}
 L2D_CPROC_action_args = {**action_args_dict}
+
+L2D_ContactProcess_srun_description = f"""Serialiser for {L2D_CPROC_progname}.py"""
+
+L2D_ContactProcess_srun_optional_args_dict = {
+    tuple(["-m", "--mode"]): {
+        "help": "Execution mode; prefix with 'slanzarv_' to submit via slanzarv (e.g. slanzarv_EI).",
+        "type": str,
+        "choices": ["EI", "SIR", "slanzarv_EI", "slanzarv_SIR"],
+        "default": "slanzarv_EI",
+    },
+    tuple(["--L-list"]): {
+        "help": f"List of lattice sizes | default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_L_LIST)}",
+        "type": int,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--L-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for lattice sizes",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--p-list"]): {
+        "help": f"Contact process occupation probabilities | default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_P_LIST)}",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--p-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for occupation probabilities",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--gamma-list"]): {
+        "help": f"Coupling values for EI dynamics | default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_GAMMA_LIST)}",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--gamma-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for EI coupling values",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--mu-list"]): {
+        "help": f"Infection rates μ for SIR dynamics | default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_MU_LIST)}",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--mu-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for infection-rate μ values",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["-rl", "--runlang"]): {
+        "help": phelp_runlang_contact,
+        "type": str,
+        "default": DEFAULT_RUNLANG,
+    },
+    **srun_opt_args,
+}
