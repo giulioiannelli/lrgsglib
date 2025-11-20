@@ -20,9 +20,7 @@ def compute_gap(
     typf: type = np.float64,
     transpose: bool = True,
     flip_to_pos: bool = True,
-    low: int = 0,
-    high: int = 1,
-) -> float:
+) -> None:
     """Compute and cache the spectral gap of the signed Laplacian for `self`.
 
     This forwards to `compute_gap_between` which accepts arbitrary
@@ -31,20 +29,15 @@ def compute_gap(
     """
     # forward to the more general implementation which handles arbitrary
     # eigenvalue indices; compute_gap_between will validate indices.
-    gap = compute_gap_between(
+    compute_gap_between(
         self,
-        low=low,
-        high=high,
+        low=0,
+        high=1,
         backend=backend,
         typf=typf,
         transpose=transpose,
         flip_to_pos=flip_to_pos,
     )
-
-    # cache the default (low=0, high=1) gap under _gap for compatibility
-    if low == 0 and high == 1:
-        self._gap = gap
-    return gap
 
 
 def compute_gap_between(
@@ -55,7 +48,8 @@ def compute_gap_between(
     typf: type = np.float64,
     transpose: bool = True,
     flip_to_pos: bool = True,
-) -> float:
+    rescale_by_sqrt: bool = True
+) -> None:
     """Compute gap between eigenvalues `eigv[low]` and `eigv[high]`.
 
     Parameters
@@ -97,15 +91,16 @@ def compute_gap_between(
         gap = diff
     else:
         gap = diff / largest
-
-    return float(gap)
+    if rescale_by_sqrt:
+        gap *= np.sqrt(self.N)
+    self.gap = gap
 
 
 def get_gap(self: "SignedGraph") -> float:
     """Return cached gap; compute it if missing."""
-    if hasattr(self, '_gap') and self._gap is not None:
-        return self._gap
-    return compute_gap(self)
+    if not hasattr(self, 'gap') or self.gap is None:
+        compute_gap(self)
+    return self.gap
 
 
 def compute_pinf(

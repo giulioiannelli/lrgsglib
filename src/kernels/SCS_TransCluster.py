@@ -36,7 +36,7 @@ def _compute_order_parameters(
     scs.make_eigVclustersYN(val=partitioner, which=0, binarize=True)
     scs.compute_pinf(which=0, val=partitioner)
 
-    gap = (scs.eigv[1] - scs.eigv[0]) / scs.eigv[-1]
+    gap = scs.get_gap()
     cluster_fraction = scs.Pinf
     energy0 = scs.get_sksph_energy_eigV(0)
     energy1 = scs.get_sksph_energy_eigV(1)
@@ -186,11 +186,10 @@ def run_transcluster(args) -> None:
     backend = resolve_backend(args.backend)
     float_type = resolve_float_type(args.float_type)
     partitioner = ConditionalPartitioning(args.partition_rule)
-    j0_value = float(args.J0)
 
     params = SCSParameters(
         N=args.N,
-        J0=j0_value,
+        J0=args.J0,
         gamma=args.gamma,
         J=args.J,
         g=args.g,
@@ -206,7 +205,7 @@ def run_transcluster(args) -> None:
         probe.std_fname,
         f"J={args.J:.3g}",
         f"g={args.g:.3g}",
-        f"J0={j0_value:.3g}",
+        f"J0={args.J0:.3g}",
     ]
     del probe
     base_filename = "_".join(suffix_tokens)
