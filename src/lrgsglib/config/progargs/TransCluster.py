@@ -190,6 +190,13 @@ SCS_TransCluster_action_args_dict = {**SCSGeneralized_action_args_dict}
 SCS_TransCluster_srun_description = f"""Serialiser for {SCS_TransCluster_progName}.py"""
 
 SCS_TransCluster_srun_optional_args_dict = {
+    tuple(["-m", "--mode"]): {
+        "help": "Execution mode: 'pCluster', 'ordParam', 'slanzarv_pCluster', or 'slanzarv_ordParam'. "
+                "If 'slanzarv_' prefix is present, jobs will be submitted via slanzarv.",
+        "type": str,
+        "choices": ["pCluster", "ordParam", "slanzarv_pCluster", "slanzarv_ordParam"],
+        "default": "slanzarv_ordParam",
+    },
     tuple(["--N-list"]): {
         "help": "List of network sizes N",
         "type": int,

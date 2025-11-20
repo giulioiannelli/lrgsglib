@@ -6,6 +6,9 @@ from pathlib import Path
 from kernels.Serializer import (
     build_jobname,
     build_memory_function,
+    resolve_slanzarv_mode,
+    _determine_precision,
+    _format_value_consistently,
     _collect_values,
     _collect_values_typed,
 )
@@ -24,15 +27,10 @@ def main() -> None:
     if not (exec_bool or print_bool):
         return
 
-    # Determine if we should use slanzarv based on mode
-    use_slanzarv = False
-    actual_mode = None
-    if args.mode:
-        if args.mode.startswith("slanzarv_"):
-            use_slanzarv = True
-            actual_mode = args.mode.replace("slanzarv_", "")
-        else:
-            actual_mode = args.mode
+    use_slanzarv, actual_mode = resolve_slanzarv_mode(
+        getattr(args, "mode", None),
+        default_use_slanzarv=False,
+    )
 
     L_values = _collect_values_typed(
         args.L_list,
@@ -63,6 +61,10 @@ def main() -> None:
             DEFAULT_L3D_TRANSCLUSTER_SRUN_SIGMA_LIST or [],
         )
 
+    p_precision = _determine_precision(p_values) if p_values else 2
+    mu_precision = _determine_precision(mu_values or [0.0])
+    sigma_precision = _determine_precision(sigma_values or [0.0])
+
     memoryfunc = build_memory_function(args.slanzarv_minMB, args.slanzarv_maxMB, L_values)
     script_path = Path("src") / f"{L3D_TransCluster_progName}.py"
 
@@ -79,18 +81,21 @@ def main() -> None:
     def dispatch(L: int, probability: float, mu: float, sigma: float) -> None:
         nonlocal total_printed, total_executed
 
-        # Build command: pass L and p as positional args,
-        # and all other arguments via *unknown (passed through from command line)
+        probability_str = _format_value_consistently(probability, p_precision)
         prog_args = [
             str(L),
-            f"{probability:.12g}",
+            probability_str,
         ]
 
         # Add mode-specific flags
+        mu_str = ""
+        sigma_str = ""
         if use_normal_weights:
+            mu_str = _format_value_consistently(mu, mu_precision)
+            sigma_str = _format_value_consistently(sigma, sigma_precision)
             prog_args.extend([
-                "--mu", f"{mu:.12g}",
-                "--sigma", f"{sigma:.12g}",
+                "--mu", mu_str,
+                "--sigma", sigma_str,
                 "--edge_weight", "normal"
             ])
         else:
@@ -113,10 +118,10 @@ def main() -> None:
                 slanz_opts.extend(["--time", str(args.moretime)])
 
             # Build jobname from L, p, and optionally mu, sigma
-            jobname_tokens = [f"L{L}", f"p{probability:.3g}"]
+            jobname_tokens = [f"L{L}", f"p{probability_str}"]
             if use_normal_weights:
-                jobname_tokens.extend([f"m{mu:.3g}", f"s{sigma:.3g}"])
-            
+                jobname_tokens.extend([f"m{mu_str}", f"s{sigma_str}"])
+
             jobname = build_jobname(
                 program_short=L3D_TransCluster_progNameShrt,
                 tokens=jobname_tokens,

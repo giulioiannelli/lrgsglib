@@ -6,8 +6,15 @@ from typing import Callable, Iterable, Sequence
 
 import numpy as np
 
-__all__ = ["build_memory_function", "build_jobname", "_determine_precision", "_format_value_consistently", "_collect_values", "_collect_values_typed"]
-
+__all__ = [
+    "build_memory_function",
+    "build_jobname",
+    "resolve_slanzarv_mode",
+    "_determine_precision",
+    "_format_value_consistently",
+    "_collect_values",
+    "_collect_values_typed",
+]
 
 def build_memory_function(min_mb: int, max_mb: int, values: Sequence[int]) -> Callable[[int], int]:
     """
@@ -55,6 +62,40 @@ def build_jobname(
             parts = [program_short, job_id, *cleaned_tokens]
 
     return delimiter.join(parts)
+
+
+def resolve_slanzarv_mode(
+    mode: str | None,
+    *,
+    prefix: str = "slanzarv_",
+    default_use_slanzarv: bool = False,
+) -> tuple[bool, str | None]:
+    """
+    Determine whether slanzarv should be used based on the ``mode`` argument.
+
+    Parameters
+    ----------
+    mode:
+        The user-specified mode string (may include the ``slanzarv_`` prefix).
+    prefix:
+        Prefix that triggers slanzarv submission.
+    default_use_slanzarv:
+        Whether to default to slanzarv when ``mode`` is missing.
+
+    Returns
+    -------
+    tuple[bool, str | None]
+        ``(use_slanzarv, stripped_mode)`` where ``stripped_mode`` has the prefix
+        removed (or is ``None`` if unavailable).
+    """
+    if not mode:
+        return default_use_slanzarv, None
+
+    if mode.startswith(prefix):
+        stripped = mode[len(prefix):] or None
+        return True, stripped
+
+    return False, mode
 
 
 def _determine_precision(values: list[float]) -> int:

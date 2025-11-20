@@ -6,6 +6,7 @@ from pathlib import Path
 from kernels.Serializer import (
     build_jobname,
     build_memory_function,
+    resolve_slanzarv_mode,
     _determine_precision,
     _format_value_consistently,
     _collect_values,
@@ -26,6 +27,11 @@ def main() -> None:
     exec_bool, print_bool = args.exec, args.print
     if not (exec_bool or print_bool):
         return
+
+    use_slanzarv, actual_mode = resolve_slanzarv_mode(
+        getattr(args, "mode", None),
+        default_use_slanzarv=True,
+    )
 
     N_values = _collect_values_typed(
         args.N_list,
@@ -93,41 +99,46 @@ def main() -> None:
             diagonal,
         ]
 
+        if actual_mode:
+            prog_args.extend(["--mode", actual_mode])
+
         cmd = ["python", str(script_path), *prog_args, *unknown]
 
-        slanz_opts = ["-m", str(memoryfunc(N))]
-        if args.nomail:
-            slanz_opts.append("--nomail")
-        if args.short:
-            slanz_opts.append("--short")
-        if args.moretime:
-            slanz_opts.extend(["--time", str(args.moretime)])
+        final_cmd = cmd
+        if use_slanzarv:
+            slanz_opts = ["-m", str(memoryfunc(N))]
+            if args.nomail:
+                slanz_opts.append("--nomail")
+            if args.short:
+                slanz_opts.append("--short")
+            if args.moretime:
+                slanz_opts.extend(["--time", str(args.moretime)])
 
-        # Build jobname from N, gamma, J, g, j0, diagonal
-        # Use consistent formatting based on calculated precision
-        jobname_tokens = [
-            f"N{N}",
-            f"g{_format_value_consistently(gamma, gamma_precision)}",
-            f"J{_format_value_consistently(J_value, J_precision)}",
-            f"gcpl{_format_value_consistently(g_value, g_precision)}",
-            f"J0{_format_value_consistently(j0, j0_precision)}",
-            f"diag{diagonal}",
-        ]
-        jobname = build_jobname(
-            program_short=SCS_TransCluster_progNameShrt,
-            tokens=jobname_tokens,
-            job_id=args.slanzarv_id or None,
-            prefix_job_id=True,
-        )
-        slanz_opts.extend(["--jobname", jobname])
+            # Build jobname from N, gamma, J, g, j0, diagonal
+            # Use consistent formatting based on calculated precision
+            jobname_tokens = [
+                f"N{N}",
+                f"g{_format_value_consistently(gamma, gamma_precision)}",
+                f"J{_format_value_consistently(J_value, J_precision)}",
+                f"gcpl{_format_value_consistently(g_value, g_precision)}",
+                f"J0{_format_value_consistently(j0, j0_precision)}",
+                f"diag{diagonal}",
+            ]
+            jobname = build_jobname(
+                program_short=SCS_TransCluster_progNameShrt,
+                tokens=jobname_tokens,
+                job_id=args.slanzarv_id or None,
+                prefix_job_id=True,
+            )
+            slanz_opts.extend(["--jobname", jobname])
 
-        slanz_cmd = ["slanzarv", *slanz_opts, *cmd]
+            final_cmd = ["slanzarv", *slanz_opts, *cmd]
 
         if print_bool:
-            print(" ".join(slanz_cmd))
+            print(" ".join(final_cmd))
             total_printed += 1
         if exec_bool:
-            subprocess.run(slanz_cmd, check=True)
+            subprocess.run(final_cmd, check=True)
             total_executed += 1
 
     for N in N_values:
