@@ -56,6 +56,91 @@ L2D_TransCluster_optional_args_dict = {
     ),
 }
 L2D_TransCluster_action_args_dict = {**action_args_dict}
+
+L2D_TransCluster_srun_description = (
+    f"Serialiser for {L2D_TransCluster_progName}.py"
+)
+
+L2D_TransCluster_srun_optional_args_dict = {
+    tuple(["-m", "--mode"]): {
+        "help": (
+            "Execution mode: 'pCluster', 'ordParam', 'slanzarv_pCluster', "
+            "or 'slanzarv_ordParam'. If 'slanzarv_' prefix is present, "
+            "jobs will be submitted via slanzarv."
+        ),
+        "type": str,
+        "choices": [
+            "pCluster",
+            "ordParam",
+            "slanzarv_pCluster",
+            "slanzarv_ordParam",
+        ],
+        "default": "slanzarv_ordParam",
+    },
+    tuple(["--L-list"]): {
+        "help": (
+            "List of lattice sizes | "
+            f"default={list(DEFAULT_L2D_TRANSCLUSTER_SRUN_L_LIST)}"
+        ),
+        "type": int,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--L-linsp"]): {
+        "help": "Semicolon-separated linspace tuples for lattice sizes",
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--p-list"]): {
+        "help": "Explicit probabilities for flipped edges",
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--p-linsp"]): {
+        "help": (
+            "Semicolon-separated linspace tuples for flipped-edge "
+            "probabilities"
+        ),
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--mu-list"]): {
+        "help": (
+            "Explicit mu values for normal edge weights "
+            "(triggers normal mode)"
+        ),
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--mu-linsp"]): {
+        "help": (
+            "Semicolon-separated linspace tuples for mu values "
+            "(triggers normal mode)"
+        ),
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    tuple(["--sigma-list"]): {
+        "help": (
+            "Explicit sigma values for normal edge weights "
+            "(triggers normal mode)"
+        ),
+        "type": float,
+        "nargs": "+",
+        "default": None,
+    },
+    tuple(["--sigma-linsp"]): {
+        "help": (
+            "Semicolon-separated linspace tuples for sigma values "
+            "(triggers normal mode)"
+        ),
+        "type": parse_multiple_linspace,
+        "default": None,
+    },
+    **srun_opt_args,
+}
 #
 L3D_TransCluster_progName = 'L3D_TransCluster'
 L3D_TransCluster_progNameShrt = 'L3DTC'
