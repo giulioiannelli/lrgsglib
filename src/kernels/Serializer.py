@@ -138,8 +138,16 @@ def _format_value_consistently(value: float, precision: int) -> str:
 def _collect_values(
     explicit: Iterable[float] | None,
     linspace_values,
+    default_values: Sequence[float] | None = None,
 ) -> list[float]:
-    return _collect_values_typed(explicit, linspace_values, float)
+    """Collect numeric values from explicit inputs or a linspace.
+
+    Falls back to ``default_values`` when neither explicit nor linspace inputs
+    are provided. Mirrors :func:`_collect_values_typed` but defaults to
+    ``float`` casting.
+    """
+
+    return _collect_values_typed(explicit, linspace_values, default_values or [], float)
 
 
 def _collect_values_typed(
