@@ -5,6 +5,7 @@ python lrgsglib/src/L2D_ContactProcess.py 64 0. -ac relu -na 200 -wd cptest -ga 
 
 from typing import Any
 from pathlib import Path
+import re
 import numpy as np
 from lrgsglib.config.funcs import peq_fstr
 
@@ -85,8 +86,38 @@ _batch_densities = []
 _last_saved_index = 0
 
 
+def _output_components(sg: Any, args: Any) -> tuple[Path, str, str]:
+    """Return (pdir, agg_prefix, sp_token) for density files."""
+    pdir = Path(getattr(sg, "path_cntct", None) or getattr(sg, "path_lrgsg", None) or sg.path_data)
+    dynlabel = "gamma=" + str(getattr(args, "gamma", ""))
+    out_suffix = get_out_suffix(args)
+    agg_prefix = "_".join(filter(None, [peq_fstr(sg.pflip), dynlabel, out_suffix]))
+    sp_val = getattr(args, "sp", None)
+    sp_token = f"_sp={int(sp_val)}" if sp_val is not None else ""
+    return pdir, agg_prefix, sp_token
+
+
+def _latest_saved_index(pdir: Path, agg_prefix: str, sp_token: str) -> int:
+    """Find the largest `_na=<n>` aggregate file already on disk."""
+    pattern = re.compile(rf"^dens_{re.escape(agg_prefix)}{re.escape(sp_token)}_na=(\d+)\.bin$")
+    latest = 0
+    for f in pdir.glob(f"dens_{agg_prefix}{sp_token}_na=*.bin"):
+        m = pattern.match(f.name)
+        if m:
+            try:
+                latest = max(latest, int(m.group(1)))
+            except ValueError:
+                pass
+    return latest
+
+
 def _process_EI_C1c(cp, args):
-    """Batch process and aggregate density for EI+C1c, saving every (number_of_averages // save_frequency) runs."""
+    """Batch process and aggregate density for EI+C1c.
+
+    Saves a cumulative file at every batch boundary with the filename
+    suffix `_na=<current>` so early stops can be resumed. Only the latest
+    `_na=<current>` file is kept.
+    """
     global _batch_densities, _last_saved_index
     i = getattr(args, "_current_average", None)
     if i is None:
@@ -97,7 +128,10 @@ def _process_EI_C1c(cp, args):
         sf = 1
         na = 1
     batch_size = max(1, na // sf)
-    pdir = Path(getattr(cp.sg, "path_cntct", None) or getattr(cp.sg, "path_lrgsg", None) or cp.sg.path_data)
+    pdir, agg_prefix, sp_token = _output_components(cp.sg, args)
+    if _last_saved_index == 0:
+        _last_saved_index = _latest_saved_index(pdir, agg_prefix, sp_token)
+    # Collect per-run density for this batch.
     dens_files = [
         f for f in pdir.glob("dens_*.bin") if cp.out_id in f.name or (getattr(cp, "rand_str", None) and cp.rand_str in f.name)
     ]
@@ -121,34 +155,37 @@ def _process_EI_C1c(cp, args):
     # Save at batch boundary or last run
     is_batch_end = (i % batch_size == 0) or (i == na)
     if is_batch_end and _batch_densities:
-        # Build aggregate filename
-        dynlabel = "gamma=" + str(getattr(args, "gamma", ""))
-        out_suffix = get_out_suffix(args)
-        agg_prefix = "_".join(filter(None, [peq_fstr(cp.sg.pflip), dynlabel, out_suffix]))
-        sp_val = getattr(args, "sp", None)
-        sp_token = f"_sp={int(sp_val)}" if sp_val is not None else ""
-        agg_name = f"dens_{agg_prefix}{sp_token}_na={i}.bin"
-        agg_path = pdir / agg_name
-        concat = np.concatenate(_batch_densities)
-        with open(agg_path, "wb") as f:
-            concat.tofile(f)
-        # Remove previous batch file
+        # Load previously aggregated data if present (for resume or prior batch).
+        prev_data = None
         if _last_saved_index > 0:
             prev_name = f"dens_{agg_prefix}{sp_token}_na={_last_saved_index}.bin"
             prev_path = pdir / prev_name
             if prev_path.exists():
                 try:
-                    prev_path.unlink()
+                    prev_data = np.fromfile(prev_path, dtype=np.float64)
                 except Exception:
-                    pass
-        # Remove all earlier batch files
-        for j in range(1, _last_saved_index):
-            old_name = f"dens_{agg_prefix}{sp_token}_na={j}.bin"
-            old_path = pdir / old_name
-            if old_path.exists():
-                try:
-                    old_path.unlink()
-                except Exception:
-                    pass
+                    prev_data = None
+        if prev_data is None:
+            prev_data = np.array([], dtype=np.float64)
+
+        concat = np.concatenate(_batch_densities)
+        new_data = np.concatenate([prev_data, concat])
+
+        agg_name = f"dens_{agg_prefix}{sp_token}_na={i}.bin"
+        agg_path = pdir / agg_name
+        with open(agg_path, "wb") as f:
+            new_data.tofile(f)
+
+        # Remove older aggregate files to keep only the latest progress marker.
+        for f in pdir.glob(f"dens_{agg_prefix}{sp_token}_na=*.bin"):
+            m = re.search(r"_na=(\d+)\.bin$", f.name)
+            if m:
+                idx = int(m.group(1))
+                if idx < i:
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
+
         _batch_densities = []
         _last_saved_index = i

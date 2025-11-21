@@ -33,6 +33,11 @@ int main(int argc, char *argv[]) {
     __fread_check(fread(state, sizeof(*state), N, f_sini), N);
     fclose(f_sini);
 
+    size_t sum = 0;
+    for (size_t i = 0; i < N; ++i) {
+        sum += state[i];
+    }
+
     Edges edges;
     NodesEdges node_edges;
     size_tp neigh_len;
@@ -40,6 +45,10 @@ int main(int argc, char *argv[]) {
     process_edges(buf, N, &edges, &node_edges, &neigh_len);
 
     for (size_t t = 0; t < steps; ++t) {
+        if (cp_reached_absorbing_state(sum, N, t, steps)) {
+            break;
+        }
+
         for (size_t sweep = 0; sweep < N; ++sweep) {
             size_t node = (size_t)(RNG_u64() % N);
             size_t degree = neigh_len[node];
@@ -49,12 +58,14 @@ int main(int argc, char *argv[]) {
                 double prob = 1.0 - exp(-rate);
                 if (prob > 0.0 && RNG_dbl() < prob) {
                     state[node] = 0;
+                    --sum;
                 }
             } else {
                 double rate = cp_infection_rate(node, state, degree, edges_node);
                 double prob = 1.0 - exp(-rate);
                 if (prob > 0.0 && RNG_dbl() < prob) {
                     state[node] = 1;
+                    ++sum;
                 }
             }
         }

@@ -1,6 +1,7 @@
 from lrgsglib import Lattice2D
 
 from .ContactProcessDynamics import run_contact_process, get_out_suffix, clean_up_files
+from . import ContactProcessDynamics as cp_dyn
 from .L2D import initialize_l2d_dict_args
 from pathlib import Path
 from dataclasses import dataclass
@@ -110,8 +111,20 @@ def run_simulation(args):
         case _:
             raise NotImplementedError(f"Post-processing for dynamics={dynamics} and runlang={runlang} is not implemented.")
 
-    for i in range(1, args.number_of_averages + 1):
-        lattice = _prepare_lattice(args)
+    # Detect existing aggregate to allow resuming.
+    first_lattice = _prepare_lattice(args)
+    pdir, agg_prefix, sp_token = cp_dyn._output_components(first_lattice, args)
+    saved_idx = cp_dyn._latest_saved_index(pdir, agg_prefix, sp_token)
+    cp_dyn._batch_densities = []
+    cp_dyn._last_saved_index = saved_idx
+    start_avg = saved_idx + 1
+    if start_avg > args.number_of_averages:
+        if args.verbose:
+            print(f"Density file already has na={saved_idx}; nothing to do.")
+        return
+
+    for i in range(start_avg, args.number_of_averages + 1):
+        lattice = first_lattice if i == start_avg else _prepare_lattice(args)
         cp = run_contact_process(args, lattice)
         setattr(args, '_current_average', i)
         _process_cp(cp, args)
@@ -119,4 +132,3 @@ def run_simulation(args):
             clean_up_files(cp, cp.sg, remove_stderr=True)
         except Exception:
             pass
-

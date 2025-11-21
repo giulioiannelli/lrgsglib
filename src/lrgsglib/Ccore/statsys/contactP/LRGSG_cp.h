@@ -45,4 +45,7 @@ void cp_update_border_after_flip(ActiveBorder *ab, size_t node, int8_t new_state
                                  const spin_tp state, size_t N,
                                  const NodesEdges node_edges, const size_tp neigh_len);
 
+/* Simulation utility */
+int cp_reached_absorbing_state(size_t sum, size_t N, size_t t, size_t steps);
+
 #endif /* __LRGSGCPLIB_H_INC__ */

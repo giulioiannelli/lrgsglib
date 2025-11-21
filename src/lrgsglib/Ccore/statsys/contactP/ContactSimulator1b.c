@@ -64,8 +64,7 @@ int main(int argc, char *argv[]) {
         density[t] = (double)sum / (double)N;
 
         /* Check for absorbing state - early termination */
-        if (sum == 0) {
-            fprintf(stderr, "Absorbing state reached at step %zu/%zu\n", t, steps);
+        if (cp_reached_absorbing_state(sum, N, t, steps)) {
             ++t;  // Move to next index for padding
             break;
         }

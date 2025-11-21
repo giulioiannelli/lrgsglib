@@ -1,6 +1,7 @@
 #include "LRGSG_cp.h"
 #include "LRGSG_utils.h"
 
+#include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -176,4 +177,12 @@ void cp_update_border_after_flip(ActiveBorder *ab, size_t node, int8_t new_state
     // When node becomes inactive, we DON'T remove anything from border
     // This trades some wasted samples for much faster border maintenance
     // The border will naturally shrink as activity moves away
+}
+
+int cp_reached_absorbing_state(size_t sum, size_t N, size_t t, size_t steps) {
+    if (sum == 0 || sum == N) {
+        fprintf(stderr, "Absorbing state reached (sum=%zu) at step %zu/%zu\n", sum, t, steps);
+        return 1;
+    }
+    return 0;
 }

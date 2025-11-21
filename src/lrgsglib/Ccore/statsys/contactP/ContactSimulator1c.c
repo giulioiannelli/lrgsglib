@@ -70,8 +70,7 @@ int main(int argc, char *argv[]) {
     size_t t;
     for (t = 0; t < steps; ++t) {
         /* Check for absorbing state - early termination */
-        if (sum == 0) {
-            fprintf(stderr, "Absorbing state reached at step %zu/%zu\n", t, steps);
+        if (cp_reached_absorbing_state(sum, N, t, steps)) {
             break;
         }
 
@@ -84,8 +83,14 @@ int main(int argc, char *argv[]) {
             double prob = activation_func(lambda);
             int8_t old_state = state[node];
             state[node] = (int8_t)(RNG_dbl() < prob);
-            // Update sum efficiently
-            sum += (state[node] - old_state);
+            // Update sum efficiently without unsigned underflow
+            if (state[node] != old_state) {
+                if (state[node]) {
+                    ++sum;
+                } else {
+                    --sum;
+                }
+            }
         }
         
         /* Save density at every step (Python will subsample) */

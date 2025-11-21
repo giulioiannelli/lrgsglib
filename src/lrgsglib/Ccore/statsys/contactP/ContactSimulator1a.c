@@ -63,8 +63,7 @@ int main(int argc, char *argv[]) {
         for (size_t i = 0; i < N; ++i) {
             sum += state[i];
         }
-        if (sum == 0) {
-            fprintf(stderr, "Absorbing state reached at step %zu/%zu\n", t, steps);
+        if (cp_reached_absorbing_state(sum, N, t, steps)) {
             break;
         }
 
