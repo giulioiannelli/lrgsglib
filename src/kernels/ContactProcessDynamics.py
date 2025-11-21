@@ -88,7 +88,7 @@ _last_saved_index = 0
 def _output_components(sg: Any, args: Any) -> tuple[Path, str, str]:
     """Return (pdir, agg_prefix, sp_token) for density files."""
     pdir = Path(getattr(sg, "path_cntct", None) or getattr(sg, "path_lrgsg", None) or sg.path_data)
-    dynlabel = "gamma=" + str(getattr(args, "gamma", ""))
+    dynlabel = f'gamma={getattr(args, "gamma", ""):.3g}'
     out_suffix = get_out_suffix(args)
     agg_prefix = "_".join(filter(None, [peq_fstr(sg.pflip), dynlabel, out_suffix]))
     sp_val = getattr(args, "sp", None)

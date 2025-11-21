@@ -62,7 +62,7 @@ def _post_process_EI_C1c(runinfos: list[RunInfo], args) -> None:
 
     if dens_arrays:
         concat = np.concatenate(dens_arrays)
-        dynlabel = 'gamma=' + str(getattr(args, 'gamma', ''))
+        dynlabel = f'gamma={getattr(args, "gamma", ""):.3g}'
         out_suffix = get_out_suffix(args)
         agg_prefix = '_'.join(filter(None, [peq_fstr(runinfos[0].pflip), dynlabel, out_suffix]))
         sp_val = getattr(args, 'sp', None)
