@@ -56,7 +56,7 @@ class SCSGeneralizedNN(FullyConnected):
             only_const_mode=only_const_mode, 
             **kwargs
         )
-        base_fname = f"scs_nn_N={self._N}_gamma={self.gamma:.3f}"
+        base_fname = f"scs_nn_N={self._N}_gamma={self.gamma:.3g}"
         suffix = getattr(self, "peq_str", "")
         self.std_fname = f"{base_fname}_{suffix}" if suffix else base_fname
 
@@ -74,7 +74,7 @@ class SCSGeneralizedNN(FullyConnected):
     def __repr__(self) -> str:
         return (
             "SCSGeneralizedNN("
-            f"N={self._N}, gamma={self.gamma:.3f}, J0={self.J0:.3g}, J={self.J:.3g}, g={self.g:.3g}"
+            f"N={self._N}, gamma={self.gamma:.3g}, J0={self.J0:.3g}, J={self.J:.3g}, g={self.g:.3g}"
             ")"
         )
 

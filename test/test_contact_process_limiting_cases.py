@@ -245,8 +245,8 @@ class TestContactProcessLimitingCases(unittest.TestCase):
             self.assertLessEqual(
                 final_densities[i], final_densities[i+1] + 0.15,
                 msg=f"Density should generally increase with gamma: "
-                    f"gamma={gamma_values[i]:.2f} -> {final_densities[i]:.3f}, "
-                    f"gamma={gamma_values[i+1]:.2f} -> {final_densities[i+1]:.3f}"
+                    f"gamma={gamma_values[i]:.2f} -> {final_densities[i]:.3g}, "
+                    f"gamma={gamma_values[i+1]:.2f} -> {final_densities[i+1]:.3g}"
             )
 
     def test_gamma_zero_behavior(self):
@@ -398,7 +398,7 @@ class TestContactProcessLimitingCases(unittest.TestCase):
         self.assertTrue(
             density_diff > 0.01 or (results['tanh'] > 0.1 and results['relu'] > 0.1),
             msg=f"Activation functions should produce valid dynamics: "
-                f"tanh={results['tanh']:.3f}, relu={results['relu']:.3f}"
+                f"tanh={results['tanh']:.3g}, relu={results['relu']:.3g}"
         )
 
     # =================================================================

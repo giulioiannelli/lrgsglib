@@ -45,6 +45,6 @@ for initial_density in [0.05, 0.10, 0.20]:
     time_1c = time.time() - t1
     
     speedup = time_1b / time_1c
-    print(f"C1b: {time_1b:.3f}s, density: {np.mean(cp_1b.s):.4f}")
-    print(f"C1c: {time_1c:.3f}s, density: {np.mean(cp_1c.s):.4f}")
+    print(f"C1b: {time_1b:.3g}s, density: {np.mean(cp_1b.s):.4f}")
+    print(f"C1c: {time_1c:.3g}s, density: {np.mean(cp_1c.s):.4f}")
     print(f"Speedup: {speedup:.2f}x {'✓✓' if speedup > 1.2 else '✓' if speedup > 1.05 else '✗'}")

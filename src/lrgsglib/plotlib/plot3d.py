@@ -131,10 +131,10 @@ def create_volume_visualization(data_sets, X, Y, Z, colors=None, colors_solid=No
             name=f'{label} (density-weighted)',
             showlegend=True,
             hovertemplate=f'<b>{label}</b><br>' +
-                         'X: %{x:.3f}<br>' +
-                         'Y: %{y:.3f}<br>' +
-                         'Z: %{z:.3f}<br>' +
-                         'Density: %{text:.3f}<extra></extra>',
+                         'X: %{x:.3g}<br>' +
+                         'Y: %{y:.3g}<br>' +
+                         'Z: %{z:.3g}<br>' +
+                         'Density: %{text:.3g}<extra></extra>',
             text=normalized_densities
         ))
     

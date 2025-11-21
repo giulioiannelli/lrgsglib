@@ -247,7 +247,7 @@ def ultrametric_matrix_distance(
     >>> D1 = np.array([[0, 1, 2], [1, 0, 3], [2, 3, 0]])
     >>> D2 = np.array([[0, 1.5, 2.1], [1.5, 0, 2.9], [2.1, 2.9, 0]])
     >>> distance = ultrametric_matrix_distance(D1, D2)
-    >>> print(f"Euclidean distance: {distance:.3f}")
+    >>> print(f"Euclidean distance: {distance:.3g}")
     """
     # Extract upper triangular indices (excluding diagonal)
     triu_idx = np.triu_indices_from(D1, k=1)

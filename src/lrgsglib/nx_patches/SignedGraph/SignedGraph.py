@@ -199,13 +199,13 @@ class SignedGraph:
     
     >>> cluster_sizes = sg.get_eigV_cluster_sizes(which=0, binarize=True)
     >>> sg.compute_pinf(which=0)
-    >>> print(f"Infinite cluster probability: {sg.Pinf:.3f}")
+    >>> print(f"Infinite cluster probability: {sg.Pinf:.3g}")
     
     Compute spin-glass energy:
     
     >>> sg.compute_rbim_energy_eigV(which=0)
     >>> energy = sg.get_rbim_energy_eigV(which=0)
-    >>> print(f"RBIM energy: {energy:.3f}")
+    >>> print(f"RBIM energy: {energy:.3g}")
     
     See Also
     --------

@@ -250,7 +250,7 @@ def test_density_sweep(path_data, verbose=True):
         density_1b = np.mean(cp_1b.s)
         
         if verbose:
-            print(f"  C1b done: {time_1b:.3f}s, final density: {density_1b:.6f}")
+            print(f"  C1b done: {time_1b:.3g}s, final density: {density_1b:.6f}")
             print(f"  Running C1c...")
         
         # Test ContactSimulator1c
@@ -278,8 +278,8 @@ def test_density_sweep(path_data, verbose=True):
         results['density_diffs'].append(density_diff)
         
         if verbose:
-            print(f"  C1c done: {time_1c:.3f}s, final density: {density_1c:.6f}")
-            print(f"  Result: C1b: {time_1b:.3f}s, C1c: {time_1c:.3f}s, Speedup: {speedup:.2f}x")
+            print(f"  C1c done: {time_1c:.3g}s, final density: {density_1c:.6f}")
+            print(f"  Result: C1b: {time_1b:.3g}s, C1c: {time_1c:.3g}s, Speedup: {speedup:.2f}x")
     
     if verbose:
         print(f"\n{'='*70}")

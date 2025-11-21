@@ -27,7 +27,7 @@ lattice.flip_random_fract_edges()
 np.random.seed(67890)
 initial_state = np.random.choice([0, 1], size=lattice.N, p=[0.95, 0.05])
 
-print(f"N={lattice.N}, steps={steps}, initial_density={np.mean(initial_state):.3f}\n")
+print(f"N={lattice.N}, steps={steps}, initial_density={np.mean(initial_state):.3g}\n")
 
 # Test C1b
 print("Running C1b...")
@@ -37,7 +37,7 @@ cp_1b.init_contact_dynamics(custom=initial_state.copy())
 t1 = time.time()
 cp_1b.run(steps=steps, verbose=False, tqdm_on=False)
 time_1b = time.time() - t1
-print(f"  C1b: {time_1b:.3f}s, final density: {np.mean(cp_1b.s):.4f}")
+print(f"  C1b: {time_1b:.3g}s, final density: {np.mean(cp_1b.s):.4f}")
 
 # Test C1c
 print("Running C1c...")
@@ -47,7 +47,7 @@ cp_1c.init_contact_dynamics(custom=initial_state.copy())
 t1 = time.time()
 cp_1c.run(steps=steps, verbose=False, tqdm_on=False)
 time_1c = time.time() - t1
-print(f"  C1c: {time_1c:.3f}s, final density: {np.mean(cp_1c.s):.4f}")
+print(f"  C1c: {time_1c:.3g}s, final density: {np.mean(cp_1c.s):.4f}")
 
 speedup = time_1b / time_1c
 print(f"\nSpeedup: {speedup:.2f}x {'✓' if speedup > 1.1 else '✗'}")

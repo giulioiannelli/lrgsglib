@@ -417,7 +417,7 @@ def plot_octagonal_square_tiling_from_nodes(x, y, vals, ax=None, cmap='viridis',
             oct2_y = (rhomb_row + 0.5) * rhomb_spacing
         else:
             # Fallback: shouldn't happen with correct rhomb-octagonal lattice
-            print(f"Warning: Node {i} at ({node_x:.3f}, {node_y:.3f}) doesn't match expected rhomb positions")
+            print(f"Warning: Node {i} at ({node_x:.3g}, {node_y:.3g}) doesn't match expected rhomb positions")
             # Use rhomb center as octagon centers (degenerate triangle)
             oct1_x = oct2_x = rhomb_center_x
             oct1_y = oct2_y = rhomb_center_y
