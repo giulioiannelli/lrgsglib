@@ -42,4 +42,9 @@ L2D_opt_args = {
         'type': str,
         'default': DEFAULT_COMPUTE
     },
+    tuple(['--prew']): {
+        'help': phelp_prew,
+        'type': float,
+        'default': DEFAULT_L2D_PREW,
+    },
 }

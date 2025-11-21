@@ -521,38 +521,6 @@ class TestContactProcessLimitingCases(unittest.TestCase):
                        msg="Single active node shouldn't saturate network with low gamma")
 
     # =================================================================
-    # Test 8: Density Conservation Tests
-    # =================================================================
-    
-    def test_density_bounded(self):
-        """
-        Test that density remains in [0, 1] throughout dynamics.
-        """
-        lattice = self._make_small_lattice(geo='sqr', side=10)
-        cp = self.ContactProcess(
-            lattice,
-            gamma=1.5,
-            activation='tanh',
-            state_type='binary',
-            runlang='py',
-            save_density=True,
-            seed=42
-        )
-        
-        initial_state = np.random.choice([0, 1], size=lattice.N, p=[0.5, 0.5])
-        cp.init_contact_dynamics(custom=initial_state)
-        self._run_contact_process(cp, 200)
-        
-        # Check all recorded densities
-        self.assertTrue(all(0.0 <= d <= 1.0 for d in cp.density),
-                       msg="Density should always be in [0, 1]")
-        
-        # Check final state
-        final_density = np.mean(cp.s)
-        self.assertGreaterEqual(final_density, 0.0)
-        self.assertLessEqual(final_density, 1.0)
-
-    # =================================================================
     # Test 9: Reproducibility with Seeds
     # =================================================================
     

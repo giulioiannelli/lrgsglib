@@ -11,10 +11,15 @@ from lrgsglib.config.progargs import (
     L2D_CPROC_args,
     L2D_CPROC_opt_args,
     L2D_CPROC_action_args,
+    L2D_opt_args,
 )
 from parsers.shared import CustomHelpAction
 
-inner_optional_args = {**L2D_CPROC_opt_args, **L2D_CPROC_action_args}
+inner_optional_args = {
+    **L2D_opt_args,  # lattice options used by the inner parser
+    **L2D_CPROC_opt_args,
+    **L2D_CPROC_action_args,
+}
 
 parser = argparse.ArgumentParser(
     description=L2D_ContactProcess_srun_description,

@@ -1,94 +1,109 @@
-from .common import *
 from .phelp.TransCluster import *
 from .defs.TransCluster import *
 from .Lattice2D import *
 from .Lattice3D import *
 from .SCSNN import *
 
+def _transcluster_common_optional_args(
+    *,
+    mode_default,
+    save_frequency_default,
+    out_suffix_default,
+    float_type_default,
+    save_frequency_help,
+    out_suffix_help=phelp_out_suffix,
+    float_type_help=phelp_float_type,
+):
+    return {
+        tuple(["-m", "--mode"]): {
+            "help": phelp_transcluster_mode,
+            "type": str,
+            "default": mode_default,
+        },
+        tuple(["-sf", "--save_frequency"]): {
+            "help": save_frequency_help,
+            "type": int,
+            "default": save_frequency_default,
+        },
+        tuple(["-o", "--out_suffix"]): {
+            "help": out_suffix_help,
+            "type": str,
+            "default": out_suffix_default,
+        },
+        tuple(["-t", "--float_type"]): {
+            "help": float_type_help,
+            "type": str,
+            "default": float_type_default,
+        },
+    }
+
+
 L2D_TransCluster_progName = 'L2D_TransCluster'
 L2D_TransCluster_progNameShrt = 'L2DTC'
 L2D_TransCluster_description = f"""
-    Transition and cluster analysis utilities for 2D signed lattices: {L2D_TransCluster_progName}.py
+    Phase Transition and cluster analysis utilities for 2D signed lattices:
+    {L2D_TransCluster_progName}.py
 """
-
 L2D_TransCluster_args = {**L2D_args}
-
 L2D_TransCluster_optional_args_dict = {
-    tuple(['--prew']): {
-        'help': phelp_prew,
-        'type': float,
-        'default': DEFAULT_L2D_TRANSCLUSTER_PREW,
-    },
-    tuple(['-m', '--mode']): {
-        'help': phelp_transcluster_mode,
-        'type': str,
-        'default': DEFAULT_L2D_TRANSCLUSTER_MODE,
-    },
-    tuple(['-sf', '--save_frequency']): {
-        'help': phelp_data_save_freq,
-        'type': int,
-        'default': DEFAULT_L2D_TRANSCLUSTER_SAVE_FREQUENCY,
-    },
-    tuple(['-o', '--out_suffix']): {
-        'help': phelp_out_suffix,
-        'type': str,
-        'default': DEFAULT_L2D_TRANSCLUSTER_OUT_SUFFIX,
-    },
-    tuple(['-t', '--float_type']): {
-        'help': phelp_float_type,
-        'type': str,
-        'default': DEFAULT_L2D_TRANSCLUSTER_FLOAT_TYPE,
-    },
+    **L2D_opt_args,
+    **_transcluster_common_optional_args(
+        mode_default=DEFAULT_L2D_TRANSCLUSTER_MODE,
+        save_frequency_default=DEFAULT_L2D_TRANSCLUSTER_SAVE_FREQUENCY,
+        out_suffix_default=DEFAULT_L2D_TRANSCLUSTER_OUT_SUFFIX,
+        float_type_default=DEFAULT_L2D_TRANSCLUSTER_FLOAT_TYPE,
+        save_frequency_help=phelp_data_save_freq,
+    ),
 }
-
 L2D_TransCluster_action_args_dict = {**action_args_dict}
-
+#
 L3D_TransCluster_progName = 'L3D_TransCluster'
 L3D_TransCluster_progNameShrt = 'L3DTC'
 L3D_TransCluster_description = f"""
-    Transition and cluster analysis utilities for 3D signed lattices: {L3D_TransCluster_progName}.py
+    Phase Transition and cluster analysis utilities for 3D signed lattices:
+    {L3D_TransCluster_progName}.py
 """
 
 L3D_TransCluster_args = {**L3D_args}
 
 L3D_TransCluster_optional_args_dict = {
     **L3D_opt_args,
-    tuple(['-m', '--mode']): {
-        'help': phelp_transcluster_mode,
-        'type': str,
-        'default': DEFAULT_L3D_TRANSCLUSTER_MODE,
-    },
-    tuple(['-sf', '--save_frequency']): {
-        'help': phelp_data_save_freq,
-        'type': int,
-        'default': DEFAULT_L3D_TRANSCLUSTER_SAVE_FREQUENCY,
-    },
-    tuple(['-o', '--out_suffix']): {
-        'help': phelp_out_suffix,
-        'type': str,
-        'default': DEFAULT_L3D_TRANSCLUSTER_OUT_SUFFIX,
-    },
-    tuple(['-t', '--float_type']): {
-        'help': phelp_float_type,
-        'type': str,
-        'default': DEFAULT_L3D_TRANSCLUSTER_FLOAT_TYPE,
-    },
+    **_transcluster_common_optional_args(
+        mode_default=DEFAULT_L3D_TRANSCLUSTER_MODE,
+        save_frequency_default=DEFAULT_L3D_TRANSCLUSTER_SAVE_FREQUENCY,
+        out_suffix_default=DEFAULT_L3D_TRANSCLUSTER_OUT_SUFFIX,
+        float_type_default=DEFAULT_L3D_TRANSCLUSTER_FLOAT_TYPE,
+        save_frequency_help=phelp_data_save_freq,
+    ),
 }
 
 L3D_TransCluster_action_args_dict = {**action_args_dict}
 
-L3D_TransCluster_srun_description = f"""Serialiser for {L3D_TransCluster_progName}.py"""
+L3D_TransCluster_srun_description = (
+    f"Serialiser for {L3D_TransCluster_progName}.py"
+)
 
 L3D_TransCluster_srun_optional_args_dict = {
     tuple(["-m", "--mode"]): {
-        "help": "Execution mode: 'pCluster', 'ordParam', 'slanzarv_pCluster', or 'slanzarv_ordParam'. "
-                "If 'slanzarv_' prefix is present, jobs will be submitted via slanzarv.",
+        "help": (
+            "Execution mode: 'pCluster', 'ordParam', 'slanzarv_pCluster', "
+            "or 'slanzarv_ordParam'. If 'slanzarv_' prefix is present, "
+            "jobs will be submitted via slanzarv."
+        ),
         "type": str,
-        "choices": ["pCluster", "ordParam", "slanzarv_pCluster", "slanzarv_ordParam"],
+        "choices": [
+            "pCluster",
+            "ordParam",
+            "slanzarv_pCluster",
+            "slanzarv_ordParam",
+        ],
         "default": "slanzarv_ordParam",
     },
     tuple(["--L-list"]): {
-        "help": f"List of lattice sizes | default={list(DEFAULT_L3D_TRANSCLUSTER_SRUN_L_LIST)}",
+        "help": (
+            "List of lattice sizes | "
+            f"default={list(DEFAULT_L3D_TRANSCLUSTER_SRUN_L_LIST)}"
+        ),
         "type": int,
         "nargs": "+",
         "default": None,
@@ -105,29 +120,44 @@ L3D_TransCluster_srun_optional_args_dict = {
         "default": None,
     },
     tuple(["--p-linsp"]): {
-        "help": "Semicolon-separated linspace tuples for flipped-edge probabilities",
+        "help": (
+            "Semicolon-separated linspace tuples for flipped-edge "
+            "probabilities"
+        ),
         "type": parse_multiple_linspace,
         "default": None,
     },
     tuple(["--mu-list"]): {
-        "help": "Explicit mu values for normal edge weights (triggers normal mode)",
+        "help": (
+            "Explicit mu values for normal edge weights "
+            "(triggers normal mode)"
+        ),
         "type": float,
         "nargs": "+",
         "default": None,
     },
     tuple(["--mu-linsp"]): {
-        "help": "Semicolon-separated linspace tuples for mu values (triggers normal mode)",
+        "help": (
+            "Semicolon-separated linspace tuples for mu values "
+            "(triggers normal mode)"
+        ),
         "type": parse_multiple_linspace,
         "default": None,
     },
     tuple(["--sigma-list"]): {
-        "help": "Explicit sigma values for normal edge weights (triggers normal mode)",
+        "help": (
+            "Explicit sigma values for normal edge weights "
+            "(triggers normal mode)"
+        ),
         "type": float,
         "nargs": "+",
         "default": None,
     },
     tuple(["--sigma-linsp"]): {
-        "help": "Semicolon-separated linspace tuples for sigma values (triggers normal mode)",
+        "help": (
+            "Semicolon-separated linspace tuples for sigma values "
+            "(triggers normal mode)"
+        ),
         "type": parse_multiple_linspace,
         "default": None,
     },
@@ -137,7 +167,8 @@ L3D_TransCluster_srun_optional_args_dict = {
 SCS_TransCluster_progName = 'SCS_TransCluster'
 SCS_TransCluster_progNameShrt = 'SCSTC'
 SCS_TransCluster_description = f"""
-    Order parameter and clustering analysis for generalized SCS networks: {SCS_TransCluster_progName}.py
+    Order parameter and clustering analysis for generalized SCS networks:
+    {SCS_TransCluster_progName}.py
 """
 
 SCS_TransCluster_args = {**SCSGeneralized_args}
@@ -153,26 +184,14 @@ SCS_TransCluster_optional_args_dict = {
         'type': int,
         'default': DEFAULT_SCS_NN_NAVG,
     },
-    tuple(['-m', '--mode']): {
-        'help': phelp_transcluster_mode,
-        'type': str,
-        'default': DEFAULT_SCS_NN_MODE,
-    },
-    tuple(['-sf', '--save_frequency']): {
-        'help': phelp_scs_save_frequency,
-        'type': int,
-        'default': DEFAULT_SCS_NN_SAVE_FREQUENCY,
-    },
-    tuple(['-o', '--out_suffix']): {
-        'help': phelp_out_suffix,
-        'type': str,
-        'default': DEFAULT_SCS_NN_OUT_SUFFIX,
-    },
-    tuple(['-t', '--float_type']): {
-        'help': phelp_scs_float_type,
-        'type': str,
-        'default': DEFAULT_SCS_NN_FLOAT_TYPE,
-    },
+    **_transcluster_common_optional_args(
+        mode_default=DEFAULT_SCS_NN_MODE,
+        save_frequency_default=DEFAULT_SCS_NN_SAVE_FREQUENCY,
+        out_suffix_default=DEFAULT_SCS_NN_OUT_SUFFIX,
+        float_type_default=DEFAULT_SCS_NN_FLOAT_TYPE,
+        save_frequency_help=phelp_scs_save_frequency,
+        float_type_help=phelp_scs_float_type,
+    ),
     tuple(['--backend']): {
         'help': phelp_scs_backend,
         'type': str,
@@ -187,14 +206,24 @@ SCS_TransCluster_optional_args_dict = {
 
 SCS_TransCluster_action_args_dict = {**SCSGeneralized_action_args_dict}
 
-SCS_TransCluster_srun_description = f"""Serialiser for {SCS_TransCluster_progName}.py"""
+SCS_TransCluster_srun_description = (
+    f"Serialiser for {SCS_TransCluster_progName}.py"
+)
 
 SCS_TransCluster_srun_optional_args_dict = {
     tuple(["-m", "--mode"]): {
-        "help": "Execution mode: 'pCluster', 'ordParam', 'slanzarv_pCluster', or 'slanzarv_ordParam'. "
-                "If 'slanzarv_' prefix is present, jobs will be submitted via slanzarv.",
+        "help": (
+            "Execution mode: 'pCluster', 'ordParam', 'slanzarv_pCluster', "
+            "or 'slanzarv_ordParam'. If 'slanzarv_' prefix is present, "
+            "jobs will be submitted via slanzarv."
+        ),
         "type": str,
-        "choices": ["pCluster", "ordParam", "slanzarv_pCluster", "slanzarv_ordParam"],
+        "choices": [
+            "pCluster",
+            "ordParam",
+            "slanzarv_pCluster",
+            "slanzarv_ordParam",
+        ],
         "default": "slanzarv_ordParam",
     },
     tuple(["--N-list"]): {

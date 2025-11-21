@@ -2,7 +2,6 @@ phelp_dynamics = "Dynamics flavour: 'EI' for excitation/inhibition (C1* backends
 phelp_mu = "Infection rate μ used by the ContactProcess (only for pure Python/C0 runs)."
 phelp_gamma = "Coupling γ for C1 backends; rescaled internally by the average degree."
 phelp_activation = "Activation function passed to the nonlinear C1 programs."
-phelp_save_density = "If set, store the instantaneous active-node density each step."
 phelp_state_type = "Internal state representation: 'binary' (0/1) or 'bipolar' (-1/+1)."
 phelp_num_log_samples = "Number of logarithmic sampling points required by the C1c backend."
 phelp_simpref = "Simulation time multiplier, i.e. total steps = simpref × number of nodes."
@@ -10,3 +9,4 @@ phelp_ic_contact = "Initial condition for the ContactProcess (e.g. 'uniform', 'g
 phelp_runlang_contact = "Execution backend for the ContactProcess (py, C0, C1, C1a, C1b, C1c)."
 phelp_randstr_contact = "Append a random string to the run identifier for unique exports."
 phelp_outsuffix_contact = "Optional suffix appended to output/export file names."
+phelp_save_frequency = "Batch size for density file saving (number of averages per file)."

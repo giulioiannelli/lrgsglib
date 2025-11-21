@@ -22,13 +22,6 @@ for k, v in L2D_CPROC_args.items():
 for k, v in optionalaction_args_dict.items():
     parser.add_argument(*k, **v)
 
-parser.add_argument(
-    "-sf", "--save-frequency",
-    help="Batch size for density file saving (number of averages per file)",
-    type=int,
-    default=10,
-)
-
 
 def _validate_contact_args(args: argparse.Namespace) -> argparse.Namespace:
     dynamics = args.dynamics.upper()

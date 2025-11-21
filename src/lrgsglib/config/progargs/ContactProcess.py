@@ -31,11 +31,6 @@ Contact_opt_args = {
         'type': str,
         'default': DEFAULT_ACTIVATION,
     },
-    tuple(['--save_density']): {
-        'help': phelp_save_density,
-        'action': argparse.BooleanOptionalAction,
-        'default': DEFAULT_SAVE_DENSITY,
-    },
     tuple(['-st', '--state_type']): {
         'help': phelp_state_type,
         'type': str,
@@ -45,6 +40,11 @@ Contact_opt_args = {
         'help': phelp_num_log_samples,
         'type': int,
         'default': DEFAULT_NUM_LOG_SAMPLES,
+    },
+    tuple(['-sf', '--save_frequency']): {
+        'help': phelp_save_frequency,
+        'type': int,
+        'default': DEFAULT_SAVE_FREQUENCY,
     },
     tuple(['-sp', '--simpref']): {
         'help': phelp_simpref,
@@ -84,17 +84,25 @@ L2D_CPROC_args = {**L2D_args, **Contact_args}
 L2D_CPROC_opt_args = {**L2D_opt_args, **Contact_opt_args}
 L2D_CPROC_action_args = {**action_args_dict}
 
-L2D_ContactProcess_srun_description = f"""Serialiser for {L2D_CPROC_progname}.py"""
+L2D_ContactProcess_srun_description = (
+    f"Serialiser for {L2D_CPROC_progname}.py"
+)
 
 L2D_ContactProcess_srun_optional_args_dict = {
     tuple(["-m", "--mode"]): {
-        "help": "Execution mode; prefix with 'slanzarv_' to submit via slanzarv (e.g. slanzarv_EI).",
+        "help": (
+            "Execution mode; prefix with 'slanzarv_' to submit via slanzarv "
+            "(e.g. slanzarv_EI)."
+        ),
         "type": str,
         "choices": ["EI", "SIR", "slanzarv_EI", "slanzarv_SIR"],
         "default": "slanzarv_EI",
     },
     tuple(["--L-list"]): {
-        "help": f"List of lattice sizes | default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_L_LIST)}",
+        "help": (
+            "List of lattice sizes | "
+            f"default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_L_LIST)}"
+        ),
         "type": int,
         "nargs": "+",
         "default": None,
@@ -105,18 +113,26 @@ L2D_ContactProcess_srun_optional_args_dict = {
         "default": None,
     },
     tuple(["--p-list"]): {
-        "help": f"Contact process occupation probabilities | default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_P_LIST)}",
+        "help": (
+            "Contact process occupation probabilities | "
+            f"default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_P_LIST)}"
+        ),
         "type": float,
         "nargs": "+",
         "default": None,
     },
     tuple(["--p-linsp"]): {
-        "help": "Semicolon-separated linspace tuples for occupation probabilities",
+        "help": (
+            "Semicolon-separated linspace tuples for occupation probabilities"
+        ),
         "type": parse_multiple_linspace,
         "default": None,
     },
     tuple(["--gamma-list"]): {
-        "help": f"Coupling values for EI dynamics | default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_GAMMA_LIST)}",
+        "help": (
+            "Coupling values for EI dynamics | "
+            f"default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_GAMMA_LIST)}"
+        ),
         "type": float,
         "nargs": "+",
         "default": None,
@@ -127,13 +143,18 @@ L2D_ContactProcess_srun_optional_args_dict = {
         "default": None,
     },
     tuple(["--mu-list"]): {
-        "help": f"Infection rates μ for SIR dynamics | default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_MU_LIST)}",
+        "help": (
+            "Infection rates μ for SIR dynamics | "
+            f"default={list(DEFAULT_L2D_CONTACTPROCESS_SRUN_MU_LIST)}"
+        ),
         "type": float,
         "nargs": "+",
         "default": None,
     },
     tuple(["--mu-linsp"]): {
-        "help": "Semicolon-separated linspace tuples for infection-rate μ values",
+        "help": (
+            "Semicolon-separated linspace tuples for infection-rate μ values"
+        ),
         "type": parse_multiple_linspace,
         "default": None,
     },

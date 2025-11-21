@@ -39,7 +39,6 @@ def initialize_contact_process_dict_args(args: Any, out_suffix: str) -> dict[str
     _validate_backend_choice(dynamics, runlang)
 
     common: dict[str, Any] = dict(
-        save_density=args.save_density,
         state_type=args.state_type,
         ic=args.init_cond,
         runlang=args.runlang,

@@ -49,8 +49,6 @@ class ContactProcessBase(BinDynSys):
     ----------
     sg : SignedGraph
         Target graph for the simulation.
-    save_density : bool, optional
-        Whether to record the active-state density at each time step.
     state_type : {"binary", "bipolar"}, optional
         State encoding passed through to :class:`BinDynSys`.
     **kwargs : Any
@@ -58,7 +56,6 @@ class ContactProcessBase(BinDynSys):
     """
 
     dyn_UVclass = "contact_process"
-    density: list[float] = []
     s_t: list[np.ndarray] = []
     _allowed_c_keys: tuple[str, ...] = ()
 
@@ -66,7 +63,6 @@ class ContactProcessBase(BinDynSys):
         self,
         sg: SignedGraph,
         *,
-        save_density: bool = False,
         state_type: Literal["binary", "bipolar"] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -80,7 +76,6 @@ class ContactProcessBase(BinDynSys):
             state_type=state_type or "binary",
             **kwargs,
         )
-        self.save_density = save_density
         self.reset_observables()
         self.sini: np.ndarray | None = None
         self.stderr_path: Path | None = None
@@ -94,7 +89,6 @@ class ContactProcessBase(BinDynSys):
     def reset_observables(self) -> None:
         """Reset cached observables collected during a run."""
 
-        self.density = []
         self.s_t = []
 
     def _iter_neighbour_data(self, node: int) -> Iterable[tuple[int, float]]:
@@ -150,8 +144,6 @@ class ContactProcessBase(BinDynSys):
         nodes = np.arange(self.N)
         iterator = tqdm.tqdm(range(self.simtime)) if tqdm_on else range(self.simtime)
         for _ in iterator:
-            if self.save_density:
-                self.density.append(float(np.mean(self.s)))
             if self.savedyn:
                 self.s_t.append(self.s.copy())
             np.random.shuffle(nodes)

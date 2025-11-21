@@ -45,10 +45,5 @@ L3D_opt_args = {
         'type': str,
         'default': DEFAULT_L3D_TRANSCLUSTER_EDGE_WEIGHT,
     },
-    tuple(['-na', '--number_of_averages']): {
-        'help': phelp_navg,
-        'type': int,
-        'default': DEFAULT_L3D_TRANSCLUSTER_NAVG,
-    },
     **SG_opt_args,
 }

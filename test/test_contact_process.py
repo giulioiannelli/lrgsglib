@@ -201,7 +201,6 @@ class TestContactProcess(unittest.TestCase):
             mu=None,
             activation="tanh",
             num_log_samples=10,
-            save_density=False,
             state_type="binary",
             init_cond="uniform",
             runlang="py",
