@@ -115,7 +115,42 @@ def flip_random_fract_edges(
 
 
 def unflip_all(self: "SignedGraph", on_g: str = SG_REPR):
-    self.flip_sel_edges(1, on_g=on_g)
+    """
+    Flip all negative edges back to positive.
+
+    This reverses all edge sign flips, restoring the graph to all positive edges.
+
+    Parameters
+    ----------
+    on_g : str, default SG_REPR
+        Graph representation identifier.
+
+    Notes
+    -----
+    This method flips all edges currently in fleset[on_g] (negative edges)
+    back to positive, effectively restoring the base graph state.
+    """
+    # Create a copy of fleset to avoid modification during iteration
+    edges_to_flip = set(self.fleset[on_g])
+    if edges_to_flip:
+        # Set all edges to positive weight (+1)
+        import networkx as nx
+        pos_weights_dict = {
+            (u, v): 1.0
+            for u, v in edges_to_flip
+        }
+        nx.set_edge_attributes(
+            self.gr[on_g],
+            values=pos_weights_dict,
+            name='weight'
+        )
+
+        # Update the edge sets (opposite of flip_sel_edges)
+        self.fleset[on_g].difference_update(edges_to_flip)
+        self.lfeset[on_g].update(edges_to_flip)
+
+        self.upd_GraphRepr_All(on_g)
+        self.upd_graph_matrices(on_g)
 
 
 def set_edges_random_normal(
