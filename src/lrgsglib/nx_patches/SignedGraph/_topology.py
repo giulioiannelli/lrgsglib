@@ -60,15 +60,32 @@ def make_rescaled_signed_laplacian(
         self.resLp = self.resLp - new_eigv0 * np.identity(self.N)
 
 
+def nodes_in(self: "SignedGraph", on_g: str = SG_REPR) -> list:
+    """
+    Get list of nodes in specified graph representation.
+
+    Parameters
+    ----------
+    on_g : str, default SG_REPR
+        Graph representation identifier.
+
+    Returns
+    -------
+    list
+        List of node identifiers.
+    """
+    return list(self.gr[on_g].nodes())
+
+
 def get_nodes_list(self: "SignedGraph", on_g: str = None) -> list:
     """
     Get list of nodes for a specific graph representation.
-    
+
     Parameters
     ----------
     on_g : str, optional
         Graph representation identifier. If None, uses self.on_g.
-        
+
     Returns
     -------
     list

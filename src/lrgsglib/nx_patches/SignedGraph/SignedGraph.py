@@ -842,6 +842,7 @@ class SignedGraph:
     from ._topology import get_signed_laplacian
     from ._topology import get_signed_laplacian_embedding
     from ._topology import make_rescaled_signed_laplacian
+    from ._topology import nodes_in
     from ._topology import get_nodes_list
     from ._topology import get_node_attributes
     from ._topology import get_edge_data
@@ -880,6 +881,7 @@ class SignedGraph:
     from ._infotheory import compute_signed_laplacian_entropy
     from ._infotheory import get_entropy
     from ._infotheory import get_specific_heat
+    from ._infotheory import get_entropy_derivative  # DEPRECATED
     #
     # energy and dynamics tools (imported from ._dynamics)
     #
