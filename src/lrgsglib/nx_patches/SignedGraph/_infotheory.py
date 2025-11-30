@@ -65,7 +65,8 @@ def compute_signed_laplacian_entropy(
     )
 
     self.entropy = normalized_entropy
-    self.specific_heat = entropy_derivative
+    self.specific_heat = entropy_derivative  # PRIMARY NAME
+    self.entropy_derivative = entropy_derivative  # DEPRECATED ALIAS
     self.variance_profile = variance_profile
     self.tauscale = time_grid
     self.entropy_params = {
@@ -86,8 +87,25 @@ def get_entropy(self: "SignedGraph") -> NDArray:
 
 
 def get_specific_heat(self: "SignedGraph") -> NDArray:
-    has_entropy = hasattr(self, "entropy_derivative") and self.entropy_derivative is not None
-    if not has_entropy:
+    """Get specific heat (entropy derivative)."""
+    if not hasattr(self, "specific_heat") or self.specific_heat is None:
         compute_signed_laplacian_entropy(self)
-    return self.entropy_derivative
+    return self.specific_heat
+
+
+def get_entropy_derivative(self: "SignedGraph") -> NDArray:
+    """
+    Get entropy derivative.
+
+    .. deprecated::
+        Use :func:`get_specific_heat` instead. This method is kept for
+        backward compatibility.
+    """
+    import warnings
+    warnings.warn(
+        "get_entropy_derivative() is deprecated, use get_specific_heat() instead",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return self.get_specific_heat()
 
