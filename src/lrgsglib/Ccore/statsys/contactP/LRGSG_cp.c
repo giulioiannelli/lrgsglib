@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <string.h>
 
 double cp_infection_rate(size_t node, spin_tp state, size_t degree, NodeEdges edges) {
     (void)node;
@@ -37,6 +38,36 @@ double cp_linear_input(double gamma, spin_tp state, size_t degree, NodeEdges edg
         total += weight * (double)state[neighbour];
     }
     return gamma * total;
+}
+
+void cp_lambda_init(double gamma, const spin_tp state, size_t N,
+                    const NodesEdges node_edges, const size_tp neigh_len,
+                    double *lambda) {
+    for (size_t i = 0; i < N; ++i) {
+        double total = 0.0;
+        size_t degree = neigh_len[i];
+        NodeEdges edges_node = node_edges[i];
+        for (size_t j = 0; j < degree; ++j) {
+            size_t neighbor = edges_node.neighbors[j];
+            total += edges_node.weights[j] * (double)state[neighbor];
+        }
+        lambda[i] = gamma * total;
+    }
+}
+
+void cp_lambda_update_neighbors(double gamma, size_t node, int delta_state,
+                                const NodesEdges node_edges, const size_tp neigh_len,
+                                double *lambda) {
+    if (delta_state == 0) {
+        return;
+    }
+    size_t degree = neigh_len[node];
+    NodeEdges edges_node = node_edges[node];
+    double delta = gamma * (double)delta_state;
+    for (size_t j = 0; j < degree; ++j) {
+        size_t neighbor = edges_node.neighbors[j];
+        lambda[neighbor] += delta * edges_node.weights[j];
+    }
 }
 
 /* Activation function: RELU - clipped to [0,1] */
@@ -185,4 +216,151 @@ int cp_reached_absorbing_state(size_t sum, size_t N, size_t t, size_t steps) {
         return 1;
     }
     return 0;
+}
+
+/* Frontier tracking implementation (three-list system) */
+
+static inline void cp_frontier_add_active_node(cp_frontier_t *frontier, size_t node) {
+    frontier->pos_active[node] = frontier->active_count;
+    frontier->active_list[frontier->active_count++] = node;
+    frontier->node_status[node] = NODE_ACTIVE;
+}
+
+static inline void cp_frontier_remove_active_node(cp_frontier_t *frontier, size_t node) {
+    size_t idx = frontier->pos_active[node];
+    size_t last_idx = --frontier->active_count;
+    if (idx < last_idx) {
+        size_t swapped = frontier->active_list[last_idx];
+        frontier->active_list[idx] = swapped;
+        frontier->pos_active[swapped] = idx;
+    }
+}
+
+static inline void cp_frontier_add_boundary_node(cp_frontier_t *frontier, size_t node) {
+    frontier->pos_boundary[node] = frontier->boundary_count;
+    frontier->boundary_list[frontier->boundary_count++] = node;
+    frontier->node_status[node] = NODE_BOUNDARY;
+}
+
+static inline void cp_frontier_remove_boundary_node(cp_frontier_t *frontier, size_t node) {
+    size_t idx = frontier->pos_boundary[node];
+    size_t last_idx = --frontier->boundary_count;
+    if (idx < last_idx) {
+        size_t swapped = frontier->boundary_list[last_idx];
+        frontier->boundary_list[idx] = swapped;
+        frontier->pos_boundary[swapped] = idx;
+    }
+    frontier->node_status[node] = NODE_INACTIVE;
+}
+
+void cp_frontier_init(cp_frontier_t *frontier, size_t N) {
+    frontier->active_list = __chMalloc(N * sizeof(size_t));
+    frontier->boundary_list = __chMalloc(N * sizeof(size_t));
+    frontier->pos_active = __chMalloc(N * sizeof(size_t));
+    frontier->pos_boundary = __chMalloc(N * sizeof(size_t));
+    frontier->node_status = __chCalloc(N, sizeof(cp_node_status_t));
+    frontier->active_neighbor_count = __chCalloc(N, sizeof(size_t));
+    frontier->N = N;
+    frontier->active_count = 0;
+    frontier->boundary_count = 0;
+    frontier->use_lambda_boundary = 0;
+}
+
+void cp_frontier_free(cp_frontier_t *frontier) {
+    free(frontier->active_list);
+    free(frontier->boundary_list);
+    free(frontier->pos_active);
+    free(frontier->pos_boundary);
+    free(frontier->node_status);
+    free(frontier->active_neighbor_count);
+}
+
+void cp_frontier_build(cp_frontier_t *frontier, const spin_tp state, const double *lambda,
+                       size_t N, const NodesEdges node_edges, const size_tp neigh_len) {
+    frontier->N = N;
+    frontier->active_count = 0;
+    frontier->boundary_count = 0;
+    memset(frontier->node_status, 0, frontier->N * sizeof(cp_node_status_t));
+    memset(frontier->active_neighbor_count, 0, frontier->N * sizeof(size_t));
+
+    /* First pass: build active list and count active neighbors */
+    for (size_t i = 0; i < N; ++i) {
+        if (state[i]) {
+            cp_frontier_add_active_node(frontier, i);
+
+            size_t degree = neigh_len[i];
+            NodeEdges edges_node = node_edges[i];
+            for (size_t j = 0; j < degree; ++j) {
+                size_t neighbor = edges_node.neighbors[j];
+                frontier->active_neighbor_count[neighbor]++;
+            }
+        }
+    }
+
+    /* Second pass: boundary = inactive nodes with active neighbors (and positive lambda if enabled) */
+    for (size_t i = 0; i < N; ++i) {
+        if (!state[i] && frontier->active_neighbor_count[i] > 0) {
+            if (!frontier->use_lambda_boundary || lambda[i] > 0.0) {
+                cp_frontier_add_boundary_node(frontier, i);
+            }
+        }
+    }
+}
+
+void cp_frontier_node_activate(cp_frontier_t *frontier, size_t node,
+                               const NodesEdges node_edges, const size_tp neigh_len,
+                               const spin_tp state, const double *lambda) {
+    /* Remove from boundary list if present */
+    if (frontier->node_status[node] == NODE_BOUNDARY) {
+        cp_frontier_remove_boundary_node(frontier, node);
+    }
+
+    /* Add to active list */
+    cp_frontier_add_active_node(frontier, node);
+
+    /* Update neighbors: increment count and add inactive ones to boundary */
+    size_t degree = neigh_len[node];
+    NodeEdges edges_node = node_edges[node];
+    for (size_t j = 0; j < degree; ++j) {
+        size_t neighbor = edges_node.neighbors[j];
+        frontier->active_neighbor_count[neighbor]++;
+
+        if (!state[neighbor] && frontier->node_status[neighbor] == NODE_INACTIVE) {
+            if (!frontier->use_lambda_boundary || lambda[neighbor] > 0.0) {
+                cp_frontier_add_boundary_node(frontier, neighbor);
+            }
+        }
+    }
+}
+
+void cp_frontier_node_deactivate(cp_frontier_t *frontier, size_t node,
+                                 const NodesEdges node_edges, const size_tp neigh_len,
+                                 const spin_tp state, const double *lambda) {
+    /* Remove from active list */
+    if (frontier->node_status[node] == NODE_ACTIVE) {
+        cp_frontier_remove_active_node(frontier, node);
+    }
+
+    /* Update neighbors: decrement count and remove from boundary if needed */
+    size_t degree = neigh_len[node];
+    NodeEdges edges_node = node_edges[node];
+    for (size_t j = 0; j < degree; ++j) {
+        size_t neighbor = edges_node.neighbors[j];
+        frontier->active_neighbor_count[neighbor]--;
+
+        if (!state[neighbor] && frontier->node_status[neighbor] == NODE_BOUNDARY) {
+            if (frontier->active_neighbor_count[neighbor] == 0 ||
+                (frontier->use_lambda_boundary && lambda[neighbor] <= 0.0)) {
+                cp_frontier_remove_boundary_node(frontier, neighbor);
+            }
+        }
+    }
+
+    /* Update this node's status */
+    if (frontier->active_neighbor_count[node] > 0 &&
+        (!frontier->use_lambda_boundary || lambda[node] > 0.0)) {
+        cp_frontier_add_boundary_node(frontier, node);
+    } else {
+        frontier->node_status[node] = NODE_INACTIVE;
+    }
 }

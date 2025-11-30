@@ -71,6 +71,11 @@ Contact_opt_args = {
         'action': argparse.BooleanOptionalAction,
         'default': DEFAULT_randstr,
     },
+    tuple(['-esdt', '--early_stop_density_threshold']): {
+        'help': 'Early stopping density threshold. If the average of the last M timesteps (M=10%% of time series length) exceeds this value after 20 runs, stop the simulation.',
+        'type': float,
+        'default': None,
+    },
 }
 
 L2D_CPROC_progname = "L2D_ContactProcess"

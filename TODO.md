@@ -1,5 +1,10 @@
 # TODO List
 
+### General 
+- [ ] Adjust the `Chronometer` for each dynamical and computational objects.
+- [ ] Adjust the logging and in general the verbosity of outputs, from notebooks to programs
+- [ ] 
+
 ### Implement Different Dynamics for Ising Model
 - [ ] Add alternative update rules beyond Glauber dynamics
   - [ ] Metropolis-Hastings dynamics

@@ -95,21 +95,78 @@ def _prepare_lattice(args):
     return lattice
 
 
+def _check_early_stopping(
+    pdir: Path,
+    agg_prefix: str,
+    sp_token: str,
+    last_saved_index: int,
+    threshold: float,
+    verbose: bool = False
+) -> bool:
+    """Check if early stopping condition is met.
+
+    Args:
+        pdir: Directory containing density files
+        agg_prefix: Prefix for aggregated density filename
+        sp_token: Sample preference token for filename
+        last_saved_index: The last saved index (na value)
+        threshold: Density threshold for early stopping
+        verbose: Whether to print diagnostic messages
+
+    Returns:
+        True if early stopping condition is met, False otherwise
+    """
+    agg_name = f"dens_{agg_prefix}{sp_token}_na={last_saved_index}.bin"
+    agg_path = pdir / agg_name
+
+    if not agg_path.exists():
+        return False
+
+    try:
+        dens_data = np.fromfile(agg_path, dtype=np.float64)
+        if len(dens_data) > 0:
+            # Reshape to (na, ns) where na is number of averages and ns is number of steps
+            na = last_saved_index
+            ns = len(dens_data) // na
+            dens_reshaped = dens_data.reshape(na, ns)
+
+            # Take last 10% of timesteps from each run
+            M_per_run = max(1, int(0.1 * ns))
+            last_M_per_run = dens_reshaped[:, -M_per_run:]
+            avg_last_M = np.mean(last_M_per_run)
+
+            if avg_last_M > threshold:
+                if verbose:
+                    print(f"""Early stopping triggered: last {M_per_run} 
+                          timesteps per run (10% of {ns}) across {na} runs have 
+                          average density {avg_last_M:.4f} > {threshold}""")
+                return True
+    except Exception as e:
+        if verbose:
+            print(f"Warning: Could not check early stopping condition: {e}")
+
+    return False
+
+
 def run_simulation(args):
     dynamics = args.dynamics.upper()
     runlang = args.runlang.upper()
-    if dynamics == "EI" and runlang != "C1C":
-        raise NotImplementedError("Only the C1c backend is currently wired for EI dynamics in L2D_ContactProcess.")
+    if dynamics == "EI" and runlang not in ("C1C", "C1D"):
+        raise NotImplementedError("Only the C1c and C1d backends are " \
+        "currently wired for EI dynamics in L2D_ContactProcess.")
     if dynamics == "SIR":
-        raise NotImplementedError("SIR-like contact-process wiring will be implemented in a dedicated subprogram.")
+        raise NotImplementedError("SIR-like contact-process wiring will " \
+        "be implemented in a dedicated subprogram.")
 
     # Choose post-processing based on (dynamics, runlang).
     match (dynamics, runlang):
-        case ("EI", "C1C"):
+        case ("EI", "C1C") | ("EI", "C1D"):
             from .ContactProcessDynamics import _process_EI_C1c, clean_up_files
             _process_cp = _process_EI_C1c
         case _:
-            raise NotImplementedError(f"Post-processing for dynamics={dynamics} and runlang={runlang} is not implemented.")
+            raise NotImplementedError(f"""Post-processing for 
+                                      dynamics={dynamics} and runlang={runlang} 
+                                      is not implemented.""")
 
     # Detect existing aggregate to allow resuming.
     first_lattice = _prepare_lattice(args)
@@ -123,6 +180,10 @@ def run_simulation(args):
             print(f"Density file already has na={saved_idx}; nothing to do.")
         return
 
+    # Early stopping parameters
+    early_stop_threshold = args.early_stop_density_threshold
+    min_runs_before_check = 20
+
     for i in range(start_avg, args.number_of_averages + 1):
         lattice = first_lattice if i == start_avg else _prepare_lattice(args)
         cp = run_contact_process(args, lattice)
@@ -132,3 +193,12 @@ def run_simulation(args):
             clean_up_files(cp, cp.sg, remove_stderr=True)
         except Exception:
             pass
+
+        # Check early stopping condition after minimum runs
+        if early_stop_threshold is not None and i >= min_runs_before_check:
+            if _check_early_stopping(pdir, agg_prefix, sp_token, 
+                                     cp_dyn._last_saved_index, 
+                                     early_stop_threshold, args.verbose):
+                if args.verbose:
+                    print(f"Stopping at run {i}")
+                break

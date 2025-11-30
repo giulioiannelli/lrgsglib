@@ -1,0 +1,156 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+**lrgsglib** implements the **Laplacian Renormalization Group for Signed Graphs** with Python modules and C/C++ extensions. It provides tools for building signed networks, running renormalization flows, and simulating statistical physics models (Ising, contact process, voter dynamics).
+
+## Build and Installation
+
+**Standalone usage:**
+```bash
+# Create and activate conda environment
+conda env create -f lrgsgenv.yml
+conda activate lrgsgenv
+
+# Initialize submodules
+git submodule init
+git submodule update
+
+# Build C/C++ components and configure environment
+make all
+
+# Install in editable mode
+pip install -e .
+```
+
+**As a submodule** (e.g., in `lrgsglib-ipynb`):
+```bash
+# From the lrgsglib subdirectory
+make all LRGSG_LLIB=$(pwd)/.. CONDA_ENV_NAME=your_env_name
+```
+- `LRGSG_LLIB` sets the outer project root for data/notebooks/logs
+- Without this, paths default to `lrgsglib/` subdirectory
+- This configures: data → `outer-project/data`, notebooks → `outer-project/ipynb`, logs → `outer-project/.log`
+
+**Rebuild after changes:**
+```bash
+make clean
+make all
+```
+
+## Running Tests
+
+```bash
+# From repository root
+pytest test/
+
+# Run specific test
+pytest test/test_contact_process.py
+
+# Quick smoke tests
+python test/quick_test.py
+python test/simple_test.py
+
+# Extended validation
+python test/extended_test.py
+```
+
+## Architecture
+
+### Python Library Structure (`src/lrgsglib/`)
+
+- **`config/`** - Configuration, error handling, program argument parsing
+  - `progargs/` - Command-line argument definitions for graph types and dynamics (ContactProcess, IsingDynamics, Lattice2D/3D, SignedGraph, etc.)
+  - `lrgsg_env.py` - Environment variables from build system
+
+- **`nx_patches/`** - NetworkX extensions for specialized graph types
+  - `SignedGraph/`, `Lattice2D/`, `Lattice3D/`, `ErdosRenyi/`, `WeightedGraph/`, etc.
+  - `funcs/` - Utility functions (spectral, thresholding, neighbors, lattice operations)
+
+- **`statsys/`** - Python wrappers for statistical physics simulations
+
+- **`plotlib/`** - Plotting utilities specialized for signed graphs and lattices
+
+- **`gt_patches/`** - graph-tool compatibility layer and C++ extensions
+
+- **`utils/`** - Core utilities organized by domain
+  - `lrg/` - Laplacian renormalization group tools (spectral analysis, coarse-graining)
+  - `basic/` - General utilities
+  - `recon/` - Reconstruction algorithms
+  - `tools/` - Helper functions
+
+- **`loglib.py`**, **`proglib.py`** - Logging and program execution helpers
+
+### C/C++ Components (`src/lrgsglib/Ccore/`)
+
+Performance-critical code lives here:
+
+- **`statsys/`** - Statistical physics simulators (compiled to `Ccore/bin/`)
+  - `RBIsingM/` - Random-bond Ising model (IsingSimulator variants)
+  - `voterM/` - Voter model dynamics (VoterSimulator variants)
+  - `contactP/` - Contact process (ContactSimulator variants)
+  - `signedRw/` - Signed random walks on lattices
+
+- **`SFMT/`** - SIMD-oriented Fast Mersenne Twister RNG
+
+- **`LRGSG_bindynsys.c/h`** - Binary dynamics system utilities
+
+**Build outputs:**
+- Binaries: `Ccore/bin/` (e.g., `IsingSimulator0`, `VoterSimulator1`, `ContactSimulator1d`)
+- Python extensions: `.so` files via pybind11
+
+### Build System
+
+The Makefile includes modular configuration files from `build/`:
+- `lrgsg-paths.mk` - Path definitions (customizable via `LRGSG_LLIB`)
+- `cconfig.mk` - C/C++ compiler flags
+- `cprogn.mk` - C program build rules
+- `conda-config.mk` - Conda environment configuration
+
+Build generates a `.env` file with all paths (`LRGSG_DATA`, `LRGSG_IPYNB`, `LRGSG_LOG`, `LRGSG_CCORE_BIN`, etc.) loaded via `python-dotenv`.
+
+## Common Workflow Patterns
+
+**Running C simulators from Python:**
+1. Python scripts (e.g., `src/L2D_IsingDynamics.py`) or kernels (`src/kernels/`) call compiled C binaries
+2. Serializers handle data storage (e.g., `L2D_IsingDynamics_Serialiser.py`)
+3. Results analyzed in notebooks with plotlib utilities
+
+**Graph creation and analysis:**
+1. Create signed graphs using nx_patches (e.g., `Lattice2D.create_graph()`, `ErdosRenyi.signed_erdos_renyi()`)
+2. Extract properties (Laplacian spectra, balance ratios) via `utils/lrg/spectral.py`
+3. Run dynamics simulations via C programs or Python wrappers
+4. Visualize with plotlib
+
+## Code Style Conventions
+
+From `AGENTS.md` and `pyproject.toml`:
+
+- **Python:** PEP 8, PEP 484 type hints, Python ≥3.12
+- **Determinism:** Randomized logic must accept a `seed` parameter
+- **Modularity:** Prefer pure functions, minimal state, small composable modules
+- **Documentation:** Concise docstrings with short runnable examples
+- **Testing:** Ship tests with all new code (pytest)
+- **Explicit over implicit:** No global state, no wildcard imports
+
+**Formatting tools:**
+- `black` (line length 80)
+- `isort` (profile: black)
+- `mypy` (strict type checking)
+- `flake8`
+
+## Key Dependencies
+
+Core: `numpy`, `scipy`, `networkx`, `matplotlib`, `pandas`, `scikit-learn`
+Performance: `pybind11`, `cupy` (GPU acceleration)
+Graphs: `graph-tool` (from conda)
+Specialized: `lmfit`, `powerlaw`, `tqdm`
+
+## Important Notes
+
+- C/C++ code uses SFMT for random number generation
+- Build system auto-generates environment configuration (`.env`, `lrgsg_env.py`)
+- When working with submodule setup, always rebuild with proper `LRGSG_LLIB` path
+- C programs are performance-critical; changes require benchmarks and tests
