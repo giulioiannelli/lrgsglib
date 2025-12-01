@@ -1,5 +1,6 @@
 #include "LRGSG_cp.h"
 #include "LRGSG_utils.h"
+#include "sfmtrng.h"
 
 #include <stdio.h>
 #include <math.h>
@@ -68,6 +69,237 @@ void cp_lambda_update_neighbors(double gamma, size_t node, int delta_state,
         size_t neighbor = edges_node.neighbors[j];
         lambda[neighbor] += delta * edges_node.weights[j];
     }
+}
+
+double cp_calculate_rate(int8_t state, double lambda, cp_activation_func_t activation_func) {
+    return state ? 1.0 : activation_func(lambda);
+}
+
+void cp_rate_init(size_t N, const spin_tp state, const double *lambda,
+                  cp_activation_func_t activation_func, double *rates, double *total_rate) {
+    double accum = 0.0;
+    for (size_t i = 0; i < N; ++i) {
+        rates[i] = cp_calculate_rate(state[i], lambda[i], activation_func);
+        accum += rates[i];
+    }
+    *total_rate = accum;
+}
+
+void cp_rate_update(size_t node, const spin_tp state, const double *lambda,
+                    cp_activation_func_t activation_func, double *rates, double *total_rate) {
+    double new_rate = cp_calculate_rate(state[node], lambda[node], activation_func);
+    double delta = new_rate - rates[node];
+    rates[node] = new_rate;
+    *total_rate += delta;
+}
+
+void cp_update_rates_neighbors(size_t node, const NodesEdges node_edges, const size_tp neigh_len,
+                               const spin_tp state, const double *lambda,
+                               cp_activation_func_t activation_func, double *rates,
+                               double *total_rate) {
+    size_t degree = neigh_len[node];
+    NodeEdges edges_node = node_edges[node];
+    for (size_t j = 0; j < degree; ++j) {
+        size_t neighbor = edges_node.neighbors[j];
+        cp_rate_update(neighbor, state, lambda, activation_func, rates, total_rate);
+    }
+}
+
+int cp_gillespie_select_event(size_t N, const double *rates, double total_rate, size_t *selected_node) {
+    if (total_rate <= 0.0) {
+        return 0;
+    }
+
+    double threshold = RNG_dbl() * total_rate;
+    double cumulative = 0.0;
+    for (size_t i = 0; i < N; ++i) {
+        cumulative += rates[i];
+        if (cumulative >= threshold) {
+            *selected_node = i;
+            return 1;
+        }
+    }
+
+    *selected_node = N - 1;
+    return 1;
+}
+
+int cp_gillespie_select_event_frontier(const cp_frontier_t *frontier, const double *rates,
+                                       double total_rate, size_t *selected_node) {
+    size_t frontier_size = frontier->active_count + frontier->boundary_count;
+    if (frontier_size == 0 || total_rate <= 0.0) {
+        return 0;
+    }
+
+    double threshold = RNG_dbl() * total_rate;
+    double cumulative = 0.0;
+
+    for (size_t idx = 0; idx < frontier->active_count; ++idx) {
+        size_t node = frontier->active_list[idx];
+        cumulative += rates[node];
+        if (cumulative >= threshold) {
+            *selected_node = node;
+            return 1;
+        }
+    }
+
+    for (size_t idx = 0; idx < frontier->boundary_count; ++idx) {
+        size_t node = frontier->boundary_list[idx];
+        cumulative += rates[node];
+        if (cumulative >= threshold) {
+            *selected_node = node;
+            return 1;
+        }
+    }
+
+    if (frontier->boundary_count > 0) {
+        *selected_node = frontier->boundary_list[frontier->boundary_count - 1];
+        return 1;
+    }
+    if (frontier->active_count > 0) {
+        *selected_node = frontier->active_list[frontier->active_count - 1];
+        return 1;
+    }
+
+    return 0;
+}
+
+static inline int cp_select_node_frontier(const cp_gillespie_sim_t *sim, size_t *node_out) {
+    return cp_gillespie_select_event_frontier(sim->frontier, sim->rates, sim->total_rate, node_out);
+}
+
+static inline int cp_select_node_dense(const cp_gillespie_sim_t *sim, size_t *node_out) {
+    return cp_gillespie_select_event(sim->N, sim->rates, sim->total_rate, node_out);
+}
+
+void cp_gillespie_set_selector(cp_gillespie_sim_t *sim) {
+    sim->select_node = sim->use_frontier_selector ? cp_select_node_frontier : cp_select_node_dense;
+}
+
+int cp_gillespie_pick_node(const cp_gillespie_sim_t *sim, size_t *node_out) {
+    if (sim->select_node) {
+        return sim->select_node(sim, node_out);
+    }
+    return sim->use_frontier_selector ? cp_select_node_frontier(sim, node_out)
+                                      : cp_select_node_dense(sim, node_out);
+}
+
+void cp_gillespie_apply_flip(cp_gillespie_sim_t *sim, size_t node, int8_t old_state, int8_t new_state,
+                             size_t *sum_ptr) {
+    int delta = (int)new_state - (int)old_state;
+    sim->state[node] = new_state;
+    if (delta > 0) {
+        ++(*sum_ptr);
+    } else {
+        --(*sum_ptr);
+    }
+
+    cp_lambda_update_neighbors(sim->gamma, node, delta, sim->node_edges, sim->neigh_len, sim->lambda);
+
+    if (sim->frontier) {
+        if (new_state) {
+            cp_frontier_node_activate(sim->frontier, node, sim->node_edges, sim->neigh_len, sim->state, sim->lambda);
+        } else {
+            cp_frontier_node_deactivate(sim->frontier, node, sim->node_edges, sim->neigh_len, sim->state, sim->lambda);
+        }
+    }
+
+    cp_rate_update(node, sim->state, sim->lambda, sim->activation_func, sim->rates, &sim->total_rate);
+    cp_update_rates_neighbors(node, sim->node_edges, sim->neigh_len, sim->state, sim->lambda, sim->activation_func,
+                              sim->rates, &sim->total_rate);
+}
+
+static inline int cp_single_update_cached(cp_cached_sim_t *sim, size_t *sum_ptr) {
+    size_t node = (size_t)(RNG_u64() % sim->N);
+    double prob = sim->activation_func(sim->lambda[node]);
+    int8_t old_state = sim->state[node];
+    int8_t new_state = (int8_t)(RNG_dbl() < prob);
+
+    if (new_state != old_state) {
+        int delta = (int)new_state - (int)old_state;
+        sim->state[node] = new_state;
+        if (delta > 0) {
+            ++(*sum_ptr);
+        } else {
+            --(*sum_ptr);
+        }
+        cp_lambda_update_neighbors(sim->gamma, node, delta, sim->node_edges, sim->neigh_len, sim->lambda);
+        return 1;
+    }
+    return 0;
+}
+
+size_t cp_run_sweep_cached(cp_cached_sim_t *sim, size_t *sum_ptr) {
+    size_t flips = 0;
+    for (size_t sweep = 0; sweep < sim->N; ++sweep) {
+        flips += (size_t)cp_single_update_cached(sim, sum_ptr);
+    }
+    return flips;
+}
+
+static inline void cp_apply_flip_with_frontier(cp_frontier_sim_t *sim, size_t node, int8_t old_state,
+                                               int8_t new_state, size_t *sum_ptr) {
+    int delta = (int)new_state - (int)old_state;
+    sim->state[node] = new_state;
+    if (delta > 0) {
+        ++(*sum_ptr);
+    } else {
+        --(*sum_ptr);
+    }
+
+    cp_lambda_update_neighbors(sim->gamma, node, delta, sim->node_edges, sim->neigh_len, sim->lambda);
+
+    if (new_state) {
+        cp_frontier_node_activate(sim->frontier, node, sim->node_edges, sim->neigh_len, sim->state, sim->lambda);
+    } else {
+        cp_frontier_node_deactivate(sim->frontier, node, sim->node_edges, sim->neigh_len, sim->state, sim->lambda);
+    }
+}
+
+cp_frontier_sweep_result_t cp_run_frontier_sweep(cp_frontier_sim_t *sim, size_t *sum_ptr) {
+    cp_frontier_sweep_result_t result = {.flips = 0, .frontier_size = sim->frontier->active_count + sim->frontier->boundary_count};
+    if (result.frontier_size == 0) {
+        return result;
+    }
+
+    for (size_t sweep = 0; sweep < sim->N; ++sweep) {
+        size_t pick = (size_t)(RNG_u64() % result.frontier_size);
+        size_t node = (pick < sim->frontier->active_count)
+                          ? sim->frontier->active_list[pick]
+                          : sim->frontier->boundary_list[pick - sim->frontier->active_count];
+
+        double prob = sim->activation_func(sim->lambda[node]);
+        int8_t old_state = sim->state[node];
+        int8_t new_state = (int8_t)(RNG_dbl() < prob);
+
+        if (new_state != old_state) {
+            cp_apply_flip_with_frontier(sim, node, old_state, new_state, sum_ptr);
+            ++result.flips;
+
+            result.frontier_size = sim->frontier->active_count + sim->frontier->boundary_count;
+            if (result.frontier_size == 0) {
+                break;
+            }
+        }
+    }
+
+    return result;
+}
+
+size_t cp_run_dense_frontier_sweep(cp_frontier_sim_t *sim, size_t *sum_ptr) {
+    size_t flips = 0;
+    for (size_t sweep = 0; sweep < sim->N; ++sweep) {
+        size_t node = (size_t)(RNG_u64() % sim->N);
+        double prob = sim->activation_func(sim->lambda[node]);
+        int8_t old_state = sim->state[node];
+        int8_t new_state = (int8_t)(RNG_dbl() < prob);
+
+        if (new_state != old_state) {
+            cp_apply_flip_with_frontier(sim, node, old_state, new_state, sum_ptr);
+            ++flips;
+        }
+    }
+    return flips;
 }
 
 /* Activation function: RELU - clipped to [0,1] */
