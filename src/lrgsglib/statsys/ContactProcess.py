@@ -8,8 +8,9 @@ This module provides two flavours of contact-process dynamics:
   ``ContactSimulator0`` C kernel.
 * :class:`ContactProcessEI` implements excitation-inhibition dynamics driven
   by ``gamma`` and activation choice, mapping to the ``ContactSimulator1*``
-  kernels (``runlang`` values ``C1``, ``C1a``, ``C1b``, ``C1c``, ``C1d``). This path
-  encapsulates the degree rescaling expected by the C implementations.
+  kernels (``runlang`` values ``C1``, ``C1a``, ``C1b``, ``C1c``, ``C1d``,
+  ``C1e``). This path encapsulates the degree rescaling expected by the C
+  implementations.
 
 Examples
 --------
@@ -370,10 +371,14 @@ class ContactProcessEI(ContactProcessBase):
     This class is intended for the C backends (``runlang`` starting with
     ``C1``). Python dynamics are not provided for the excitation-inhibition
     path. The ``C1d`` variant uses adaptive frontier optimization for improved
-    performance when density is low (< 0.15).
+    performance when density is low (< 0.15). The ``C1e`` variant reuses the
+    cached-``lambda`` update scheme without maintaining a frontier and shares
+    the ``num_log_samples`` argument with ``C1c`` and ``C1d``. The ``C1f``
+    variant introduces a Gillespie-style event-driven loop over the frontier
+    for low-density regimes.
     """
 
-    _allowed_c_keys = ("C1", "C1A", "C1B", "C1C", "C1D")
+    _allowed_c_keys = ("C1", "C1A", "C1B", "C1C", "C1D", "C1E", "C1F")
 
     def __init__(
         self,
@@ -422,7 +427,7 @@ class ContactProcessEI(ContactProcessBase):
         if key == "C1A":
             nSampleLog = getattr(self, "nSampleLog", 100)
             args.append(f"{nSampleLog}")
-        elif key in ("C1C", "C1D"):
+        elif key in ("C1C", "C1D", "C1E", "C1F"):
             args.append(f"{self.num_log_samples}")
 
         return args

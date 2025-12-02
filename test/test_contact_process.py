@@ -130,6 +130,80 @@ class TestContactProcess(unittest.TestCase):
             model.remove_run_c_files(remove_stderr=True)
             model.sg.remove_exported_files()
 
+    def test_c1e_builder_arguments_include_cached_lambda_variant(self):
+        path_graph = nx.path_graph(4)
+        for u, v in path_graph.edges:
+            path_graph[u][v]["weight"] = 1.0
+        sg = self.SignedGraph(
+            path_graph,
+            pflip=0.0,
+            init_nw_dict=False,
+            path_data=self.data_dir,
+            path_plot=self.log_dir,
+        )
+        model = self.ContactProcessEI(
+            sg,
+            runlang="C1e",
+            gamma=0.5,
+            activation="tanh",
+            num_log_samples=15,
+            seed=0,
+            simpref=1,
+        )
+        model.simtime = 30
+        model.init_contact_dynamics()
+        try:
+            expected_binary = self.ccore_dir / "ContactSimulator1e"
+            self.assertEqual(Path(model.cprogram[0]), expected_binary)
+            self.assertEqual(model.cprogram[1], str(model.N))
+            self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
+            self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
+            self.assertEqual(model.cprogram[4], f"{model.simtime}")
+            self.assertEqual(model.cprogram[-2], model.activation)
+            self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
+        finally:
+            if model.stderr_fopen and not model.stderr_fopen.closed:
+                model.stderr_fopen.close()
+            model.remove_run_c_files(remove_stderr=True)
+            model.sg.remove_exported_files()
+
+    def test_c1f_builder_arguments_include_gillespie_variant(self):
+        path_graph = nx.path_graph(3)
+        for u, v in path_graph.edges:
+            path_graph[u][v]["weight"] = 1.0
+        sg = self.SignedGraph(
+            path_graph,
+            pflip=0.0,
+            init_nw_dict=False,
+            path_data=self.data_dir,
+            path_plot=self.log_dir,
+        )
+        model = self.ContactProcessEI(
+            sg,
+            runlang="C1f",
+            gamma=0.75,
+            activation="relu",
+            num_log_samples=12,
+            seed=1,
+            simpref=1,
+        )
+        model.simtime = 25
+        model.init_contact_dynamics()
+        try:
+            expected_binary = self.ccore_dir / "ContactSimulator1f"
+            self.assertEqual(Path(model.cprogram[0]), expected_binary)
+            self.assertEqual(model.cprogram[1], str(model.N))
+            self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
+            self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
+            self.assertEqual(model.cprogram[4], f"{model.simtime}")
+            self.assertEqual(model.cprogram[-2], model.activation)
+            self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
+        finally:
+            if model.stderr_fopen and not model.stderr_fopen.closed:
+                model.stderr_fopen.close()
+            model.remove_run_c_files(remove_stderr=True)
+            model.sg.remove_exported_files()
+
     def test_sir_step_recovery_and_infection(self):
         sg = self._make_graph()
         model = self.ContactProcessSIR(

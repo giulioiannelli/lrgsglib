@@ -4,7 +4,6 @@
 #include <math.h>
 
 #define EXPECTED_ARGC (10 + 1)
-#define FRONTIER_DENSITY_THRESHOLD 0.15
 
 int main(int argc, char *argv[]) {
     if (argc < EXPECTED_ARGC) {
@@ -49,21 +48,13 @@ int main(int argc, char *argv[]) {
     double *lambda = __chMalloc(N * sizeof(*lambda));
     cp_lambda_init(gamma, state, N, node_edges, neigh_len, lambda);
 
-    /* Allocate density array */
+    /* Allocate density array - will be filled by Python's log-spaced indices */
     double *density = __chCalloc(num_log_samples, sizeof(double));
 
     /* Open output file for density time series */
     FILE *f_dens;
     sprintf(buf, DENS_FNAME, datdir, syshape, p, out_id);
     __fopen(&f_dens, buf, "wb");
-
-    /* Initialize frontier tracking */
-    cp_frontier_t frontier;
-    cp_frontier_init(&frontier, N);
-    frontier.use_lambda_boundary = (activation == CP_ACTIVATION_RELU);
-
-    /* Build initial frontier from state */
-    cp_frontier_build(&frontier, state, lambda, N, node_edges, neigh_len);
 
     /* Calculate initial density */
     size_t sum = 0;
@@ -74,73 +65,51 @@ int main(int argc, char *argv[]) {
     size_t sample_idx = 0;
     density[sample_idx++] = (double)sum / (double)N;
 
-    fprintf(stderr, "Initial: density=%.6f, active=%zu, boundary=%zu, threshold=%.2f\n",
-            density[0], frontier.active_count, frontier.boundary_count, FRONTIER_DENSITY_THRESHOLD);
+    fprintf(stderr, "Initial density: %.6f, will save %zu samples\n", density[0], num_log_samples);
 
-    /* Get activation function pointer once */
-    cp_activation_func_t activation_func = cp_get_activation_function(activation);
-    double invN = 1.0 / (double)N;
-
-    cp_frontier_sim_t sim = {
+    /* Build simulation context */
+    cp_cached_sim_t sim = {
         .gamma = gamma,
         .N = N,
         .state = state,
         .lambda = lambda,
         .node_edges = node_edges,
         .neigh_len = neigh_len,
-        .frontier = &frontier,
-        .activation_func = activation_func,
+        .activation_func = cp_get_activation_function(activation),
     };
 
-    /* Simulation loop */
+    /* Simulation loop - save density every step */
     size_t t;
     for (t = 0; t < steps; ++t) {
-        /* Check for absorbing state */
         if (cp_reached_absorbing_state(sum, N, t, steps)) {
             break;
         }
 
-        /* Adaptive algorithm selection based on density */
-        double current_density = (double)sum * invN;
-        int use_frontier = (current_density < FRONTIER_DENSITY_THRESHOLD);
+        (void)cp_run_sweep_cached(&sim, &sum);
 
-        if (use_frontier) {
-            /* Low density: use frontier optimization */
-            cp_frontier_sweep_result_t frontier_result = cp_run_frontier_sweep(&sim, &sum);
-            if (frontier_result.frontier_size == 0) {
-                fprintf(stderr, "Reached absorbing state at t=%zu (empty frontier)\n", t);
-                break;
-            }
-        } else {
-            /* High density: use standard random sampling */
-            (void)cp_run_dense_frontier_sweep(&sim, &sum);
-        }
-
-        /* Save density */
         if (sample_idx < num_log_samples) {
             density[sample_idx++] = (double)sum / (double)N;
         }
     }
 
-    /* Fill remaining samples with final density if ended early */
+    /* Fill remaining samples with final density if simulation ended early */
     double final_density = (double)sum / (double)N;
     while (sample_idx < num_log_samples) {
         density[sample_idx++] = final_density;
     }
 
-    fprintf(stderr, "Complete: t=%zu, density=%.6f, active=%zu, boundary=%zu\n",
-            t, final_density, frontier.active_count, frontier.boundary_count);
+    fprintf(stderr, "Simulation complete: %zu steps, final density=%.6f\n", t, final_density);
 
-    /* Write outputs */
+    /* Write density values as simple array */
     fwrite(density, sizeof(double), num_log_samples, f_dens);
     fclose(f_dens);
 
+    /* Write final state to stdout */
     fwrite(state, sizeof(*state), N, stdout);
     fflush(stdout);
 
     /* Cleanup */
     free(density);
-    cp_frontier_free(&frontier);
     free(lambda);
     free(edges);
     for (size_t i = 0; i < N; ++i) {
