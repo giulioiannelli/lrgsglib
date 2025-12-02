@@ -68,7 +68,8 @@ typedef struct cp_gillespie_sim_t {
     cp_frontier_t *frontier;  // Optional frontier, used when selecting only active/boundary nodes
     cp_activation_func_t activation_func;
     int use_frontier_selector;
-    int (*select_node)(const cp_gillespie_sim_t *sim, size_t *node_out);
+    /* Use the struct tag here because the typedef is not complete inside the struct body */
+    int (*select_node)(const struct cp_gillespie_sim_t *sim, size_t *node_out);
 } cp_gillespie_sim_t;
 
 int cp_gillespie_pick_node(const cp_gillespie_sim_t *sim, size_t *node_out);
