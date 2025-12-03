@@ -48,8 +48,19 @@ int main(int argc, char *argv[]) {
     double *lambda = __chMalloc(N * sizeof(*lambda));
     cp_lambda_init(gamma, state, N, node_edges, neigh_len, lambda);
 
-    /* Allocate density array - will be filled by Python's log-spaced indices */
+    /* Allocate density array and compute log-spaced sample indices */
     double *density = __chCalloc(num_log_samples, sizeof(double));
+    size_t *sample_steps = __chMalloc(num_log_samples * sizeof(*sample_steps));
+
+    /* Generate log-spaced sample indices from 0 to steps-1 */
+    for (size_t i = 0; i < num_log_samples; ++i) {
+        double log_val = (double)i / (double)(num_log_samples - 1) * log10((double)steps);
+        sample_steps[i] = (size_t)pow(10.0, log_val);
+        if (sample_steps[i] >= steps) {
+            sample_steps[i] = steps - 1;
+        }
+    }
+    sample_steps[0] = 0;  /* Ensure first sample is at t=0 */
 
     /* Open output file for density time series */
     FILE *f_dens;
@@ -65,7 +76,7 @@ int main(int argc, char *argv[]) {
     size_t sample_idx = 0;
     density[sample_idx++] = (double)sum / (double)N;
 
-    fprintf(stderr, "Initial density: %.6f, will save %zu samples\n", density[0], num_log_samples);
+    fprintf(stderr, "Initial density: %.6f, will save %zu log-spaced samples\n", density[0], num_log_samples);
 
     /* Build simulation context */
     cp_cached_sim_t sim = {
@@ -78,17 +89,19 @@ int main(int argc, char *argv[]) {
         .activation_func = cp_get_activation_function(activation),
     };
 
-    /* Simulation loop - save density every step */
+    /* Simulation loop - save density at log-spaced intervals */
     size_t t;
-    for (t = 0; t < steps; ++t) {
+    for (t = 1; t <= steps; ++t) {
         if (cp_reached_absorbing_state(sum, N, t, steps)) {
             break;
         }
 
         (void)cp_run_sweep_cached(&sim, &sum);
 
-        if (sample_idx < num_log_samples) {
-            density[sample_idx++] = (double)sum / (double)N;
+        /* Check if we've reached the next sample point */
+        if (sample_idx < num_log_samples && t == sample_steps[sample_idx]) {
+            density[sample_idx] = (double)sum / (double)N;
+            sample_idx++;
         }
     }
 
@@ -110,6 +123,7 @@ int main(int argc, char *argv[]) {
 
     /* Cleanup */
     free(density);
+    free(sample_steps);
     free(lambda);
     free(edges);
     for (size_t i = 0; i < N; ++i) {
