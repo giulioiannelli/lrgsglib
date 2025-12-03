@@ -1,0 +1,2 @@
+DEFAULT_CELL = 'rand'
+DEFAULT_NAVG_ER = 500

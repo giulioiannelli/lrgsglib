@@ -4,6 +4,7 @@ from .defs.IsingDynamics import *
 #
 from .Lattice2D import *
 from .Lattice3D import *
+from .ErdosRenyi import *
 # general arguments
 IsDyn_args = {
     'T': {
@@ -128,3 +129,15 @@ L3D_ISDYN_action_args = {**action_args_dict}
 L3D_ISDYN_opt_args = {**IsDyn_opt_args}
 L3D_ISDYN_srun_opt_args = {**IsDyn_srun_list_args, **IsDyn_srun_args}
 L3D_ISDYN_srun_action_args = {**srun_action_args}
+# ErdosRenyi args
+## names and descriptions
+ER_ISDYN_progname = 'ER_IsingDynamics'
+ER_ISDYN_progname_shrt = 'ERID'
+ER_ISDYN_description = f"""
+    Computational resources regarding the Ising Dynamics on signed
+    Erdos-Renyi graphs: {ER_ISDYN_progname}.py
+"""
+## arg parsers dict
+ER_ISDYN_args = {**ER_args, **IsDyn_args}
+ER_ISDYN_action_args = {**action_args_dict}
+ER_ISDYN_opt_args = {**IsDyn_opt_args}
