@@ -246,28 +246,46 @@ extern double* logspace(double start, double stop, int num) {
  * @note The returned array must be freed by the caller using free() when no longer needed.
  */
 extern int* logspace_int(double stop, int* num) {
-    int* vec = (int*)malloc((*num) * sizeof(int));
-    double step = stop / (*num - 1);
-
-    for (int i = 0; i < *num; i++) {
-        vec[i] = (int)round(pow(10, i * step));
+    int requested = *num;
+    if (requested <= 0) {
+        return NULL;
     }
-    // Check if the first two points are the same
-    if (vec[0] == vec[1]) {
-        int num_max = 1 + (int)(1 / (log10(2) / stop));
-        num_max = num_max < *num ? num_max : *num;
-        // Free the previously allocated memory
-        free(vec);
-        // Update the num value
-        *num = num_max;
-        vec = (int*)malloc((*num) * sizeof(int));
-        step = stop / (*num - 1);
+    if (requested == 1) {
+        int *vec = (int*)malloc(sizeof(int));
+        vec[0] = (int)round(pow(10.0, stop));
+        *num = 1;
+        return vec;
+    }
 
-        for (int i = 0; i < *num; i++) {
-            vec[i] = (int)round(pow(10, i * step));
+    int *vec = (int*)malloc((size_t)requested * sizeof(int));
+    double step = stop / (requested - 1);
+    int max_val = (int)round(pow(10.0, stop));
+    int prev = 0;
+    int count = 0;
+
+    for (int i = 0; i < requested; i++) {
+        int val = (int)round(pow(10.0, i * step));
+        if (val < 1) {
+            val = 1;
+        }
+        if (val <= prev) {
+            val = prev + 1;  // enforce strictly increasing sequence
+        }
+        if (val > max_val) {
+            val = max_val;
+        }
+        if (val == prev) {
+            continue;  // cannot add duplicate
+        }
+        vec[count++] = val;
+        prev = val;
+        if (prev == max_val) {
+            break;
         }
     }
 
+    *num = count;
+    vec = (int*)realloc(vec, (size_t)count * sizeof(int));
     return vec;
 }
 /** perform the sum of a floating point array 

@@ -15,6 +15,7 @@ FN_CPSIM1C  = ContactSimulator1c
 FN_CPSIM1D  = ContactSimulator1d
 FN_CPSIM1E  = ContactSimulator1e
 FN_CPSIM1F  = ContactSimulator1f
+FN_CPSIM1G  = ContactSimulator1g
 FN_LRGSGLIB = LRGSG_utils sfmtrng
 SRC_BINDYNSYS = LRGSG_bindynsys
 SRC_RBIM    = LRGSG_rbim
@@ -25,7 +26,7 @@ SFMTSRC     = SFMT
 FNS := $(FN_RBIMSIM0) $(FN_RBIMSIM1) $(FN_RBIMSIM2) \
        $(FN_RBIMSIM3) $(FN_RBIMSIM4) $(FN_RBIMSIM5) \
        $(FN_VMSIM0) $(FN_VMSIM1) $(FN_CPSIM0) $(FN_CPSIM1) \
-       $(FN_CPSIM1A) $(FN_CPSIM1B) $(FN_CPSIM1C) $(FN_CPSIM1D) $(FN_CPSIM1E) $(FN_CPSIM1F)
+       $(FN_CPSIM1A) $(FN_CPSIM1B) $(FN_CPSIM1C) $(FN_CPSIM1D) $(FN_CPSIM1E) $(FN_CPSIM1F) $(FN_CPSIM1G)
 # only these go into PROGS
 PROGS := $(addprefix $(LRGSG_CCORE_BIN)/, $(FNS))
 # #

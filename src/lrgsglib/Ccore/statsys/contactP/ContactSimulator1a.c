@@ -1,12 +1,13 @@
 #include "LRGSG_cp.h"
 #include "LRGSG_utils.h"
 #include "sfmtrng.h"
+#include <math.h>
 
 #define EXPECTED_ARGC (10 + 1)
 
 int main(int argc, char *argv[]) {
     if (argc < EXPECTED_ARGC) {
-        fprintf(stderr, "Usage: %s N p gamma steps datdir syshape run_id out_id activation nSampleLog\n", argv[0]);
+        fprintf(stderr, "Usage: %s N p gamma steps datdir syshape run_id out_id activation num_log_samples\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -22,7 +23,12 @@ int main(int argc, char *argv[]) {
     const char *run_id = argv[7];
     const char *out_id = argv[8];
     const char *activation_name = argv[9];
-    int nSampleLog = atoi(argv[10]);
+    size_t num_log_samples = strtozu(argv[10]);
+    if (num_log_samples == 0) {
+        fprintf(stderr, "num_log_samples must be positive\n");
+        return EXIT_FAILURE;
+    }
+    int nSampleLog = (int)(num_log_samples - 1); /* exclude t=0 already saved */
 
     cp_activation_t activation = cp_activation_from_string(activation_name);
 
@@ -43,34 +49,46 @@ int main(int argc, char *argv[]) {
     sprintf(buf, EDGL_FNAME, datdir, syshape, p, run_id);
     process_edges(buf, N, &edges, &node_edges, &neigh_len);
 
-    /* Generate logarithmically spaced time points */
-    int* logspc = logspace_int(log10((double)steps), &nSampleLog);
+    /* Generate logarithmically spaced sampling times after t=0 */
+    int *logspc = NULL;
+    if (nSampleLog > 0) {
+        logspc = logspace_int(log10((double)steps), &nSampleLog);
+    }
+    size_t planned_samples = (size_t)nSampleLog + 1;
 
-    /* Open output file for snapshots */
+    /* Allocate density array for log-spaced samples */
+    double *density = __chCalloc(num_log_samples, sizeof(double));
+
+    /* Open output files */
+    FILE *f_dens;
+    sprintf(buf, DENS_FNAME, datdir, syshape, p, out_id);
+    __fopen(&f_dens, buf, "wb");
+
     FILE *f_sout;
     sprintf(buf, SOUT_FNAME, datdir, syshape, p, out_id);
     __fopen(&f_sout, buf, "wb");
 
-    /* Get activation function pointer once */
+    /* Calculate initial density and save initial snapshot */
+    size_t sum = 0;
+    for (size_t i = 0; i < N; ++i) {
+        sum += state[i];
+    }
+    size_t sample_idx = 0;
+    density[sample_idx] = (double)sum / (double)N;
+    fwrite(state, sizeof(*state), N, f_sout);
+    sample_idx++;
+    size_t log_idx = 0;
+
+    fprintf(stderr, "Initial density: %.6f, will save %zu log-spaced samples (requested %zu)\n",
+            density[0], planned_samples, num_log_samples);
+
     cp_activation_func_t activation_func = cp_get_activation_function(activation);
 
-    /* Simulation loop with log-spaced snapshots */
-    int next_sample_idx = 0;
+    /* Simulation loop with log-spaced density and snapshots */
     size_t t;
     for (t = 0; t < steps; ++t) {
-        /* Check for absorbing state - early termination */
-        size_t sum = 0;
-        for (size_t i = 0; i < N; ++i) {
-            sum += state[i];
-        }
         if (cp_reached_absorbing_state(sum, N, t, steps)) {
             break;
-        }
-
-        /* Save snapshot at logarithmically spaced intervals */
-        if (next_sample_idx < nSampleLog && t == (size_t)logspc[next_sample_idx]) {
-            fwrite(state, sizeof(*state), N, f_sout);
-            next_sample_idx++;
         }
 
         /* Monte Carlo sweep */
@@ -80,16 +98,49 @@ int main(int argc, char *argv[]) {
             NodeEdges edges_node = node_edges[node];
             double lambda = cp_linear_input(gamma, state, degree, edges_node);
             double prob = activation_func(lambda);
+            int8_t old_state = state[node];
             state[node] = (int8_t)(RNG_dbl() < prob);
+            if (state[node] != old_state) {
+                if (state[node]) {
+                    ++sum;
+                } else {
+                    --sum;
+                }
+            }
+        }
+
+        /* Save density and configuration at logarithmically spaced intervals */
+        if (logspc && log_idx < (size_t)nSampleLog && (t + 1) == (size_t)logspc[log_idx] &&
+            sample_idx < num_log_samples) {
+            density[sample_idx] = (double)sum / (double)N;
+            fwrite(state, sizeof(*state), N, f_sout);
+            sample_idx++;
+            log_idx++;
         }
     }
+
+    /* Fill remaining samples with final density and configuration if ended early */
+    double final_density = (double)sum / (double)N;
+    while (sample_idx < num_log_samples) {
+        density[sample_idx] = final_density;
+        fwrite(state, sizeof(*state), N, f_sout);
+        sample_idx++;
+    }
+
+    fprintf(stderr, "Simulation complete: %zu steps, final density=%.6f, saved %zu samples\n",
+            t, final_density, sample_idx);
+
+    /* Write outputs */
+    fwrite(density, sizeof(double), num_log_samples, f_dens);
+    fclose(f_dens);
+    fclose(f_sout);
 
     /* Write final state to stdout */
     fwrite(state, sizeof(*state), N, stdout);
     fflush(stdout);
 
     /* Cleanup */
-    fclose(f_sout);
+    free(density);
     free(logspc);
     free(edges);
     for (size_t i = 0; i < N; ++i) {

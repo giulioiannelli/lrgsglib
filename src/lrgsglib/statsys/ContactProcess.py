@@ -364,7 +364,7 @@ class ContactProcessEI(ContactProcessBase):
     activation : {"tanh", "relu"}, optional
         Non-linearity used by the C1 kernels; ignored by other backends.
     num_log_samples : int, optional
-        Number of log samples used by the ``C1c`` and ``C1d`` variants.
+        Number of log samples used by the ``C1c``, ``C1d``, ``C1e``, ``C1f``, and ``C1g`` variants.
 
     Notes
     -----
@@ -375,10 +375,11 @@ class ContactProcessEI(ContactProcessBase):
     cached-``lambda`` update scheme without maintaining a frontier and shares
     the ``num_log_samples`` argument with ``C1c`` and ``C1d``. The ``C1f``
     variant introduces a Gillespie-style event-driven loop over the frontier
-    for low-density regimes.
+    for low-density regimes. The ``C1g`` variant combines ``C1e``'s cached-lambda
+    updates with configuration snapshots at log-spaced intervals (like ``C1a``).
     """
 
-    _allowed_c_keys = ("C1", "C1A", "C1B", "C1C", "C1D", "C1E", "C1F")
+    _allowed_c_keys = ("C1", "C1A", "C1B", "C1C", "C1D", "C1E", "C1F", "C1G")
 
     def __init__(
         self,
@@ -427,7 +428,7 @@ class ContactProcessEI(ContactProcessBase):
         if key == "C1A":
             nSampleLog = getattr(self, "nSampleLog", 100)
             args.append(f"{nSampleLog}")
-        elif key in ("C1C", "C1D", "C1E", "C1F"):
+        elif key in ("C1C", "C1D", "C1E", "C1F", "C1G"):
             args.append(f"{self.num_log_samples}")
 
         return args

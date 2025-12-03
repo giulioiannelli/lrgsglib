@@ -2,11 +2,12 @@
 Command example to run EI dynamics on L2D contact process with batching of density files:
 python lrgsglib/src/L2D_ContactProcess.py 64 0. -ac relu -na 200 -wd cptest -ga 0.493 -rl C1c -sp 1000 --randstr -sf 10
 
-Supported C1 backends for EI dynamics: C1c, C1d, C1e, C1f
+Supported C1 backends for EI dynamics: C1c, C1d, C1e, C1f, C1g
 - C1c: Log-spaced density sampling with standard MC sweeps
 - C1d: Adaptive frontier optimization for low-density regimes
 - C1e: Cached-lambda updates without frontier (log-spaced sampling)
 - C1f: Gillespie-style event-driven loop over frontier
+- C1g: C1e with configuration snapshots at log-spaced intervals
 """
 
 from typing import Any

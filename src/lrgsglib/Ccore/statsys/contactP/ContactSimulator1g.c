@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     double *lambda = __chMalloc(N * sizeof(*lambda));
     cp_lambda_init(gamma, state, N, node_edges, neigh_len, lambda);
 
-    /* Generate logarithmically spaced sampling times after t=0 */
+    /* Generate logarithmically spaced time points after t=0 */
     int *logspc = NULL;
     if (nSampleLog > 0) {
         logspc = logspace_int(log10((double)steps), &nSampleLog);
@@ -63,10 +63,14 @@ int main(int argc, char *argv[]) {
     /* Allocate density array */
     double *density = __chCalloc(num_log_samples, sizeof(double));
 
-    /* Open output file for density time series */
+    /* Open output files */
     FILE *f_dens;
     sprintf(buf, DENS_FNAME, datdir, syshape, p, out_id);
     __fopen(&f_dens, buf, "wb");
+
+    FILE *f_sout;
+    sprintf(buf, SOUT_FNAME, datdir, syshape, p, out_id);
+    __fopen(&f_sout, buf, "wb");
 
     /* Calculate initial density */
     size_t sum = 0;
@@ -75,8 +79,12 @@ int main(int argc, char *argv[]) {
     }
 
     size_t sample_idx = 0;
-    density[sample_idx++] = (double)sum / (double)N;
+    density[sample_idx] = (double)sum / (double)N;
+    sample_idx++;
     size_t log_idx = 0;
+
+    /* Save initial configuration */
+    fwrite(state, sizeof(*state), N, f_sout);
 
     fprintf(stderr, "Initial density: %.6f, will save %zu log-spaced samples (requested %zu)\n",
             density[0], planned_samples, num_log_samples);
@@ -92,18 +100,29 @@ int main(int argc, char *argv[]) {
         .activation_func = cp_get_activation_function(activation),
     };
 
-    /* Simulation loop - save density at log-spaced steps */
+    /* Simulation loop - save density and configuration at log-spaced intervals */
     size_t t;
     for (t = 0; t < steps; ++t) {
         if (cp_reached_absorbing_state(sum, N, t, steps)) {
             break;
         }
 
-        (void)cp_run_sweep_cached(&sim, &sum);
+        size_t num_flips = cp_run_sweep_cached(&sim, &sum);
 
+        /* Debug output for first 10 steps and every power of 10 */
+        if (t <= 10 || (t % (size_t)pow(10, floor(log10((double)t)))) == 0) {
+            fprintf(stderr, "[DEBUG] t=%zu: flips=%zu, sum=%zu, density=%.6f\n",
+                    t, num_flips, sum, (double)sum / (double)N);
+        }
+
+        /* Save density and configuration at logarithmically spaced intervals */
         if (logspc && log_idx < (size_t)nSampleLog && (t + 1) == (size_t)logspc[log_idx] &&
             sample_idx < num_log_samples) {
-            density[sample_idx++] = (double)sum / (double)N;
+            density[sample_idx] = (double)sum / (double)N;
+            fwrite(state, sizeof(*state), N, f_sout);
+            fprintf(stderr, "[SAMPLE] t=%zu: saved density=%.6f (sample %zu/%d)\n",
+                    t + 1, density[sample_idx], sample_idx + 1, nSampleLog + 1);
+            sample_idx++;
             log_idx++;
         }
     }
@@ -111,14 +130,18 @@ int main(int argc, char *argv[]) {
     /* Fill remaining samples with final density if simulation ended early */
     double final_density = (double)sum / (double)N;
     while (sample_idx < num_log_samples) {
-        density[sample_idx++] = final_density;
+        density[sample_idx] = final_density;
+        fwrite(state, sizeof(*state), N, f_sout);
+        sample_idx++;
     }
 
-    fprintf(stderr, "Simulation complete: %zu steps, final density=%.6f\n", t, final_density);
+    fprintf(stderr, "Simulation complete: %zu steps, final density=%.6f, saved %zu samples\n",
+            t, final_density, sample_idx);
 
     /* Write density values as simple array */
     fwrite(density, sizeof(double), num_log_samples, f_dens);
     fclose(f_dens);
+    fclose(f_sout);
 
     /* Write final state to stdout */
     fwrite(state, sizeof(*state), N, stdout);

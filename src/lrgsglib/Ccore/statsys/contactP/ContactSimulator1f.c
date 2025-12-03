@@ -25,6 +25,11 @@ int main(int argc, char *argv[]) {
     const char *out_id = argv[8];
     const char *activation_name = argv[9];
     size_t num_log_samples = strtozu(argv[10]);
+    if (num_log_samples == 0) {
+        fprintf(stderr, "num_log_samples must be positive\n");
+        return EXIT_FAILURE;
+    }
+    int nSampleLog = (int)(num_log_samples - 1);
 
     cp_activation_t activation = cp_activation_from_string(activation_name);
 
@@ -48,6 +53,13 @@ int main(int argc, char *argv[]) {
     /* Cache lambda = gamma * sum_j w_ij s_j for all nodes */
     double *lambda = __chMalloc(N * sizeof(*lambda));
     cp_lambda_init(gamma, state, N, node_edges, neigh_len, lambda);
+
+    /* Generate logarithmically spaced sampling times after t=0 */
+    int *logspc = NULL;
+    if (nSampleLog > 0) {
+        logspc = logspace_int(log10((double)steps), &nSampleLog);
+    }
+    size_t planned_samples = (size_t)nSampleLog + 1;
 
     /* Allocate density array */
     double *density = __chCalloc(num_log_samples, sizeof(double));
@@ -76,9 +88,16 @@ int main(int argc, char *argv[]) {
 
     size_t sample_idx = 0;
     density[sample_idx++] = (double)sum / (double)N;
+    size_t log_idx = 0;
+    size_t sweeps_done = 0;
+    size_t sweep_progress = 0;
 
-    fprintf(stderr, "Initial: density=%.6f, active=%zu, boundary=%zu\n",
-            density[0], use_frontier ? frontier.active_count : 0u, use_frontier ? frontier.boundary_count : 0u);
+    fprintf(stderr, "Initial: density=%.6f, active=%zu, boundary=%zu, will save %zu log-spaced samples (requested %zu)\n",
+            density[0],
+            use_frontier ? frontier.active_count : 0u,
+            use_frontier ? frontier.boundary_count : 0u,
+            planned_samples,
+            num_log_samples);
 
     /* Prepare Gillespie simulation context */
     cp_activation_func_t activation_func = cp_get_activation_function(activation);
@@ -122,8 +141,16 @@ int main(int argc, char *argv[]) {
         int8_t new_state = (int8_t)(1 - old_state);
         cp_gillespie_apply_flip(&sim, node, old_state, new_state, &sum);
 
-        if (sample_idx < num_log_samples && ((event + 1) % N == 0)) {
-            density[sample_idx++] = (double)sum / (double)N;
+        /* Track sweeps (N events) and sample at logarithmically spaced sweep counts */
+        sweep_progress++;
+        if (sweep_progress == N) {
+            sweeps_done++;
+            sweep_progress = 0;
+            if (logspc && log_idx < (size_t)nSampleLog && sweeps_done == (size_t)logspc[log_idx] &&
+                sample_idx < num_log_samples) {
+                density[sample_idx++] = (double)sum / (double)N;
+                log_idx++;
+            }
         }
     }
 
@@ -132,8 +159,8 @@ int main(int argc, char *argv[]) {
         density[sample_idx++] = final_density;
     }
 
-    fprintf(stderr, "Complete: density=%.6f, active=%zu, boundary=%zu, time=%.6f\n",
-            final_density, frontier.active_count, frontier.boundary_count, current_time);
+    fprintf(stderr, "Complete: density=%.6f, active=%zu, boundary=%zu, time=%.6f, saved %zu samples\n",
+            final_density, frontier.active_count, frontier.boundary_count, current_time, sample_idx);
 
     /* Write outputs */
     fwrite(density, sizeof(double), num_log_samples, f_dens);
@@ -144,6 +171,7 @@ int main(int argc, char *argv[]) {
 
     /* Cleanup */
     free(density);
+    free(logspc);
     if (use_frontier) {
         cp_frontier_free(&frontier);
     }

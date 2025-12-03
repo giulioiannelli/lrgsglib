@@ -151,8 +151,8 @@ def _check_early_stopping(
 def run_simulation(args):
     dynamics = args.dynamics.upper()
     runlang = args.runlang.upper()
-    if dynamics == "EI" and runlang not in ("C1C", "C1D", "C1E", "C1F"):
-        raise NotImplementedError("Only the C1c, C1d, C1e, and C1f backends are " \
+    if dynamics == "EI" and runlang not in ("C1C", "C1D", "C1E", "C1F", "C1G"):
+        raise NotImplementedError("Only the C1c, C1d, C1e, C1f, and C1g backends are " \
         "currently wired for EI dynamics in L2D_ContactProcess.")
     if dynamics == "SIR":
         raise NotImplementedError("SIR-like contact-process wiring will " \
@@ -160,7 +160,7 @@ def run_simulation(args):
 
     # Choose post-processing based on (dynamics, runlang).
     match (dynamics, runlang):
-        case ("EI", "C1C") | ("EI", "C1D") | ("EI", "C1E") | ("EI", "C1F"):
+        case ("EI", "C1C") | ("EI", "C1D") | ("EI", "C1E") | ("EI", "C1F") | ("EI", "C1G"):
             from .ContactProcessDynamics import _process_EI_C1c, clean_up_files
             _process_cp = _process_EI_C1c
         case _:
