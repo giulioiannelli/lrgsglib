@@ -81,6 +81,17 @@ int main(int argc, char *argv[]) {
     cp_activation_func_t activation_func = cp_get_activation_function(activation);
     double invN = 1.0 / (double)N;
 
+    cp_frontier_sim_t sim = {
+        .gamma = gamma,
+        .N = N,
+        .state = state,
+        .lambda = lambda,
+        .node_edges = node_edges,
+        .neigh_len = neigh_len,
+        .frontier = &frontier,
+        .activation_func = activation_func,
+    };
+
     /* Simulation loop */
     size_t t;
     for (t = 0; t < steps; ++t) {
@@ -95,83 +106,14 @@ int main(int argc, char *argv[]) {
 
         if (use_frontier) {
             /* Low density: use frontier optimization */
-            size_t frontier_size = frontier.active_count + frontier.boundary_count;
-            if (frontier_size == 0) {
+            cp_frontier_sweep_result_t frontier_result = cp_run_frontier_sweep(&sim, &sum);
+            if (frontier_result.frontier_size == 0) {
                 fprintf(stderr, "Reached absorbing state at t=%zu (empty frontier)\n", t);
                 break;
             }
-
-            /* Monte Carlo sweep - N samples from active+boundary frontier */
-            for (size_t sweep = 0; sweep < N; ++sweep) {
-                /* Sample uniformly from combined frontier */
-                size_t pick = (size_t)(RNG_u64() % frontier_size);
-                size_t node;
-
-                if (pick < frontier.active_count) {
-                    node = frontier.active_list[pick];
-                } else {
-                    node = frontier.boundary_list[pick - frontier.active_count];
-                }
-
-                /* Calculate transition probability */
-                double prob = activation_func(lambda[node]);
-                int8_t old_state = state[node];
-                int8_t new_state = (int8_t)(RNG_dbl() < prob);
-
-                if (new_state != old_state) {
-                    int delta = (int)new_state - (int)old_state;
-                    state[node] = new_state;
-                    if (delta > 0) {
-                        ++sum;
-                    } else {
-                        --sum;
-                    }
-                    cp_lambda_update_neighbors(gamma, node, delta, node_edges, neigh_len, lambda);
-
-                    if (new_state) {
-                        /* ACTIVATION: 0 → 1 */
-                        cp_frontier_node_activate(&frontier, node, node_edges, neigh_len, state, lambda);
-                    } else {
-                        /* DEACTIVATION: 1 → 0 */
-                        cp_frontier_node_deactivate(&frontier, node, node_edges, neigh_len, state, lambda);
-                    }
-
-                    /* Update frontier size for this sweep */
-                    frontier_size = frontier.active_count + frontier.boundary_count;
-                    if (frontier_size == 0) {
-                        break; // Exit sweep early if frontier empty
-                    }
-                }
-            }
         } else {
             /* High density: use standard random sampling */
-            for (size_t sweep = 0; sweep < N; ++sweep) {
-                size_t node = (size_t)(RNG_u64() % N);
-                double prob = activation_func(lambda[node]);
-                int8_t old_state = state[node];
-                int8_t new_state = (int8_t)(RNG_dbl() < prob);
-
-                if (new_state != old_state) {
-                    int delta = (int)new_state - (int)old_state;
-                    state[node] = new_state;
-                    if (delta > 0) {
-                        ++sum;
-                    } else {
-                        --sum;
-                    }
-                    cp_lambda_update_neighbors(gamma, node, delta, node_edges, neigh_len, lambda);
-
-                    if (new_state) {
-                        /* ACTIVATION: 0 → 1 */
-                        /* Maintain frontier lists for when density drops */
-                        cp_frontier_node_activate(&frontier, node, node_edges, neigh_len, state, lambda);
-                    } else {
-                        /* DEACTIVATION: 1 → 0 */
-                        /* Maintain frontier lists for when density drops */
-                        cp_frontier_node_deactivate(&frontier, node, node_edges, neigh_len, state, lambda);
-                    }
-                }
-            }
+            (void)cp_run_dense_frontier_sweep(&sim, &sum);
         }
 
         /* Save density */

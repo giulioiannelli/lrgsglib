@@ -28,12 +28,12 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "num_log_samples must be positive\n");
         return EXIT_FAILURE;
     }
-    int nSampleLog = (int)(num_log_samples - 1); /* exclude t=0 already saved */
+    int nSampleLog = (int)(num_log_samples - 1);
 
     cp_activation_t activation = cp_activation_from_string(activation_name);
 
     char buf[STRL512];
-    
+
     /* Read initial state */
     FILE *f_sini;
     sprintf(buf, SINI_FNAME, datdir, syshape, p, run_id);
@@ -49,14 +49,18 @@ int main(int argc, char *argv[]) {
     sprintf(buf, EDGL_FNAME, datdir, syshape, p, run_id);
     process_edges(buf, N, &edges, &node_edges, &neigh_len);
 
-    /* Generate logarithmically spaced sampling times after t=0 */
+    /* Cache lambda = gamma * sum_j w_ij s_j for all nodes */
+    double *lambda = __chMalloc(N * sizeof(*lambda));
+    cp_lambda_init(gamma, state, N, node_edges, neigh_len, lambda);
+
+    /* Generate logarithmically spaced time points after t=0 */
     int *logspc = NULL;
     if (nSampleLog > 0) {
         logspc = logspace_int(log10((double)steps), &nSampleLog);
     }
     size_t planned_samples = (size_t)nSampleLog + 1;
 
-    /* Allocate density array for log-spaced samples */
+    /* Allocate density array */
     double *density = __chCalloc(num_log_samples, sizeof(double));
 
     /* Open output files */
@@ -68,45 +72,47 @@ int main(int argc, char *argv[]) {
     sprintf(buf, SOUT_FNAME, datdir, syshape, p, out_id);
     __fopen(&f_sout, buf, "wb");
 
-    /* Calculate initial density and save initial snapshot */
+    /* Calculate initial density */
     size_t sum = 0;
     for (size_t i = 0; i < N; ++i) {
         sum += state[i];
     }
+
     size_t sample_idx = 0;
     density[sample_idx] = (double)sum / (double)N;
-    fwrite(state, sizeof(*state), N, f_sout);
     sample_idx++;
     size_t log_idx = 0;
+
+    /* Save initial configuration */
+    fwrite(state, sizeof(*state), N, f_sout);
 
     fprintf(stderr, "Initial density: %.6f, will save %zu log-spaced samples (requested %zu)\n",
             density[0], planned_samples, num_log_samples);
 
-    cp_activation_func_t activation_func = cp_get_activation_function(activation);
+    /* Build simulation context */
+    cp_cached_sim_t sim = {
+        .gamma = gamma,
+        .N = N,
+        .state = state,
+        .lambda = lambda,
+        .node_edges = node_edges,
+        .neigh_len = neigh_len,
+        .activation_func = cp_get_activation_function(activation),
+    };
 
-    /* Simulation loop with log-spaced density and snapshots */
+    /* Simulation loop - save density and configuration at log-spaced intervals */
     size_t t;
     for (t = 0; t < steps; ++t) {
         if (cp_reached_absorbing_state(sum, N, t, steps)) {
             break;
         }
 
-        /* Monte Carlo sweep */
-        for (size_t sweep = 0; sweep < N; ++sweep) {
-            size_t node = (size_t)(RNG_u64() % N);
-            size_t degree = neigh_len[node];
-            NodeEdges edges_node = node_edges[node];
-            double lambda = cp_linear_input(gamma, state, degree, edges_node);
-            double prob = activation_func(lambda);
-            int8_t old_state = state[node];
-            state[node] = (int8_t)(RNG_dbl() < prob);
-            if (state[node] != old_state) {
-                if (state[node]) {
-                    ++sum;
-                } else {
-                    --sum;
-                }
-            }
+        size_t num_flips = cp_run_sweep_cached(&sim, &sum);
+
+        /* Debug output for first 10 steps and every power of 10 */
+        if (t <= 10 || (t % (size_t)pow(10, floor(log10((double)t)))) == 0) {
+            fprintf(stderr, "[DEBUG] t=%zu: flips=%zu, sum=%zu, density=%.6f\n",
+                    t, num_flips, sum, (double)sum / (double)N);
         }
 
         /* Save density and configuration at logarithmically spaced intervals */
@@ -114,12 +120,14 @@ int main(int argc, char *argv[]) {
             sample_idx < num_log_samples) {
             density[sample_idx] = (double)sum / (double)N;
             fwrite(state, sizeof(*state), N, f_sout);
+            fprintf(stderr, "[SAMPLE] t=%zu: saved density=%.6f (sample %zu/%d)\n",
+                    t + 1, density[sample_idx], sample_idx + 1, nSampleLog + 1);
             sample_idx++;
             log_idx++;
         }
     }
 
-    /* Fill remaining samples with final density and configuration if ended early */
+    /* Fill remaining samples with final density if simulation ended early */
     double final_density = (double)sum / (double)N;
     while (sample_idx < num_log_samples) {
         density[sample_idx] = final_density;
@@ -130,7 +138,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Simulation complete: %zu steps, final density=%.6f, saved %zu samples\n",
             t, final_density, sample_idx);
 
-    /* Write outputs */
+    /* Write density values as simple array */
     fwrite(density, sizeof(double), num_log_samples, f_dens);
     fclose(f_dens);
     fclose(f_sout);
@@ -142,6 +150,7 @@ int main(int argc, char *argv[]) {
     /* Cleanup */
     free(density);
     free(logspc);
+    free(lambda);
     free(edges);
     for (size_t i = 0; i < N; ++i) {
         if (neigh_len[i]) {

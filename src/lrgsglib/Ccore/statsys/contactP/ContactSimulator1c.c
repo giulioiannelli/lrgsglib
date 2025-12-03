@@ -24,6 +24,11 @@ int main(int argc, char *argv[]) {
     const char *out_id = argv[8];
     const char *activation_name = argv[9];
     size_t num_log_samples = strtozu(argv[10]);
+    if (num_log_samples == 0) {
+        fprintf(stderr, "num_log_samples must be positive\n");
+        return EXIT_FAILURE;
+    }
+    int nSampleLog = (num_log_samples > 0) ? (int)(num_log_samples - 1) : 0;
 
     cp_activation_t activation = cp_activation_from_string(activation_name);
 
@@ -44,7 +49,14 @@ int main(int argc, char *argv[]) {
     sprintf(buf, EDGL_FNAME, datdir, syshape, p, run_id);
     process_edges(buf, N, &edges, &node_edges, &neigh_len);
 
-    /* Allocate density array - will be filled by Python's log-spaced indices */
+    /* Generate logarithmically spaced sampling times (exclude t=0 already saved) */
+    int *logspc = NULL;
+    if (nSampleLog > 0) {
+        logspc = logspace_int(log10((double)steps), &nSampleLog);
+    }
+    size_t planned_samples = (size_t)nSampleLog + 1;
+
+    /* Allocate density array for log-spaced samples */
     double *density = __chCalloc(num_log_samples, sizeof(double));
 
     /* Open output file for density time series */
@@ -60,13 +72,15 @@ int main(int argc, char *argv[]) {
     
     size_t sample_idx = 0;
     density[sample_idx++] = (double)sum / (double)N;
+    size_t log_idx = 0;
     
-    fprintf(stderr, "Initial density: %.6f, will save %zu samples\n", density[0], num_log_samples);
+    fprintf(stderr, "Initial density: %.6f, will save %zu log-spaced samples (requested %zu)\n",
+            density[0], planned_samples, num_log_samples);
 
     /* Get activation function pointer once */
     cp_activation_func_t activation_func = cp_get_activation_function(activation);
 
-    /* Simulation loop - save density every step */
+    /* Simulation loop - save density only at log-spaced steps */
     size_t t;
     for (t = 0; t < steps; ++t) {
         /* Check for absorbing state - early termination */
@@ -93,9 +107,11 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        /* Save density at every step (Python will subsample) */
-        if (sample_idx < num_log_samples) {
+        /* Save density at logarithmically spaced points (after completing step t+1) */
+        if (logspc && log_idx < (size_t)nSampleLog && (t + 1) == (size_t)logspc[log_idx] &&
+            sample_idx < num_log_samples) {
             density[sample_idx++] = (double)sum / (double)N;
+            log_idx++;
         }
     }
     
@@ -118,6 +134,7 @@ int main(int argc, char *argv[]) {
 
     /* Cleanup */
     free(density);
+    free(logspc);
     free(edges);
     for (size_t i = 0; i < N; ++i) {
         if (neigh_len[i]) {
