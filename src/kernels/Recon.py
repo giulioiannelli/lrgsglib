@@ -9,7 +9,7 @@ from lrgsglib.config.funcs import avgeq_fstr, build_fname_or_pattern_direct
 from lrgsglib.utils.basic import update_mean_m2, join_non_empty
 from lrgsglib.utils.lrg import compute_spin_match_series
 #
-from .generic import setup_logger
+from .generic import setup_logger, find_existing_averages
 from .IsingDynamics import run_ising_dynamics, clean_up_files
 #
 __all__ = [
@@ -69,7 +69,7 @@ def check_existing_file_and_needed_averages(
     save_dir : Path
         Directory where the result file is expected to be saved.
     args : Any
-        Argument object with attributes `mode`, `L`, `p`, `T`, and 
+        Argument object with attributes `mode`, `L`, `p`, `T`, and
         `number_of_averages`.
     loglogger : Any
         Logger instance for status output.
@@ -81,28 +81,24 @@ def check_existing_file_and_needed_averages(
         Returns 0 if the file already satisfies the requested # of averages.
     """
     pattern = build_fname_or_pattern(args, mode='pattern')
-    existing_files = list(save_dir.glob(pattern))
-    #
-    if not existing_files:
-        loglogger.info(f"No existing file found. Computing \
-                       {args.number_of_averages} averages.")
+
+    current_avg = find_existing_averages(
+        save_dir,
+        pattern,
+        count_token="na",
+        find_max=False,
+        logger=loglogger,
+    )
+
+    if current_avg == 0:
+        loglogger.info(f"No existing file found. Computing {args.number_of_averages} averages.")
         return args.number_of_averages
-    #
-    # Extract the current number of averages from the filename
-    existing_file = existing_files[0]
-    loglogger.info(f"Found existing file: {existing_file}")
-    try:
-        current_avg = int(existing_file.stem.split("_avg=")[-1])
-    except ValueError:
-        loglogger.warning("Could not parse the number of averages from the \
-                          filename.")
-        return args.number_of_averages
-    #
+
     # Determine the number of additional averages needed
     if current_avg >= args.number_of_averages:
-        loglogger.info("The existing file already satisfies the requested \
-                       averages.")
+        loglogger.info("The existing file already satisfies the requested averages.")
         return 0
+
     needed_averages = args.number_of_averages - current_avg
     loglogger.info(f"Existing file has {current_avg} averages. "
                    f"{needed_averages} more averages are needed.")

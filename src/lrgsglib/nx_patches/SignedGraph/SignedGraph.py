@@ -474,9 +474,7 @@ class SignedGraph:
         random.seed(self.seed)
         try:
             cp.random.seed(self.seed)
-        except Exception as e:
-            warnings.warn(f"Could not set cupy random seed: {e}. "
-                          "Cupy will not be used for random operations.")
+        except Exception:
             pass
         np.random.seed(self.seed)
         #

@@ -8,6 +8,7 @@ from typing import Callable, Iterable, Sequence
 import numpy as np
 
 from lrgsglib import SCSGeneralizedNN
+from lrgsglib.utils.basic.paths import remove_if_exists
 from lrgsglib.utils.tools import ConditionalPartitioning
 
 from .SCS import (
@@ -15,7 +16,7 @@ from .SCS import (
     build_scs_kwargs,
     probe_output_graph,
 )
-from .generic import resolve_backend, resolve_float_type
+from .generic import resolve_backend, resolve_float_type, find_existing_averages
 
 __all__ = ["run_transcluster"]
 
@@ -26,10 +27,10 @@ def _compute_order_parameters(
     backend: str,
     float_type: type,
     partitioner: ConditionalPartitioning,
+    seed: int | None = None,
 ) -> tuple[float, float, float]:
-    # `params` is expected to contain the model parameter `J0` and optionally `seed`.
-    # build_scs_kwargs will use `params.seed` if present.
-    kwargs = build_scs_kwargs(params, make_dir_tree=False)
+    # build_scs_kwargs will use the provided seed if given, otherwise params.seed
+    kwargs = build_scs_kwargs(params, make_dir_tree=False, seed=seed)
     scs = SCSGeneralizedNN(**kwargs)
     scs.compute_laplacian_spectrum_weigV(backend=backend, typf=float_type)
     scs.load_eigV_on_graph(which=0, binarize=False)
@@ -50,37 +51,12 @@ def _write_results(path: Path, data: Iterable[Iterable[float]]) -> None:
     np.savetxt(path, array, fmt="%.7g")
 
 
-def _find_existing_navg(base_path: Path, base_filename: str, out_suffix: str | None) -> int:
-    """Search for existing partial result files and return the largest found navg value."""
-    existing_navg = 0
-    if not base_path.exists():
-        return 0
-
-    import glob
-
-    pattern = str(base_path / f"{base_filename}_navg=*")
-    if out_suffix:
-        pattern += f"_{out_suffix}"
-    pattern += ".txt"
-
-    existing_files = glob.glob(pattern)
-    for filepath in existing_files:
-        filename = Path(filepath).stem
-        try:
-            navg_part = [p for p in filename.split('_') if p.startswith("navg=")][0]
-            navg_val = int(navg_part.split('=')[1])
-            existing_navg = max(existing_navg, navg_val)
-        except Exception:
-            # ignore unparsable files
-            pass
-
-    return existing_navg
-
-
-def _make_build_output_path(base_path: Path, suffix_tokens: list[str], out_suffix: str | None) -> Callable[[int], Path]:
-    """Return a closure that builds output Path objects for a given navg."""
-    def build_output_path(navg: int) -> Path:
-        tokens = list(suffix_tokens) + [f"navg={navg}"]
+def _make_build_output_path(
+    base_path: Path, suffix_tokens: list[str], out_suffix: str | None
+) -> Callable[[int], Path]:
+    """Return a closure that builds output Path objects for a given na."""
+    def build_output_path(na: int) -> Path:
+        tokens = list(suffix_tokens) + [f"na={na}"]
         if out_suffix:
             tokens.append(out_suffix)
         return base_path / ("_".join(tokens) + ".txt")
@@ -90,13 +66,13 @@ def _make_build_output_path(base_path: Path, suffix_tokens: list[str], out_suffi
 
 def _read_prev_partial(prev_path: Path) -> tuple[np.ndarray, int]:
     """Load a previous partial file (new averages-only format) and return
-    (accumulator_avg, navg).
+    (accumulator_avg, na).
 
     New file layout (per refactor) is:
       [avg_smax, avg_smax2, std, avg_gap, avg_ediff]
 
-    We extract navg from the filename (expects a token 'navg=<N>' in the stem)
-    because navg is no longer saved inside the file.
+    We extract na from the filename (expects a token 'na=<N>' in the stem)
+    because na is no longer saved inside the file.
     """
     arr = np.loadtxt(prev_path).reshape(-1)
     # arr layout: [avg_smax, avg_smax2, std, avg_gap, avg_ediff]
@@ -111,24 +87,26 @@ def _read_prev_partial(prev_path: Path) -> tuple[np.ndarray, int]:
         float(arr[4]),  # avg_ediff
     ], dtype=float)
 
-    # parse navg from filename stem
+    # parse na from filename stem
     stem = prev_path.stem
-    navg = 0
+    na = 0
     for part in stem.split('_'):
-        if part.startswith('navg='):
+        if part.startswith('na='):
             try:
-                navg = int(part.split('=', 1)[1])
+                na = int(part.split('=', 1)[1])
             except Exception:
                 pass
             break
 
-    if navg <= 0:
-        raise ValueError(f"Could not determine navg from filename: {prev_path.name}")
+    if na <= 0:
+        raise ValueError(f"Could not determine na from filename: {prev_path.name}")
 
-    return accumulator_avg, navg
+    return accumulator_avg, na
 
 
-def _compute_averages_and_stats(accumulator_avg: np.ndarray) -> tuple[float, float, float, float, float]:
+def _compute_averages_and_stats(
+    accumulator_avg: np.ndarray,
+) -> tuple[float, float, float, float, float]:
     """Compute averages and std from normalized accumulator array.
 
     accumulator_avg is [smax_avg, smax2_avg, gap_avg, ediff_avg].
@@ -143,7 +121,13 @@ def _compute_averages_and_stats(accumulator_avg: np.ndarray) -> tuple[float, flo
     return smax_avg, smax2_avg, std, gap_avg, ediff_avg
 
 
-def _pack_results(smax_avg: float, smax2_avg: float, std: float, gap_avg: float, ediff_avg: float) -> list[list[float]]:
+def _pack_results(
+    smax_avg: float,
+    smax2_avg: float,
+    std: float,
+    gap_avg: float,
+    ediff_avg: float,
+) -> list[list[float]]:
         """Return results in the nested-list format used by _write_results.
 
         New layout (averages only):
@@ -158,31 +142,141 @@ def _compute_and_write(path: Path, accumulator_avg: np.ndarray) -> None:
         The written file contains averages only in the order:
             [avg_smax, avg_smax2, std, avg_gap, avg_ediff]
         """
-        smax_avg, smax2_avg, std, gap_avg, ediff_avg = _compute_averages_and_stats(
-                accumulator_avg
-        )
+        (
+            smax_avg,
+            smax2_avg,
+            std,
+            gap_avg,
+            ediff_avg,
+        ) = _compute_averages_and_stats(accumulator_avg)
         rows = _pack_results(smax_avg, smax2_avg, std, gap_avg, ediff_avg)
         _write_results(path, rows)
 
 
 
 def _gen_sample_seed(rng: np.random.Generator | None) -> int | None:
+    """Generate a random seed for sampling, or None if no RNG is provided."""
     if rng is None:
         return None
     return int(rng.integers(0, 2**32))
 
 
-def _remove_if_exists(path: Path) -> None:
-    if path.exists():
-        path.unlink()
+def _setup_output_paths(
+    args, params: SCSParameters
+) -> tuple[Callable[[int], Path], int]:
+    """Setup output directory structure and determine existing progress.
+
+    Returns:
+        tuple: (build_output_path_func, existing_na)
+    """
+    probe = probe_output_graph(params)
+    base_dir = probe.path_phtra
+    if getattr(args, "verbose", False):
+        print(f"Output directory: {base_dir}")
+
+    suffix_tokens = [
+        args.mode,
+        probe.std_fname,
+        f"J={args.J:.3g}",
+        f"g={args.g:.3g}",
+        f"J0={args.J0:.3g}",
+    ]
+    del probe
+    base_filename = "_".join(suffix_tokens)
+
+    base_path = Path(base_dir)
+
+    # Build pattern for finding existing files
+    pattern = f"{base_filename}_na=*"
+    if args.out_suffix:
+        pattern += f"_{args.out_suffix}"
+    pattern += ".txt"
+
+    existing_na = find_existing_averages(
+        base_path,
+        pattern,
+        count_token="na",
+        find_max=True,
+        logger=None,
+    )
+
+    build_output_path = _make_build_output_path(
+        base_path, suffix_tokens, args.out_suffix
+    )
+
+    return build_output_path, existing_na
+
+
+def _initialize_accumulator(
+    start_avg: int, build_output_path: Callable[[int], Path]
+) -> np.ndarray:
+    """Initialize accumulator from previous partial file if it exists.
+
+    Returns:
+        np.ndarray: accumulator array [smax_avg, smax2_avg, gap_avg, ediff_avg]
+    """
+    accumulator = np.zeros(4, dtype=float)
+    if start_avg > 0:
+        prev_path = build_output_path(start_avg)
+        if prev_path.exists():
+            accumulator, _ = _read_prev_partial(prev_path)
+    return accumulator
+
+
+def _update_running_averages(
+    accumulator: np.ndarray,
+    n: int,
+    smax: float,
+    gap: float,
+    energy_diff: float,
+) -> None:
+    """Update running averages using incremental formula (in-place).
+
+    accumulator layout: [smax_avg, smax2_avg, gap_avg, ediff_avg]
+    """
+    accumulator[0] += (smax - accumulator[0]) / n
+    accumulator[1] += (smax * smax - accumulator[1]) / n
+    accumulator[2] += (gap - accumulator[2]) / n
+    accumulator[3] += (energy_diff - accumulator[3]) / n
+
+
+def _save_intermediate_if_needed(
+    args,
+    avg_idx: int,
+    current_total: int,
+    accumulator: np.ndarray,
+    build_output_path: Callable[[int], Path],
+) -> None:
+    """Save intermediate results and clean up old files if save frequency is met."""
+    if not args.save_frequency or args.save_frequency <= 0:
+        return
+
+    if (avg_idx + 1) % args.save_frequency == 0:
+        interim_path = build_output_path(current_total)
+        _compute_and_write(interim_path, accumulator)
+
+        # Remove older partial file
+        old_n = current_total - args.save_frequency
+        if old_n > 0:
+            remove_if_exists(build_output_path(old_n))
 
 
 def run_transcluster(args) -> None:
+    """Main entry point for transient cluster order parameter calculation.
+
+    Computes averaged order parameters (cluster size, gap, energy
+    difference) for SCS generalized networks with incremental saving
+    and resume capability.
+    """
+    # Validate inputs
     if args.mode != "ordParam":
-        raise ValueError("SCS_TransCluster currently supports only 'ordParam' mode.")
+        raise ValueError(
+            "SCS_TransCluster currently supports only 'ordParam' mode."
+        )
     if args.number_of_averages <= 0:
         raise ValueError("Number of averages must be positive.")
 
+    # Setup computation parameters
     backend = resolve_backend(args.backend)
     float_type = resolve_float_type(args.float_type)
     partitioner = ConditionalPartitioning(args.partition_rule)
@@ -197,114 +291,68 @@ def run_transcluster(args) -> None:
         workdir=args.workdir,
         seed=args.seed,
     )
-    probe = probe_output_graph(params)
-    base_dir = probe.path_phtra
 
-    suffix_tokens = [
-        args.mode,
-        probe.std_fname,
-        f"J={args.J:.3g}",
-        f"g={args.g:.3g}",
-        f"J0={args.J0:.3g}",
-    ]
-    del probe
-    base_filename = "_".join(suffix_tokens)
+    # Setup output paths and check for existing results
+    build_output_path, existing_na = _setup_output_paths(args, params)
 
-    # ---- READ EXISTING PARTIAL FILES ----
-    base_path = Path(base_dir)
-
-    existing_navg = _find_existing_navg(base_path, base_filename, args.out_suffix)
-
-    if existing_navg >= args.number_of_averages:
+    if existing_na >= args.number_of_averages:
         if getattr(args, "verbose", False):
-            print(f"File with {existing_navg} averages already exists. Nothing to do.")
+            print(
+                f"File with {existing_na} averages already exists. "
+                "Nothing to do."
+            )
         return
 
-    start_avg = existing_navg
-    remaining_averages = args.number_of_averages - existing_navg
-    if existing_navg > 0:
-        if getattr(args, "verbose", False):
-            print(f"Found existing file with {existing_navg} averages. Computing {remaining_averages} more...")
+    start_avg = existing_na
+    remaining_averages = args.number_of_averages - existing_na
+    if existing_na > 0 and getattr(args, "verbose", False):
+        print(
+            f"Found existing file with {existing_na} averages. "
+            f"Computing {remaining_averages} more..."
+        )
 
-    build_output_path = _make_build_output_path(base_path, suffix_tokens, args.out_suffix)
     final_output_path = build_output_path(args.number_of_averages)
-    if final_output_path.exists() and not getattr(args, "remove_files", False):
+    if final_output_path.exists() and not getattr(
+        args, "remove_files", False
+    ):
         raise SystemExit(f"File {final_output_path.name} already exists.")
 
-    # ---------------------------------------------------------
-    # INITIALIZE ACCUMULATORS, INCLUDING READING PREVIOUS DATA
-    # ---------------------------------------------------------
-    # accumulator now stores running averages: [smax_avg, smax2_avg, gap_avg, ediff_avg]
-    accumulator = np.zeros(4, dtype=float)
-    cluster_fractions = []
+    # Initialize accumulator (resume from previous if available)
+    accumulator = _initialize_accumulator(start_avg, build_output_path)
 
-    # if previous partial file exists, read and initialize
-    if start_avg > 0:
-        prev_path = build_output_path(start_avg)
-        if prev_path.exists():
-            accumulator, prev_N = _read_prev_partial(prev_path)
-
-    # ---------------------------------------------------------
-    # MAIN LOOP
-    # ---------------------------------------------------------
-    rng = np.random.default_rng(args.seed) if args.seed is not None else None
+    # Main computation loop
+    rng = (
+        np.random.default_rng(args.seed)
+        if args.seed is not None
+        else None
+    )
 
     for avg_idx in range(remaining_averages):
         sample_seed = _gen_sample_seed(rng)
 
-        # create a params copy for this iteration with the sampled seed (if any)
-        params_iter = SCSParameters(
-            N=params.N,
-            J0=params.J0,
-            gamma=params.gamma,
-            J=params.J,
-            g=params.g,
-            diagonal=params.diagonal,
-            workdir=params.workdir,
-            seed=sample_seed,
-        )
-
         gap, smax, energy_diff = _compute_order_parameters(
-            params_iter,
+            params,
             backend=backend,
             float_type=float_type,
             partitioner=partitioner,
+            seed=sample_seed,
         )
 
-        # update running averages using incremental formula
-        current_total_averages = start_avg + avg_idx + 1
-        n = current_total_averages
-        # accumulator holds previous average for n-1 samples (or 0). Update to include new sample
-        # accumulator = [avg_smax, avg_smax2, avg_gap, avg_ediff]
+        # Update running averages incrementally
+        current_total = start_avg + avg_idx + 1
+        _update_running_averages(
+            accumulator, current_total, smax, gap, energy_diff
+        )
 
-        accumulator[0] += (smax - accumulator[0]) / n         # smax_avg
-        accumulator[1] += (smax*smax - accumulator[1]) / n    # smax2_avg
-        accumulator[2] += (gap - accumulator[2]) / n          # gap_avg
-        accumulator[3] += (energy_diff - accumulator[3]) / n  # ediff_avg
+        # Save intermediate results periodically
+        _save_intermediate_if_needed(
+            args, avg_idx, current_total, accumulator, build_output_path
+        )
 
-
-        # ---- SAVING INTERMEDIATE ----
-        if args.save_frequency and args.save_frequency > 0:
-            if (avg_idx + 1) % args.save_frequency == 0:
-
-                n_tot = current_total_averages
-                interim_output_path = build_output_path(n_tot)
-                _compute_and_write(interim_output_path, accumulator)
-
-                # remove older partial file
-                old_n = n_tot - args.save_frequency
-                if old_n > 0:
-                    old_path = build_output_path(old_n)
-                    _remove_if_exists(old_path)
-
-    # ---------------------------------------------------------
-    # FINAL OUTPUT
-    # ---------------------------------------------------------
-    total_N = start_avg + remaining_averages
-
+    # Write final results
     _compute_and_write(final_output_path, accumulator)
-    # remove old file with fewer averages
+
+    # Clean up old partial file
     if start_avg > 0:
-        old_final_path = build_output_path(start_avg)
-        _remove_if_exists(old_final_path)
+        remove_if_exists(build_output_path(start_avg))
 

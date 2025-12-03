@@ -3,6 +3,7 @@ from .iterables import uniques
 #
 __all__ = [
     'list_dir',
+    'remove_if_exists',
     'remove_directory_if_empty',
     'remove_empty_dirs',
     'find_matching_files',
@@ -47,6 +48,35 @@ def list_dir(path: str) -> List[str]:
     if not dir_path.is_dir():
         raise NotADirectoryError(f"Not a directory: {path}")
     return sorted(entry.name for entry in dir_path.iterdir())
+#
+def remove_if_exists(path: Union[str, Path]) -> bool:
+    """
+    Remove a file if it exists.
+
+    Parameters
+    ----------
+    path : Union[str, Path]
+        Path to the file to remove.
+
+    Returns
+    -------
+    bool
+        True if the file existed and was removed; False otherwise.
+
+    Example
+    -------
+    >>> remove_if_exists("/tmp/tempfile.txt")
+    True
+    """
+    p = Path(path)
+    if p.exists():
+        try:
+            p.unlink()
+            return True
+        except OSError as e:
+            logger.error(f"Failed to remove {p!r}: {e}")
+            return False
+    return False
 #
 def remove_directory_if_empty(path: Union[str, Path]) -> bool:
     """

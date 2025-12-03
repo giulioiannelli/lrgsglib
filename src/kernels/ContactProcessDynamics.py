@@ -12,11 +12,11 @@ Supported C1 backends for EI dynamics: C1c, C1d, C1e, C1f, C1g
 
 from typing import Any
 from pathlib import Path
-import re
 import numpy as np
 from lrgsglib.config.funcs import peq_fstr
 
 from lrgsglib import ContactProcessEI, ContactProcessSIR, SignedGraph, join_non_empty
+from .generic import find_existing_averages
 
 __all__ = [
     "initialize_contact_process_dict_args",
@@ -105,16 +105,14 @@ def _output_components(sg: Any, args: Any) -> tuple[Path, str, str]:
 
 def _latest_saved_index(pdir: Path, agg_prefix: str, sp_token: str) -> int:
     """Find the largest `_na=<n>` aggregate file already on disk."""
-    pattern = re.compile(rf"^dens_{re.escape(agg_prefix)}{re.escape(sp_token)}_na=(\d+)\.bin$")
-    latest = 0
-    for f in pdir.glob(f"dens_{agg_prefix}{sp_token}_na=*.bin"):
-        m = pattern.match(f.name)
-        if m:
-            try:
-                latest = max(latest, int(m.group(1)))
-            except ValueError:
-                pass
-    return latest
+    pattern = f"dens_{agg_prefix}{sp_token}_na=*.bin"
+    return find_existing_averages(
+        pdir,
+        pattern,
+        count_token="na",
+        find_max=True,
+        logger=None,
+    )
 
 
 def _process_EI_C1c(cp, args):
@@ -184,14 +182,15 @@ def _process_EI_C1c(cp, args):
 
         # Remove older aggregate files to keep only the latest progress marker.
         for f in pdir.glob(f"dens_{agg_prefix}{sp_token}_na=*.bin"):
-            m = re.search(r"_na=(\d+)\.bin$", f.name)
-            if m:
-                idx = int(m.group(1))
-                if idx < i:
-                    try:
+            try:
+                # Extract na value from filename (e.g., "dens_..._na=50.bin" -> 50)
+                stem_parts = [p for p in f.stem.split('_') if p.startswith("na=")]
+                if stem_parts:
+                    idx = int(stem_parts[0].split('=')[1])
+                    if idx < i:
                         f.unlink()
-                    except Exception:
-                        pass
+            except (ValueError, IndexError, Exception):
+                pass
 
         _batch_densities = []
         _last_saved_index = i
