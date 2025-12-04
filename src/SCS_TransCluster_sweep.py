@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import sys
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -86,6 +87,7 @@ def _process_point(
     nproc: int,
     combo_seed: int | None,
     verbose: bool,
+    pbar=None,
 ) -> None:
     params = SCSParameters(seed=None, **param_kwargs)
     probe = probe_output_graph(params)
@@ -113,11 +115,9 @@ def _process_point(
     )
 
     if existing_navg >= navg:
-        if verbose:
-            print(
-                f"[skip] N={params.N}, g={params.g}, J0={params.J0:.4g} "
-                f"already has {existing_navg} averages."
-            )
+        if verbose and pbar:
+            msg = f"[skip] N={params.N}, g={params.g}, J0={params.J0:.4g} already has {existing_navg} averages."
+            pbar.set_postfix_str(msg, refresh=True)
         return
 
     accumulator_avg = np.zeros(4, dtype=float)
@@ -126,21 +126,19 @@ def _process_point(
         if prev_path.exists():
             try:
                 accumulator_avg, prev_n = _read_prev_partial(prev_path)
-                if prev_n != existing_navg and verbose:
-                    print(
-                        f"[warn] Expected navg={existing_navg} from filename but "
-                        f"found {prev_n} inside {prev_path.name}"
-                    )
+                if prev_n != existing_navg and verbose and pbar:
+                    msg = f"[warn] Expected navg={existing_navg} from filename but found {prev_n} inside {prev_path.name}"
+                    pbar.set_postfix_str(msg, refresh=True)
             except Exception as exc:  # pragma: no cover - defensive
-                print(f"[warn] Could not read previous file {prev_path.name}: {exc}")
+                if verbose and pbar:
+                    msg = f"[warn] Could not read previous file {prev_path.name}: {exc}"
+                    pbar.set_postfix_str(msg, refresh=True)
                 accumulator_avg = np.zeros(4, dtype=float)
                 existing_navg = 0
         else:
-            if verbose:
-                print(
-                    f"[warn] Found navg={existing_navg} in filenames but "
-                    f"file {prev_path.name} is missing; recomputing from scratch."
-                )
+            if verbose and pbar:
+                msg = f"[warn] Found navg={existing_navg} in filenames but file {prev_path.name} is missing; recomputing from scratch."
+                pbar.set_postfix_str(msg, refresh=True)
             existing_navg = 0
 
     remaining = navg - existing_navg
@@ -156,13 +154,13 @@ def _process_point(
     if nproc <= 1 or remaining == 1:
         iterator = map(_single_average_worker, tasks)
         if verbose and remaining > 1:
-            iterator = tqdm(iterator, total=remaining, desc="averages (serial)")
+            iterator = tqdm(iterator, total=remaining, desc="averages (serial)", position=1, leave=False)
         results = list(iterator)
     else:
         with Pool(processes=nproc) as pool:
             iterator = pool.imap_unordered(_single_average_worker, tasks)
             if verbose:
-                iterator = tqdm(iterator, total=remaining, desc="averages (pool)")
+                iterator = tqdm(iterator, total=remaining, desc="averages (pool)", position=1, leave=False)
             results = list(iterator)
 
     accumulator_avg, total_n = _accumulate_results(existing_navg, accumulator_avg, results)
@@ -172,11 +170,9 @@ def _process_point(
     if existing_navg > 0:
         remove_if_exists(build_output_path(existing_navg))
 
-    if verbose:
-        print(
-            f"[done] N={params.N}, g={params.g}, J0={params.J0:.4g} -> "
-            f"navg={total_n} written to {final_output_path}"
-        )
+    if verbose and pbar:
+        msg = f"[done] N={params.N}, g={params.g}, J0={params.J0:.4g} -> navg={total_n} written to {final_output_path.name}"
+        pbar.set_postfix_str(msg, refresh=True)
 
 
 def run_batch(
@@ -210,11 +206,12 @@ def run_batch(
     combo_rng = np.random.default_rng(seed)
 
     combos = list(itertools.product(N_list, g_list, j0_values))
-    combo_iter = combos
-    if verbose and progress:
-        combo_iter = tqdm(combo_iter, total=len(combos), desc="sweep", leave=False)
 
-    for N_val, g_val, j0_val in combo_iter:
+    pbar = None
+    if progress:
+        pbar = tqdm(total=len(combos), desc="sweep", position=0, leave=True)
+
+    for N_val, g_val, j0_val in combos:
         param_kwargs = dict(
             N=int(N_val),
             J0=float(j0_val),
@@ -235,7 +232,13 @@ def run_batch(
             nproc=effective_nproc,
             combo_seed=combo_seed,
             verbose=verbose,
+            pbar=pbar,
         )
+        if pbar:
+            pbar.update(1)
+
+    if pbar:
+        pbar.close()
 
 
 def parse_args() -> argparse.Namespace:
