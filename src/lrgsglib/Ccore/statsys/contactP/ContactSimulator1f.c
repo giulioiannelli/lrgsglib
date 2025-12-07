@@ -122,9 +122,10 @@ int main(int argc, char *argv[]) {
 
     size_t max_events = steps * N;
     double current_time = 0.0;
+    cp_absorbing_check_func_t absorbing_state_checker = cp_get_absorbing_state_checker(p);
 
     for (size_t event = 0; event < max_events; ++event) {
-        if (sim.total_rate <= 0.0 || cp_reached_absorbing_state(sum, N, event, max_events)) {
+        if (sim.total_rate <= 0.0 || absorbing_state_checker(sum, N, event, max_events)) {
             break;
         }
 

@@ -62,7 +62,7 @@ def _post_process_EI_C1c(runinfos: list[RunInfo], args) -> None:
 
     if dens_arrays:
         concat = np.concatenate(dens_arrays)
-        dynlabel = f'gamma={getattr(args, "gamma", ""):.3g}'
+        dynlabel = f'gamma={getattr(args, "gamma", ""):.4g}'
         out_suffix = get_out_suffix(args)
         agg_prefix = '_'.join(filter(None, [peq_fstr(runinfos[0].pflip), dynlabel, out_suffix]))
         sp_val = getattr(args, 'sp', None)
@@ -151,8 +151,8 @@ def _check_early_stopping(
 def run_simulation(args):
     dynamics = args.dynamics.upper()
     runlang = args.runlang.upper()
-    if dynamics == "EI" and runlang not in ("C1C", "C1D", "C1E", "C1F", "C1G"):
-        raise NotImplementedError("Only the C1c, C1d, C1e, C1f, and C1g backends are " \
+    if dynamics == "EI" and runlang not in ("C1C", "C1D", "C1E", "C1F", "C1G", "PY"):
+        raise NotImplementedError("Only C1c, C1d, C1e, C1f, C1g, and py backends are " \
         "currently wired for EI dynamics in L2D_ContactProcess.")
     if dynamics == "SIR":
         raise NotImplementedError("SIR-like contact-process wiring will " \
@@ -163,6 +163,9 @@ def run_simulation(args):
         case ("EI", "C1C") | ("EI", "C1D") | ("EI", "C1E") | ("EI", "C1F") | ("EI", "C1G"):
             from .ContactProcessDynamics import _process_EI_C1c, clean_up_files
             _process_cp = _process_EI_C1c
+        case ("EI", "PY"):
+            # Python backend uses default processor
+            _process_cp = _post_process_default
         case _:
             raise NotImplementedError(f"""Post-processing for
                                       dynamics={dynamics} and runlang={runlang}

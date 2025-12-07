@@ -442,12 +442,29 @@ void cp_update_border_after_flip(ActiveBorder *ab, size_t node, int8_t new_state
     // The border will naturally shrink as activity moves away
 }
 
-int cp_reached_absorbing_state(size_t sum, size_t N, size_t t, size_t steps) {
+static int cp_absorbing_sum_zero(size_t sum, size_t N, size_t t, size_t steps) {
+    (void)N;
     if (sum == 0) {
         fprintf(stderr, "Absorbing state reached (sum=%zu) at step %zu/%zu\n", sum, t, steps);
         return 1;
     }
     return 0;
+}
+
+static int cp_absorbing_sum_zero_or_all(size_t sum, size_t N, size_t t, size_t steps) {
+    if (sum == 0 || sum == N) {
+        fprintf(stderr, "Absorbing state reached (sum=%zu) at step %zu/%zu\n", sum, t, steps);
+        return 1;
+    }
+    return 0;
+}
+
+cp_absorbing_check_func_t cp_get_absorbing_state_checker(double pflip) {
+    return (pflip == 0.0) ? cp_absorbing_sum_zero_or_all : cp_absorbing_sum_zero;
+}
+
+int cp_reached_absorbing_state(size_t sum, size_t N, size_t t, size_t steps) {
+    return cp_absorbing_sum_zero(sum, N, t, steps);
 }
 
 /* Frontier tracking implementation (three-list system) */

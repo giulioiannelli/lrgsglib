@@ -34,9 +34,10 @@ def _normalize_dynamics(args: Any) -> str:
 
 
 def _validate_backend_choice(dynamics: str, runlang: str) -> None:
-    if dynamics == "EI" and not runlang.startswith("C1"):
-        raise ValueError("Excitation/inhibition dynamics require a C1* runlang (e.g., C1c).")
-    if dynamics == "SIR" and runlang.startswith("C1"):
+    runlang_upper = runlang.upper()
+    if dynamics == "EI" and not (runlang_upper.startswith("C1") or runlang_upper == "PY"):
+        raise ValueError("Excitation/inhibition dynamics require C1* or 'py' runlang.")
+    if dynamics == "SIR" and runlang_upper.startswith("C1"):
         raise ValueError("SIR dynamics do not map to the C1* contact-process kernels.")
 
 
@@ -49,7 +50,8 @@ def initialize_contact_process_dict_args(args: Any, out_suffix: str) -> dict[str
         state_type=args.state_type,
         ic=args.init_cond,
         runlang=args.runlang,
-        simpref=args.simpref,
+        steps=getattr(args, "steps", None),
+        simref=getattr(args, "simref", None),
         rndStr=args.randstr,
         out_suffix=out_suffix,
     )
@@ -95,7 +97,7 @@ _last_saved_index = 0
 def _output_components(sg: Any, args: Any) -> tuple[Path, str, str]:
     """Return (pdir, agg_prefix, sp_token) for density files."""
     pdir = Path(getattr(sg, "path_cntct", None) or getattr(sg, "path_lrgsg", None) or sg.path_data)
-    dynlabel = f'gamma={getattr(args, "gamma", ""):.3g}'
+    dynlabel = f'gamma={getattr(args, "gamma", ""):.4g}'
     out_suffix = get_out_suffix(args)
     agg_prefix = "_".join(filter(None, [peq_fstr(sg.pflip), dynlabel, out_suffix]))
     sp_val = getattr(args, "sp", None)

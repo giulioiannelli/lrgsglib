@@ -44,8 +44,10 @@ int main(int argc, char *argv[]) {
     sprintf(buf, EDGL_FNAME, datdir, syshape, p, run_id);
     process_edges(buf, N, &edges, &node_edges, &neigh_len);
 
+    cp_absorbing_check_func_t absorbing_state_checker = cp_get_absorbing_state_checker(p);
+
     for (size_t t = 0; t < steps; ++t) {
-        if (cp_reached_absorbing_state(sum, N, t, steps)) {
+        if (absorbing_state_checker(sum, N, t, steps)) {
             break;
         }
 

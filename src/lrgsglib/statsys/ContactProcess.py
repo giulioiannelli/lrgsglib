@@ -35,12 +35,58 @@ from typing import Any, Iterable, Literal, cast
 
 import numpy as np
 import tqdm
+from numba import njit
 
 from .BinDynSys import BinDynSys
 from ..config.const import LOG, LRGSG_CCORE_BIN, LRGSG_LOG
 from ..nx_patches import SignedGraph
 from ..utils.basic.strings import join_non_empty
 from ..utils.tools.chronometer import time_function_accumulate
+
+
+# ========================================================================
+# Numba-optimized activation functions for ContactProcessEI Python backend
+# ========================================================================
+
+@njit
+def _activation_relu(lambda_val: float) -> float:
+    """ReLU activation: P = clip(Lambda, 0, 1).
+
+    Parameters
+    ----------
+    lambda_val : float
+        The weighted sum of neighbor states (gamma_eff * sum(w_ij * s[j]))
+
+    Returns
+    -------
+    float
+        Activation probability in [0, 1]
+    """
+    # Manual clipping for numba scalar compatibility
+    if lambda_val < 0.0:
+        return 0.0
+    elif lambda_val > 1.0:
+        return 1.0
+    return lambda_val
+
+
+@njit
+def _activation_tanh(lambda_val: float) -> float:
+    """Tanh activation: P = (1 + tanh(Lambda)) / 2.
+
+    Maps tanh output from [-1, 1] to [0, 1] for probability interpretation.
+
+    Parameters
+    ----------
+    lambda_val : float
+        The weighted sum of neighbor states (gamma_eff * sum(w_ij * s[j]))
+
+    Returns
+    -------
+    float
+        Activation probability in [0, 1]
+    """
+    return (1.0 + np.tanh(lambda_val)) / 2.0
 
 
 class ContactProcessBase(BinDynSys):
@@ -133,9 +179,8 @@ class ContactProcessBase(BinDynSys):
         except AttributeError:
             self.init_contact_dynamics()
 
-    def initialize_run_parameters(self, steps: int | None = None) -> None:
-        if steps is not None:
-            self.simtime = int(steps)
+    def initialize_run_parameters(self, steps: int | None = None, simref: float | None = None) -> None:
+        self._set_time_controls(steps=steps, simref=simref)
 
     # ------------------------------------------------------------------
     # Python dynamics
@@ -143,7 +188,7 @@ class ContactProcessBase(BinDynSys):
     def contact_sampling(self, tqdm_on: bool) -> None:
         dsNstep = self.dsNstep()
         nodes = np.arange(self.N)
-        iterator = tqdm.tqdm(range(self.simtime)) if tqdm_on else range(self.simtime)
+        iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
         for _ in iterator:
             if self.savedyn:
                 self.s_t.append(self.s.copy())
@@ -175,7 +220,7 @@ class ContactProcessBase(BinDynSys):
     def _dynamics_out_label(self) -> str:
         gamma = getattr(self, "gamma", None)
         if gamma is not None:
-            return f"gamma={float(gamma):.12g}"
+            return f"gamma={float(gamma):.4g}"
         mu = getattr(self, "mu", None)
         if mu is not None:
             return f"mu={float(mu):.12g}"
@@ -284,11 +329,12 @@ class ContactProcessBase(BinDynSys):
         self,
         tqdm_on: bool = True,
         steps: int | None = None,
+        simref: float | None = None,
         verbose: bool = False,
         clean_export: bool = True,
     ) -> None:
         self.check_attribute()
-        self.initialize_run_parameters(steps)
+        self.initialize_run_parameters(steps, simref)
         if self.runlang.startswith("C"):
             self.build_cprogram_command()
             self.run_cprogram(verbose)
@@ -349,7 +395,7 @@ class ContactProcessSIR(ContactProcessBase):
             base_args[0],  # N
             base_args[1],  # p
             f"{self.mu:.12g}",
-            f"{self.simtime}",
+            f"{self.steps}",
         ] + base_args[2:]
 
 
@@ -402,13 +448,194 @@ class ContactProcessEI(ContactProcessBase):
         self.activation = self._validate_activation(activation)
         self.num_log_samples = int(num_log_samples)
 
+        # Lambda caching data structures (initialized in init_contact_dynamics)
+        # Numba-compatible contiguous arrays for Python backend
+        self._neigh_indices: np.ndarray | None = None    # Flattened neighbor indices
+        self._neigh_weights: np.ndarray | None = None    # Flattened neighbor weights
+        self._neigh_offsets: np.ndarray | None = None    # Offsets into flattened arrays
+        self._reverse_weights: np.ndarray | None = None  # N x N matrix for reverse edge lookup
+        self._lambda_arr: np.ndarray | None = None       # Cached lambda values
+
+        # Pre-select activation function (avoid if-else in hot loop)
+        if self.activation == 'relu':
+            self._activation_fn = _activation_relu
+        elif self.activation == 'tanh':
+            self._activation_fn = _activation_tanh
+        else:
+            raise ValueError(f"Unknown activation: {self.activation}")
+
+    def _init_lambda_cache(self) -> None:
+        """Initialize lambda array and neighbor structures for Python backend.
+
+        Creates flattened, contiguous arrays for numba compatibility.
+        Uses CSR-like format for efficient storage and access.
+        """
+        N = self.N
+
+        # First pass: collect neighbor data using inherited method
+        neigh_list_ragged = []
+        neigh_weights_ragged = []
+
+        for i in range(N):
+            neighbors = list(self._iter_neighbour_data(i))
+            neigh_indices = [n[0] for n in neighbors]
+            neigh_weights = [n[1] for n in neighbors]
+            neigh_list_ragged.append(neigh_indices)
+            neigh_weights_ragged.append(neigh_weights)
+
+        # Flatten into contiguous arrays for numba
+        total_edges = sum(len(nl) for nl in neigh_list_ragged)
+        self._neigh_indices = np.empty(total_edges, dtype=np.int32)
+        self._neigh_weights = np.empty(total_edges, dtype=np.float64)
+        self._neigh_offsets = np.empty(N + 1, dtype=np.int32)
+
+        offset = 0
+        for i in range(N):
+            self._neigh_offsets[i] = offset
+            deg = len(neigh_list_ragged[i])
+            if deg > 0:
+                self._neigh_indices[offset:offset+deg] = neigh_list_ragged[i]
+                self._neigh_weights[offset:offset+deg] = neigh_weights_ragged[i]
+            offset += deg
+        self._neigh_offsets[N] = offset
+
+        # Build reverse edge weight matrix (N x N, sparse but fast lookup)
+        # For large graphs (N > 10000), consider using scipy.sparse
+        self._reverse_weights = np.zeros((N, N), dtype=np.float64)
+        for i in range(N):
+            start = self._neigh_offsets[i]
+            end = self._neigh_offsets[i + 1]
+            for idx in range(start, end):
+                j = self._neigh_indices[idx]
+                w_ij = self._neigh_weights[idx]
+                self._reverse_weights[j, i] = w_ij  # Store weight from i to j
+
+        # Initialize lambda array from current state
+        self._lambda_arr = np.zeros(N, dtype=np.float64)
+        for i in range(N):
+            start = self._neigh_offsets[i]
+            end = self._neigh_offsets[i + 1]
+            weighted_sum = 0.0
+            for idx in range(start, end):
+                j = self._neigh_indices[idx]
+                w_ij = self._neigh_weights[idx]
+                weighted_sum += w_ij * self.s[j]
+            self._lambda_arr[i] = self.gamma_eff * weighted_sum
+
+    def init_contact_dynamics(self, custom: Any = None, exName: str = "") -> None:
+        """Initialize contact dynamics with lambda caching for Python backend.
+
+        Parameters
+        ----------
+        custom : Any, optional
+            Custom initial state
+        exName : str, optional
+            Export name for files
+        """
+        super().init_contact_dynamics(custom, exName)
+        # Initialize lambda cache for Python backend
+        if not self.runlang.upper().startswith('C'):
+            self._init_lambda_cache()
+
     # ------------------------------------------------------------------
     # Python dynamics
     # ------------------------------------------------------------------
-    def ds1step(self, node: int) -> None:  # pragma: no cover - not used
-        raise NotImplementedError(
-            "ContactProcessEI provides only C backends; Python dynamics are not implemented."
-        )
+    def ds1step(self, node: int) -> None:
+        """Single-step update using cached lambda (Python backend).
+
+        This method is used by the parent class's contact_sampling() when
+        the numba-optimized sweep is not called directly.
+
+        Parameters
+        ----------
+        node : int
+            Node index to update
+        """
+        if self._lambda_arr is None:
+            raise RuntimeError("Lambda cache not initialized. Call init_contact_dynamics() first.")
+
+        # Get probability from cached lambda
+        P = self._activation_fn(self._lambda_arr[node])
+
+        # Sample new state
+        old_state = self.s[node]
+        new_state = np.int8(1 if np.random.random() < P else 0)
+
+        # Update if changed
+        if new_state != old_state:
+            self.s[node] = new_state
+            delta = new_state - old_state
+
+            # Update lambda for all neighbors
+            start = self._neigh_offsets[node]
+            end = self._neigh_offsets[node + 1]
+            for idx in range(start, end):
+                j = self._neigh_indices[idx]
+                w_ji = self._reverse_weights[j, node]
+                self._lambda_arr[j] += self.gamma_eff * w_ji * delta
+
+    @staticmethod
+    @njit
+    def _sweep_ei_lambda_cache(
+        state: np.ndarray,
+        lambda_arr: np.ndarray,
+        neigh_indices: np.ndarray,
+        neigh_weights: np.ndarray,
+        neigh_offsets: np.ndarray,
+        reverse_weights: np.ndarray,
+        gamma_eff: float,
+        activation_fn,
+        N: int
+    ) -> None:
+        """Numba-optimized sweep for ContactProcessEI with lambda caching.
+
+        Performs one Monte Carlo sweep (N single-node updates) with random node
+        selection. Updates lambda values incrementally when states change.
+
+        Parameters
+        ----------
+        state : np.ndarray[int8]
+            Current state configuration (binary: 0 or 1)
+        lambda_arr : np.ndarray[float64]
+            Cached lambda values (gamma_eff * sum(w_ji * s[j]))
+        neigh_indices : np.ndarray[int32]
+            Flattened neighbor indices (CSR format)
+        neigh_weights : np.ndarray[float64]
+            Flattened neighbor weights parallel to neigh_indices
+        neigh_offsets : np.ndarray[int32]
+            Offsets into flattened arrays for each node (CSR format)
+        reverse_weights : np.ndarray[float64]
+            N x N matrix of edge weights for O(1) reverse edge lookup
+        gamma_eff : float
+            Effective gamma (already rescaled by average degree)
+        activation_fn : callable
+            Pre-selected activation function (_activation_relu or _activation_tanh)
+        N : int
+            Number of nodes
+        """
+        for _ in range(N):
+            i = np.random.randint(N)
+
+            # Get activation probability from cached lambda
+            P = activation_fn(lambda_arr[i])
+
+            # Sample new state
+            old_state = state[i]
+            new_state = np.int8(1 if np.random.random() < P else 0)
+
+            # Update if changed
+            if new_state != old_state:
+                state[i] = new_state
+                delta = new_state - old_state
+
+                # Update lambda for all neighbors of i
+                start = neigh_offsets[i]
+                end = neigh_offsets[i + 1]
+                for idx in range(start, end):
+                    j = neigh_indices[idx]
+                    # Find reverse edge weight (j -> i)
+                    w_ji = reverse_weights[j, i]
+                    lambda_arr[j] += gamma_eff * w_ji * delta
 
     # ------------------------------------------------------------------
     # C backend integration
@@ -420,7 +647,7 @@ class ContactProcessEI(ContactProcessBase):
             base_args[0],  # N
             base_args[1],  # p
             f"{self.gamma_eff:.12g}",
-            f"{self.simtime}",
+            f"{self.steps}",
         ] + base_args[2:] + [
             self.activation,
         ]
@@ -437,12 +664,63 @@ class ContactProcessEI(ContactProcessBase):
         self,
         tqdm_on: bool = True,
         steps: int | None = None,
+        simref: float | None = None,
         verbose: bool = False,
         clean_export: bool = True,
     ) -> None:
-        if not self.runlang.upper().startswith("C1"):
-            raise NotImplementedError("ContactProcessEI supports only C1* backends.")
-        super().run(tqdm_on=tqdm_on, steps=steps, verbose=verbose, clean_export=clean_export)
+        """Run contact process dynamics (C1* or Python backend).
+
+        Parameters
+        ----------
+        tqdm_on : bool, optional
+            Show progress bar (default: True)
+        steps : int, optional
+            Number of Monte Carlo sweeps (default: None, uses existing config)
+        simref : float, optional
+            Size-normalised time (steps = simref * N). Ignored if ``steps`` is provided.
+        verbose : bool, optional
+            Verbose output (default: False)
+        clean_export : bool, optional
+            Clean up exported files after run (default: True)
+        """
+        runlang_upper = self.runlang.upper()
+
+        if runlang_upper.startswith("C1"):
+            # Use C backend
+            super().run(
+                tqdm_on=tqdm_on,
+                steps=steps,
+                simref=simref,
+                verbose=verbose,
+                clean_export=clean_export,
+            )
+        elif runlang_upper == "PY":
+            # Use Python backend with numba-optimized sweep
+            self.check_attribute()
+            self.initialize_run_parameters(steps=steps, simref=simref)
+
+            # Use optimized sweep directly instead of contact_sampling
+            iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
+            for _ in iterator:
+                if self.savedyn:
+                    self.s_t.append(self.s.copy())
+
+                # Call numba-optimized sweep
+                self._sweep_ei_lambda_cache(
+                    self.s,
+                    self._lambda_arr,
+                    self._neigh_indices,
+                    self._neigh_weights,
+                    self._neigh_offsets,
+                    self._reverse_weights,
+                    self.gamma_eff,
+                    self._activation_fn,
+                    self.N
+                )
+        else:
+            raise ValueError(
+                f"ContactProcessEI supports C1* or 'py' backends, got '{self.runlang}'"
+            )
 
 
 # Backwards compatibility alias

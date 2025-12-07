@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
 
     /* Get activation function pointer once */
     cp_activation_func_t activation_func = cp_get_activation_function(activation);
+    cp_absorbing_check_func_t absorbing_state_checker = cp_get_absorbing_state_checker(p);
 
     /* Simulation loop with density tracking */
     size_t t;
@@ -64,7 +65,7 @@ int main(int argc, char *argv[]) {
         density[t] = (double)sum / (double)N;
 
         /* Check for absorbing state - early termination */
-        if (cp_reached_absorbing_state(sum, N, t, steps)) {
+        if (absorbing_state_checker(sum, N, t, steps)) {
             ++t;  // Move to next index for padding
             break;
         }

@@ -83,11 +83,12 @@ int main(int argc, char *argv[]) {
             density[0], planned_samples, num_log_samples);
 
     cp_activation_func_t activation_func = cp_get_activation_function(activation);
+    cp_absorbing_check_func_t absorbing_state_checker = cp_get_absorbing_state_checker(p);
 
     /* Simulation loop with log-spaced density and snapshots */
     size_t t;
     for (t = 0; t < steps; ++t) {
-        if (cp_reached_absorbing_state(sum, N, t, steps)) {
+        if (absorbing_state_checker(sum, N, t, steps)) {
             break;
         }
 

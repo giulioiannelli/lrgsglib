@@ -79,7 +79,7 @@ class TestContactProcess(unittest.TestCase):
             runlang="py",
             ic="uniform",
             seed=123,
-            simpref=1,
+            steps=1,
         )
         model.init_contact_dynamics()
         try:
@@ -106,9 +106,9 @@ class TestContactProcess(unittest.TestCase):
             activation="relu",
             num_log_samples=25,
             seed=0,
-            simpref=1,
+            steps=1,
         )
-        model.simtime = 42
+        model._set_time_controls(steps=42)
         model.init_contact_dynamics()
         try:
             self.assertTrue(model.sfout.exists())
@@ -120,7 +120,7 @@ class TestContactProcess(unittest.TestCase):
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertNotEqual(model.gamma_eff, model.gamma)
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
-            self.assertEqual(model.cprogram[4], f"{model.simtime}")
+            self.assertEqual(model.cprogram[4], f"{model.steps}")
             self.assertEqual(model.cprogram[8], model.out_id)
             self.assertEqual(model.cprogram[-2], model.activation)
             self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
@@ -148,9 +148,9 @@ class TestContactProcess(unittest.TestCase):
             activation="tanh",
             num_log_samples=15,
             seed=0,
-            simpref=1,
+            steps=1,
         )
-        model.simtime = 30
+        model._set_time_controls(steps=30)
         model.init_contact_dynamics()
         try:
             expected_binary = self.ccore_dir / "ContactSimulator1e"
@@ -158,7 +158,7 @@ class TestContactProcess(unittest.TestCase):
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
-            self.assertEqual(model.cprogram[4], f"{model.simtime}")
+            self.assertEqual(model.cprogram[4], f"{model.steps}")
             self.assertEqual(model.cprogram[-2], model.activation)
             self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
         finally:
@@ -185,9 +185,9 @@ class TestContactProcess(unittest.TestCase):
             activation="relu",
             num_log_samples=12,
             seed=1,
-            simpref=1,
+            steps=1,
         )
-        model.simtime = 25
+        model._set_time_controls(steps=25)
         model.init_contact_dynamics()
         try:
             expected_binary = self.ccore_dir / "ContactSimulator1f"
@@ -195,7 +195,7 @@ class TestContactProcess(unittest.TestCase):
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
-            self.assertEqual(model.cprogram[4], f"{model.simtime}")
+            self.assertEqual(model.cprogram[4], f"{model.steps}")
             self.assertEqual(model.cprogram[-2], model.activation)
             self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
         finally:
@@ -210,7 +210,7 @@ class TestContactProcess(unittest.TestCase):
             sg,
             runlang="py",
             mu=5.0,
-            simpref=1,
+            steps=1,
             seed=0,
         )
 
@@ -235,8 +235,8 @@ class TestContactProcess(unittest.TestCase):
 
     def test_c_backend_run_reads_stdout_state(self):
         sg = self._make_graph()
-        model = self.ContactProcessSIR(sg, mu=0.2, runlang="C0", simpref=1, seed=0)
-        model.simtime = 5
+        model = self.ContactProcessSIR(sg, mu=0.2, runlang="C0", steps=1, seed=0)
+        model._set_time_controls(steps=5)
 
         fake_binary = self.ccore_dir / "ContactSimulator0"
         fake_binary.write_text("#!/bin/sh\n")
@@ -278,7 +278,8 @@ class TestContactProcess(unittest.TestCase):
             state_type="binary",
             init_cond="uniform",
             runlang="py",
-            simpref=1,
+            steps=1,
+            simref=None,
             randstr=False,
             out_suffix="",
         )
@@ -293,11 +294,11 @@ class TestContactProcess(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.cp_kernel.run_simulation(args)
 
-    def test_simpref_controls_total_steps(self):
+    def test_simref_scales_steps(self):
         sg = self._make_graph()
-        model = self.ContactProcessEI(sg, gamma=0.5, simpref=5)
-        self.assertEqual(model.simpref, 5)
-        self.assertEqual(model.simtime, 5 * model.N)
+        model = self.ContactProcessEI(sg, gamma=0.5, simref=5)
+        self.assertEqual(model.simref, 5)
+        self.assertEqual(model.steps, 5 * model.N)
 
     def test_out_id_includes_gamma_and_random_suffix(self):
         sg = self._make_graph()
@@ -305,7 +306,7 @@ class TestContactProcess(unittest.TestCase):
             sg,
             gamma=0.499,
             runlang="C1c",
-            simpref=2,
+            simref=2,
             rndStr=True,
             out_suffix="uniform_rand",
         )

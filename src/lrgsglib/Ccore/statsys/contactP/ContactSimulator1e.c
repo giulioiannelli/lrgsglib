@@ -92,10 +92,12 @@ int main(int argc, char *argv[]) {
         .activation_func = cp_get_activation_function(activation),
     };
 
+    cp_absorbing_check_func_t absorbing_state_checker = cp_get_absorbing_state_checker(p);
+
     /* Simulation loop - save density at log-spaced steps */
     size_t t;
     for (t = 0; t < steps; ++t) {
-        if (cp_reached_absorbing_state(sum, N, t, steps)) {
+        if (absorbing_state_checker(sum, N, t, steps)) {
             break;
         }
 

@@ -46,10 +46,15 @@ Contact_opt_args = {
         'type': int,
         'default': DEFAULT_SAVE_FREQUENCY,
     },
-    tuple(['-sp', '--simpref']): {
-        'help': phelp_simpref,
+    tuple(['--steps', '-stp']): {
+        'help': phelp_steps,
         'type': int,
-        'default': DEFAULT_SIM_PREF,
+        'default': DEFAULT_STEPS,
+    },
+    tuple(['--simref', '-sp']): {
+        'help': phelp_simref,
+        'type': float,
+        'default': DEFAULT_SIMREF,
     },
     tuple(['-ic', '--init_cond']): {
         'help': phelp_ic_contact,

@@ -43,6 +43,8 @@ void cp_update_rates_neighbors(size_t node, const NodesEdges node_edges, const s
 int cp_gillespie_select_event(size_t N, const double *rates, double total_rate, size_t *selected_node);
 int cp_gillespie_select_event_frontier(const cp_frontier_t *frontier, const double *rates,
                                        double total_rate, size_t *selected_node);
+typedef int (*cp_absorbing_check_func_t)(size_t sum, size_t N, size_t t, size_t steps);
+cp_absorbing_check_func_t cp_get_absorbing_state_checker(double pflip);
 
 typedef struct {
     double gamma;
