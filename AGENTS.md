@@ -1,7 +1,7 @@
 # AGENT.md — Guidelines for code-generation agents working on **lrgsglib**
 
 > **Goal**  
-> Make high-quality, *modular, clear, simple, optimized, and formal* contributions to **lrgsglib** — a research library for Laplacian Renormalization Group (LRG) and signed-graph utilities, with Python modules and C/C++ extensions.
+> Make high-quality, *modular, clear, simple, optimized, and formal* contributions to **lrgsglib** — a network-theory library for computing theoretically predicted quantities in the Laplacian Renormalization Group (LRG) for signed graphs (topological symmetry breaking scenario), with Python modules and C/C++ extensions.
 
 ---
 
@@ -41,9 +41,13 @@ Follow the repository’s conventions; prefer **pure functions**, minimal hidden
 
 ## 4) Repository context & conventions
 
-- **Core purpose:** LRG and signed-graph tooling (utilities for Laplacians, spectra, percolation/entropy measures, RG-style operations).
+- **Core purpose:** Network-theory tooling for LRG on signed graphs: compute Laplacians, spectra, coarse-graining, percolation/entropy measures, and RG-style operations that capture topological symmetry breaking.
+- **Architectural primitives:**  
+  - **Structures:** Topological containers such as `Lattice2D`, `ErdosRenyi`, etc., modeled as `SignedGraph` objects responsible for graph construction and topological property computation.  
+  - **Dynamics:** Binary spin-system processes (e.g., `IsingDynamics`, `ContactProcess`, other `BinDynSys`) that mount on `SignedGraph` instances and drive simulations. Keep dynamics decoupled from the graph backend.
+- **Performance & reproducibility:** Aim for long, optimized simulations with reproducible, cross-platform behavior. Provide backend options (`numpy`/`scipy` default; prefer optional `numba`/`cupy` accelerators; use `src/lrgsglib/Ccore/` kernels for hot paths). Preserve deterministic seeds and package/install cleanly (pip/conda-friendly).
 - **Languages:** Python (primary), C/C++ extensions in `src/lrgsglib/Ccore/` for hot paths.
-- **Typical stack:** `numpy`, `scipy`, `networkx`, `matplotlib`. Keep dependencies minimal.
+- **Typical stack:** `numpy`, `scipy`, `matplotlib`, and currently `networkx` (target: abstract away and support faster/multiple graph backends). Keep dependencies minimal and swappable.
 - **Python target:** 3.11+.
 - **Common modules (illustrative, not exhaustive):**
   - `src/lrgsglib/utils/lrg/spectral.py` (e.g., `get_graph_lspectrum`, `compute_laplacian_properties`)

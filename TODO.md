@@ -3,7 +3,8 @@
 ### General 
 - [ ] Adjust the `Chronometer` for each dynamical and computational objects.
 - [ ] Adjust the logging and in general the verbosity of outputs, from notebooks to programs
-- [ ] 
+- [ ] Implement The whole set of `gt_patches` copying from the `nx_patches` for faster functions
+- [ ] In the `gt` backend there will be code in c++, compile it and test functions work when called in python then
 
 ### Implement Different Dynamics for Ising Model
 - [ ] Add alternative update rules beyond Glauber dynamics
