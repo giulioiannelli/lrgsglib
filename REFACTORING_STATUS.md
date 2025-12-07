@@ -1,8 +1,8 @@
 # SignedGraph Refactoring Status
 
-**Last Updated:** 2025-12-02
-**Current Phase:** Phase 2 - Task 2.1 Complete ✅
-**Next Task:** Phase 2, Task 2.2 - Refactor SignedGraph.__init__
+**Last Updated:** 2025-12-07
+**Current Phase:** Phase 2 - Task 2.2 Complete ✅
+**Next Task:** Phase 2, Task 2.3 - Properties and Caching
 
 ## Quick Reference
 
@@ -70,13 +70,41 @@
 
 **Test Status:** 42/45 tests passing (3 correctly skipped)
 
+### ✅ Phase 2: Backend Integration - Task 2.2 (COMPLETE)
+
+**Commits:**
+- `75c8755` - refactor: add backend parameter to SignedGraph.__init__
+
+**Task 2.2: Refactor SignedGraph.__init__**
+- **Files Modified:**
+  - `src/lrgsglib/nx_patches/SignedGraph/SignedGraph.py`
+    - Added `backend` parameter with type hints
+    - Added `_init_backend()` helper method
+    - Improved type hints throughout __init__
+    - Updated docstring
+  - `test/test_signed_graph/test_base_class.py` (20 new tests)
+- **Features:**
+  - Backend parameter in __init__ (default: Backend.NUMPY)
+  - _init_backend() helper method for clean initialization
+  - Stores self._backend and self._backend_name
+  - Supports string or Backend enum
+  - Auto-fallback to NumPy if CuPy unavailable
+- **Tests:** 20/20 passing
+  - Backend initialization with different types
+  - Backend fallback behavior
+  - Backend integration with graph operations
+  - Parameter validation
+  - Properties and integration
+
+**Test Status:** 72/76 total tests passing (4 correctly skipped)
+
 ## Current Status
 
 **Working Directory:** Clean, all changes committed
 **Branch:** `dev-notebooks`
-**Last Commit:** `f4a6864` (Backend abstraction layer)
+**Last Commit:** `75c8755` (Add backend parameter to __init__)
 
-## Next Session: Phase 2, Task 2.2 - Refactor SignedGraph.__init__
+## Next Session: Phase 2, Task 2.3 - Properties and Caching
 
 ### Resume Point
 
