@@ -1,8 +1,8 @@
 # SignedGraph Refactoring Status
 
 **Last Updated:** 2025-12-07
-**Current Phase:** Phase 2 - Tasks 2.1-2.3 Complete ✅
-**Next Task:** Phase 3 - Spectral Module Refactoring
+**Current Phase:** Phase 3 - Backend Integration Started ✅
+**Next Task:** Phase 3 - Continue Spectral Module Refactoring
 
 ## Quick Reference
 
@@ -144,7 +144,36 @@
 - 1 new file created (_backend.py)
 - 1 file comprehensively refactored (SignedGraph.py)
 
-## Next Session: Phase 3 - Spectral Module Refactoring
+## ✅ Phase 3: Spectral Module - Backend Integration (STARTED)
+
+**Commits:**
+- `af372bb` - refactor: integrate backend system into spectral functions
+
+**Task 3.2: Integrate Backend into Spectral Functions**
+- **Files Modified:**
+  - `src/lrgsglib/nx_patches/SignedGraph/_spectral.py`
+    - Updated compute_laplacian_spectrum() to use self._backend
+    - Updated compute_laplacian_spectrum_weigV() with backend integration
+    - Updated compute_adjacency_spectrum_weigV() with backend integration
+    - Changed backend parameter to Optional[str]=None (use instance backend by default)
+  - `src/lrgsglib/nx_patches/SignedGraph/_backend.py`
+    - Fixed CupyBackend.eigvalsh() array conversion
+    - Fixed CupyBackend.eigh() array conversion
+  - `test/test_signed_graph/test_spectral.py` (18 new tests)
+- **Features:**
+  - GPU acceleration for spectral computations via CuPy
+  - Backward compatible backend override parameter
+  - Consistent NumPy array returns across all backends
+  - Automatic array conversion for CuPy backend
+- **Tests:** 18/18 passing
+  - Laplacian spectrum computation (5 tests)
+  - Full eigendecomposition (8 tests)
+  - Adjacency spectrum (3 tests)
+  - Integration tests (2 tests)
+
+**Test Status:** 105/109 total tests passing (4 correctly skipped)
+
+## Next Session: Phase 3 - Continue Spectral Refactoring
 
 ### Resume Point
 
