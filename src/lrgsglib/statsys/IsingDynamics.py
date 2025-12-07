@@ -29,22 +29,47 @@ class IsingDynamics(BinDynSys):
         thrmSTEP: int = 20, 
         eqSTEP: int = 20, 
         freq: int = 10,
-        nstepsIsing: int = 100,
+        steps: int | None = None,
+        simref: float | None = None,
+        nstepsIsing: int | None = None,
         save_magnetization: bool = False,
         upd_mode: str = "asynchronous",
         **kwargs
     ) -> None:
         dynpath = getattr(sg, 'path_ising', None)
-        super(IsingDynamics, self).__init__(sg, dynpath=dynpath, **kwargs)
+        resolved_steps = steps
+        if resolved_steps is None:
+            resolved_steps = nstepsIsing
+        if resolved_steps is None:
+            resolved_steps = eqSTEP
+        super(IsingDynamics, self).__init__(sg, dynpath=dynpath, steps=resolved_steps, simref=simref, **kwargs)
         self.T = T
-        self.nstepsIsing = nstepsIsing
         self.thrmSTEP = thrmSTEP
-        self.eqSTEP = eqSTEP
         self.freq = freq
         self.save_magnetization = save_magnetization
         self.NoClust = NoClust
         self.NeigV = -1
         self.upd_mode = upd_mode
+
+    @property
+    def eqSTEP(self) -> int:
+        """Compatibility alias for equilibration sweeps."""
+
+        return self.steps
+
+    @eqSTEP.setter
+    def eqSTEP(self, value: int) -> None:
+        self._set_time_controls(steps=value)
+
+    @property
+    def nstepsIsing(self) -> int:
+        """Compatibility alias mapping legacy field to the sweep count."""
+
+        return self.steps
+
+    @nstepsIsing.setter
+    def nstepsIsing(self, value: int) -> None:
+        self._set_time_controls(steps=value)
     #
     def neigh_ene(self, neigh: list) -> float:
         return np.sum(neigh) / len(neigh)
@@ -89,9 +114,17 @@ class IsingDynamics(BinDynSys):
         except AttributeError:
             self.init_ising_dynamics()
 
-    def initialize_run_parameters(self, T_ising):
+    def initialize_run_parameters(
+        self,
+        T_ising,
+        steps: int | None = None,
+        simref: float | None = None,
+        eqSTEP: int | None = None,
+    ):
         if T_ising:
             self.T = T_ising
+        chosen_steps = steps if steps is not None else eqSTEP
+        self._set_time_controls(steps=chosen_steps, simref=simref)
 
     def build_cprogram_command(self):
         self.CbaseName = f"IsingSimulator{self.runlang[-1]}"
@@ -101,7 +134,7 @@ class IsingDynamics(BinDynSys):
             f"{self.sg.pflip:.3g}",
             f"{self.NoClust}",
             f"{self.thrmSTEP:.3g}",
-            f"{self.eqSTEP}",
+            f"{self.steps}",
             self.sg.path_sgdata.relative_to(Path.cwd()),
             self.sg.syshapePth,
             self.run_id,
@@ -139,8 +172,8 @@ class IsingDynamics(BinDynSys):
                 pass
 
         sample = list(range(self.sg.N))
-        iterator = tqdm(range(self.nstepsIsing)) if tqdm_on \
-            else range(self.nstepsIsing)
+        iterator = tqdm(range(self.steps)) if tqdm_on \
+            else range(self.steps)
         self.ene = []
         for _ in iterator:
             self.magn.append(np.sum(self.s))
@@ -149,10 +182,20 @@ class IsingDynamics(BinDynSys):
             save_magn_array()
     #
     @time_function_accumulate(auto_log=False)
-    def run(self, tqdm_on: bool = True, T_ising: float = None, verbose: bool = False, clean_export: bool = True):
+    def run(
+        self,
+        tqdm_on: bool = True,
+        T_ising: float = None,
+        steps: int | None = None,
+        simref: float | None = None,
+        eqSTEP: int | None = None,
+        verbose: bool = False,
+        clean_export: bool = True,
+    ):
         self.check_attribute()
-        self.initialize_run_parameters(T_ising)
+        self.initialize_run_parameters(T_ising, steps=steps, simref=simref, eqSTEP=eqSTEP)
         if self.runlang.startswith("C"):
+            self.build_cprogram_command()
             self.run_cprogram(verbose)
             if clean_export:
                 self.remove_run_c_files()

@@ -53,7 +53,8 @@ class BinDynSys:
         ic: str = "uniform",
         field: NDArray = None,
         runlang: str = "py",
-        simpref: int = 1,
+        simref: float | None = None,
+        steps: int | None = None,
         savedyn: bool = False,
         seed: int = None,
         rndStr: bool = False,
@@ -77,11 +78,7 @@ class BinDynSys:
         self.out_suffix = out_suffix
         self.pflip_id = peq_fstr(self.sg.pflip)
         self.field = field if field is not None else ZERO_FIELD(self.N)
-        simpref_int = 1 if simpref is None else int(simpref)
-        if simpref_int < 1:
-            raise ValueError("simpref must be a positive integer.")
-        self.simpref = simpref_int
-        self.simtime = self.simpref * self.N
+        self._set_time_controls(simref=simref, steps=steps, allow_default=True)
         if dynpath is None:
             base_dynpath = getattr(self.sg, "path_data", Path.cwd())
             self.dynpath = Path(base_dynpath)
@@ -108,6 +105,66 @@ class BinDynSys:
         if state_type not in {"bipolar", "binary"}:
             raise ValueError("state_type must be either 'bipolar' or 'binary'.")
         self._state_type: StateType = state_type
+
+    # ------------------------------------------------------------------
+    # Time-control helpers
+    # ------------------------------------------------------------------
+    def _set_time_controls(
+        self,
+        *,
+        simref: float | None = None,
+        steps: int | None = None,
+        allow_default: bool = False,
+    ) -> None:
+        """
+        Configure the simulation horizon in Monte Carlo sweeps.
+
+        Each Monte Carlo step corresponds to ``N`` single-site updates
+        (Markov time). Users can specify either ``steps`` (number of
+        sweeps) or ``simref`` (size-normalised time, where
+        ``steps = simref * N``). When both are provided, ``steps`` takes
+        precedence. If neither is provided and ``allow_default`` is True,
+        a single sweep is used.
+        """
+        if steps is None and simref is None:
+            if not allow_default and hasattr(self, "steps"):
+                return
+            steps = 1
+
+        resolved_simref = float(simref) if simref is not None else None
+        if resolved_simref is not None and resolved_simref <= 0:
+            raise ValueError("simref must be positive.")
+
+        resolved_steps = int(steps) if steps is not None else None
+        if resolved_steps is not None and resolved_steps < 1:
+            raise ValueError("steps must be a positive integer.")
+
+        if resolved_steps is None and resolved_simref is not None:
+            resolved_steps = max(1, int(round(resolved_simref * self.N)))
+        if resolved_simref is None and resolved_steps is not None:
+            resolved_simref = resolved_steps / float(self.N)
+
+        if resolved_steps is None or resolved_simref is None:
+            raise ValueError("Unable to resolve simulation steps; provide simref or steps.")
+
+        self.steps = resolved_steps
+        self.simref = resolved_simref
+
+    @property
+    def simtime(self) -> int:
+        """Compatibility alias mapping to :attr:`steps`."""
+
+        return self.steps
+
+    @simtime.setter
+    def simtime(self, value: int) -> None:
+        self._set_time_controls(steps=value)
+
+    @property
+    def total_single_updates(self) -> int:
+        """Total number of single-node updates for the configured run."""
+
+        return self.steps * self.N
 
     @property
     def state_type(self) -> StateType:

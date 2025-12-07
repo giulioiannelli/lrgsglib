@@ -27,7 +27,9 @@ class VoterModel(BinDynSys):
         self,
         sg,
         *,
-        eqSTEP: int = 20,
+        steps: int | None = None,
+        simref: float | None = None,
+        eqSTEP: int | None = None,
         save_magnetization: bool = False,
         upd_mode: str = "asynchronous",
         freq: int = 10,
@@ -35,8 +37,8 @@ class VoterModel(BinDynSys):
         **kwargs: Any,
     ) -> None:
         dynpath = getattr(sg, 'path_voter', None)
-        super().__init__(sg, dynpath=dynpath, **kwargs)
-        self.eqSTEP = int(eqSTEP)
+        resolved_steps = steps if steps is not None else eqSTEP
+        super().__init__(sg, dynpath=dynpath, steps=resolved_steps, simref=simref, **kwargs)
         self.save_magnetization = save_magnetization
         self.upd_mode = upd_mode
         self.freq = freq
@@ -48,6 +50,16 @@ class VoterModel(BinDynSys):
         self.cprogram: list[str | Path] = []
         self.out_id: str = self.out_suffix
         self.magn_path: Path | None = None
+
+    @property
+    def eqSTEP(self) -> int:
+        """Compatibility alias for the configured number of sweeps."""
+
+        return self.steps
+
+    @eqSTEP.setter
+    def eqSTEP(self, value: int) -> None:
+        self._set_time_controls(steps=value)
 
     # ------------------------------------------------------------------
     # Utility helpers
@@ -80,10 +92,14 @@ class VoterModel(BinDynSys):
         except AttributeError:
             self.init_voter_dynamics()
 
-    def initialize_run_parameters(self, eqSTEP: int | None = None) -> None:
-        if eqSTEP is not None:
-            self.eqSTEP = int(eqSTEP)
-        self.simtime = self.eqSTEP
+    def initialize_run_parameters(
+        self,
+        steps: int | None = None,
+        simref: float | None = None,
+        eqSTEP: int | None = None,
+    ) -> None:
+        chosen_steps = steps if steps is not None else eqSTEP
+        self._set_time_controls(steps=chosen_steps, simref=simref)
 
     # ------------------------------------------------------------------
     # Python dynamics
@@ -101,7 +117,7 @@ class VoterModel(BinDynSys):
     def voter_sampling(self, tqdm_on: bool) -> None:
         dsNstep = self.dsNstep()
         nodes = list(self.sg.gr[self.sg.on_g].nodes())
-        iterator = tqdm.tqdm(range(self.eqSTEP)) if tqdm_on else range(self.eqSTEP)
+        iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
         for _ in iterator:
             if self.save_magnetization:
                 self.magn.append(float(np.sum(self.s)) / float(self.N))
@@ -129,7 +145,7 @@ class VoterModel(BinDynSys):
         arglist = [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
-            f"{self.eqSTEP}",
+            f"{self.steps}",
             str(datdir),
             syshape,
             self.run_id,
@@ -215,13 +231,16 @@ class VoterModel(BinDynSys):
     def run(
         self,
         tqdm_on: bool = True,
+        steps: int | None = None,
+        simref: float | None = None,
         eqSTEP: int | None = None,
         verbose: bool = False,
         clean_export: bool = True,
     ) -> None:
         self.check_attribute()
-        self.initialize_run_parameters(eqSTEP)
+        self.initialize_run_parameters(steps=steps, simref=simref, eqSTEP=eqSTEP)
         if self.runlang.startswith("C"):
+            self.build_cprogram_command()
             self.run_cprogram(verbose)
             if clean_export:
                 self.remove_run_c_files()

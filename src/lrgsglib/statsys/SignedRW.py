@@ -6,9 +6,7 @@ class SignedRW(BinDynSys):
     id_string_signedrw = ""
 
     def __init__(self, sg: SignedGraph = Lattice2D, **kwargs) -> None:
-        self.sg = sg
-        self.dynpath = self.path_lrgsg
-        super(BinDynSys, self).__init__(self.sg, **kwargs)
+        super().__init__(sg, **kwargs)
 
     def ds1step(self, nd: int):
         nodedict = dict(self.sg.H[nd])
@@ -19,7 +17,7 @@ class SignedRW(BinDynSys):
     def run_py(self):
         dsNstep = self.dsNstep()
         nodes = list(self.sg.H.nodes())
-        for _ in range(self.simtime):
+        for _ in range(self.steps):
             smp = random.sample(nodes, self.sg.N)
             self.s_t.append(self.s.copy())
             # self.ds1step(np.random.randint(self.sg.N))
