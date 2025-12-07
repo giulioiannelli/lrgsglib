@@ -874,6 +874,12 @@ class SignedGraph:
     from ._spectral import make_adj_eigV_transposed
     from ._spectral import make_adj_eigV_column_major
     #
+    # quantum propagator methods (imported from ._spectral)
+    #
+    from ._spectral import compute_quantum_propagator
+    from ._spectral import quantum_walk_probabilities
+    from ._spectral import quantum_observables_time_series
+    #
     # information theory tools (imported from ._infotheory)
     #
     from ._infotheory import compute_signed_laplacian_entropy

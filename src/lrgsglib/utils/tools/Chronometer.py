@@ -47,20 +47,45 @@ class Chronometer:
             formatted_line = f"{name:<25} {data['total_time']:<20.4g} {data['count']:<10} {average_time:<20.4g}"
             print(formatted_line)
 
-def time_function_accumulate(func):
-    def wrapper(*args, **kwargs):
-        # Create a new chronometer instance for the function
-        chrono = Chronometer(func.__name__)
-        chronometer_instances[func.__name__] = chrono
-        
-        # Execute the function
-        result = func(*args, **kwargs)
-        
-        # End the chronometer
-        chrono.end()
-        
-        return result
-    return wrapper
+def time_function_accumulate(func=None, *, auto_log=False):
+    """Decorator to accumulate timing data for a function.
+
+    Can be used with or without parameters:
+        @time_function_accumulate
+        def my_func(): ...
+
+        @time_function_accumulate(auto_log=True)
+        def my_func(): ...
+
+    Parameters
+    ----------
+    func : callable, optional
+        The function to decorate (provided when used without parentheses)
+    auto_log : bool, optional
+        If True, print timing info immediately after each call (default: False)
+    """
+    def decorator(f):
+        def wrapper(*args, **kwargs):
+            # Create a new chronometer instance for the function
+            chrono = Chronometer(f.__name__, auto_print=auto_log)
+            chronometer_instances[f.__name__] = chrono
+
+            # Execute the function
+            result = f(*args, **kwargs)
+
+            # End the chronometer
+            chrono.end()
+
+            return result
+        return wrapper
+
+    # Handle both @time_function_accumulate and @time_function_accumulate(...)
+    if func is None:
+        # Called with parentheses: @time_function_accumulate(auto_log=True)
+        return decorator
+    else:
+        # Called without parentheses: @time_function_accumulate
+        return decorator(func)
 
 def print_accumulated_timings():
     print("\nSummary of accumulated function timings:")
