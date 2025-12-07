@@ -30,6 +30,7 @@ from ...utils.lrg import compute_ising_pairwise_energy
 from ...utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 from ...utils.tools import NestedDict, ConditionalPartitioning
 from ...utils.tools.ConditionalPartitioning import ConditionalPartitioningInput
+from ._backend import Backend, BackendManager, ArrayBackend
 #
 logger = logging.getLogger(__name__)
 
@@ -230,29 +231,30 @@ class SignedGraph:
     #
     def __init__(
         self,
-        G: Graph, 
+        G: Graph,
         pflip: float = SG_PFLIP,
         on_g: str = SG_REPR,
         seed: Optional[int] = None,
         path_data: Optional[Path] = None,
         path_plot: Optional[Path] = None,
         init_nw_dict: bool = SG_INIT_NW_DICT,
-        init_weights_val: Union[float, dict] = SG_INIT_WVAL,
+        init_weights_val: Union[float, Dict[str, float]] = SG_INIT_WVAL,
         export_mode: str = SG_EXPORT_M,
         make_dir_tree: bool = True,
         imported: bool = SG_IMPORT_ON,
         import_fname: str = '',
         import_mode: str = SG_LOAD_M,
-    ):
+        backend: Union[str, Backend] = Backend.NUMPY,
+    ) -> None:
         """
         Initialize a SignedGraph instance.
-        
+
         Parameters
         ----------
         G : Graph
             A NetworkX graph object to be used as the base graph.
         pflip : float, default SG_PFLIP
-            Probability of flipping edges to negative weights.
+            Probability of flipping edges to negative weights (0.0 to 1.0).
         on_g : str, default SG_REPR
             Primary graph representation identifier.
         seed : int, optional
@@ -263,7 +265,7 @@ class SignedGraph:
             Base path for plot storage. Defaults to global PATHPLOT.
         init_nw_dict : bool, default SG_INIT_NW_DICT
             Whether to initialize the network dictionary container.
-        init_weights_val : Union[float, dict], default SG_INIT_WVAL
+        init_weights_val : Union[float, Dict[str, float]], default SG_INIT_WVAL
             Initial edge weight value(s) for new graphs.
         export_mode : str, default SG_EXPORT_M
             Export mode for graph data (currently unused in init).
@@ -275,23 +277,30 @@ class SignedGraph:
             Filename to load graph from (if imported=True).
         import_mode : str, default SG_LOAD_M
             Mode for loading graph data.
-            
+        backend : Union[str, Backend], default Backend.NUMPY
+            Computational backend for array operations. Can be 'numpy', 'scipy',
+            'cupy', or a Backend enum value. CuPy enables GPU acceleration.
+
         Notes
         -----
         Initialization follows these steps:
-        1. Initialize core data structures (edge sets, mappings)
-        2. Validate pflip and set up randomness
-        3. Ensure required attributes for subclass compatibility
-        4. Initialize file paths and directory structure
-        5. Set configuration parameters
-        6. Load or assign the base graph
-        7. Initialize graph representations
-        8. Set up signed graph structure (unless only_const_mode)
-        9. Optionally initialize network dictionary and clustering utility
-        
-        Subclasses (topology wrappers) may set attributes like `std_fname`, 
+        1. Initialize backend for numerical computations
+        2. Initialize core data structures (edge sets, mappings)
+        3. Validate pflip and set up randomness
+        4. Ensure required attributes for subclass compatibility
+        5. Initialize file paths and directory structure
+        6. Set configuration parameters
+        7. Load or assign the base graph
+        8. Initialize graph representations
+        9. Set up signed graph structure (unless only_const_mode)
+        10. Optionally initialize network dictionary and clustering utility
+
+        Subclasses (topology wrappers) may set attributes like `std_fname`,
         `only_const_mode`, and `nwContainer` before calling this constructor.
         """
+        # Initialize backend for numerical computations
+        self._init_backend(backend)
+
         # Initialize core data structures
         self.graph_representation_dictionary = {}
         self.map_node = {}
@@ -363,6 +372,29 @@ class SignedGraph:
             
             # Initialize clustering utility
             self.__init_graph_clustering_utility__()
+
+    def _init_backend(self, backend: Union[str, Backend]) -> None:
+        """
+        Initialize the computational backend for array operations.
+
+        Parameters
+        ----------
+        backend : Union[str, Backend]
+            Backend specification. Can be 'numpy', 'scipy', 'cupy', or a Backend enum value.
+
+        Notes
+        -----
+        The backend is stored in two forms:
+        - self._backend: The ArrayBackend instance for numerical operations
+        - self._backend_name: String name of the backend ('numpy', 'scipy', or 'cupy')
+
+        CuPy backend requires CUDA-capable GPU and CuPy installation.
+        If CuPy is requested but unavailable, falls back to NumPy with warning.
+        """
+        # Store backend instance for numerical operations
+        self._backend: ArrayBackend = BackendManager.get_backend(backend, fallback=True)
+        self._backend_name: str = self._backend.name
+
     #
     @property
     def adj(self):
