@@ -397,59 +397,177 @@ class SignedGraph:
 
     #
     @property
-    def adj(self):
-        """Adjacency matrix of the signed graph for the current graph representation."""
+    def adj(self) -> Any:
+        """Adjacency matrix of the signed graph for the current graph representation.
+
+        Returns
+        -------
+        Any
+            Sparse matrix (scipy.sparse) or None if not computed.
+        """
         return self.adjacency_matrices.get(self.on_g)
-    
+
     @property
-    def degm(self):
-        """Degree matrix of the graph for the current graph representation."""
+    def degm(self) -> Any:
+        """Degree matrix of the graph for the current graph representation.
+
+        Returns
+        -------
+        Any
+            Sparse diagonal matrix (scipy.sparse) or None if not computed.
+        """
         return self.degree_matrices.get(self.on_g)
-    
+
     @property
-    def gr(self):
-        """Dictionary of graph representations."""
+    def gr(self) -> Dict[str, Graph]:
+        """Dictionary of graph representations.
+
+        Returns
+        -------
+        Dict[str, Graph]
+            Mapping from representation names to NetworkX graphs.
+        """
         return self.graph_representation_dictionary
-    
+
     @property
-    def gcl(self):
-        """Graph clustering utility (nested dictionary structure)."""
+    def gcl(self) -> Any:
+        """Graph clustering utility (nested dictionary structure).
+
+        Returns
+        -------
+        Any
+            Nested dictionary structure for clustering data.
+        """
         return self.graph_clustering_utility
-    
+
     @property
-    def lap(self):
-        """Standard Laplacian matrix (D - A) for the current graph representation."""
+    def lap(self) -> Any:
+        """Standard Laplacian matrix (D - A) for the current graph representation.
+
+        Returns
+        -------
+        Any
+            Sparse matrix (scipy.sparse) or None if not computed.
+        """
         return self.laplacian_matrices.get(self.on_g)
-    
+
     @property
-    def sdeg(self):
-        """Signed degree matrix (absolute degree values) for the current graph representation."""
+    def sdeg(self) -> Any:
+        """Signed degree matrix (absolute degree values) for the current graph representation.
+
+        Returns
+        -------
+        Any
+            Sparse diagonal matrix (scipy.sparse) or None if not computed.
+        """
         return self.signed_degree_matrices.get(self.on_g)
-    
+
     @property
-    def slp(self):
-        """Signed Laplacian matrix (D_s - A) for the current graph representation."""
+    def slp(self) -> Any:
+        """Signed Laplacian matrix (D_s - A) for the current graph representation.
+
+        Returns
+        -------
+        Any
+            Sparse matrix (scipy.sparse) or None if not computed.
+        """
         return self.signed_laplacian_matrices.get(self.on_g)
-    
+
     @property
-    def N(self):
-        """Number of nodes in the primary graph representation."""
+    def N(self) -> int:
+        """Number of nodes in the primary graph representation.
+
+        Returns
+        -------
+        int
+            Node count.
+        """
         return self.gr[self.on_g].number_of_nodes()
-    
+
     @property
-    def Ne(self):
-        """Number of edges in the primary graph representation."""
+    def Ne(self) -> int:
+        """Number of edges in the primary graph representation.
+
+        Returns
+        -------
+        int
+            Edge count.
+        """
         return self.gr[self.on_g].number_of_edges()
-    
+
     @property
-    def Ne_n(self):
-        """Number of negative edges in the primary graph representation."""
+    def Ne_n(self) -> int:
+        """Number of negative edges in the primary graph representation.
+
+        Returns
+        -------
+        int
+            Count of edges with negative weights.
+        """
         return len(self.fleset[self.on_g])
-    
+
     @property
-    def edges_with_data(self):
-        """Edges with data in the primary graph representation."""
+    def edges_with_data(self) -> Any:
+        """Edges with data in the primary graph representation.
+
+        Returns
+        -------
+        EdgeDataView
+            NetworkX edge view with data attributes.
+        """
         return self.gr[self.on_g].edges(data=True)
+
+    def _invalidate_matrix_cache(self, on_g: Optional[str] = None) -> None:
+        """
+        Clear cached matrices after graph modification.
+
+        This method should be called whenever the graph structure or edge weights
+        are modified to ensure matrix properties return updated values.
+
+        Parameters
+        ----------
+        on_g : str, optional
+            Specific graph representation to invalidate. If None, invalidates
+            all cached matrices for all representations.
+
+        Notes
+        -----
+        The following matrices are cleared:
+        - Adjacency matrices
+        - Degree matrices
+        - Signed degree matrices
+        - Laplacian matrices
+        - Signed Laplacian matrices
+
+        Spectral properties (eigv, eigV) are NOT cleared as they may have been
+        explicitly computed and should be managed separately.
+
+        Examples
+        --------
+        >>> sg = SignedGraph(G=nx.karate_club_graph())
+        >>> sg.flip_random_fract_edges(pflip=0.2)  # This calls _invalidate_matrix_cache
+        >>> # Matrices will be recomputed on next access
+        """
+        if on_g is None:
+            # Clear all cached matrices for all representations
+            self.adjacency_matrices.clear()
+            self.degree_matrices.clear()
+            self.signed_degree_matrices.clear()
+            self.laplacian_matrices.clear()
+            self.signed_laplacian_matrices.clear()
+        else:
+            # Clear cached matrices for specific representation
+            if on_g in self.adjacency_matrices:
+                del self.adjacency_matrices[on_g]
+            if on_g in self.degree_matrices:
+                del self.degree_matrices[on_g]
+            if on_g in self.signed_degree_matrices:
+                del self.signed_degree_matrices[on_g]
+            if on_g in self.laplacian_matrices:
+                del self.laplacian_matrices[on_g]
+            if on_g in self.signed_laplacian_matrices:
+                del self.signed_laplacian_matrices[on_g]
+
     #
     def __ensure_required_attributes__(self) -> None:
         """

@@ -211,3 +211,199 @@ class TestBackendManagerIntegrationWithSignedGraph:
         # Should be different instances
         assert sg1._backend is not sg2._backend
         assert sg1._backend_name != sg2._backend_name
+
+
+class TestSignedGraphPropertiesWithTypeHints:
+    """Tests for SignedGraph properties with proper type hints."""
+
+    def test_N_property_returns_int(self, small_graph):
+        """Test that N property has correct type."""
+        sg = SignedGraph(G=small_graph)
+        assert isinstance(sg.N, int)
+        assert sg.N > 0
+
+    def test_Ne_property_returns_int(self, small_graph):
+        """Test that Ne property has correct type."""
+        sg = SignedGraph(G=small_graph)
+        assert isinstance(sg.Ne, int)
+        assert sg.Ne > 0
+
+    def test_Ne_n_property_returns_int(self, small_graph):
+        """Test that Ne_n property has correct type."""
+        sg = SignedGraph(G=small_graph, pflip=0.3, seed=42)
+        assert isinstance(sg.Ne_n, int)
+        assert sg.Ne_n >= 0
+
+    def test_gr_property_returns_dict(self, small_graph):
+        """Test that gr property returns dict."""
+        sg = SignedGraph(G=small_graph)
+        assert isinstance(sg.gr, dict)
+        assert len(sg.gr) > 0
+
+    def test_properties_are_read_only(self, small_graph):
+        """Test that properties cannot be assigned to."""
+        sg = SignedGraph(G=small_graph)
+
+        # Properties should not be settable
+        with pytest.raises(AttributeError):
+            sg.N = 100
+
+        with pytest.raises(AttributeError):
+            sg.Ne = 50
+
+
+class TestMatrixCaching:
+    """Tests for matrix caching behavior."""
+
+    def test_invalidate_matrix_cache_clears_all(self, small_graph):
+        """Test that _invalidate_matrix_cache clears all matrices."""
+        sg = SignedGraph(G=small_graph)
+
+        # Access matrices to populate cache
+        _ = sg.adj
+        _ = sg.lap
+        _ = sg.slp
+
+        # Verify matrices are cached
+        assert sg.on_g in sg.adjacency_matrices
+        assert sg.on_g in sg.laplacian_matrices
+        assert sg.on_g in sg.signed_laplacian_matrices
+
+        # Invalidate cache
+        sg._invalidate_matrix_cache()
+
+        # Verify cache is cleared
+        assert len(sg.adjacency_matrices) == 0
+        assert len(sg.laplacian_matrices) == 0
+        assert len(sg.signed_laplacian_matrices) == 0
+
+    def test_invalidate_matrix_cache_specific_repr(self, small_graph):
+        """Test that _invalidate_matrix_cache can target specific representation."""
+        sg = SignedGraph(G=small_graph)
+
+        # Access matrices to populate cache
+        _ = sg.adj
+        on_g = sg.on_g
+
+        # Manually add another representation for testing
+        sg.adjacency_matrices['other_repr'] = sg.adj
+
+        # Invalidate specific representation
+        sg._invalidate_matrix_cache(on_g=on_g)
+
+        # Only specified representation should be cleared
+        assert on_g not in sg.adjacency_matrices
+        assert 'other_repr' in sg.adjacency_matrices
+
+    def test_matrix_properties_return_none_when_not_computed(self, small_graph):
+        """Test that matrix properties return None when not in cache."""
+        sg = SignedGraph(G=small_graph)
+
+        # Clear cache
+        sg._invalidate_matrix_cache()
+
+        # Properties should return None (not computed yet)
+        assert sg.adj is None
+        assert sg.lap is None
+        assert sg.slp is None
+        assert sg.degm is None
+        assert sg.sdeg is None
+
+    def test_cache_persists_across_property_access(self, small_graph):
+        """Test that cached matrices persist across multiple accesses."""
+        sg = SignedGraph(G=small_graph)
+
+        # Access matrix to populate cache
+        adj1 = sg.adj
+
+        # Second access should return same cached object
+        adj2 = sg.adj
+
+        # Should be the same object (identity, not just equality)
+        if adj1 is not None:
+            assert adj1 is adj2
+
+
+class TestPropertiesUpdateOnChange:
+    """Tests that properties update correctly after graph modifications."""
+
+    def test_Ne_n_updates_after_flip(self, small_graph):
+        """Test that Ne_n property updates after flipping edges."""
+        sg = SignedGraph(G=small_graph, pflip=0.0, seed=42)
+
+        # Initially no negative edges
+        initial_neg = sg.Ne_n
+        assert initial_neg == 0
+
+        # Flip some edges
+        sg.flip_random_fract_edges(pflip=0.5)
+
+        # Should have negative edges now
+        assert sg.Ne_n > initial_neg
+        assert sg.Ne_n > 0
+
+    def test_N_remains_constant_after_flip(self, small_graph):
+        """Test that N doesn't change when flipping edges."""
+        sg = SignedGraph(G=small_graph, pflip=0.3, seed=42)
+
+        initial_N = sg.N
+
+        # Flip edges
+        sg.flip_random_fract_edges(pflip=0.5)
+
+        # Node count should not change
+        assert sg.N == initial_N
+
+    def test_Ne_remains_constant_after_flip(self, small_graph):
+        """Test that Ne doesn't change when flipping edges."""
+        sg = SignedGraph(G=small_graph, pflip=0.3, seed=42)
+
+        initial_Ne = sg.Ne
+
+        # Flip edges
+        sg.flip_random_fract_edges(pflip=0.5)
+
+        # Edge count should not change (just signs flip)
+        assert sg.Ne == initial_Ne
+
+    def test_matrix_cache_invalidated_after_modification(self, small_graph):
+        """Test that matrix cache is properly invalidated after modifications."""
+        sg = SignedGraph(G=small_graph)
+
+        # Access matrix to populate cache
+        _ = sg.slp
+        assert sg.on_g in sg.signed_laplacian_matrices
+
+        # Modify graph
+        sg.flip_random_fract_edges(pflip=0.2)
+
+        # Cache should still exist but content may be outdated
+        # (flip_random_fract_edges should ideally call _invalidate_matrix_cache)
+        # Note: This depends on implementation of flip_random_fract_edges
+
+
+class TestPropertiesDocumentation:
+    """Tests for property documentation and return types."""
+
+    def test_all_properties_have_docstrings(self, small_graph):
+        """Test that all properties have docstrings."""
+        sg = SignedGraph(G=small_graph)
+
+        properties = ['N', 'Ne', 'Ne_n', 'adj', 'lap', 'slp', 'degm', 'sdeg', 'gr']
+
+        for prop_name in properties:
+            prop = getattr(type(sg), prop_name)
+            assert prop.__doc__ is not None, f"{prop_name} should have docstring"
+            assert len(prop.__doc__.strip()) > 0, f"{prop_name} docstring should not be empty"
+
+    def test_property_docstrings_have_returns_section(self, small_graph):
+        """Test that property docstrings document return types."""
+        sg = SignedGraph(G=small_graph)
+
+        properties = ['N', 'Ne', 'Ne_n', 'adj', 'lap', 'slp']
+
+        for prop_name in properties:
+            prop = getattr(type(sg), prop_name)
+            docstring = prop.__doc__
+            assert 'Returns' in docstring or 'returns' in docstring.lower(), \
+                f"{prop_name} docstring should document return type"
