@@ -358,12 +358,20 @@ class CupyBackend:
     @classmethod
     def eigvalsh(cls, a: Any) -> Any:
         cp = cls._get_cp()
-        return cp.linalg.eigvalsh(a)
+        # Convert to CuPy array if needed
+        a_gpu = cp.asarray(a)
+        eigvals = cp.linalg.eigvalsh(a_gpu)
+        # Return as NumPy array for consistency
+        return cp.asnumpy(eigvals)
 
     @classmethod
     def eigh(cls, a: Any) -> tuple[Any, Any]:
         cp = cls._get_cp()
-        return cp.linalg.eigh(a)
+        # Convert to CuPy array if needed
+        a_gpu = cp.asarray(a)
+        eigvals, eigvecs = cp.linalg.eigh(a_gpu)
+        # Return as NumPy arrays for consistency
+        return cp.asnumpy(eigvals), cp.asnumpy(eigvecs)
 
     @classmethod
     def to_numpy(cls, a: Any) -> np.ndarray:

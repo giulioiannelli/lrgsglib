@@ -81,7 +81,8 @@ def compute_laplacian_spectrum(self: "SignedGraph", typf: type = np.float64):
     >>> compute_laplacian_spectrum(graph, typf=np.float32)
     """
     lapl_arr = self.slp.astype(typf).todense()
-    self.eigv = np.linalg.eigvalsh(lapl_arr)
+    # Use backend for eigenvalue computation (supports numpy/scipy/cupy)
+    self.eigv = self._backend.eigvalsh(lapl_arr)
 #
 def compute_k_eigvV(
     self: "SignedGraph",
@@ -197,7 +198,7 @@ def compute_k_adj_eigvV(
 #
 def compute_laplacian_spectrum_weigV(
     self: "SignedGraph",
-    backend: str = 'numpy',
+    backend: Optional[str] = None,
     transpose: bool = True,
     flip_to_pos: bool = True,
     typf: type = np.float64
@@ -211,10 +212,10 @@ def compute_laplacian_spectrum_weigV(
     
     Parameters
     ----------
-    backend : str, default 'numpy'
-        Backend to use for computation:
-        - 'numpy': Use numpy.linalg.eigh (CPU, dense)
-        - 'cupy': Use cupy.linalg.eigh (GPU, requires cupy installed)
+    backend : str, optional
+        Backend to use for computation. If None (default), uses self._backend
+        set during initialization. Supported: 'numpy', 'scipy', 'cupy'.
+        For backward compatibility, you can override the instance backend.
     transpose : bool, default True
         If True, eigenvectors stored as row-major (M×N) where M is number
         of eigenvectors and N is vector length. Access as self.eigV[i].
@@ -311,20 +312,19 @@ def compute_laplacian_spectrum_weigV(
             make_eigV_column_major(self)
         return
 
-    match backend:
-        case 'cupy':
-            try:
-                import cupy as cp
-                slp = cp.asarray(self.slp.astype(typf).toarray())
-                self.eigv, self.eigV = cp.linalg.eigh(slp)
-                self.eigv, self.eigV = self.eigv.get(), self.eigV.get()
-            except ImportError:
-                logger.warning("cupy not available, falling back to numpy backend.")
-                slp = self.slp.astype(typf).toarray()
-                self.eigv, self.eigV = np.linalg.eigh(slp)
-        case 'numpy' | _:
-            slp = self.slp.astype(typf).toarray()
-            self.eigv, self.eigV = np.linalg.eigh(slp)
+    # Use instance backend if not explicitly specified
+    if backend is None:
+        backend_obj = self._backend
+    else:
+        # Allow override for backward compatibility
+        from ._backend import BackendManager
+        backend_obj = BackendManager.get_backend(backend, fallback=True)
+
+    # Convert sparse matrix to dense array for eigendecomposition
+    slp = self.slp.astype(typf).toarray()
+
+    # Compute eigenvalues and eigenvectors using backend
+    self.eigv, self.eigV = backend_obj.eigh(slp)
 
     if flip_to_pos:
         self.eigV = flip_to_positive_majority_adapted(self.eigV, axis=0)
@@ -336,7 +336,7 @@ def compute_laplacian_spectrum_weigV(
 
 def compute_adjacency_spectrum_weigV(
     self: "SignedGraph",
-    backend: str = 'numpy',
+    backend: Optional[str] = None,
     transpose: bool = True,
     flip_to_pos: bool = True,
     typf: type = np.float64
@@ -346,8 +346,9 @@ def compute_adjacency_spectrum_weigV(
 
     Parameters
     ----------
-    backend : str, default 'numpy'
-        Backend to use for computation: 'numpy' or 'cupy'.
+    backend : str, optional
+        Backend to use for computation. If None (default), uses self._backend.
+        Supported: 'numpy', 'scipy', 'cupy'.
     transpose : bool, default True
         If True, eigenvectors stored as row-major (M×N). If False, column-major.
     flip_to_pos : bool, default True
@@ -381,27 +382,20 @@ def compute_adjacency_spectrum_weigV(
             make_adj_eigV_column_major(self)
         return
 
-    def _dense_adj():
-        adj_matrix = self.adj.astype(typf)
-        return adj_matrix.toarray() if hasattr(adj_matrix, "toarray") else np.asarray(adj_matrix, dtype=typf)
+    # Use instance backend if not explicitly specified
+    if backend is None:
+        backend_obj = self._backend
+    else:
+        # Allow override for backward compatibility
+        from ._backend import BackendManager
+        backend_obj = BackendManager.get_backend(backend, fallback=True)
 
-    match backend:
-        case 'cupy':
-            try:
-                import cupy as cp
-                dense_adj = _dense_adj()
-                adj_gpu = cp.asarray(dense_adj)
-                eigv, eigV = cp.linalg.eigh(adj_gpu)
-                self.adj_eigv, self.adj_eigV = eigv.get(), eigV.get()
-            except ImportError:
-                logger.warning(
-                    "cupy not available, falling back to numpy backend for adjacency spectrum."
-                )
-                dense_adj = _dense_adj()
-                self.adj_eigv, self.adj_eigV = np.linalg.eigh(dense_adj)
-        case 'numpy' | _:
-            dense_adj = _dense_adj()
-            self.adj_eigv, self.adj_eigV = np.linalg.eigh(dense_adj)
+    # Convert adjacency matrix to dense array
+    adj_matrix = self.adj.astype(typf)
+    dense_adj = adj_matrix.toarray() if hasattr(adj_matrix, "toarray") else np.asarray(adj_matrix, dtype=typf)
+
+    # Compute eigenvalues and eigenvectors using backend
+    self.adj_eigv, self.adj_eigV = backend_obj.eigh(dense_adj)
 
     if flip_to_pos:
         self.adj_eigV = flip_to_positive_majority_adapted(self.adj_eigV, axis=0)
