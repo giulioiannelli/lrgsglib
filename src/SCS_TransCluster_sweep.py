@@ -32,13 +32,14 @@ from lrgsglib.utils.basic.paths import remove_if_exists
 from lrgsglib.utils.tools import ConditionalPartitioning
 
 
-def _single_average_worker(task: tuple[dict, str, type, str, int | None]) -> np.ndarray:
+def _single_average_worker(task: tuple[dict, str, type, str, int | None, bool]) -> np.ndarray:
     """Compute one average sample and return [smax, smax2, gap, ediff]."""
-    param_kwargs, backend, float_type, partition_rule, seed = task
+    param_kwargs, backend, float_type, partition_rule, seed, use_edge_sign = task
     params = SCSParameters(seed=seed, **param_kwargs)
     partitioner = ConditionalPartitioning(partition_rule)
     gap, cluster_fraction, energy_diff = _compute_order_parameters(
-        params, backend=backend, float_type=float_type, partitioner=partitioner
+        params, backend=backend, float_type=float_type, partitioner=partitioner,
+        use_edge_sign_clustering=use_edge_sign
     )
     smax = cluster_fraction
     return np.array([smax, smax * smax, gap, energy_diff], dtype=float)
@@ -87,6 +88,7 @@ def _process_point(
     nproc: int,
     combo_seed: int | None,
     verbose: bool,
+    use_edge_sign_clustering: bool,
     pbar=None,
 ) -> None:
     params = SCSParameters(seed=None, **param_kwargs)
@@ -149,7 +151,7 @@ def _process_point(
     tasks = []
     for _ in range(remaining):
         sample_seed = int(rng.integers(0, 2**32))
-        tasks.append((param_kwargs, backend, float_type, partition_rule, sample_seed))
+        tasks.append((param_kwargs, backend, float_type, partition_rule, sample_seed, use_edge_sign_clustering))
 
     if nproc <= 1 or remaining == 1:
         iterator = map(_single_average_worker, tasks)
@@ -193,6 +195,7 @@ def run_batch(
     seed: int | None,
     verbose: bool,
     progress: bool = True,
+    use_edge_sign_clustering: bool = False,
 ) -> None:
     backend_resolved = _resolve_backend_with_fallback(backend)
     float_type_resolved = resolve_float_type(float_type)
@@ -232,6 +235,7 @@ def run_batch(
             nproc=effective_nproc,
             combo_seed=combo_seed,
             verbose=verbose,
+            use_edge_sign_clustering=use_edge_sign_clustering,
             pbar=pbar,
         )
         if pbar:

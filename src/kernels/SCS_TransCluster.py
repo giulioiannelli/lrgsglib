@@ -28,17 +28,84 @@ def _compute_order_parameters(
     float_type: type,
     partitioner: ConditionalPartitioning,
     seed: int | None = None,
+    use_edge_sign_clustering: bool = False,
 ) -> tuple[float, float, float]:
+    """Compute order parameters for SCS networks.
+
+    Parameters
+    ----------
+    params : SCSParameters
+        SCS model parameters
+    backend : str
+        Computation backend ('numpy' or 'cupy')
+    float_type : type
+        Float precision type
+    partitioner : ConditionalPartitioning
+        Partition rule for eigenvector thresholding
+    seed : int | None
+        Random seed for this realization
+    use_edge_sign_clustering : bool, default False
+        If True, use edge-sign-aware clustering: only consider positive-weight edges
+        when finding connected components. If False (default), use topology-based
+        clustering that ignores edge weights.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        (gap, cluster_fraction, energy_diff)
+    """
     # build_scs_kwargs will use the provided seed if given, otherwise params.seed
     kwargs = build_scs_kwargs(params, make_dir_tree=False, seed=seed)
     scs = SCSGeneralizedNN(**kwargs)
     scs.compute_laplacian_spectrum_weigV(backend=backend, typf=float_type)
     scs.load_eigV_on_graph(which=0, binarize=False)
-    scs.make_eigVclustersYN(val=partitioner, which=0, binarize=True)
-    scs.compute_pinf(which=0, val=partitioner)
+
+    if use_edge_sign_clustering:
+        # Edge-sign-aware clustering: filter by edge weight sign
+        import networkx as nx
+
+        # Get the graph and partition condition
+        G = scs.gr['G']
+        predicate = partitioner.cond_func
+
+        # Get nodes with eigenvector values satisfying the partition condition
+        nodes_selected = [
+            node for node in G.nodes()
+            if predicate(G.nodes[node].get('eigV0', 0))
+        ]
+
+        if not nodes_selected:
+            cluster_fraction = 0.0
+        else:
+            # Create subgraph with only selected nodes
+            subgraph = G.subgraph(nodes_selected)
+
+            # Filter to keep only POSITIVE weight edges (excluding self-loops)
+            positive_edges = [
+                (u, v) for u, v, data in subgraph.edges(data=True)
+                if u != v and data.get('weight', 0) > 0
+            ]
+
+            if not positive_edges:
+                # No positive edges -> isolated nodes
+                cluster_fraction = 1.0 / scs.N if nodes_selected else 0.0
+            else:
+                # Create graph with only positive edges
+                G_positive = nx.Graph()
+                G_positive.add_nodes_from(nodes_selected)
+                G_positive.add_edges_from(positive_edges)
+
+                # Find connected components
+                components = list(nx.connected_components(G_positive))
+                largest_component_size = max(len(comp) for comp in components)
+                cluster_fraction = largest_component_size / scs.N
+    else:
+        # Original topology-based clustering (default behavior)
+        scs.make_eigVclustersYN(val=partitioner, which=0, binarize=True)
+        scs.compute_pinf(which=0, val=partitioner)
+        cluster_fraction = scs.Pinf
 
     gap = scs.get_gap()
-    cluster_fraction = scs.Pinf
     energy0 = scs.get_sksph_energy_eigV(0)
     energy1 = scs.get_sksph_energy_eigV(1)
     return gap, cluster_fraction, energy0 - energy1
