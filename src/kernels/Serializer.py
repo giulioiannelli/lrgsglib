@@ -103,25 +103,44 @@ def _determine_precision(values: list[float]) -> int:
     Determine the minimum number of decimal places needed to distinguish all values.
     Returns the number of decimal places needed.
     """
-    if len(values) <= 1:
-        # For single value or empty, use minimal precision
+    if not values:
         return 2
+
+    # Determine intrinsic precision from the values themselves
+    # by checking how many decimal places are present in the string representation
+    intrinsic_precision = 2
+    for val in values:
+        # Convert to string and count decimal places
+        val_str = f"{val:.15g}"  # Use general format to avoid trailing zeros
+        if '.' in val_str:
+            decimal_part = val_str.split('.')[1]
+            # Remove scientific notation if present
+            if 'e' in decimal_part.lower():
+                decimal_part = decimal_part.split('e')[0]
+            intrinsic_precision = max(intrinsic_precision, len(decimal_part))
+
+    if len(values) <= 1:
+        # For single value, use its intrinsic precision
+        return min(intrinsic_precision, 8)
 
     # Sort values to find minimum differences
     sorted_vals = sorted(set(values))
     if len(sorted_vals) == 1:
-        return 2
+        return min(intrinsic_precision, 8)
 
     # Find the minimum difference between consecutive values
     min_diff = min(abs(sorted_vals[i+1] - sorted_vals[i]) for i in range(len(sorted_vals) - 1))
 
     # Determine precision needed: we need enough decimals so that min_diff is distinguishable
     if min_diff == 0:
-        return 2
+        return min(intrinsic_precision, 8)
 
     # Calculate how many decimal places we need
     # We want at least 2 significant digits in the minimum difference
     precision = max(2, int(np.ceil(-np.log10(min_diff) + 1)))
+
+    # Use the maximum of intrinsic precision and distinction precision
+    precision = max(precision, intrinsic_precision)
 
     # Cap at reasonable maximum
     return min(precision, 8)
