@@ -98,6 +98,8 @@ def main() -> None:
         final_cmd = cmd
         if use_slanzarv:
             slanz_opts = ["-m", str(memoryfunc(L))]
+            slanz_opts.extend(["--output", ".log/%x_%j.out"])
+            slanz_opts.extend(["--error", ".log/%x_%j.err"])
             if args.nomail:
                 slanz_opts.append("--nomail")
             if args.short:
