@@ -98,8 +98,6 @@ def main() -> None:
         final_cmd = cmd
         if use_slanzarv:
             slanz_opts = ["-m", str(memoryfunc(L))]
-            slanz_opts.extend(["--output", ".log/%x_%j.out"])
-            slanz_opts.extend(["--error", ".log/%x_%j.err"])
             if args.nomail:
                 slanz_opts.append("--nomail")
             if args.short:
@@ -125,7 +123,14 @@ def main() -> None:
             )
             slanz_opts.extend(["--jobname", jobname])
 
-            final_cmd = ["slanzarv", *slanz_opts, *cmd]
+            # Pass sbatch options after -- separator
+            sbatch_opts = [
+                "--",
+                "--output=.log/%x_%j.out",
+                "--error=.log/%x_%j.err",
+            ]
+
+            final_cmd = ["slanzarv", *slanz_opts, *sbatch_opts, *cmd]
 
         if print_bool:
             print(" ".join(final_cmd))
