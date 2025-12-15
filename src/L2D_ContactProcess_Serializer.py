@@ -123,14 +123,14 @@ def main() -> None:
             )
             slanz_opts.extend(["--jobname", jobname])
 
-            # Pass sbatch options after -- separator
-            sbatch_opts = [
-                "--",
+            # Pass sbatch options before -- separator
+            slanz_opts.extend([
                 "--output=.log/%x_%j.out",
                 "--error=.log/%x_%j.err",
-            ]
+                "--",
+            ])
 
-            final_cmd = ["slanzarv", *slanz_opts, *sbatch_opts, *cmd]
+            final_cmd = ["slanzarv", *slanz_opts, *cmd]
 
         if print_bool:
             print(" ".join(final_cmd))
