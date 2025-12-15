@@ -81,7 +81,8 @@ def run_contact_process(args: Any, signed_graph: SignedGraph):
     cp_cls = ContactProcessEI if dynamics == "EI" else ContactProcessSIR
     cp = cp_cls(signed_graph, **contact_kwargs)
     cp.init_contact_dynamics()
-    cp.run(verbose=args.verbose, clean_export=args.remove_files)
+    # Disable cleanup during run; explicit cleanup happens after processing
+    cp.run(verbose=args.verbose, clean_export=False)
     return cp
 
 

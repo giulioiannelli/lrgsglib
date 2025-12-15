@@ -71,19 +71,14 @@ def _post_process_EI_C1c(runinfos: list[RunInfo], args) -> None:
         concat.tofile(out_path)
 
 
-def _post_process_default(cps: list, args) -> None:
+def _post_process_default(cp, args) -> None:
     """Default post-processor for non-specialised backends.
 
-    Currently this performs a best-effort per-run cleanup by delegating to
-    `clean_up_files`. Keeping this as a separate function makes it easy to
-    replace with aggregation logic for other dynamics/runlang combinations
-    in the future.
+    This is a placeholder for future aggregation logic for other
+    dynamics/runlang combinations. Cleanup is handled separately in the
+    main simulation loop.
     """
-    for cp in cps:
-        try:
-            clean_up_files(cp, cp.sg, remove_stderr=True)
-        except Exception:
-            pass
+    pass
 
 
 def _prepare_lattice(args):
@@ -192,10 +187,11 @@ def run_simulation(args):
         cp = run_contact_process(args, lattice)
         setattr(args, '_current_average', i)
         _process_cp(cp, args)
-        try:
-            clean_up_files(cp, cp.sg, remove_stderr=True)
-        except Exception:
-            pass
+        if args.remove_files:
+            try:
+                clean_up_files(cp, cp.sg, remove_stderr=True)
+            except Exception:
+                pass
 
         # Check early stopping condition after minimum runs
         if early_stop_threshold is not None and i >= min_runs_before_check:
