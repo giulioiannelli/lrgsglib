@@ -11,6 +11,8 @@ from kernels.Serializer import (
     _format_value_consistently,
     _collect_values,
     _collect_values_typed,
+    build_slanzarv_command,
+    format_slanzarv_command,
 )
 from parsers.SCS_TransCluster_Serializer import parser, SCS_TransCluster_progName, SCS_TransCluster_progNameShrt
 from lrgsglib.config.progargs import (
@@ -132,10 +134,13 @@ def main() -> None:
             )
             slanz_opts.extend(["--jobname", jobname])
 
-            final_cmd = ["slanzarv", *slanz_opts, *cmd]
+            final_cmd = build_slanzarv_command(slanz_opts, cmd)
 
         if print_bool:
-            print(" ".join(final_cmd))
+            if use_slanzarv:
+                print(format_slanzarv_command(slanz_opts, cmd))
+            else:
+                print(" ".join(final_cmd))
             total_printed += 1
         if exec_bool:
             subprocess.run(final_cmd, check=True)

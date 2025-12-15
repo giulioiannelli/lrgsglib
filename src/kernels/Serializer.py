@@ -14,6 +14,8 @@ __all__ = [
     "_format_value_consistently",
     "_collect_values",
     "_collect_values_typed",
+    "format_slanzarv_command",
+    "build_slanzarv_command",
 ]
 
 def build_memory_function(min_mb: int, max_mb: int, values: Sequence[int]) -> Callable[[int], int]:
@@ -183,3 +185,64 @@ def _collect_values_typed(
     if not values:
         values.extend(caster(v) for v in default_values)
     return values
+
+
+def build_slanzarv_command(
+    slanz_opts: list[str],
+    cmd: list[str],
+) -> list[str]:
+    """
+    Build a complete slanzarv command with sbatch options.
+
+    Parameters
+    ----------
+    slanz_opts : list[str]
+        Slanzarv-specific options (e.g., ["-m", "2048", "--nomail", "--jobname", "myjob"])
+    cmd : list[str]
+        The actual command to execute (e.g., ["python", "script.py", "arg1", "arg2"])
+
+    Returns
+    -------
+    list[str]
+        Complete command list including slanzarv, sbatch options, and the command
+    """
+    sbatch_opts = [
+        "--output=.log/%x_%j.out",
+        "--error=.log/%x_%j.err",
+    ]
+
+    return ["slanzarv", *slanz_opts, *sbatch_opts, "--", *cmd]
+
+
+def format_slanzarv_command(
+    slanz_opts: list[str],
+    cmd: list[str],
+) -> str:
+    """
+    Format a slanzarv command for readable multi-line output.
+
+    Produces output in the format:
+        slanzarv <options> --output=... --error=... -- \\
+          python script.py args...
+
+    Parameters
+    ----------
+    slanz_opts : list[str]
+        Slanzarv-specific options (e.g., ["-m", "2048", "--nomail", "--jobname", "myjob"])
+    cmd : list[str]
+        The actual command to execute (e.g., ["python", "script.py", "arg1", "arg2"])
+
+    Returns
+    -------
+    str
+        Formatted multi-line command string with backslash continuation
+    """
+    sbatch_opts = [
+        "--output=.log/%x_%j.out",
+        "--error=.log/%x_%j.err",
+    ]
+
+    slanzarv_sbatch_line = " ".join(["slanzarv", *slanz_opts, *sbatch_opts, "--"])
+    python_line = "  " + " ".join(cmd)
+
+    return f"{slanzarv_sbatch_line} \\\n{python_line}"

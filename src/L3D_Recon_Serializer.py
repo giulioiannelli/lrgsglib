@@ -4,7 +4,12 @@ from pathlib import Path
 
 import subprocess
 
-from kernels.Serializer import build_jobname, build_memory_function
+from kernels.Serializer import (
+    build_jobname,
+    build_memory_function,
+    build_slanzarv_command,
+    format_slanzarv_command,
+)
 from lrgsglib import *
 from parsers.L3D_Recon import L3D_Recon_progName, L3D_Recon_progNameShrt
 from parsers.L3D_Recon_srun import parse_arguments, parser
@@ -53,10 +58,10 @@ def main():
         )
         slanz_opts.extend(["--jobname", jobname])
 
-        slanz_cmd = ["slanzarv", *slanz_opts, *cmd]
+        slanz_cmd = build_slanzarv_command(slanz_opts, cmd)
 
         if print_bool:
-            print(" ".join(slanz_cmd))
+            print(format_slanzarv_command(slanz_opts, cmd))
             total_printed += 1
         if exec_bool:
             subprocess.run(slanz_cmd)
