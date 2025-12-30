@@ -167,11 +167,11 @@ def perform_spectral_calculations(args):
     # Determine mode and process accordingly
     if args.mode.endswith("dist"):
         if args.mode == "eigvec_dist":
-            fname_base = f"mc_dist{args.howmany}_{args.p:.3g}_{args.eigen_mode}"
+            fname_base = f"mc_dist{args.howmany}_{args.pflip:.3g}_{args.eigen_mode}"
             initial_fn = eigvec_initial_data
             update_fn = eigvec_update_data
         elif args.mode == "eigval_dist":
-            fname_base = f"mc_dist_eigval_{args.p:.3g}"
+            fname_base = f"mc_dist_eigval_{args.pflip:.3g}"
             initial_fn = eigval_initial_data
             update_fn = eigval_update_data
 
@@ -181,7 +181,7 @@ def perform_spectral_calculations(args):
         )
 
     elif args.mode == "eigvals":
-        fname_base = f"mc_eigvals_{args.p:.3g}"
+        fname_base = f"mc_eigvals_{args.pflip:.3g}"
 
         # Determine eigenvalue mode: full spectrum or partial
         # If howmany <= 0, compute full spectrum (needed for entropy calculations)
@@ -198,7 +198,7 @@ def perform_spectral_calculations(args):
                 periodic=args.periodic,
                 variant=args.variant,
                 mode=eig_mode,
-                pflip=args.p
+                pflip=args.pflip
             )
             eigvlist.append(eigv)
 
@@ -215,6 +215,24 @@ def perform_spectral_calculations(args):
 
                 with open(path_fname, "wb") as f:
                     pk.dump(eigvlist, f)
+
+        # Save final result after loop completes
+        path_fname_base = get_mc_spectrum_path(args)
+        final_idx = args.number_of_averages - 1
+        path_fname_final = path_fname_base / Path(f"{fname_base}_{final_idx}.pkl")
+
+        # Remove last checkpoint if different from final
+        if final_idx % args.period != 0:
+            last_checkpoint = (final_idx // args.period) * args.period
+            path_fname_prev = path_fname_base / Path(f"{fname_base}_{last_checkpoint}.pkl")
+            if os.path.exists(path_fname_prev):
+                os.remove(path_fname_prev)
+
+        with open(path_fname_final, "wb") as f:
+            pk.dump(eigvlist, f)
+
+        if args.verbose:
+            print(f"Saved final eigenvalue list with {len(eigvlist)} realizations to {path_fname_final}")
 
 
 # ============================================================================
@@ -307,7 +325,7 @@ def eigvec_initial_data(args):
         variant=args.variant,
         mode=args.eigen_mode,
         howmany=args.howmany,
-        pflip=args.p,
+        pflip=args.pflip,
         backend=args.eigen_mode
     )
 
@@ -353,7 +371,7 @@ def eigvec_update_data(batch_size, bins, bin_centers, bin_counter, args):
             variant=args.variant,
             mode=args.eigen_mode,
             howmany=args.howmany,
-            pflip=args.p,
+            pflip=args.pflip,
             backend=args.eigen_mode
         )
         for i in range(args.howmany):

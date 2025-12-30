@@ -2,10 +2,22 @@ from lrgsglib.config.progargs import *
 from parsers.shared import parse_arguments
 
 # Build combined argument dictionary
+# Note: Exclude verbose from action_args_dict to avoid conflict with -v for variant
+# We'll add verbose manually with only long form below
+common_action_args = {k: v for k, v in action_args_dict.items()
+                      if k != tuple(['-v', '--verbose'])}
+
 optionalaction_args_dict = {
     **MC_opt_args,  # MultiplicativeCascade optional args
     **MCG_SlaplSpect_optional_args_dict,  # Spectral analysis optional args
-    **MCG_SlaplSpect_action_args_dict  # Action flags
+    **MCG_SlaplSpect_action_args_dict,  # Action flags
+    **common_action_args,  # Common action flags (print_chrono, etc., excluding verbose)
+    # Add verbose with only long form to avoid -v conflict with variant
+    tuple(['--verbose']): {
+        'help': phelp_verbose,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_VERBOSE
+    }
 }
 
 # Create parser
