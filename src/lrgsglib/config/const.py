@@ -233,6 +233,26 @@ MSG_ONLY_CONST_MODE = False
 MSG_PHTABB = "msg_"
 MSG_PATH = "msg_multiplicative_cascade"
 MSG_PATHS = {MSG_DEFAULT_TYPE: MSG_PATH}
+
+# MultiplicativeCascade constants
+MC_STDFN = ""
+MC_SGPATH = "msg_mc"
+MC_PHTABB = "mc_"
+
+# Vicsek constants
+VCK_STDFN = ""
+VCK_SGPATH = "msg_plv"
+VCK_PHTABB = "vck_"
+
+# DiracComb constants
+DCOMB_STDFN = ""
+DCOMB_SGPATH = "msg_dcomb"
+DCOMB_PHTABB = "dcomb_"
+
+# DiracBrush constants
+DBRUSH_STDFN = ""
+DBRUSH_SGPATH = "msg_dbrush"
+DBRUSH_PHTABB = "dbrush_"
 L3D_PATH_DICT = {a: L3D_PHTABB + g for a,g in 
                  zip(L3D_GEO_SHRT_LIST+L3D_GEO_LIST, L3D_GEO_LIST*2)}
 #

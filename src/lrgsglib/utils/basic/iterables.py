@@ -377,13 +377,11 @@ def uniques(lst: List[Any]) -> List[Any]:
 
     Examples
     --------
-    ```python
     >>> uniques([1, 2, 2, 3, 4, 4, 5])
     [1, 2, 3, 4, 5]
 
     >>> uniques(['apple', 'banana', 'apple', 'cherry'])
     ['apple', 'banana', 'cherry']
-    ```
 
     Notes
     -----

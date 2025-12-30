@@ -84,8 +84,9 @@ def compute_quantum_propagator_spectral(
     -----
     The quantum propagator is unitary: U(t)^† U(t) = I
 
-    Mathematical formula:
-        U(t) = ∑ₙ exp(-i*t*λₙ) |vₙ⟩⟨vₙ|
+    Mathematical formula::
+
+        U(t) = ∑ₙ exp(-i*t*λₙ) \\|vₙ⟩⟨vₙ\\|
              = V · diag(exp(-i*t*eigenvalues)) · V^†
 
     Examples
@@ -324,7 +325,7 @@ def compute_quantum_coherence(rho_t: NDArray) -> float:
     Returns
     -------
     coherence : float
-        Total quantum coherence: C(ρ) = ∑_{i≠j} |ρ_ij|
+        Total quantum coherence: C(ρ) = ∑_{i≠j} abs(ρ_ij)
 
     Notes
     -----
@@ -379,7 +380,7 @@ def von_neumann_entropy(
 
     Notes
     -----
-    For pure states (|ψ⟩⟨ψ|): S_vN = 0
+    For pure states (\\|ψ⟩⟨ψ\\|): S_vN = 0
     For maximally mixed state (I/N): S_vN = log(N)
     General bounds: 0 ≤ S_vN ≤ log(N)
 

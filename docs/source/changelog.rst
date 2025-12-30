@@ -65,7 +65,7 @@ Future versions will include:
 - Parallel simulation capabilities
 - Enhanced visualization tools
 - Theory section with mathematical background
-- Jupyter notebook tutorials
+- Comprehensive Python code examples
 
 **Under Consideration:**
 

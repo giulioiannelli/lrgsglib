@@ -99,6 +99,7 @@ def get_opposite_color(
     ----------
     color : ColorType
         The input color, which can be:
+
         - A hexadecimal string (e.g., '#6496c8')
         - A named color (e.g., 'red')
         - An RGB tuple with values in the range [0, 1] (e.g., (0.1, 0.5, 0.8))

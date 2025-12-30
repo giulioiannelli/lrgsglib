@@ -16,7 +16,7 @@ from ._spectral import compute_laplacian_spectrum_weigV
 
 def compute_gap(
     self: "SignedGraph",
-    backend: str = 'numpy',
+    backend: Optional[str] = None,
     typf: type = np.float64,
     transpose: bool = True,
     flip_to_pos: bool = True,
@@ -44,7 +44,7 @@ def compute_gap_between(
     self: "SignedGraph",
     low: int = 0,
     high: int = 1,
-    backend: str = 'numpy',
+    backend: Optional[str] = None,
     typf: type = np.float64,
     transpose: bool = True,
     flip_to_pos: bool = True,

@@ -22,7 +22,11 @@ if TYPE_CHECKING:
 #
 # computation methods
 #
-def compute_laplacian_spectrum(self: "SignedGraph", typf: type = np.float64):
+def compute_laplacian_spectrum(
+    self: "SignedGraph",
+    typf: type = np.float64,
+    backend: Optional[str] = None,
+):
     """
     Compute eigenvalues only of the signed Laplacian (no eigenvectors).
     
@@ -35,11 +39,15 @@ def compute_laplacian_spectrum(self: "SignedGraph", typf: type = np.float64):
     typf : type, default np.float64
         Data type for computation (e.g., np.float32 for memory savings,
         np.float64 for higher precision).
+    backend : str, optional
+        Override the instance backend ('numpy', 'scipy', or 'cupy').
+        Defaults to the backend selected on the graph instance.
     
     Returns
     -------
     None
         Results are stored in instance attribute:
+
         - self.eigv : ndarray of shape (N,)
             Eigenvalues in ascending order.
     
@@ -80,14 +88,30 @@ def compute_laplacian_spectrum(self: "SignedGraph", typf: type = np.float64):
     >>> # Use lower precision
     >>> compute_laplacian_spectrum(graph, typf=np.float32)
     """
-    lapl_arr = self.slp.astype(typf).todense()
+    cached_eigv = getattr(self, "eigv", None)
+    if cached_eigv is not None and len(cached_eigv) == self.N:
+        return
+
+    if backend is None:
+        backend_obj = self._backend
+    else:
+        from ._backend import BackendManager
+        backend_obj = BackendManager.get_backend(backend, fallback=True)
+
+    laplacian = self.slp.astype(typf)
+    dense_laplacian = (
+        laplacian.toarray()
+        if hasattr(laplacian, "toarray")
+        else np.asarray(laplacian, dtype=typf)
+    )
+
     # Use backend for eigenvalue computation (supports numpy/scipy/cupy)
-    self.eigv = self._backend.eigvalsh(lapl_arr)
+    self.eigv = backend_obj.eigvalsh(dense_laplacian)
 #
 def compute_k_eigvV(
     self: "SignedGraph",
     k: int = 1,
-    backend: str = 'scipy',
+    backend: Optional[str] = None,
     transpose: bool = True,
     flip_to_pos: bool = True,
     typf: type = np.float64,
@@ -113,12 +137,13 @@ def compute_k_eigvV(
     which : str, default 'SM'
         Which eigenvalues to find ('SM' = smallest magnitude).
     """
-    if (backend in ['numpy', 'cupy']) or k > self.N // 2:
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
+    if (backend_name in ['numpy', 'cupy']) or k > self.N // 2:
         compute_laplacian_spectrum_weigV(
-            self, backend, transpose, flip_to_pos, typf
+            self, backend_name, transpose, flip_to_pos, typf
         )
-    elif backend.startswith('scipy'):
-        mode = backend.split('_')
+    elif backend_name.startswith('scipy'):
+        mode = backend_name.split('_')
         mode = mode[-1] if len(mode) > 1 else 'caley'
         self.eigv, self.eigV = scsp_eigsh(
             self.slp.astype(typf), k=k, which=which, mode=mode
@@ -139,7 +164,7 @@ def compute_k_eigvV(
 def compute_k_adj_eigvV(
     self: "SignedGraph",
     k: int = 1,
-    backend: str = 'scipy',
+    backend: Optional[str] = None,
     transpose: bool = True,
     flip_to_pos: bool = True,
     typf: type = np.float64,
@@ -169,21 +194,21 @@ def compute_k_adj_eigvV(
             "Adjacency matrix is not initialized; build it before computing "
             "adjacency eigenpairs."
         )
-
-    if (backend in ['numpy', 'cupy']) or k > self.N // 2:
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
+    if (backend_name in ['numpy', 'cupy']) or k > self.N // 2:
         compute_adjacency_spectrum_weigV(
-            self, backend=backend, transpose=transpose,
+            self, backend=backend_name, transpose=transpose,
             flip_to_pos=flip_to_pos, typf=typf
         )
         return
 
-    if not backend.startswith('scipy'):
+    if not backend_name.startswith('scipy'):
         raise ValueError(
-            f"Unsupported backend '{backend}' for sparse adjacency eigensolver. "
+            f"Unsupported backend '{backend_name}' for sparse adjacency eigensolver. "
             "Use a scipy backend or fall back to dense computation."
         )
 
-    mode = backend.split('_')
+    mode = backend_name.split('_')
     mode = mode[-1] if len(mode) > 1 else 'caley'
     self.adj_eigv, self.adj_eigV = scsp_eigsh(
         self.adj.astype(typf), k=k, which=which, mode=mode
@@ -231,6 +256,7 @@ def compute_laplacian_spectrum_weigV(
     -------
     None
         Results are stored in instance attributes:
+
         - self.eigv : ndarray of shape (N,)
             Eigenvalues in ascending order.
         - self.eigV : ndarray of shape (M, N) or (N, M)
@@ -242,26 +268,30 @@ def compute_laplacian_spectrum_weigV(
     Notes
     -----
     **Caching Behavior:**
+
     The function checks if a complete spectrum has already been computed
     (self.eigv and self.eigV exist with correct dimensions). If so, it only
     adjusts the transpose state if needed, avoiding redundant computation.
-    
+
     **Storage Layout:**
+
     - Column-major (transpose=False): eigV has shape (N, N), access i-th
       eigenvector as eigV[:, i]
     - Row-major (transpose=True): eigV has shape (N, N), access i-th
       eigenvector as eigV[i, :]
-    
+
     Row-major is the default as it provides more intuitive indexing and
     better cache locality for subsequent operations on individual eigenvectors.
-    
+
     **Eigenvector Orientation:**
+
     Both numpy and cupy return eigenvectors in column-major format. The
     flip_to_pos operation is applied along axis=0 (columns) before any
     transposition. This ensures that each eigenvector has more positive
     than negative components, providing consistent orientation.
-    
+
     **Backend Selection:**
+
     - Use 'numpy' for general purposes (CPU-based, no dependencies)
     - Use 'cupy' for large graphs where GPU acceleration provides significant
       speedup (requires cupy installation and compatible GPU)
@@ -584,7 +614,7 @@ def get_eigV_check(
     which: int = 0, 
     binarize: bool = False, 
     reshaped: bool = False,
-    backend: str = 'scipy',
+    backend: Optional[str] = None,
     typf: type = np.float64,
     transpose: bool = True,
     flip_to_pos: bool = True,
@@ -670,16 +700,17 @@ def get_eigV_check(
     >>> # Request with specific precision
     >>> v1 = get_eigV_check(graph, which=1, typf=np.float32)
     """
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     if not hasattr(self, "eigV") or which >= len(self.eigV):
         if which < self.N // 2:
             compute_k_eigvV(
-                self, k=which + 1, backend=backend, typf=typf,
+                self, k=which + 1, backend=backend_name, typf=typf,
                 transpose=transpose, flip_to_pos=flip_to_pos
             )
         else:
             compute_laplacian_spectrum_weigV(
                 self, typf=typf, transpose=transpose,
-                backend=backend, flip_to_pos=flip_to_pos
+                backend=backend_name, flip_to_pos=flip_to_pos
             )
     #
     return get_eigV(self, which=which, binarize=binarize, reshape=reshaped)
@@ -689,7 +720,7 @@ def get_eigV_bin_check(
     self: "SignedGraph",
     which: int = 0,
     reshaped: bool = False,
-    backend: str = 'scipy',
+    backend: Optional[str] = None,
     typf: type = np.float64,
     transpose: bool = True,
     flip_to_pos: bool = True,
@@ -762,9 +793,10 @@ def get_eigV_bin_check(
     >>> # Use GPU acceleration
     >>> v2_bin = get_eigV_bin_check(graph, which=2, backend='cupy')
     """
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     return get_eigV_check(
         self, which=which, binarize=True, reshaped=reshaped,
-        backend=backend, typf=typf, transpose=transpose, flip_to_pos=flip_to_pos
+        backend=backend_name, typf=typf, transpose=transpose, flip_to_pos=flip_to_pos
     )
 
 def get_eigV_check_list(
@@ -773,7 +805,7 @@ def get_eigV_check_list(
     binarize: bool = False,
     reshaped: bool = False,
     asarray: bool = False,
-    backend: str = 'scipy',
+    backend: Optional[str] = None,
     typf: type = np.float64,
     transpose: bool = True,
     flip_to_pos: bool = True,
@@ -888,9 +920,10 @@ def get_eigV_check_list(
     
     # Retrieve eigenvectors using the established method
     # Note: get_eigV_check already handles computation checks automatically
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     eigvec_list = [
         get_eigV_check(
-            self, i, binarize=binarize, reshaped=reshaped, backend=backend, 
+            self, i, binarize=binarize, reshaped=reshaped, backend=backend_name, 
             typf=typf, transpose=transpose, flip_to_pos=flip_to_pos
         ) 
         for i in range(maxidx)
@@ -905,7 +938,7 @@ def get_eigV_bin_check_list(
     custom_slice: slice = slice(None),
     reshaped: bool = False,
     asarray: bool = False,
-    backend: str = 'scipy',
+    backend: Optional[str] = None,
     typf: type = np.float64,
     transpose: bool = True,
     flip_to_pos: bool = True,
@@ -989,10 +1022,11 @@ def get_eigV_bin_check_list(
     ...     graph, custom_slice=slice(10), backend='cupy', asarray=True
     ... )
     """
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     return get_eigV_check_list(
         self, custom_slice=custom_slice, binarize=True, 
         reshaped=reshaped, asarray=asarray,
-        backend=backend, typf=typf, transpose=transpose, flip_to_pos=flip_to_pos
+        backend=backend_name, typf=typf, transpose=transpose, flip_to_pos=flip_to_pos
     )
 
 def get_sgspect_basis(
@@ -1126,7 +1160,7 @@ def quantum_walk_probabilities(
     Returns
     -------
     probabilities : NDArray, shape (N,)
-        Quantum probability at each node: P_j(t) = |⟨j|U(t)|i⟩|²
+        Quantum probability at each node: P_j(t) = \\|⟨j\\|U(t)\\|i⟩\\|²
 
     Raises
     ------
@@ -1219,5 +1253,3 @@ def quantum_observables_time_series(
     return compute_quantum_observables_from_eigenvalues(
         self.eigv, self.eigV, self.N, t_array, init_type, init_node
     )
-
-

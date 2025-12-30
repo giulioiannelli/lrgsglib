@@ -92,15 +92,17 @@ class SignedGraph:
     -------
     Core Graph Operations
     ---------------------
+
     flip_sel_edges(links, name='weight', on_g=SG_REPR)
         Flip the sign of selected edges.
     flip_random_fract_edges(pflip=None, on_g=SG_REPR)
         Randomly flip a fraction of edges based on pflip.
     get_random_links(n=1, only_in='', on_g=SG_REPR)
         Get random edges from the graph (all, positive, or negative).
-    
+
     Spectral Analysis (imported from ._spectral)
-    -------------------------------------------
+    ---------------------------------------------
+
     compute_laplacian_spectrum_weigV(typf=np.float64, transpose=True, 
                                      backend='numpy')
         Compute full eigendecomposition of the signed Laplacian.
@@ -113,9 +115,10 @@ class SignedGraph:
         Get binarized eigenvector (sign pattern).
     get_signed_laplacian_embedding(k=2)
         Get k-dimensional spectral embedding.
-    
+
     Clustering and Community Detection
-    ----------------------------------
+    -----------------------------------
+
     get_eigV_cluster_sizes(which=0, binarize=True, val=None, on_g=SG_REPR)
         Compute cluster sizes from eigenvector-based partitioning.
     get_cluster_distribution(which=0, on_g=SG_REPR, binarize=True, 
@@ -125,18 +128,20 @@ class SignedGraph:
         Create clusters based on node attribute values.
     compute_pinf(which=0, val=None, on_g=SG_REPR)
         Compute infinite cluster probability (percolation order parameter).
-    
+
     Energy and Dynamics (imported from ._dynamics)
-    ----------------------------------------------
+    -----------------------------------------------
+
     compute_rbim_energy_eigV(which=0, use_gpu=False, on_g=SG_REPR)
         Compute Random Bond Ising Model energy for binarized eigenvector.
     compute_sksph_energy_eigV(which=0, use_gpu=False, on_g=SG_REPR)
         Compute spherical Sherrington-Kirkpatrick model energy.
     get_ferroAntiferro_regions(attr_str='s', on_g=SG_REPR)
         Identify ferromagnetic and antiferromagnetic regions.
-    
+
     Information Theory (imported from ._infotheory)
-    -----------------------------------------------
+    ------------------------------------------------
+
     compute_signed_laplacian_entropy(steps=600, t1=-2, t2=5, w_thresh=None, 
                                      typf=np.float64, backend='numpy', 
                                      transpose=None)
@@ -147,16 +152,18 @@ class SignedGraph:
         Return entropy derivative (specific heat analog).
     
     Import/Export (via ._exports / ._loaders)
-    ----------------------------------------
+    ------------------------------------------
+
     export_eigV_all(out_suffix='', ext=BIN)
         Export all eigenvectors to binary file.
     load_eigV_all(fname='', load_mode=SG_LOAD_M)
         Load eigenvectors from binary file.
     set_edgel_from_bin(file_path, mode='numpy', on_g=SG_REPR)
         Load edge list from binary file.
-    
+
     Graph Representations
-    --------------------
+    ---------------------
+
     upd_GraphRepr_All(on_g=SG_REPR, also_itself=True)
         Update all graph representations to maintain consistency.
     upd_graph_matrices(format='csr', on_g=SG_REPR)
@@ -164,46 +171,47 @@ class SignedGraph:
     
     Notes
     -----
-    The signed Laplacian is defined as L_s = D_s - A, where D_s is the 
-    diagonal matrix of absolute degree values and A is the signed adjacency 
+    The signed Laplacian is defined as L_s = D_s - A, where D_s is the
+    diagonal matrix of absolute degree values and A is the signed adjacency
     matrix. This formulation is particularly useful for studying frustration,
-    balance theory, and spin-glass dynamics on networks.
-    
-    Edge weights are expected to be ±1 or arbitrary real values. Negative 
-    edges represent antagonistic or frustrated interactions, while positive 
+    balance theory, and spin-glass dynamics on networks [1]_ [2]_.
+
+    Edge weights are expected to be ±1 or arbitrary real values. Negative
+    edges represent antagonistic or frustrated interactions, while positive
     edges represent cooperative interactions.
-    
+
     The class supports multiple graph representations that can be maintained
-    simultaneously (e.g., different node labelings) through the `on_g` 
+    simultaneously (e.g., different node labelings) through the `on_g`
     parameter.
-    
-    Spectral methods use either NumPy, SciPy, or CuPy (GPU-accelerated) 
+
+    Spectral methods use either NumPy, SciPy, or CuPy (GPU-accelerated)
     backends depending on availability and problem size.
     
     Examples
     --------
-    Create a signed graph from a NetworkX graph:
-    
+
+    Create a signed graph from a NetworkX graph::
+
     >>> import networkx as nx
     >>> G = nx.erdos_renyi_graph(100, 0.1)
     >>> sg = SignedGraph(G, pflip=0.3, seed=42)
     >>> print(f"Nodes: {sg.N}, Edges: {sg.Ne}, Negative edges: {sg.Ne_n}")
-    
-    Compute and analyze the signed Laplacian spectrum:
-    
+
+    Compute and analyze the signed Laplacian spectrum::
+
     >>> sg.compute_laplacian_spectrum_weigV()
     >>> sg.compute_signed_laplacian_entropy()
     >>> entropy = sg.get_entropy()
     >>> print(f"Entropy profile shape: {entropy.shape}")
-    
-    Analyze clustering from eigenvectors:
-    
+
+    Analyze clustering from eigenvectors::
+
     >>> cluster_sizes = sg.get_eigV_cluster_sizes(which=0, binarize=True)
     >>> sg.compute_pinf(which=0)
     >>> print(f"Infinite cluster probability: {sg.Pinf:.3g}")
-    
-    Compute spin-glass energy:
-    
+
+    Compute spin-glass energy::
+
     >>> sg.compute_rbim_energy_eigV(which=0)
     >>> energy = sg.get_rbim_energy_eigV(which=0)
     >>> print(f"RBIM energy: {energy:.3g}")
@@ -1033,9 +1041,11 @@ class SignedGraph:
     # information theory tools (imported from ._infotheory)
     #
     from ._infotheory import compute_signed_laplacian_entropy
+    from ._infotheory import compute_renyi_entropy_profile
     from ._infotheory import get_entropy
     from ._infotheory import get_specific_heat
     from ._infotheory import get_entropy_derivative  # DEPRECATED
+    from ._infotheory import get_renyi_results
     #
     # energy and dynamics tools (imported from ._dynamics)
     #

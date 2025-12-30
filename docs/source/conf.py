@@ -39,7 +39,6 @@ extensions = [
     'sphinx_rtd_theme',             # ReadTheDocs theme
     'sphinx_copybutton',            # Copy button for code blocks
     'myst_parser',                  # Markdown support
-    'nbsphinx',                     # Jupyter notebook support
     'sphinxcontrib.bibtex',         # Bibliography support
 ]
 
@@ -58,6 +57,11 @@ autodoc_default_options = {
 }
 autodoc_typehints = 'description'
 autodoc_typehints_description_target = 'documented'
+
+# Suppress warnings
+suppress_warnings = [
+    'autodoc.duplicate',  # Suppress duplicate object description warnings
+]
 
 # Napoleon settings (NumPy style docstrings)
 napoleon_google_docstring = False
@@ -97,10 +101,6 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from lrgsglib import *
 """
-
-# nbsphinx configuration
-nbsphinx_execute = 'never'  # Don't execute notebooks during build
-nbsphinx_allow_errors = False
 
 # Bibliography
 bibtex_bibfiles = []  # Will add bibliography files later

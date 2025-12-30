@@ -34,27 +34,27 @@ def create_volume_visualization(data_sets, X, Y, Z, colors=None, colors_solid=No
         Default: ['red', 'green', 'blue']
     
     KEY PARAMETERS FOR TUNING:
-    =========================
-    
-    🚫 TO AVOID BIG SURFACES AROUND ISOLATED POINTS:
-    ------------------------------------------------
+    ==========================
+
+    TO AVOID BIG SURFACES AROUND ISOLATED POINTS:
+    ----------------------------------------------
     significance_threshold=0.1-0.2  # Higher = stricter filtering
     min_threshold_percentile=70-80  # Higher = only show dense cores
-    
-    🎨 VOLUME APPEARANCE:
-    --------------------
+
+    VOLUME APPEARANCE:
+    ------------------
     opacity=0.3-0.6                # Lower = more transparent
     surface_count=1-3               # Fewer = cleaner appearance
     significance_threshold=0.01-0.3 # Lower = more volume, Higher = less volume
-    
-    ✨ CONTRAST & SHARPNESS:
-    -----------------------
+
+    CONTRAST & SHARPNESS:
+    ---------------------
     contrast_power=0.8-2.0          # Higher = sharper contrast
     min_threshold_percentile=40-80  # Higher = fewer surfaces
     max_threshold_percentile=85-95  # Controls surface extent
-    
-    📊 POINT VISUALIZATION:
-    ----------------------
+
+    POINT VISUALIZATION:
+    --------------------
     sample_size=200-500             # More points = more detail
     min_point_size=3-6              # Smallest point size
     max_point_size=15-30            # Largest point size
@@ -445,7 +445,7 @@ def create_volume_visualization_simple(data_sets,
         List of color strings for volume rendering (with alpha)
     colors_solid : list, optional
         List of solid color strings for scatter points
-    **kwargs : dict
+    \\**kwargs : dict
         Additional parameters passed to create_volume_visualization
         
     Returns:

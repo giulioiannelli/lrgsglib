@@ -5,6 +5,32 @@ lrgsglib Documentation
 
 The library combines high-level Python interfaces with performance-critical C/C++ extensions for efficient simulations on large networks.
 
+Project Scope
+-------------
+
+This project analyzes (signed) graph structure through the lens of the
+(signed) Laplacian operator, with a particular focus on diffusion and
+anomalous diffusion phenomena (including Anderson-localization-style
+behavior). The central goal is to disentangle *structure* from *dynamics*:
+we study how spectral information (eigenvalues/eigenvectors) of possibly
+frustrated, disordered systems shapes and constrains dynamical processes.
+
+To connect structure with dynamics, the library provides a family of
+universality-class dynamics (e.g., ContactProcess, Ising, Voter models),
+so users can simulate stochastic processes on the same underlying graphs
+and compare how diffusion modes influence macroscopic behavior. For speed,
+several dynamics have optimized C backends.
+
+Project Layout
+--------------
+
+- ``src/lrgsglib`` contains the reusable Python package (graph objects,
+  dynamics classes, utilities, plotting helpers, and bindings).
+- ``src/`` contains standalone or compound programs used to compute or
+  reproduce specific experiments and data products.
+- ``src/lrgsglib/Ccore`` hosts performance-critical C/C++ extensions used
+  by selected dynamics.
+
 .. note::
    This documentation is for version |release|. For the latest development version,
    see the `GitHub repository <https://github.com/giulioiannelli/lrgsglib>`_.
