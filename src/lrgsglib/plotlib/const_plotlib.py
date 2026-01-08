@@ -39,16 +39,21 @@ cred, cblu = twilight(twilight_lim_low), twilight(twilight_lim_blu)
 restr_twilight_vals = twilight(
     linspace(twilight_lim_low, twilight_lim_high)
 )
+def _register_cmap(name, cmap):
+    if name not in mpl.colormaps:
+        mpl.colormaps.register(name=name, cmap=cmap)
+
+
 restr_twilight = LinearSegmentedColormap.from_list(
     "restr_twilight", restr_twilight_vals
 )
 credcblu = ListedColormap([cred, cblu])
-mpl.colormaps.register(name="restr_twilight", cmap=restr_twilight)
-mpl.colormaps.register(name='restr_twilight_r', cmap=restr_twilight.reversed())
+_register_cmap("restr_twilight", restr_twilight)
+_register_cmap("restr_twilight_r", restr_twilight.reversed())
 
 red_blue = LinearSegmentedColormap.from_list("red_blue", ["red", "blue"])
-mpl.colormaps.register(name="red_blue", cmap=red_blue)
-mpl.colormaps.register(name="red_blue_r", cmap=red_blue.reversed())
+_register_cmap("red_blue", red_blue)
+_register_cmap("red_blue_r", red_blue.reversed())
 
 PLT_SL2DSQ_SIDE1 = 7
 PLT_SL2DSQ_SIDE2 = 7
