@@ -49,13 +49,113 @@ pytest test/
 # Run specific test
 pytest test/test_contact_process.py
 
-# Quick smoke tests
-python test/quick_test.py
-python test/simple_test.py
+# Run benchmarks
+python test/bench_contact_process_quick.py
+python test/bench_mcg_slaplspect_backends.py
 
-# Extended validation
-python test/extended_test.py
+# Run diagnostic scripts
+python test/diagnose_cp_p0_anomalies.py
 ```
+
+### Test Folder Organization and Conventions
+
+**CRITICAL: Follow these conventions for all test-related files:**
+
+#### File Naming Conventions
+Tests must follow specific naming patterns that clearly indicate their purpose:
+
+- **`test_*.py`** - Unit tests (pytest-compatible)
+  - Example: `test_contact_process.py`, `test_lattice2d_spectral.py`
+  - For testing specific functionality/modules
+
+- **`bench_*.py`** - Performance benchmarks
+  - Example: `bench_contact_process_quick.py`, `bench_mcg_slaplspect_backends.py`
+  - Be SPECIFIC: not "benchmark.py" but "bench_<what>_<aspect>.py"
+  - Clearly indicate WHAT is being benchmarked in the filename
+
+- **`demo_*.py`** - Demonstration/example scripts
+  - Example: `demo_cp2d_relu.py`, `demo_edge_sign_clustering.py`
+  - For showcasing features or workflows
+
+- **`diagnose_*.py`** - Diagnostic/debugging scripts
+  - Example: `diagnose_cp_p0_anomalies.py`, `diagnose_cp_subcritical_anomalies.py`
+  - For investigating specific issues
+
+- **`script_*.py`** - Utility scripts
+  - Example: `script_check_border_mode.py`, `script_chl_antiferro_recon.py`
+  - For one-off tasks or utilities
+
+#### Directory Structure
+
+```
+test/
+├── .tmp/                    # ALL temporary/output files go here (gitignored)
+│   ├── *.pkl                # Benchmark results
+│   ├── *.png                # Generated plots
+│   └── *.log                # Log files
+├── output/                  # Persistent test outputs (if needed)
+├── figures/                 # Test-generated figures for documentation
+├── test_*.py                # Unit tests
+├── bench_*.py               # Benchmarks
+├── demo_*.py                # Demonstrations
+└── diagnose_*.py            # Diagnostics
+```
+
+#### Output File Management
+
+**IMPORTANT**: Keep test folder clean!
+
+1. **Temporary files** (benchmark results, intermediate data) → `test/.tmp/`
+   ```python
+   TEST_TMP_DIR = Path(__file__).parent / ".tmp"
+   TEST_TMP_DIR.mkdir(exist_ok=True)
+   output_file = TEST_TMP_DIR / "my_results.pkl"
+   ```
+
+2. **Documentation** (markdown files, reports) → `.agents/devd/<project>/`
+   - NEVER put .md files in test folder
+   - Agent documentation belongs in `.agents/` tree only
+
+3. **Persistent outputs** (if absolutely necessary) → `test/output/` or `test/figures/`
+   - Use sparingly
+   - Only for outputs that need to be committed
+
+#### Example: Proper Benchmark Structure
+
+```python
+#!/usr/bin/env python
+"""
+Benchmark MCG_SlaplSpect.py with different backends (scipy vs cupy).
+
+Clear description of what's being tested and why.
+Output files stored in test/.tmp/
+"""
+
+from pathlib import Path
+
+# Set up output directory
+TEST_TMP_DIR = Path(__file__).parent / ".tmp"
+TEST_TMP_DIR.mkdir(exist_ok=True)
+
+# ... benchmark code ...
+
+# Save results to .tmp
+results_file = TEST_TMP_DIR / "bench_mcg_slaplspect_results.pkl"
+```
+
+#### Common Mistakes to Avoid
+
+❌ Vague names: `benchmark.py`, `test.py`, `script.py`
+✓ Specific names: `bench_mcg_slaplspect_backends.py`, `test_contact_process.py`
+
+❌ Output files in test root: `test/results.pkl`, `test/output.png`
+✓ Output files in .tmp: `test/.tmp/results.pkl`, `test/.tmp/output.png`
+
+❌ Documentation in test folder: `test/BENCHMARK_RESULTS.md`
+✓ Documentation in agents folder: `.agents/devd/project/BENCHMARK_RESULTS.md`
+
+❌ Mixed concerns: test + analysis in one file (unless very simple)
+✓ Separate files: `bench_X.py` + `bench_X_analyze.py` (if needed)
 
 ## Architecture
 

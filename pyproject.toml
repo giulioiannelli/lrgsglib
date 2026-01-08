@@ -103,3 +103,10 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests that invoke scripts or cross-module workflows",
+    "slow: tests that may take longer or write larger artifacts",
+    "gpu: tests requiring a CUDA-capable device",
+]
