@@ -245,7 +245,11 @@ class TestVicsekGraphConnectivity:
 
     def test_edge_count_reasonable(self):
         """Test that edge count is reasonable."""
-        vck = VicsekGraph(N=50, k=3)
+        import numpy as np
+
+        np.random.seed(0)
+        pij_matrix = np.full((2, 2), 0.5)
+        vck = VicsekGraph(N=50, k=2, pij=pij_matrix)
         # Should have some edges
         assert vck.Ne > 0
         # Should not have more edges than complete graph
