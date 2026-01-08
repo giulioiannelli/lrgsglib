@@ -65,11 +65,12 @@ class MultispectralGraph(SignedGraph):
         else:
             self.G = nx.Graph()
 
-        # Set system shape path
-        try:
-            self.syshapePth = f"N={self.G.number_of_nodes()}"
-        except Exception:
-            self.syshapePth = ""
+        # Set system shape path (only if not already set by subclass)
+        if not hasattr(self, 'syshapePth') or self.syshapePth is None:
+            try:
+                self.syshapePth = f"N={self.G.number_of_nodes()}"
+            except Exception:
+                self.syshapePth = ""
 
         super().__init__(self.G, **kwargs)
 

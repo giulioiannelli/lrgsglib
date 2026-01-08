@@ -3,7 +3,7 @@ from numpy.random import choice, rand
 import numpy as np
 from networkx import Graph, empty_graph, NetworkXError, set_node_attributes
 from networkx.utils import pairwise
-from networkx.utils.backends import _dispatchable
+from networkx.utils.backends import _dispatchable as _nx_dispatchable, _registered_algorithms
 from typing import Any
 #
 __all__ = [
@@ -15,7 +15,16 @@ __all__ = [
     "rhomb_octagonal_graph_FastPatch"
 ]
 #
-@_dispatchable(graphs=None, returns_graph=True)
+def _dispatchable_safe(**kwargs):
+    def decorator(func):
+        name = kwargs.get("name", func.__name__)
+        if name in _registered_algorithms:
+            return func
+        return _nx_dispatchable(func, **kwargs)
+    return decorator
+
+
+@_dispatchable_safe(graphs=None, returns_graph=True)
 def triangular_lattice_graph_modified(
     m: int,
     n: int,
@@ -136,7 +145,7 @@ def triangular_lattice_graph_modified(
 
     return G
 #
-@_dispatchable(graphs=None, returns_graph=True)
+@_dispatchable_safe(graphs=None, returns_graph=True)
 def triangular_lattice_graph_FastPatch(
     m: int,
     n: int,
@@ -259,7 +268,7 @@ def triangular_lattice_graph_FastPatch(
 
     return G
 #
-@_dispatchable(graphs=None, returns_graph=True)
+@_dispatchable_safe(graphs=None, returns_graph=True)
 def hexagonal_lattice_graph_FastPatch(
     n: int,
     m: int,
@@ -353,7 +362,7 @@ def hexagonal_lattice_graph_FastPatch(
 
     return G
 #
-@_dispatchable(graphs=None, returns_graph=True)
+@_dispatchable_safe(graphs=None, returns_graph=True)
 def squared_lattice_graph_FastPatch(
     m: int,
     n: int,
@@ -443,7 +452,7 @@ def squared_lattice_graph_FastPatch(
 
     return G
 #
-@_dispatchable(graphs=None, returns_graph=True)
+@_dispatchable_safe(graphs=None, returns_graph=True)
 def squared_lattice_SW_graph_FastPatch(
     m: int,
     n: int,
@@ -514,7 +523,7 @@ def squared_lattice_SW_graph_FastPatch(
 
     return G
 
-@_dispatchable(graphs=None, returns_graph=True)
+@_dispatchable_safe(graphs=None, returns_graph=True)
 def rhomb_octagonal_graph_FastPatch(
     m: int,
     n: int,

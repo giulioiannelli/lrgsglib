@@ -46,6 +46,7 @@ class MultiplicativeCascadeGraph(MultispectralGraph):
         variant: str = "exp_clocks",
         stdFnameSFFX: str = MC_STDFN,
         sgpathn: str = MC_SGPATH,
+        out_suffix: str = "",
         **kwargs,
     ):
         # Store parameters
@@ -55,11 +56,30 @@ class MultiplicativeCascadeGraph(MultispectralGraph):
         self.stochastic = stochastic
         self.periodic = periodic
         self.variant = variant
+        self.out_suffix = out_suffix
 
         # Computed attributes
         self.seed_probabilities = (p1, p2, p3, p4)
         self.sample_fraction = fraction
         self.probability_matrix = None
+
+        # Build syshapePth before calling parent
+        # Format: i={iterations}_f={fraction:.3g}_P={p1:.3g}_{p2:.3g}_{p3:.3g}_{p4:.3g}_{mode}
+        from ..common import DEFAULT_P_FSTR_FMT
+        fmtfunc = lambda x: f"{x:{DEFAULT_P_FSTR_FMT}}"
+        mode_str = "stochastic" if stochastic else "regular"
+
+        # Build syshapePth with proper ordering
+        self.syshapePth = (
+            f"i={iterations}_"
+            f"f={fmtfunc(fraction)}_"
+            f"P={fmtfunc(p1)}_{fmtfunc(p2)}_{fmtfunc(p3)}_{fmtfunc(p4)}_"
+            f"{mode_str}"
+        )
+
+        # Append out_suffix if provided
+        if out_suffix:
+            self.syshapePth += f"_{out_suffix}"
 
         super().__init__(
             stdFnameSFFX=stdFnameSFFX,
