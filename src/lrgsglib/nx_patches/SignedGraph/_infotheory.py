@@ -36,9 +36,9 @@ def compute_signed_laplacian_entropy(
         not hasattr(self, "eigv") or self.eigv is None or len(self.eigv) != self.N
     )
 
-    # Resolve backend using BackendManager with proper defaults and fallback
+    # Resolve backend using instance default unless explicitly overridden.
     if backend is None:
-        resolved_backend = Backend.NUMPY.value
+        resolved_backend = getattr(self, "_backend_name", Backend.NUMPY.value)
     else:
         backend_obj = BackendManager.get_backend(backend, fallback=True)
         resolved_backend = backend_obj.name
@@ -150,9 +150,9 @@ def compute_renyi_entropy_profile(
         not hasattr(self, "eigv") or self.eigv is None or len(self.eigv) != self.N
     )
 
-    # Resolve backend using BackendManager with proper defaults and fallback
+    # Resolve backend using instance default unless explicitly overridden.
     if backend is None:
-        resolved_backend = Backend.NUMPY.value
+        resolved_backend = getattr(self, "_backend_name", Backend.NUMPY.value)
     else:
         backend_obj = BackendManager.get_backend(backend, fallback=True)
         resolved_backend = backend_obj.name
