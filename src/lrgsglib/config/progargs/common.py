@@ -42,6 +42,12 @@ srun_opt_args = {
         'type': str,
         'default': DEFAULT_SLANZARV_ID
     },
+    tuple(['--gputype']): {
+        'help': phelp_gputype,
+        'type': str,
+        'default': DEFAULT_GPUTYPE,
+        'choices': ['a100', 'fermi', 'fermi:2']
+    },
 }
 # Serializers program arguments
 srun_action_args = {
@@ -64,5 +70,10 @@ srun_action_args = {
         'help': phelp_short,
         'action': argparse.BooleanOptionalAction,
         'default': DEFAULT_SHORT
+    },
+    tuple(['--gpu']): {
+        'help': phelp_gpu,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_GPU
     },
 }

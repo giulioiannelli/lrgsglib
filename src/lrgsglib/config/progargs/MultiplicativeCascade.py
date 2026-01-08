@@ -56,7 +56,7 @@ MC_opt_args = {
         'default': DEFAULT_MC_VARIANT
     },
     tuple(['-p', '--pflip']): {
-        'help': phelp_p,  # Reuse from SignedGraph
+        'help': phelp_p,  # Reuse from SignedGraph (probability of flipping edge signs)
         'type': float,
         'default': 0.0
     },
@@ -64,6 +64,11 @@ MC_opt_args = {
         'help': phelp_navg,  # Reuse from common
         'type': int,
         'default': DEFAULT_NAVG
+    },
+    tuple(['-os', '--out_suffix']): {
+        'help': 'Optional suffix appended to output directory name',
+        'type': str,
+        'default': ""
     },
     tuple(['-wd', '--workdir']): {
         'help': phelp_workdir,  # Reuse from common

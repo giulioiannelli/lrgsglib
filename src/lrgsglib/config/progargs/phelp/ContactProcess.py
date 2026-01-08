@@ -10,4 +10,4 @@ phelp_ic_contact = "Initial condition for the ContactProcess (e.g. 'uniform', 'g
 phelp_runlang_contact = "Execution backend for the ContactProcess (py, C0, C1, C1a, C1b, C1c)."
 phelp_randstr_contact = "Append a random string to the run identifier for unique exports."
 phelp_outsuffix_contact = "Optional suffix appended to output/export file names."
-phelp_save_frequency = "Number of save checkpoints during the run; divides total averages into sf batches (e.g., sf=10 with na=200 saves every 20 runs)."
+phelp_save_frequency = "Save every N averages (0 saves only the final aggregate)."
