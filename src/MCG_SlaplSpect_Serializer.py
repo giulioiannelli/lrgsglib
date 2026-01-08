@@ -13,6 +13,7 @@ from kernels.Serializer import (
     _format_value_consistently,
     build_slanzarv_command,
     format_slanzarv_command,
+    auto_select_gpu_type,
 )
 from parsers.MCG_SlaplSpect_Serializer import (
     MCG_MCGSS_progname,
@@ -76,6 +77,9 @@ def parse_matrix_file(filepath: str) -> list[tuple[float, float, float, float]]:
 
 def main() -> None:
     args, unknown = parser.parse_known_args()
+    # Filter out the '--' separator if present
+    unknown = [arg for arg in unknown if arg != '--']
+
     exec_bool, print_bool = args.exec, args.print
 
     if not (exec_bool or print_bool):
@@ -119,16 +123,60 @@ def main() -> None:
     fraction_precision = _determine_precision(fraction_values)
     pflip_precision = _determine_precision(pflip_values)
 
-    # Memory function (based on iterations, which controls graph size)
-    memoryfunc = build_memory_function(
-        args.slanzarv_minMB,
-        args.slanzarv_maxMB,
-        iterations_values
-    )
-
     script_path = Path("src") / f"{MCG_MCGSS_progname}.py"
 
     total_printed = total_executed = 0
+
+    def estimate_memory_mb(p1: float, p2: float, p3: float, p4: float,
+                           fraction: float, iterations: int) -> int:
+        """
+        Estimate memory requirement in MB by generating test graph.
+
+        Uses same logic as MCG_SlaplSpect.py select_optimal_backend():
+        - Dense GPU (< 60GB matrix): 2GB safety margin for CPU fallback
+        - Dense CPU (60-150GB, N < 75k): allocate for dense matrix + workspace
+        - Sparse CPU (N > 75k): allocate for sparse matrix + workspace
+        """
+        from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+
+        # Generate test graph to get actual N and E
+        test_graph = MultiplicativeCascadeGraph(
+            p1=p1, p2=p2, p3=p3, p4=p4,
+            fraction=fraction,
+            iterations=iterations,
+            stochastic=False,
+            periodic=True,
+            variant='exp_clocks',
+            pflip=0.0  # pflip doesn't affect graph size
+        )
+
+        N = test_graph.N
+        E = test_graph.gr['G'].number_of_edges()
+
+        # Calculate matrix sizes
+        dense_gb = (N ** 2 * 8) / (1024 ** 3)
+        sparse_mb = (E * 16) / (1024 ** 2)
+
+        # Apply same thresholds as select_optimal_backend
+        GPU_VRAM_LIMIT_GB = 60.0
+        CPU_RAM_LIMIT_GB = 150.0
+        SPARSE_CROSSOVER_N = 75000
+
+        if dense_gb < GPU_VRAM_LIMIT_GB:
+            # Dense GPU will be used, allocate minimal CPU memory for safety
+            return 2048  # 2GB safety margin
+        elif dense_gb < CPU_RAM_LIMIT_GB and N < SPARSE_CROSSOVER_N:
+            # Dense CPU fallback: matrix + 2x workspace for eigensolver
+            memory_mb = int(dense_gb * 1024 * 3.0)  # 3x for matrix + workspace
+            return min(memory_mb, 150 * 1024)  # Cap at 150GB
+        else:
+            # Sparse CPU: For nearly-full spectrum (k=N-2), eigsh workspace
+            # needs approximately (k + 8) * N * 8 bytes ≈ N² * 8 bytes
+            # This is similar to dense matrix memory!
+            k = N - 2  # eigsh with sparse gets N-2 eigenvalues
+            workspace_gb = (k + 8) * N * 8 / (1024 ** 3)
+            memory_mb = int(workspace_gb * 1024 * 1.2)  # +20% safety margin
+            return min(max(memory_mb, 4096), 300 * 1024)  # 4GB min, 300GB max
 
     def dispatch(p1: float, p2: float, p3: float, p4: float,
                  fraction: float, iterations: int, pflip: float) -> None:
@@ -147,17 +195,33 @@ def main() -> None:
             _format_value_consistently(pflip, pflip_precision),
         ]
 
-        cmd = ["python", str(script_path), *prog_args, *unknown]
+        # Add backend argument (default to cupy for cluster; can be overridden in unknown)
+        cmd = ["python", str(script_path), *prog_args, "--backend", "cupy", *unknown]
 
         final_cmd = cmd
         if use_slanzarv:
-            slanz_opts = ["-m", str(memoryfunc(iterations))]
+            # Estimate memory based on actual graph parameters
+            memory_mb = estimate_memory_mb(p1, p2, p3, p4, fraction, iterations)
+            slanz_opts = ["-m", str(memory_mb)]
             if args.nomail:
                 slanz_opts.append("--nomail")
             if args.short:
                 slanz_opts.append("--short")
             if args.moretime:
                 slanz_opts.extend(["--time", str(args.moretime)])
+            if args.gpu:
+                slanz_opts.append("--gpu")
+
+                # Select GPU type
+                if args.gputype:
+                    gputype = args.gputype
+                else:
+                    # Default to A100 (compatible with CUDA 12.x in current conda environment)
+                    # Backend auto-selection inside MCG_SlaplSpect.py will handle fallback
+                    # to CPU if graph is too large for GPU (printed to slanzarv output file)
+                    gputype = 'a100'
+
+                slanz_opts.extend(["--gputype", gputype])
 
             # Build job name with matrix hash for uniqueness
             matrix_hash = f"{_format_value_consistently(p1, p_precision)}" \

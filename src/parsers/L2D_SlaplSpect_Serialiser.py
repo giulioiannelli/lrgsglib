@@ -9,7 +9,7 @@ L2D_SlaplSpect_progNameShrt = "L2DSS"
 DEFAULT_BINSC = 500
 DEFAULT_EIGMODE = 'scipy'
 DEFAULT_NAVG = 10**4
-DEFAULT_PERIOD = DEFAULT_NAVG//20
+DEFAULT_SAVE_FREQUENCY = DEFAULT_NAVG//20
 DEFAULT_WORKDIR = ''
 DEFAULT_HOWMANY = 1
 DEFAULT_GEO = 'squared'
@@ -55,8 +55,8 @@ phelp_mode = f"""
 phelp_navg = f"""
     Number of averages to compute 
 """
-phelp_period = f"""
-    Period for saving the data 
+phelp_save_frequency = f"""
+    Save frequency for the data 
 """
 phelp_workDir = f"""
     Working directory 
@@ -82,10 +82,10 @@ parDO = {'mode': {'names': ['-m', '--mode'],
                 'help': phelp_navg,
                 'type': int,
                 'default': DEFAULT_NAVG},
-        'period': {'names': ['-prd', '--period'],
-                'help': phelp_period,
+        'save_frequency': {'names': ['-sf', '--save_frequency'],
+                'help': phelp_save_frequency,
                 'type': int,
-                'default': DEFAULT_PERIOD},
+                'default': DEFAULT_SAVE_FREQUENCY},
         'bins_count': {'names': ['-bc', '--bins_count'],
                 'help': phelp_binsc,
                 'type': int,

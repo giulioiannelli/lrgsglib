@@ -30,7 +30,7 @@ Accumulation process:
 7. Final output: Single Counter object with {bin_center: total_count}
 
 Storage format: Counter (dict-like)
-File: mc_dist_eigval_{pflip}.pkl
+File: mc_dist_eigval_p={pflip}_na={navg}.pkl
 
 
 MODE 2: eigvec_dist
@@ -45,7 +45,7 @@ Accumulation process:
 7. Final output: List of howmany Counters
 
 Storage format: list[Counter]
-File: mc_dist{howmany}_{pflip}_{backend}.pkl
+File: mc_dist{howmany}_p={pflip}_{eigen_mode}_na={navg}.pkl
 
 
 MODE 3: eigvals
@@ -54,11 +54,11 @@ Accumulation process:
 1. Generate graphs one by one
 2. Compute FIRST howmany eigenvalues (e.g., 50 smallest)
 3. Store numpy array for each graph: eigvlist.append(eigv)
-4. Save checkpoint every period realizations
+4. Save checkpoint every save_frequency realizations
 5. Final output: List of numpy arrays (one per graph realization)
 
 Storage format: list[np.ndarray]
-File: mc_eigvals_{pflip}_{idx}.pkl
+File: mc_eigvals_p={pflip}_na={navg}.pkl
 """
 
 
@@ -73,7 +73,7 @@ def read_eigval_dist(filename):
     Parameters
     ----------
     filename : str
-        Path to pickle file (e.g., 'mc_dist_eigval_0.1.pkl')
+        Path to pickle file (e.g., 'mc_dist_eigval_p=0.1_na=1000.pkl')
 
     Returns
     -------
@@ -102,7 +102,7 @@ def demo_eigval_dist():
     # python MCG_SlaplSpect.py 0.8 0.6 0.6 0.8 0.4 5 \
     #     --mode eigval_dist -p 0.1 --number_of_averages 1000
 
-    filename = "mc_dist_eigval_0.1.pkl"
+    filename = "mc_dist_eigval_p=0.1_na=1000.pkl"
 
     print(f"\n1. What's in the file '{filename}':")
     print("   - A single Counter object")
@@ -158,7 +158,7 @@ def read_eigvec_dist(filename):
     Parameters
     ----------
     filename : str
-        Path to pickle file (e.g., 'mc_dist5_0.1_scipy.pkl')
+        Path to pickle file (e.g., 'mc_dist5_p=0.1_smallest_na=500.pkl')
 
     Returns
     -------
@@ -187,7 +187,7 @@ def demo_eigvec_dist():
     # python MCG_SlaplSpect.py 0.8 0.6 0.6 0.8 0.4 5 \
     #     --mode eigvec_dist --howmany 5 -p 0.1 --number_of_averages 500
 
-    filename = "mc_dist5_0.1_scipy.pkl"
+    filename = "mc_dist5_p=0.1_smallest_na=500.pkl"
 
     print(f"\n1. What's in the file '{filename}':")
     print("   - A list of 5 Counter objects (one per eigenvector)")
@@ -238,7 +238,7 @@ def read_eigvals(filename):
     Parameters
     ----------
     filename : str
-        Path to pickle file (e.g., 'mc_eigvals_0.1_100.pkl')
+        Path to pickle file (e.g., 'mc_eigvals_p=0.1_na=100.pkl')
 
     Returns
     -------
@@ -261,7 +261,7 @@ def demo_eigvals():
     # python MCG_SlaplSpect.py 0.8 0.6 0.6 0.8 0.4 5 \
     #     --mode eigvals --howmany 50 -p 0.1 --number_of_averages 100
 
-    filename = "mc_eigvals_0.1_100.pkl"
+    filename = "mc_eigvals_p=0.1_na=100.pkl"
 
     print(f"\n1. What's in the file '{filename}':")
     print("   - A list of 100 numpy arrays")
@@ -349,7 +349,7 @@ python MCG_SlaplSpect.py 0.8 0.6 0.6 0.8 0.4 6 \\
     --bins_count 1000 \\
     --verbose
 
-Output: mc_dist_eigval_0.1.pkl
+Output: mc_dist_eigval_p=0.1_na=2000.pkl
 
 
 STEP 2: Read and analyze the data
@@ -362,7 +362,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Read the Counter object
-with open('mc_dist_eigval_0.1.pkl', 'rb') as f:
+with open('mc_dist_eigval_p=0.1_na=2000.pkl', 'rb') as f:
     counter = pk.load(f)
 
 # Extract histogram
@@ -407,7 +407,7 @@ pflip_values = [0.0, 0.05, 0.1, 0.15, 0.2]
 plt.figure(figsize=(12, 7))
 
 for p in pflip_values:
-    filename = f'mc_dist_eigval_{p:.2g}.pkl'
+    filename = f'mc_dist_eigval_p={p:.2g}_na=2000.pkl'
 
     with open(filename, 'rb') as f:
         counter = pk.load(f)

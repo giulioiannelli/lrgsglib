@@ -173,7 +173,7 @@ def test_command_line_workflow():
 
     print("\n2. Load and analyze:")
     print("   import pickle as pk")
-    print("   with open('mc_eigvals_0.1_100.pkl', 'rb') as f:")
+    print("   with open('mc_eigvals_p=0.1_na=100.pkl', 'rb') as f:")
     print("       eigvals_list = pk.load(f)")
     print("   # Then compute entropy for each...")
 
