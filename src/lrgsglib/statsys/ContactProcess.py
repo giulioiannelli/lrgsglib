@@ -723,5 +723,19 @@ class ContactProcessEI(ContactProcessBase):
             )
 
 
-# Backwards compatibility alias
-ContactProcess = ContactProcessSIR
+def ContactProcess(sg: SignedGraph, *args: Any, **kwargs: Any):
+    """
+    Factory for contact-process variants.
+
+    Uses ContactProcessEI when gamma/activation/C1 backends are requested,
+    otherwise falls back to ContactProcessSIR.
+    """
+    runlang = kwargs.get("runlang")
+    if (
+        "gamma" in kwargs
+        or "activation" in kwargs
+        or "num_log_samples" in kwargs
+        or (isinstance(runlang, str) and runlang.upper().startswith("C1"))
+    ):
+        return ContactProcessEI(sg, *args, **kwargs)
+    return ContactProcessSIR(sg, *args, **kwargs)

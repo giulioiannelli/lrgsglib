@@ -1,5 +1,5 @@
 """ Contact process dynamics runner functions.
-Command example to run EI dynamics on L2D contact process with batching of density files:
+Command example to run EI dynamics on L2D contact process with periodic saves:
 python lrgsglib/src/L2D_ContactProcess.py 64 0. -ac relu -na 200 -wd cptest -ga 0.493 -rl C1c -sp 1000 --randstr -sf 10
 
 Supported C1 backends for EI dynamics: C1c, C1d, C1e, C1f, C1g
@@ -121,7 +121,7 @@ def _latest_saved_index(pdir: Path, agg_prefix: str, sp_token: str) -> int:
 def _process_EI_C1c(cp, args):
     """Batch process and aggregate density for EI+C1c.
 
-    Saves a cumulative file at every batch boundary with the filename
+    Saves a cumulative file every ``save_frequency`` averages with the filename
     suffix `_na=<current>` so early stops can be resumed. Only the latest
     `_na=<current>` file is kept.
     """
@@ -130,11 +130,12 @@ def _process_EI_C1c(cp, args):
     if i is None:
         raise ValueError("args._current_average must be set for aggregation filename.")
     na = getattr(args, "number_of_averages", None)
-    sf = getattr(args, "save_frequency", getattr(args, "sf", None))
-    if na is None or sf is None:
-        sf = 1
+    save_every = getattr(args, "save_frequency", getattr(args, "sf", None))
+    if na is None:
         na = 1
-    batch_size = max(1, na // sf)
+    if save_every is None or save_every <= 0:
+        save_every = na
+    batch_size = max(1, int(save_every))
     pdir, agg_prefix, sp_token = _output_components(cp.sg, args)
     if _last_saved_index == 0:
         _last_saved_index = _latest_saved_index(pdir, agg_prefix, sp_token)

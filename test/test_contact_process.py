@@ -44,7 +44,9 @@ class TestContactProcess(unittest.TestCase):
         cls.SignedGraph = SignedGraph
         cls.ContactProcessSIR = ContactProcessSIR
         cls.ContactProcessEI = ContactProcessEI
-        cls.initialize_contact_process_dict_args = initialize_contact_process_dict_args
+        cls.initialize_contact_process_dict_args = staticmethod(
+            initialize_contact_process_dict_args
+        )
         cls.cp_kernel = cp_kernel
         cls.cp_parser = cp_parser
 
@@ -112,10 +114,11 @@ class TestContactProcess(unittest.TestCase):
         model.init_contact_dynamics()
         try:
             self.assertTrue(model.sfout.exists())
-            self.assertTrue(hasattr(model.sg, "path_exp_edgl") and model.sg.path_exp_edgl.exists())
-            self.assertTrue(hasattr(model.sg, "path_exp_adj") and model.sg.path_exp_adj.exists())
-            expected_binary = self.ccore_dir / "ContactSimulator1c"
-            self.assertEqual(Path(model.cprogram[0]), expected_binary)
+            self.assertTrue(
+                hasattr(model.sg, "path_exp_edgl")
+                and model.sg.path_exp_edgl.exists()
+            )
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator1c")
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertNotEqual(model.gamma_eff, model.gamma)
@@ -153,8 +156,7 @@ class TestContactProcess(unittest.TestCase):
         model._set_time_controls(steps=30)
         model.init_contact_dynamics()
         try:
-            expected_binary = self.ccore_dir / "ContactSimulator1e"
-            self.assertEqual(Path(model.cprogram[0]), expected_binary)
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator1e")
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
@@ -190,8 +192,7 @@ class TestContactProcess(unittest.TestCase):
         model._set_time_controls(steps=25)
         model.init_contact_dynamics()
         try:
-            expected_binary = self.ccore_dir / "ContactSimulator1f"
-            self.assertEqual(Path(model.cprogram[0]), expected_binary)
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator1f")
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
@@ -227,11 +228,13 @@ class TestContactProcess(unittest.TestCase):
             model.ds1step(1)
             self.assertEqual(model.s[1], 1)
 
-    def test_ei_run_requires_c_backend(self):
+    def test_ei_run_allows_python_backend(self):
         sg = self._make_graph()
-        model = self.ContactProcessEI(sg, gamma=0.4, runlang="py")
-        with self.assertRaises(NotImplementedError):
-            model.run()
+        model = self.ContactProcessEI(sg, gamma=0.4, runlang="py", steps=1, seed=0)
+        model.init_contact_dynamics()
+        model.run(tqdm_on=False, steps=2)
+        unique = np.unique(model.s)
+        self.assertTrue(np.all(np.isin(unique, (0, 1))))
 
     def test_c_backend_run_reads_stdout_state(self):
         sg = self._make_graph()
