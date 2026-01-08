@@ -27,7 +27,6 @@ from ...utils.basic import is_in_range, join_non_empty,\
     flip_to_positive_majority_adapted, bin_sign, flip_to_positive_majority,\
     generate_random_id, normalize_array, dtype_numerical_precision
 from ...utils.lrg import compute_ising_pairwise_energy
-from ...utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 from ...utils.tools import NestedDict, ConditionalPartitioning
 from ...utils.tools.ConditionalPartitioning import ConditionalPartitioningInput
 from ._backend import Backend, BackendManager, ArrayBackend

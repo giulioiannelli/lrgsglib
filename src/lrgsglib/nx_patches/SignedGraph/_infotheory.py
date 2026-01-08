@@ -3,7 +3,10 @@ from typing import Optional, TYPE_CHECKING
 from numpy.typing import NDArray
 
 from ...utils.basic import dtype_numerical_precision
-from ...utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
+from ...utils.lrg.infocomm import (
+    entropy,
+    compute_renyi_observables_from_eigenvalues,
+)
 
 # reuse spectral building blocks
 from ._spectral import compute_laplacian_spectrum
@@ -23,6 +26,8 @@ def compute_signed_laplacian_entropy(
     typf: type = np.float64,
     backend: Optional[str] = None,
     transpose: Optional[bool] = None,
+    entropy_norm: str = "complement",
+    specific_heat_scale: str = "logN",
 ) -> None:
     if steps < 1:
         raise ValueError("steps must be at least 1 to build the entropy profile.")
@@ -44,17 +49,16 @@ def compute_signed_laplacian_entropy(
     eigenvalues = np.asarray(self.eigv, dtype=typf)
     threshold = w_thresh if w_thresh is not None else dtype_numerical_precision(typf)
 
-    normalized_entropy, entropy_derivative, variance_profile, time_grid = (
-        compute_entropy_observables_from_eigenvalues(
-            eigenvalues=eigenvalues,
-            num_nodes=self.N,
-            steps=steps,
-            t1=t1,
-            t2=t2,
-            typf=typf,
-            threshold=threshold,
-            pad_last=False,
-        )
+    normalized_entropy, entropy_derivative, variance_profile, time_grid = entropy(
+        eigenvalues=eigenvalues,
+        num_nodes=self.N,
+        steps=steps,
+        t1=t1,
+        t2=t2,
+        wTresh=threshold,
+        entropy_norm=entropy_norm,
+        specific_heat_scale=specific_heat_scale,
+        typf=typf,
     )
 
     self.entropy = normalized_entropy
@@ -70,6 +74,8 @@ def compute_signed_laplacian_entropy(
         "typf": typf,
         "backend": backend,
         "transpose": transpose,
+        "entropy_norm": entropy_norm,
+        "specific_heat_scale": specific_heat_scale,
     }
 
 
@@ -115,13 +121,19 @@ def compute_renyi_entropy_profile(
     transpose: Optional[bool] = None,
     tail_fraction: float = 0.1,
     drop_invalid: bool = True,
+    entropy_norm: Optional[str] = None,
+    legacy_normalization: bool = True,
+    specific_heat_scale: str = "none",
 ) -> None:
     """
     Compute Rényi/Tsallis entropy and generalized specific heat for a given ``q``.
 
     Laplacian eigenvalues play the role of energy levels. Entropies are
     normalized by ``log(N)`` to mirror the standard Shannon profile. For
-    ``q→1`` this reduces to the normalized Shannon entropy.
+    ``q→1`` this reduces to the normalized Shannon entropy. Use
+    ``entropy_norm="complement"`` to match the SignedGraph Shannon
+    normalization; set ``legacy_normalization=True`` to preserve older outputs.
+    Use ``specific_heat_scale="logN"`` to scale the derivative by ``log(N)``.
 
     Note: eigenvectors are not used; ``transpose`` is kept for API compatibility
     and ignored.
@@ -150,68 +162,22 @@ def compute_renyi_entropy_profile(
 
     eigvals = np.asarray(self.eigv, dtype=typf)
     eps = w_thresh if w_thresh is not None else dtype_numerical_precision(typf)
-    eigvals = np.where(np.abs(eigvals) > eps, eigvals, typf(0))
-    log_N = np.log(typf(self.N)) if self.N > 1 else typf(1)
 
-    tau_grid = np.logspace(t1, t2, steps, dtype=typf)
-    renyi_entropy = np.full_like(tau_grid, np.nan, dtype=typf)
-    tsallis_entropy = np.full_like(tau_grid, np.nan, dtype=typf)
-    log_tau = np.log(tau_grid)
-
-    invalid_counts = 0
-    for idx, tau in enumerate(tau_grid):
-        if abs(q - 1.0) < 1e-8:
-            weights = np.exp(-tau * eigvals)
-            Z = np.nansum(weights, dtype=typf)
-            if Z == 0:
-                continue
-            p = weights / Z
-            with np.errstate(divide="ignore", invalid="ignore"):
-                shannon_raw = -np.nansum(p * np.log(p), dtype=typf)
-            shannon_norm = shannon_raw / log_N
-            renyi_entropy[idx] = shannon_norm
-            tsallis_entropy[idx] = shannon_norm
-            continue
-
-        base = 1.0 + (1.0 - q) * tau * eigvals
-        if drop_invalid:
-            valid = base > 0
-            invalid_counts += np.count_nonzero(~valid)
-            base = np.where(valid, base, 0.0)
-        exponent = typf(1.0 / (q - 1.0))
-        with np.errstate(over="ignore", invalid="ignore"):
-            eps_i = np.power(base, exponent, dtype=typf)
-        Z = np.nansum(eps_i, dtype=typf)
-        if Z <= 0:
-            continue
-        p = eps_i / Z
-        mq = np.nansum(np.power(p, q, dtype=typf), dtype=typf)
-        if mq <= 0:
-            continue
-        renyi_raw = (1.0 / (1.0 - q)) * np.log(mq)
-        tsallis_raw = (1.0 / (q - 1.0)) * (1.0 - mq)
-        renyi_entropy[idx] = renyi_raw / log_N
-        tsallis_entropy[idx] = tsallis_raw / log_N
-
-    with np.errstate(invalid="ignore"):
-        specific_heat = -np.gradient(renyi_entropy, log_tau)
-
-    tail_len = max(1, int(round(tail_fraction * steps)))
-    tail_slice = specific_heat[-tail_len:]
-    ds_estimate = (
-        np.nan if tail_slice.size == 0 else typf(2.0) * np.nanmean(tail_slice, dtype=typf)
+    results = compute_renyi_observables_from_eigenvalues(
+        eigenvalues=eigvals,
+        num_nodes=self.N,
+        q=q,
+        steps=steps,
+        t1=t1,
+        t2=t2,
+        typf=typf,
+        threshold=eps,
+        tail_fraction=tail_fraction,
+        drop_invalid=drop_invalid,
+        entropy_norm=entropy_norm,
+        legacy_normalization=legacy_normalization,
+        specific_heat_scale=specific_heat_scale,
     )
-
-    results = {
-        "q": q,
-        "tau": tau_grid,
-        "renyi_entropy": renyi_entropy,
-        "tsallis_entropy": tsallis_entropy,
-        "specific_heat": specific_heat,
-        "ds_estimate": ds_estimate,
-        "tail_fraction": tail_fraction,
-        "invalid_weight_counts": invalid_counts,
-    }
 
     if not hasattr(self, "renyi_results") or self.renyi_results is None:
         self.renyi_results = {}

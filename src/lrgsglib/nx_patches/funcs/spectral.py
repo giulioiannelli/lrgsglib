@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from networkx import Graph, NetworkXError, to_numpy_array, to_scipy_sparse_array
 from networkx.drawing.layout import _process_params, rescale_layout
-from networkx.utils.backends import _dispatchable
+from networkx.utils.backends import _dispatchable, _registered_algorithms
 from scipy.sparse import csr_array, spdiags
 from scipy.sparse.linalg import eigsh
 from typing import List
@@ -15,8 +15,14 @@ __all__ = [
     "signed_spectral_layout",
 ]
 
+if "signed_laplacian_matrix" in _registered_algorithms:
+    def _dispatchable_signed(func):
+        return func
+else:
+    _dispatchable_signed = _dispatchable(edge_attrs="weight")
 
-@_dispatchable(edge_attrs="weight")
+
+@_dispatchable_signed
 def signed_laplacian_matrix(
     G: Graph, nodelist: List | None = None, weight: str = "weight"
 ) -> csr_array:
