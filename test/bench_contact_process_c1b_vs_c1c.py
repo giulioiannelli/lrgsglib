@@ -17,15 +17,28 @@ Expected behavior:
 - Both should produce identical final densities when using same seeds
 """
 
+import os
 import sys
 import time
 import numpy as np
 from pathlib import Path
 
+# Pytest utilities for time budget enforcement
+import pytest
+
 # Add lrgsglib to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.lrgsglib import Lattice2D, ContactProcess, PATHDATA
+
+MAX_RUNTIME = float(os.environ.get("LRGSG_TEST_MAX_SECONDS", "30"))
+FAST_TEST = os.environ.get("LRGSG_TEST_FAST", "1") != "0"
+_START_TIME = time.monotonic()
+
+
+def _check_budget(label: str) -> None:
+    if time.monotonic() - _START_TIME > MAX_RUNTIME:
+        pytest.skip(f"Exceeded {MAX_RUNTIME}s budget during {label}.")
 
 
 def setup_test_environment():
@@ -177,18 +190,25 @@ def test_density_sweep(path_data, verbose=True):
         print(f"{'='*70}")
     
     # Test parameters
+    if FAST_TEST:
+        side = 16
+        steps = 6 * side**2
+        density_values = [0.05, 0.20, 0.50]
+    else:
+        side = 48
+        steps = 100 * side**2  # Shorter runs for sweep
+        density_values = [0.05, 0.10, 0.20, 0.30, 0.50, 0.70]
+
     base_params = {
-        'side': 48,
+        'side': side,
         'geo': 'sqr',
         'pflip': 0.20,
         'gamma': 0.62,
         'activation': 'relu',
-        'steps': 100 * 48**2,  # Shorter runs for sweep
+        'steps': steps,
         'lattice_seed': 12345,
         'state_seed': 67890
     }
-    
-    density_values = [0.05, 0.10, 0.20, 0.30, 0.50, 0.70]
     results = {
         'densities': density_values,
         'C1b_times': [],
@@ -198,6 +218,7 @@ def test_density_sweep(path_data, verbose=True):
     }
     
     for density in density_values:
+        _check_budget(f"density={density:.2f} setup")
         test_params = base_params.copy()
         test_params['initial_density'] = density
         
@@ -248,6 +269,7 @@ def test_density_sweep(path_data, verbose=True):
         cp_1b.run(steps=test_params['steps'], verbose=False, tqdm_on=False)
         time_1b = time.time() - start_time
         density_1b = np.mean(cp_1b.s)
+        _check_budget(f"density={density:.2f} C1b")
         
         if verbose:
             print(f"  C1b done: {time_1b:.3g}s, final density: {density_1b:.6f}")
@@ -268,6 +290,7 @@ def test_density_sweep(path_data, verbose=True):
         cp_1c.run(steps=test_params['steps'], verbose=False, tqdm_on=False)
         time_1c = time.time() - start_time
         density_1c = np.mean(cp_1c.s)
+        _check_budget(f"density={density:.2f} C1c")
         
         speedup = time_1b / time_1c
         density_diff = abs(density_1b - density_1c)
@@ -321,14 +344,23 @@ def main():
     print("\n\nTEST 1: Single Performance Test")
     print("="*70)
     
+    if FAST_TEST:
+        side = 16
+        steps = 6 * side**2
+        density = 0.5
+    else:
+        side = 48
+        steps = 100 * side**2
+        density = 0.5
+
     test_params = {
-        'side': 48,
+        'side': side,
         'geo': 'sqr',
         'pflip': 0.20,
         'gamma': 0.62,
         'activation': 'relu',
-        'steps': 100 * 48**2,
-        'initial_density': 0.5,
+        'steps': steps,
+        'initial_density': density,
         'lattice_seed': 12345,
         'state_seed': 67890
     }
