@@ -130,32 +130,26 @@ def main() -> None:
     def estimate_memory_mb(p1: float, p2: float, p3: float, p4: float,
                            fraction: float, iterations: int) -> int:
         """
-        Estimate memory requirement in MB by generating test graph.
+        Estimate memory requirement in MB using analytical formulas.
 
-        Uses same logic as MCG_SlaplSpect.py select_optimal_backend():
-        - Dense GPU (< 60GB matrix): 2GB safety margin for CPU fallback
+        No graph generation needed - uses deterministic size formulas:
+        - SIZE = 2^(iterations + 1)
+        - N = max(1, round(fraction × SIZE²))
+        - E ≈ 2 × N (approximate for grid-based graphs)
+
+        Uses same backend selection logic as MCG_SlaplSpect.py:
+        - Dense GPU (< 60GB matrix): 2GB safety margin
         - Dense CPU (60-150GB, N < 75k): allocate for dense matrix + workspace
         - Sparse CPU (N > 75k): allocate for sparse matrix + workspace
         """
-        from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
-
-        # Generate test graph to get actual N and E
-        test_graph = MultiplicativeCascadeGraph(
-            p1=p1, p2=p2, p3=p3, p4=p4,
-            fraction=fraction,
-            iterations=iterations,
-            stochastic=False,
-            periodic=True,
-            variant='exp_clocks',
-            pflip=0.0  # pflip doesn't affect graph size
-        )
-
-        N = test_graph.N
-        E = test_graph.gr['G'].number_of_edges()
+        # Compute graph size analytically (no graph generation)
+        SIZE = 2 ** (iterations + 1)
+        N = max(1, round(fraction * SIZE * SIZE))
+        E_approx = 2 * N  # Approximate for grid-based graphs
 
         # Calculate matrix sizes
         dense_gb = (N ** 2 * 8) / (1024 ** 3)
-        sparse_mb = (E * 16) / (1024 ** 2)
+        sparse_mb = (E_approx * 16) / (1024 ** 2)
 
         # Apply same thresholds as select_optimal_backend
         GPU_VRAM_LIMIT_GB = 60.0
@@ -172,7 +166,6 @@ def main() -> None:
         else:
             # Sparse CPU: For nearly-full spectrum (k=N-2), eigsh workspace
             # needs approximately (k + 8) * N * 8 bytes ≈ N² * 8 bytes
-            # This is similar to dense matrix memory!
             k = N - 2  # eigsh with sparse gets N-2 eigenvalues
             workspace_gb = (k + 8) * N * 8 / (1024 ** 3)
             memory_mb = int(workspace_gb * 1024 * 1.2)  # +20% safety margin
