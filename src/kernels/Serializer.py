@@ -16,6 +16,8 @@ __all__ = [
     "_collect_values_typed",
     "format_slanzarv_command",
     "build_slanzarv_command",
+    "estimate_mcg_laplacian_memory_mb",
+    "auto_select_gpu_type",
 ]
 
 def build_memory_function(min_mb: int, max_mb: int, values: Sequence[int]) -> Callable[[int], int]:
@@ -246,3 +248,143 @@ def format_slanzarv_command(
     python_line = "  " + " ".join(cmd)
 
     return f"{slanzarv_sbatch_line} \\\n{python_line}"
+
+
+def estimate_mcg_laplacian_memory_mb(
+    p1: float,
+    p2: float,
+    p3: float,
+    p4: float,
+    iterations: int,
+    fraction: float = 0.4,
+    stochastic: bool = False,
+) -> float:
+    """
+    Estimate memory requirements (in MB) for MCG Laplacian eigenvalue computation.
+
+    Generates a single sample graph to get actual N, then estimates memory based on
+    dense Laplacian matrix storage + eigenvalue solver workspace.
+
+    Parameters
+    ----------
+    p1, p2, p3, p4 : float
+        Cascade probability matrix parameters
+    iterations : int
+        Number of cascade iterations
+    fraction : float
+        Fraction of edges kept (default 0.4)
+    stochastic : bool
+        Whether to use stochastic mode (default False for deterministic sizing)
+
+    Returns
+    -------
+    float
+        Estimated memory in MB (conservative upper bound)
+
+    Notes
+    -----
+    Memory includes:
+    - Dense Laplacian matrix: N × N × 8 bytes (float64)
+    - Eigenvalue solver workspace: ~3-4× matrix size (for full decomposition)
+    - Safety margin: 20%
+
+    This function actually generates a sample graph, so it's accurate but may take
+    a few seconds for large iterations (>10).
+    """
+    from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+
+    # Generate a sample graph to get actual N
+    mc = MultiplicativeCascadeGraph(
+        p1=p1,
+        p2=p2,
+        p3=p3,
+        p4=p4,
+        fraction=fraction,
+        iterations=iterations,
+        stochastic=stochastic,
+    )
+
+    N = mc.N
+
+    # Memory for dense Laplacian matrix (N x N, float64 = 8 bytes)
+    matrix_mb = (N ** 2 * 8) / (1024 ** 2)
+
+    # Eigenvalue solver workspace (conservative: 4x matrix size for full decomposition)
+    # This accounts for intermediate arrays, eigenvectors, working memory, etc.
+    total_mb = matrix_mb * 4
+
+    # Add safety margin (20%)
+    total_mb *= 1.2
+
+    return total_mb
+
+
+def auto_select_gpu_type(
+    p1: float,
+    p2: float,
+    p3: float,
+    p4: float,
+    iterations: int,
+    fraction: float = 0.4,
+    stochastic: bool = False,
+    fermi_threshold_mb: float = 1024.0,
+    verbose: bool = False
+) -> str:
+    """
+    Automatically select GPU type based on estimated memory requirements.
+
+    Generates a sample graph to get actual size, then selects appropriate GPU.
+
+    Parameters
+    ----------
+    p1, p2, p3, p4 : float
+        Cascade probability matrix parameters
+    iterations : int
+        Number of cascade iterations
+    fraction : float
+        Fraction of edges kept (default 0.4)
+    stochastic : bool
+        Whether to use stochastic mode (default False for deterministic sizing)
+    fermi_threshold_mb : float
+        Memory threshold (MB) for selecting Fermi vs A100 (default 1024 = 1GB)
+    verbose : bool
+        Print selection reasoning
+
+    Returns
+    -------
+    str
+        GPU type: 'fermi' for small problems, 'a100' for large problems
+
+    Notes
+    -----
+    Fermi (Tesla C2050):
+    - 3GB VRAM, CUDA 8.0 max
+    - Suitable for small/medium graphs (< 1GB memory)
+
+    A100:
+    - 80GB VRAM, CUDA 12.1+
+    - Needed for large graphs or when using modern CUDA/CuPy
+
+    Conservative threshold of 1GB ensures Fermi isn't overloaded.
+    """
+    estimated_mb = estimate_mcg_laplacian_memory_mb(
+        p1=p1,
+        p2=p2,
+        p3=p3,
+        p4=p4,
+        iterations=iterations,
+        fraction=fraction,
+        stochastic=stochastic,
+    )
+
+    if estimated_mb < fermi_threshold_mb:
+        gpu_type = 'fermi'
+        reason = f"small problem (estimated {estimated_mb:.1f}MB < {fermi_threshold_mb:.0f}MB threshold)"
+    else:
+        gpu_type = 'a100'
+        reason = f"large problem (estimated {estimated_mb:.1f}MB >= {fermi_threshold_mb:.0f}MB threshold)"
+
+    if verbose:
+        print(f"Auto-selecting GPU: {gpu_type} ({reason})")
+
+    return gpu_type
