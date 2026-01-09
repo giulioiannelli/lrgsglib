@@ -134,8 +134,7 @@ def test_file_format():
                 t1=-2,
                 t2=3,
                 typf=np.float64,
-                threshold=1e-10,
-                pad_last=False
+                threshold=1e-10
             )
 
             # Verify outputs

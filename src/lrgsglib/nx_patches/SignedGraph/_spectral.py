@@ -79,6 +79,14 @@ def compute_laplacian_spectrum(
     - Entropy calculations (N-2 is sufficient for large N)
     - Memory-constrained environments
 
+    **Sparse Eigenvalue Limitation:**
+    Sparse eigensolvers (ARPACK) typically return N-2 eigenvalues due to
+    numerical limitations. This is stored in the ``_sparse_spectrum`` flag.
+    For full N eigenvalues, use dense computation (``keep_sparse=False``) or
+    ensure the graph is small enough for dense methods. The eigenvalues are
+    stored in ``self.eigv``. Use ``self._sparse_spectrum`` to check if the
+    spectrum is complete (False) or sparse (True, N-2 values).
+
     See Also
     --------
     compute_laplacian_spectrum_weigV : Compute both eigenvalues and eigenvectors
@@ -100,20 +108,51 @@ def compute_laplacian_spectrum(
     >>> spectral_gap = graph.eigv[1] - graph.eigv[0]
     >>> trace = graph.eigv.sum()
     """
+    from ._backend import BackendManager, Backend
+
+    # Check if we have a valid cached spectrum
     cached_eigv = getattr(self, "eigv", None)
-    if cached_eigv is not None and len(cached_eigv) >= self.N - 2:
+    has_cache = cached_eigv is not None and len(cached_eigv) >= self.N - 2
+
+    if has_cache and keep_sparse is None:
+        # Auto-mode: accept cached spectrum (sparse or dense)
         return
 
+    if has_cache and keep_sparse is not None:
+        # Explicit mode: check if cached spectrum matches requested sparsity
+        cached_is_sparse = len(cached_eigv) == self.N - 2
+        cached_is_dense = len(cached_eigv) == self.N
+
+        if keep_sparse and cached_is_sparse:
+            # Requested sparse, have sparse -> use cache
+            return
+        elif not keep_sparse and cached_is_dense:
+            # Requested dense, have dense -> use cache
+            return
+        # Otherwise fall through to recompute
+
+    backend_requested = backend
     if backend is None:
-        backend_obj = self._backend
-    else:
-        from ._backend import BackendManager
-        backend_obj = BackendManager.get_backend(backend, fallback=True)
+        # Use instance default if available, fall back to numpy
+        backend = getattr(self, "_backend_name", Backend.NUMPY.value)
+
+    # Always go through BackendManager for consistent validation and fallback
+    backend_obj = BackendManager.get_backend(backend, fallback=True)
 
     # Determine if we should use sparse methods
     if keep_sparse is None:
         # Auto-decide based on size and sparsity
-        sparsity = self.slp.nnz / (self.N * self.N) if hasattr(self.slp, 'nnz') else 1.0
+        import scipy.sparse
+
+        # Detect sparsity more robustly
+        if hasattr(self.slp, 'nnz'):
+            sparsity = self.slp.nnz / (self.N * self.N)
+        elif scipy.sparse.issparse(self.slp):
+            sparsity = self.slp.count_nonzero() / (self.N * self.N)
+        else:
+            # Dense matrix
+            sparsity = 1.0
+
         # For CuPy backend, prefer dense unless matrix is very large
         if backend_obj.name == 'cupy':
             keep_sparse = self.N > 10000 and sparsity < 0.3
@@ -121,12 +160,24 @@ def compute_laplacian_spectrum(
             keep_sparse = self.N > 5000 and sparsity < 0.3
 
     self._sparse_spectrum = keep_sparse
+    self._last_spectrum_backend = backend_obj.name
+    self._last_spectrum_request = backend_requested
+    self.spectrum_params = {
+        "backend_requested": backend_requested,
+        "backend_used": backend_obj.name,
+        "keep_sparse": keep_sparse,
+        "with_eigvectors": False,
+    }
 
     laplacian = self.slp.astype(typf)
 
     if keep_sparse:
         # Use sparse methods - gets N-2 eigenvalues, discards eigenvectors
-        self.eigv, _ = backend_obj.eigh_sparse(laplacian, k=None)
+        self.eigv, _ = backend_obj.eigh_sparse(
+            laplacian,
+            k=None,
+            return_eigenvectors=False,
+        )
     else:
         # Convert to dense for full eigenvalue computation
         dense_laplacian = (
@@ -144,7 +195,8 @@ def compute_k_eigvV(
     transpose: bool = True,
     flip_to_pos: bool = True,
     typf: type = np.float64,
-    which: str = 'SM'
+    which: str = 'SM',
+    solver: str = 'eigsh',
 ):
     """
     Compute k smallest eigenvectors of the signed Laplacian.
@@ -155,6 +207,8 @@ def compute_k_eigvV(
         Number of eigenvectors to compute.
     backend : str, default 'scipy'
         Backend to use: 'scipy', 'numpy', or 'cupy'.
+    solver : str, default 'eigsh'
+        Sparse solver to use when applicable: 'eigsh' (ARPACK) or 'lobpcg'.
     transpose : bool, default True
         If True, eigenvectors stored as row-major (M×N) where M is number
         of eigenvectors and N is vector length. Access as self.eigV[i].
@@ -167,6 +221,80 @@ def compute_k_eigvV(
         Which eigenvalues to find ('SM' = smallest magnitude).
     """
     backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
+    solver = solver.lower()
+    if solver not in {"eigsh", "lobpcg"}:
+        raise ValueError("solver must be 'eigsh' or 'lobpcg'.")
+
+    if solver == "lobpcg":
+        import warnings
+        if k > self.N // 2:
+            raise ValueError("lobpcg is intended for small k (k <= N/2).")
+
+        if which in {"SM", "SA"}:
+            if which == "SM":
+                warnings.warn(
+                    "lobpcg uses algebraic ordering; treating which='SM' as 'SA'.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+            largest = False
+        elif which in {"LM", "LA"}:
+            if which == "LM":
+                warnings.warn(
+                    "lobpcg uses algebraic ordering; treating which='LM' as 'LA'.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+            largest = True
+        else:
+            raise ValueError("lobpcg supports which in {'SM','SA','LM','LA'}.")
+
+        if backend_name == "cupy":
+            import cupy as cp
+            import cupyx.scipy.sparse as cusp
+            import cupyx.scipy.sparse.linalg as cusp_linalg
+            from scipy.sparse import issparse, csr_matrix
+
+            laplacian = self.slp.astype(typf)
+            if issparse(laplacian):
+                laplacian_gpu = cusp.csr_matrix(laplacian)
+            else:
+                laplacian_gpu = cusp.csr_matrix(csr_matrix(laplacian))
+
+            X = cp.eye(self.N, k, dtype=typf)
+            eigvals_gpu, eigvecs_gpu = cusp_linalg.lobpcg(
+                laplacian_gpu, X, largest=largest
+            )
+            eigvals = cp.asnumpy(eigvals_gpu)
+            eigvecs = cp.asnumpy(eigvecs_gpu)
+        elif backend_name.startswith("scipy"):
+            import scipy.sparse as scsp
+            from scipy.sparse.linalg import lobpcg
+
+            laplacian = self.slp.astype(typf)
+            if not scsp.issparse(laplacian):
+                laplacian = scsp.csr_matrix(laplacian)
+
+            X = np.eye(self.N, k, dtype=typf)
+            eigvals, eigvecs = lobpcg(laplacian, X, largest=largest)
+        else:
+            raise ValueError("lobpcg is supported only for scipy or cupy backends.")
+
+        order = np.argsort(eigvals)
+        if largest:
+            order = order[::-1]
+        eigvals = eigvals[order]
+        eigvecs = eigvecs[:, order]
+
+        if flip_to_pos:
+            eigvecs = flip_to_positive_majority_adapted(eigvecs, axis=0)
+
+        self.eigv, self.eigV = eigvals, eigvecs
+        self._eigV_is_transposed = False
+        if transpose:
+            make_eigV_transposed(self)
+        return
+
     if (backend_name in ['numpy', 'cupy']) or k > self.N // 2:
         compute_laplacian_spectrum_weigV(
             self, backend_name, transpose, flip_to_pos, typf
@@ -393,6 +521,7 @@ def compute_laplacian_spectrum_weigV(
         return
 
     # Use instance backend if not explicitly specified
+    backend_requested = backend
     if backend is None:
         backend_obj = self._backend
     else:
@@ -411,6 +540,14 @@ def compute_laplacian_spectrum_weigV(
             keep_sparse = self.N > 5000 and sparsity < 0.3
     
     self._sparse_spectrum = keep_sparse
+    self._last_spectrum_backend = backend_obj.name
+    self._last_spectrum_request = backend_requested
+    self.spectrum_params = {
+        "backend_requested": backend_requested,
+        "backend_used": backend_obj.name,
+        "keep_sparse": keep_sparse,
+        "with_eigvectors": True,
+    }
     
     if keep_sparse:
         # Use sparse iterative methods (computes N-2 eigenpairs)

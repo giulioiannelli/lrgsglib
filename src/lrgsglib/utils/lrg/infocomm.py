@@ -5,7 +5,7 @@ from networkx import Graph
 #
 from numpy.typing import NDArray
 from scipy.cluster.hierarchy import cophenet
-from scipy.linalg import expm
+from scipy.linalg import expm, eigh_tridiagonal
 from scipy.sparse import csr_matrix, csr_array
 from scipy.sparse.linalg import expm as sparse_expm
 from scipy.spatial.distance import squareform
@@ -18,6 +18,7 @@ __all__ = [
     "lapl_dists",
     "entropy",
     "compute_entropy_observables_from_eigenvalues",
+    "compute_entropy_observables_slq",
     "compute_renyi_observables_from_eigenvalues",
 ]
 #
@@ -176,11 +177,156 @@ def entropy(
             t2=t2,
             typf=typf,
             threshold=wTresh,
-            pad_last=False,
             entropy_norm=entropy_norm,
             specific_heat_scale=specific_heat_scale,
         )
     )
+
+    return normalized_entropy, entropy_derivative, variance_profile, time_grid
+
+
+def _lanczos_tridiagonal(
+    matvec: Callable[[NDArray], NDArray],
+    n: int,
+    m: int,
+    v0: NDArray,
+    typf: type,
+) -> Tuple[NDArray, NDArray]:
+    v_prev = np.zeros(n, dtype=typf)
+    v = v0 / np.linalg.norm(v0)
+    alphas = np.zeros(m, dtype=typf)
+    betas = np.zeros(m - 1, dtype=typf)
+    beta = typf(0)
+
+    for j in range(m):
+        w = matvec(v)
+        if j > 0:
+            w = w - beta * v_prev
+        alpha = np.dot(v, w)
+        w = w - alpha * v
+        beta = np.linalg.norm(w)
+
+        alphas[j] = alpha
+        if j < m - 1:
+            betas[j] = beta
+
+        if beta == 0:
+            return alphas[: j + 1], betas[: j]
+
+        v_prev, v = v, w / beta
+
+    return alphas, betas
+
+
+def _slq_trace_estimates(
+    laplacian: NDArray,
+    time_grid: NDArray,
+    num_samples: int,
+    lanczos_steps: int,
+    seed: Optional[int],
+    typf: type,
+) -> Tuple[NDArray, NDArray, NDArray]:
+    n = laplacian.shape[0]
+    rng = np.random.default_rng(seed)
+    trace_exp = np.zeros_like(time_grid, dtype=typf)
+    trace_l_exp = np.zeros_like(time_grid, dtype=typf)
+    trace_l2_exp = np.zeros_like(time_grid, dtype=typf)
+
+    matvec = laplacian.dot if hasattr(laplacian, "dot") else lambda x: laplacian @ x
+
+    for _ in range(num_samples):
+        r = rng.choice([-1.0, 1.0], size=n).astype(typf)
+        norm_sq = np.dot(r, r)
+        alphas, betas = _lanczos_tridiagonal(
+            matvec=matvec,
+            n=n,
+            m=lanczos_steps,
+            v0=r,
+            typf=typf,
+        )
+        evals, evecs = eigh_tridiagonal(alphas, betas)
+        weights = evecs[0, :] ** 2
+
+        exp_terms = np.exp(-np.outer(time_grid, evals))
+        w0 = exp_terms @ weights
+        w1 = exp_terms @ (weights * evals)
+        w2 = exp_terms @ (weights * (evals ** 2))
+
+        trace_exp += norm_sq * w0
+        trace_l_exp += norm_sq * w1
+        trace_l2_exp += norm_sq * w2
+
+    inv_samples = typf(1.0 / num_samples)
+    return trace_exp * inv_samples, trace_l_exp * inv_samples, trace_l2_exp * inv_samples
+
+
+def compute_entropy_observables_slq(
+    laplacian: NDArray,
+    num_nodes: int,
+    steps: int = 600,
+    t1: int = -2,
+    t2: int = 5,
+    typf: type = np.float64,
+    entropy_norm: str = "complement",
+    specific_heat_scale: str = "logN",
+    lanczos_steps: int = 50,
+    num_samples: int = 30,
+    seed: Optional[int] = None,
+) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
+    """
+    Approximate entropy observables with stochastic Lanczos quadrature.
+
+    This avoids explicit eigenvalue computation by estimating traces of
+    exp(-tau L), L exp(-tau L), and L^2 exp(-tau L) with Hutchinson sampling.
+    """
+    if laplacian.shape[0] != laplacian.shape[1]:
+        raise ValueError("laplacian must be a square matrix.")
+    if steps < 1:
+        raise ValueError("steps must be at least 1 to build the entropy profile.")
+    if num_samples < 1:
+        raise ValueError("num_samples must be at least 1.")
+    if lanczos_steps < 2:
+        raise ValueError("lanczos_steps must be at least 2.")
+
+    laplacian = (
+        laplacian.astype(typf)
+        if hasattr(laplacian, "astype")
+        else np.asarray(laplacian, dtype=typf)
+    )
+
+    time_grid = np.logspace(t1, t2, steps, dtype=typf)
+    trace_exp, trace_l_exp, trace_l2_exp = _slq_trace_estimates(
+        laplacian=laplacian,
+        time_grid=time_grid,
+        num_samples=num_samples,
+        lanczos_steps=lanczos_steps,
+        seed=seed,
+        typf=typf,
+    )
+
+    log_N = np.log(typf(num_nodes)) if num_nodes > 0 else typf(1)
+    entropy_profile = np.zeros_like(time_grid, dtype=typf)
+    variance_profile = np.zeros_like(time_grid, dtype=typf)
+
+    valid = trace_exp > 0
+    avg = np.zeros_like(time_grid, dtype=typf)
+    avg2 = np.zeros_like(time_grid, dtype=typf)
+    avg[valid] = trace_l_exp[valid] / trace_exp[valid]
+    avg2[valid] = trace_l2_exp[valid] / trace_exp[valid]
+    variance_profile[valid] = avg2[valid] - avg[valid] ** 2
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        entropy_profile[valid] = (
+            time_grid[valid] * avg[valid] + np.log(trace_exp[valid])
+        ) / log_N
+
+    normalized_entropy = _normalize_entropy_profile(entropy_profile, entropy_norm)
+    entropy_derivative = np.gradient(normalized_entropy, np.log(time_grid))
+    scale = specific_heat_scale.lower()
+    if scale == "logn":
+        entropy_derivative = log_N * entropy_derivative
+    elif scale != "none":
+        raise ValueError("specific_heat_scale must be 'logN' or 'none'.")
 
     return normalized_entropy, entropy_derivative, variance_profile, time_grid
 
@@ -193,7 +339,6 @@ def compute_entropy_observables_from_eigenvalues(
     t2: int = 5,
     typf: type = np.float64,
     threshold: Optional[float] = None,
-    pad_last: bool = False,
     entropy_norm: str = "complement",
     specific_heat_scale: str = "logN",
 ) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
@@ -217,9 +362,6 @@ def compute_entropy_observables_from_eigenvalues(
     threshold : float, optional
         Magnitude threshold below which eigenvalues are treated as zero.
         Defaults to the machine precision of `typf`.
-    pad_last : bool, optional
-        When True, append a final derivative sample equal to the last computed
-        value so that the derivative array matches the time grid length.
     entropy_norm : str, optional
         Entropy normalization mode: "standard" or "complement".
     specific_heat_scale : str, optional
