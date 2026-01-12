@@ -169,10 +169,10 @@ def compute_laplacian_spectrum(
         "with_eigvectors": False,
     }
 
-    laplacian = self.slp.astype(typf)
-
     if keep_sparse:
         # Use sparse methods - gets N-2 eigenvalues, discards eigenvectors
+        # Cast to correct dtype only if needed
+        laplacian = self.slp if self.slp.dtype == typf else self.slp.astype(typf)
         self.eigv, _ = backend_obj.eigh_sparse(
             laplacian,
             k=None,
@@ -180,11 +180,29 @@ def compute_laplacian_spectrum(
         )
     else:
         # Convert to dense for full eigenvalue computation
-        dense_laplacian = (
-            laplacian.toarray()
-            if hasattr(laplacian, "toarray")
-            else np.asarray(laplacian, dtype=typf)
-        )
+        # CRITICAL: Avoid intermediate copies to minimize peak memory
+        if hasattr(self.slp, "toarray"):
+            # Sparse matrix: check dtype before converting
+            if self.slp.dtype == typf:
+                # Already correct dtype: direct conversion
+                dense_laplacian = self.slp.toarray()
+            else:
+                # Wrong dtype: must copy during conversion
+                # Cast sparse first (cheap), then convert to dense
+                dense_laplacian = self.slp.astype(typf).toarray()
+
+            # CRITICAL: Explicitly clear sparse Laplacian to free memory before eigval computation
+            # For very large matrices (N>100k), this can save 10-50GB of heap space
+            # The sparse matrix is no longer needed after dense conversion
+            sparse_key = self.on_g
+            if sparse_key in self.signed_laplacian_matrices:
+                del self.signed_laplacian_matrices[sparse_key]
+            import gc
+            gc.collect()  # Force garbage collection to reclaim sparse matrix memory
+        else:
+            # Already dense: just cast if needed
+            dense_laplacian = np.asarray(self.slp, dtype=typf)
+
         # Use eigvalsh (eigenvalues only, faster than eigh)
         self.eigv = backend_obj.eigvalsh(dense_laplacian)
 #

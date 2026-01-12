@@ -191,9 +191,14 @@ def main() -> None:
         elif dense_gb < CPU_RAM_LIMIT_GB:
             # Dense CPU: scipy.linalg.eigvalsh for eigenvalues ONLY
             # LAPACK dsyevd with JOBZ='N': WORK=(2*N+1)*8 bytes ≈ negligible
-            # Total memory ≈ N²*8 bytes (matrix) + small overhead
+            # Memory breakdown:
+            #   - NetworkX graph structure: ~0.1-0.2 GB per 1000 nodes (adjacency lists, dicts)
+            #   - Sparse Laplacian (CSR): ~(E*16) bytes ≈ negligible for grid graphs
+            #   - Dense Laplacian: N²*8 bytes
+            #   - eigvalsh overhead: ~0% (LAPACK JOBZ='N')
+            # Conservative estimate: 1.2× accounts for graph overhead + fragmentation
             # See: https://www.netlib.org/lapack/explore-html/d8/d30/group__heevd_ga25b71a69f9921df0a6050aa5883f54f4.html
-            memory_mb = int(dense_gb * 1024 * 1.1)  # 1.1x: matrix + 10% overhead
+            memory_mb = int(dense_gb * 1024 * 1.2)  # 1.2x: matrix + graph overhead
             return (min(memory_mb, 1200 * 1024), 'scipy', False)  # CPU-only node
         else:
             # Graph too large for full spectrum
