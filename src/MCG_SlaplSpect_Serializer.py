@@ -189,10 +189,11 @@ def main() -> None:
             memory_mb = int(dense_gb * 1024 * 2.0)
             return (max(memory_mb, 2048), 'cupy', True)  # Request GPU node
         elif dense_gb < CPU_RAM_LIMIT_GB:
-            # Dense CPU: matrix + 3.5x workspace for eigensolver
-            # High-memory nodes (Orion: 1536GB) can handle this
-            # For full spectrum, dense is always better than sparse!
-            memory_mb = int(dense_gb * 1024 * 3.5)  # 3.5x for safety
+            # Dense CPU: scipy.linalg.eigvalsh for eigenvalues ONLY
+            # LAPACK dsyevd with JOBZ='N': WORK=(2*N+1)*8 bytes ≈ negligible
+            # Total memory ≈ N²*8 bytes (matrix) + small overhead
+            # See: https://www.netlib.org/lapack/explore-html/d8/d30/group__heevd_ga25b71a69f9921df0a6050aa5883f54f4.html
+            memory_mb = int(dense_gb * 1024 * 1.1)  # 1.1x: matrix + 10% overhead
             return (min(memory_mb, 1200 * 1024), 'scipy', False)  # CPU-only node
         else:
             # Graph too large for full spectrum
