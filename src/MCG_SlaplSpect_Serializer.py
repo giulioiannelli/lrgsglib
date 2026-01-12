@@ -176,8 +176,11 @@ def main() -> None:
         # A100-80GB: Use 70GB limit (leave 10GB for workspace/overhead)
         # Dense matrix + workspace ≈ 3× matrix size, so N_max ≈ sqrt(70/3) ≈ 48k nodes
         GPU_VRAM_LIMIT_GB = 70.0
-        CPU_RAM_LIMIT_GB = 150.0
-        SPARSE_CROSSOVER_N = 75000
+        # High-memory CPU nodes (Nix/Orion) have 768-1536 GB RAM
+        CPU_RAM_LIMIT_GB = 500.0
+        # Use dense up to N=250k for full spectrum (sparse ARPACK is broken for k≈N)
+        # it=8 produces N≈212k, which needs ~230GB dense = ~800GB with workspace
+        SPARSE_CROSSOVER_N = 250000
 
         if dense_gb < GPU_VRAM_LIMIT_GB:
             # Dense GPU: CPU builds graph, GPU computes eigenvalues
@@ -185,16 +188,15 @@ def main() -> None:
             memory_mb = int(dense_gb * 1024 * 2.0)
             return (max(memory_mb, 2048), 'cupy', True)  # Request GPU node
         elif dense_gb < CPU_RAM_LIMIT_GB and N < SPARSE_CROSSOVER_N:
-            # Dense CPU fallback: matrix + 2x workspace for eigensolver
-            memory_mb = int(dense_gb * 1024 * 3.0)  # 3x for matrix + workspace
-            return (min(memory_mb, 150 * 1024), 'scipy', False)  # CPU-only node
+            # Dense CPU: matrix + 3x workspace for eigensolver
+            # High-memory nodes (Orion: 1536GB) can handle this
+            memory_mb = int(dense_gb * 1024 * 3.5)  # 3.5x for safety
+            return (min(memory_mb, 1200 * 1024), 'scipy', False)  # CPU-only node
         else:
-            # Sparse CPU: For nearly-full spectrum (k=N-2), eigsh workspace
-            # needs approximately (k + 8) * N * 8 bytes ≈ N² * 8 bytes
-            k = N - 2  # eigsh with sparse gets N-2 eigenvalues
-            workspace_gb = (k + 8) * N * 8 / (1024 ** 3)
-            memory_mb = int(workspace_gb * 1024 * 1.2)  # +20% safety margin
-            return (min(max(memory_mb, 4096), 300 * 1024), 'scipy', False)  # CPU-only node
+            # Graph too large for full spectrum
+            # User should either use partial spectrum (--howmany) or give up
+            memory_mb = 300 * 1024  # Placeholder, won't work for full spectrum
+            return (memory_mb, 'scipy', False)
 
     def dispatch(p1: float, p2: float, p3: float, p4: float,
                  fraction: float, iterations: int, pflip: float) -> None:
@@ -225,27 +227,16 @@ def main() -> None:
             p1, p2, p3, p4, fraction, iterations
         )
 
-        # If user specified backend, use that for slanzarv decisions
+        # If user specified backend, override the determined backend
         if user_backend is not None:
             backend = user_backend
             # Recalculate use_gpu_node based on user's backend choice
             use_gpu_node = (backend == 'cupy')
 
-            # If user wants scipy, recalculate memory for CPU
-            if backend == 'scipy' and not use_gpu_node:
-                SIZE = 2 ** (iterations + 1)
-                N_grid = max(1, round(fraction * SIZE * SIZE))
-                N = int(N_grid * 1.15)
-                dense_gb = (N ** 2 * 8) / (1024 ** 3)
-
-                if dense_gb < 150.0 and N < 75000:
-                    memory_mb = int(dense_gb * 1024 * 3.0)
-                    memory_mb = min(memory_mb, 150 * 1024)
-                else:
-                    k = N - 2
-                    workspace_gb = (k + 8) * N * 8 / (1024 ** 3)
-                    memory_mb = int(workspace_gb * 1024 * 1.2)
-                    memory_mb = min(max(memory_mb, 4096), 300 * 1024)
+            # Recalculate memory with user's backend choice
+            memory_mb, _, _ = estimate_memory_and_backend(
+                p1, p2, p3, p4, fraction, iterations
+            )
 
         # Build explicit command with all options visible
         # Start with backend (determined or user-specified)

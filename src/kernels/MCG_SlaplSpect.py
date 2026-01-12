@@ -71,12 +71,16 @@ def select_optimal_backend(N, E, requested_backend='cupy', verbose=False):
         except:
             pass  # Fall back to default if cupy not available
 
-    # CPU RAM limit (conservative, assumes ~200GB available on cluster nodes)
-    CPU_RAM_LIMIT_GB = 150.0
+    # CPU RAM limit for dense eigendecomposition
+    # High-memory nodes (Nix/Orion) have 768-1536 GB, so we can handle larger matrices
+    CPU_RAM_LIMIT_GB = 500.0
 
     # Threshold where sparse becomes faster than dense on CPU
-    # From benchmarks: sparse is slower for N < 50k, faster for N > 100k
-    SPARSE_CROSSOVER_N = 75000
+    # NOTE: Sparse is ONLY efficient for partial spectrum (k << N)
+    # For full spectrum (k ≈ N), sparse ARPACK allocates N×N workspace → use dense instead!
+    # From benchmarks: sparse is slower for N < 50k, faster for N > 100k (when k << N)
+    # it=8 produces N≈212k → use dense for full spectrum
+    SPARSE_CROSSOVER_N = 250000  # Use dense up to N=250k for full spectrum
 
     # Strategy 1: Dense GPU if requested and fits
     if requested_backend == 'cupy' and dense_gb < GPU_VRAM_LIMIT_GB:
