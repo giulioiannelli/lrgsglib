@@ -82,23 +82,23 @@ def select_optimal_backend(N, E, requested_backend='cupy', verbose=False):
     # Strategy 1: Dense GPU if requested and fits
     if requested_backend == 'cupy' and dense_gb < GPU_VRAM_LIMIT_GB:
         if verbose:
-            print(f"Backend auto-select: Dense GPU (cupy) - {dense_gb:.1f}GB < {GPU_VRAM_LIMIT_GB:.1f}GB limit")
+            print(f"Backend auto-select: Dense GPU (cupy) - {dense_gb:.1f}GB < {GPU_VRAM_LIMIT_GB:.1f}GB limit", flush=True)
         return ('cupy', False, f'denseGPU')
 
     # Strategy 2: Dense CPU if fits in RAM
     # For full spectrum, dense is ALWAYS better than sparse (no N×N workspace issue)
     if dense_gb < CPU_RAM_LIMIT_GB:
         if verbose:
-            print(f"Backend auto-select: Dense CPU (scipy) - {dense_gb:.1f}GB < {CPU_RAM_LIMIT_GB:.1f}GB limit")
-            print(f"  Full spectrum for N={N:,} nodes")
+            print(f"Backend auto-select: Dense CPU (scipy) - {dense_gb:.1f}GB < {CPU_RAM_LIMIT_GB:.1f}GB limit", flush=True)
+            print(f"  Full spectrum for N={N:,} nodes", flush=True)
         return ('scipy', False, f'denseCPU')
 
     # Strategy 3: Graph too large for full spectrum
     # User must either use partial spectrum (--howmany) or reduce graph size
     if verbose:
-        print(f"Backend auto-select: Graph too large for full spectrum!")
-        print(f"  N={N:,} nodes would require {dense_gb:.1f}GB (limit: {CPU_RAM_LIMIT_GB:.1f}GB)")
-        print(f"  Solution: Use --howmany to compute partial spectrum")
+        print(f"Backend auto-select: Graph too large for full spectrum!", flush=True)
+        print(f"  N={N:,} nodes would require {dense_gb:.1f}GB (limit: {CPU_RAM_LIMIT_GB:.1f}GB)", flush=True)
+        print(f"  Solution: Use --howmany to compute partial spectrum", flush=True)
     # Return sparse as placeholder, but it will likely fail
     return ('scipy', True, f'tooLarge_usePartialSpectrum')
 
@@ -156,10 +156,10 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
             def get_mem_gb():
                 return process.memory_info().rss / (1024**3)
             mem_start = get_mem_gb()
-            print(f"[MEM] Start: {mem_start:.2f} GB")
+            print(f"[MEM] Start: {mem_start:.2f} GB", flush=True)
         except ImportError:
             verbose_mem = False
-            print("[WARNING] psutil not available, memory tracking disabled")
+            print("[WARNING] psutil not available, memory tracking disabled", flush=True)
     else:
         verbose_mem = False
 
@@ -169,7 +169,7 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
 
     # Generate graph
     if verbose:
-        print(f"[STEP 1/5] Creating MultiplicativeCascadeGraph (p1={p1}, p2={p2}, p3={p3}, p4={p4}, fraction={fraction}, it={iterations})...")
+        print(f"[STEP 1/5] Creating MultiplicativeCascadeGraph (p1={p1}, p2={p2}, p3={p3}, p4={p4}, fraction={fraction}, it={iterations})...", flush=True)
 
     G = MultiplicativeCascadeGraph(
         p1=p1, p2=p2, p3=p3, p4=p4,
@@ -185,8 +185,8 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
     if verbose:
         try:
             mem_after_graph = get_mem_gb()
-            print(f"[MEM] After graph creation: {mem_after_graph:.2f} GB (+{mem_after_graph - mem_start:.2f} GB)")
-            print(f"[INFO] Graph: N={G.N:,} nodes, E={G.Ne:,} edges")
+            print(f"[MEM] After graph creation: {mem_after_graph:.2f} GB (+{mem_after_graph - mem_start:.2f} GB)", flush=True)
+            print(f"[INFO] Graph: N={G.N:,} nodes, E={G.Ne:,} edges", flush=True)
         except:
             pass
 
@@ -202,7 +202,7 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
         N = graph.number_of_nodes()  # Get N directly from graph, not G.N
         E = graph.number_of_edges()
         if verbose:
-            print(f"[DEBUG] Graph has N={N:,} nodes, E={E:,} edges, G.N={G.N}")
+            print(f"[DEBUG] Graph has N={N:,} nodes, E={E:,} edges, G.N={G.N}", flush=True)
         actual_backend, actual_keep_sparse, backend_suffix = select_optimal_backend(
             N, E, requested_backend=backend, verbose=verbose
         )
@@ -215,9 +215,9 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
         # Use eigenvalues-only computation (faster, no eigenvectors)
         # Try GPU, fall back to CPU if OOM
         if verbose:
-            print(f"[STEP 2/5] Computing Laplacian spectrum (backend={actual_backend}, keep_sparse={actual_keep_sparse})...")
+            print(f"[STEP 2/5] Computing Laplacian spectrum (backend={actual_backend}, keep_sparse={actual_keep_sparse})...", flush=True)
             matrix_gb = (G.N ** 2 * 8) / (1024**3)
-            print(f"[INFO] Dense matrix size: {matrix_gb:.1f} GB")
+            print(f"[INFO] Dense matrix size: {matrix_gb:.1f} GB", flush=True)
 
         try:
             G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
@@ -226,15 +226,15 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
             if verbose:
                 try:
                     mem_after_spectrum = get_mem_gb()
-                    print(f"[MEM] After spectrum computation: {mem_after_spectrum:.2f} GB (+{mem_after_spectrum - mem_after_graph:.2f} GB)")
-                    print(f"[INFO] Computed {len(eigvals)} eigenvalues")
+                    print(f"[MEM] After spectrum computation: {mem_after_spectrum:.2f} GB (+{mem_after_spectrum - mem_after_graph:.2f} GB)", flush=True)
+                    print(f"[INFO] Computed {len(eigvals)} eigenvalues", flush=True)
                 except:
                     pass
         except Exception as e:
             # Check if it's a GPU OOM error
             if 'cupy' in str(type(e).__module__) and 'OutOfMemory' in str(type(e).__name__):
-                print(f"GPU Out of Memory! Falling back to Dense CPU")
-                print(f"  Error: {e}")
+                print(f"GPU Out of Memory! Falling back to Dense CPU", flush=True)
+                print(f"  Error: {e}", flush=True)
                 # Fall back to dense CPU
                 actual_backend = 'scipy'
                 actual_keep_sparse = False
@@ -250,7 +250,7 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
         G.compute_k_eigvV(k=k, backend=actual_backend)
         eigvals = G.eigv  # Partial spectrum (first k eigenvalues)
     else:
-        raise ValueError(f"Unknown mode: {mode}")
+        raise ValueError(f"Unknown mode: {mode}", flush=True)
 
     return eigvals
 
@@ -327,7 +327,7 @@ def eigV_for_mc_graph_ptch(p1, p2, p3, p4, fraction, iterations,
         start = mid - howmany // 2
         eigvecs = G.eigV[start:start+howmany, :]
     else:
-        raise ValueError(f"Unknown mode: {mode}")
+        raise ValueError(f"Unknown mode: {mode}", flush=True)
 
     return np.abs(eigvecs)  # Shape (howmany, N)
 
@@ -456,8 +456,8 @@ def perform_spectral_calculations(args):
                         metadata_list = pk.load(f)
             except Exception as e:
                 if args.verbose:
-                    print(f"Warning: Could not load existing file {existing_file}: {e}")
-                    print("Starting from scratch")
+                    print(f"Warning: Could not load existing file {existing_file}: {e}", flush=True)
+                    print("Starting from scratch", flush=True)
                 eigvlist = []
                 metadata_list = []
                 start_idx = 0
@@ -513,7 +513,7 @@ def perform_spectral_calculations(args):
                     if prev_file.exists():
                         prev_file.unlink()
                         if args.verbose:
-                            print(f"Removed previous checkpoint: {prev_file.name}")
+                            print(f"Removed previous checkpoint: {prev_file.name}", flush=True)
                     if prev_metadata.exists():
                         prev_metadata.unlink()
 
@@ -530,7 +530,7 @@ def perform_spectral_calculations(args):
             if prev_file.exists():
                 prev_file.unlink()
                 if args.verbose:
-                    print(f"Removed last checkpoint: {prev_file.name}")
+                    print(f"Removed last checkpoint: {prev_file.name}", flush=True)
             if prev_metadata.exists():
                 prev_metadata.unlink()
 
@@ -578,11 +578,11 @@ def perform_spectral_calculations(args):
                         # Old format fallback
                         entropy_list = data if isinstance(data, list) else []
                 if args.verbose:
-                    print(f"Loaded {len(entropy_list)} existing entropy profiles")
+                    print(f"Loaded {len(entropy_list)} existing entropy profiles", flush=True)
             except Exception as e:
                 if args.verbose:
-                    print(f"Warning: Could not load {existing_file}: {e}")
-                    print("Starting from scratch")
+                    print(f"Warning: Could not load {existing_file}: {e}", flush=True)
+                    print("Starting from scratch", flush=True)
                 entropy_list = []
                 tau_scale = None
                 start_idx = 0
@@ -621,7 +621,7 @@ def perform_spectral_calculations(args):
             G.compute_laplacian_spectrum(backend=spectral_backend)
 
             if G.eigv is None:
-                raise ValueError(f"Eigenvalue computation failed for realization {idx}")
+                raise ValueError(f"Eigenvalue computation failed for realization {idx}", flush=True)
 
             # Compute entropy observables from eigenvalues
             entropy, specific_heat, variance, time_grid = compute_entropy_observables_from_eigenvalues(
@@ -635,9 +635,9 @@ def perform_spectral_calculations(args):
             )
 
             if idx == start_idx and args.verbose:
-                print(f"  Computed entropy for N={G.N} nodes")
-                print(f"  Eigenvalue range: [{np.min(G.eigv):.6f}, {np.max(G.eigv):.6f}]")
-                print(f"  Tau range: [{time_grid[0]:.2e}, {time_grid[-1]:.2e}]")
+                print(f"  Computed entropy for N={G.N} nodes", flush=True)
+                print(f"  Eigenvalue range: [{np.min(G.eigv):.6f}, {np.max(G.eigv):.6f}]", flush=True)
+                print(f"  Tau range: [{time_grid[0]:.2e}, {time_grid[-1]:.2e}]", flush=True)
 
             # Store tau_scale from first realization (same for all)
             if tau_scale is None:
@@ -664,7 +664,7 @@ def perform_spectral_calculations(args):
                     if prev_file.exists():
                         prev_file.unlink()
                         if args.verbose:
-                            print(f"Removed previous checkpoint: {prev_file.name}")
+                            print(f"Removed previous checkpoint: {prev_file.name}", flush=True)
 
                 last_saved_na = current_count
 
@@ -678,13 +678,13 @@ def perform_spectral_calculations(args):
             if prev_file.exists():
                 prev_file.unlink()
                 if args.verbose:
-                    print(f"Removed last checkpoint: {prev_file.name}")
+                    print(f"Removed last checkpoint: {prev_file.name}", flush=True)
 
         if args.verbose:
-            print(f"\nEntropy mode completed:")
-            print(f"  - Computed {len(entropy_list)} realizations")
-            print(f"  - Time points: {len(tau_scale)}")
-            print(f"  - Saved to: {fname_base}_na={args.number_of_averages}.pkl")
+            print(f"\nEntropy mode completed:", flush=True)
+            print(f"  - Computed {len(entropy_list)} realizations", flush=True)
+            print(f"  - Time points: {len(tau_scale)}", flush=True)
+            print(f"  - Saved to: {fname_base}_na={args.number_of_averages}.pkl", flush=True)
 
 
 # ============================================================================
@@ -706,7 +706,7 @@ def eigvec_initial_data(args):
         Absolute values of eigenvector components.
     """
     if args.verbose:
-        print("Computing initial eigenvector data for MC graph...")
+        print("Computing initial eigenvector data for MC graph...", flush=True)
 
     out_suffix = getattr(args, 'out_suffix', '')
 
@@ -725,7 +725,7 @@ def eigvec_initial_data(args):
     )
 
     if args.verbose:
-        print(f"Computed eigenvector data of size {result.shape}")
+        print(f"Computed eigenvector data of size {result.shape}", flush=True)
     return result
 
 
@@ -744,7 +744,7 @@ def eigval_initial_data(args):
         Eigenvalues of signed Laplacian.
     """
     if args.verbose:
-        print("Computing initial eigenvalue data for MC graph...")
+        print("Computing initial eigenvalue data for MC graph...", flush=True)
 
     out_suffix = getattr(args, 'out_suffix', '')
 
@@ -762,7 +762,7 @@ def eigval_initial_data(args):
     )
 
     if args.verbose:
-        print(f"Computed eigenvalue data of size {result.shape}")
+        print(f"Computed eigenvalue data of size {result.shape}", flush=True)
     return result
 
 
@@ -789,7 +789,7 @@ def eigvec_update_data(batch_size, bins, bin_centers, bin_counter, args):
         Updated bin counters.
     """
     if args.verbose:
-        print(f"Updating eigenvector data for batch size {batch_size}...")
+        print(f"Updating eigenvector data for batch size {batch_size}...", flush=True)
     eig_values = [[] for _ in range(args.howmany)]
 
     out_suffix = getattr(args, 'out_suffix', '')
@@ -823,7 +823,7 @@ def eigvec_update_data(batch_size, bins, bin_centers, bin_counter, args):
         bin_counter[i].update(bin_eigenvalues(eig_values[i], bins, bin_centers))
 
     if args.verbose:
-        print("Updated eigenvector data.")
+        print("Updated eigenvector data.", flush=True)
     return bin_counter
 
 
@@ -850,7 +850,7 @@ def eigval_update_data(batch_size, bins, bin_centers, bin_counter, args):
         Updated bin counter.
     """
     if args.verbose:
-        print(f"Updating eigenvalue data for batch size {batch_size}...")
+        print(f"Updating eigenvalue data for batch size {batch_size}...", flush=True)
 
     out_suffix = getattr(args, 'out_suffix', '')
 
@@ -878,5 +878,5 @@ def eigval_update_data(batch_size, bins, bin_centers, bin_counter, args):
     bin_counter.update(bin_eigenvalues(eig_values, bins, bin_centers))
 
     if args.verbose:
-        print("Updated eigenvalue data.")
+        print("Updated eigenvalue data.", flush=True)
     return bin_counter
