@@ -178,24 +178,26 @@ def main() -> None:
         GPU_VRAM_LIMIT_GB = 70.0
         # High-memory CPU nodes (Nix/Orion) have 768-1536 GB RAM
         CPU_RAM_LIMIT_GB = 500.0
-        # Use dense up to N=250k for full spectrum (sparse ARPACK is broken for k≈N)
-        # it=8 produces N≈212k, which needs ~230GB dense = ~800GB with workspace
-        SPARSE_CROSSOVER_N = 250000
+
+        # NOTE: This is for FULL SPECTRUM (--howmany 0)
+        # For full spectrum, dense is ALWAYS better than sparse
+        # (sparse with k≈N allocates N×N workspace)
 
         if dense_gb < GPU_VRAM_LIMIT_GB:
             # Dense GPU: CPU builds graph, GPU computes eigenvalues
             # Allocate 2x dense matrix size for graph construction + workspace
             memory_mb = int(dense_gb * 1024 * 2.0)
             return (max(memory_mb, 2048), 'cupy', True)  # Request GPU node
-        elif dense_gb < CPU_RAM_LIMIT_GB and N < SPARSE_CROSSOVER_N:
-            # Dense CPU: matrix + 3x workspace for eigensolver
+        elif dense_gb < CPU_RAM_LIMIT_GB:
+            # Dense CPU: matrix + 3.5x workspace for eigensolver
             # High-memory nodes (Orion: 1536GB) can handle this
+            # For full spectrum, dense is always better than sparse!
             memory_mb = int(dense_gb * 1024 * 3.5)  # 3.5x for safety
             return (min(memory_mb, 1200 * 1024), 'scipy', False)  # CPU-only node
         else:
             # Graph too large for full spectrum
-            # User should either use partial spectrum (--howmany) or give up
-            memory_mb = 300 * 1024  # Placeholder, won't work for full spectrum
+            # User should use partial spectrum (--howmany) instead
+            memory_mb = 300 * 1024  # Placeholder, will fail
             return (memory_mb, 'scipy', False)
 
     def dispatch(p1: float, p2: float, p3: float, p4: float,

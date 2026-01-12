@@ -75,12 +75,9 @@ def select_optimal_backend(N, E, requested_backend='cupy', verbose=False):
     # High-memory nodes (Nix/Orion) have 768-1536 GB, so we can handle larger matrices
     CPU_RAM_LIMIT_GB = 500.0
 
-    # Threshold where sparse becomes faster than dense on CPU
-    # NOTE: Sparse is ONLY efficient for partial spectrum (k << N)
-    # For full spectrum (k ≈ N), sparse ARPACK allocates N×N workspace → use dense instead!
-    # From benchmarks: sparse is slower for N < 50k, faster for N > 100k (when k << N)
-    # it=8 produces N≈212k → use dense for full spectrum
-    SPARSE_CROSSOVER_N = 250000  # Use dense up to N=250k for full spectrum
+    # NOTE: This function is called for FULL SPECTRUM computation
+    # Sparse ARPACK with k≈N allocates N×N workspace → always prefer dense!
+    # Sparse is ONLY useful for partial spectrum (k << N) - not handled here
 
     # Strategy 1: Dense GPU if requested and fits
     if requested_backend == 'cupy' and dense_gb < GPU_VRAM_LIMIT_GB:
@@ -88,20 +85,22 @@ def select_optimal_backend(N, E, requested_backend='cupy', verbose=False):
             print(f"Backend auto-select: Dense GPU (cupy) - {dense_gb:.1f}GB < {GPU_VRAM_LIMIT_GB:.1f}GB limit")
         return ('cupy', False, f'denseGPU')
 
-    # Strategy 2: Dense CPU if fits in RAM and not too large
-    if dense_gb < CPU_RAM_LIMIT_GB and N < SPARSE_CROSSOVER_N:
+    # Strategy 2: Dense CPU if fits in RAM
+    # For full spectrum, dense is ALWAYS better than sparse (no N×N workspace issue)
+    if dense_gb < CPU_RAM_LIMIT_GB:
         if verbose:
-            print(f"Backend auto-select: Dense CPU (scipy) - {dense_gb:.1f}GB RAM, N={N:,} < {SPARSE_CROSSOVER_N:,}")
+            print(f"Backend auto-select: Dense CPU (scipy) - {dense_gb:.1f}GB < {CPU_RAM_LIMIT_GB:.1f}GB limit")
+            print(f"  Full spectrum for N={N:,} nodes")
         return ('scipy', False, f'denseCPU')
 
-    # Strategy 3: Sparse CPU for very large graphs
-    # Gets N-2 eigenvalues (missing 2 is negligible for N > 10k)
+    # Strategy 3: Graph too large for full spectrum
+    # User must either use partial spectrum (--howmany) or reduce graph size
     if verbose:
-        print(f"Backend auto-select: Sparse CPU (scipy) - N={N:,} too large for dense")
-        print(f"  Dense would be: {dense_gb:.1f}GB")
-        print(f"  Sparse uses: {sparse_mb:.1f}MB")
-        print(f"  Will compute N-2 = {N-2:,} eigenvalues (missing 2/{N} = {2/N*100:.1f}%)")
-    return ('scipy', True, f'sparseCPU_N-2')
+        print(f"Backend auto-select: Graph too large for full spectrum!")
+        print(f"  N={N:,} nodes would require {dense_gb:.1f}GB (limit: {CPU_RAM_LIMIT_GB:.1f}GB)")
+        print(f"  Solution: Use --howmany to compute partial spectrum")
+    # Return sparse as placeholder, but it will likely fail
+    return ('scipy', True, f'tooLarge_usePartialSpectrum')
 
 
 def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
