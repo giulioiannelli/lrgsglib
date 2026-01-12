@@ -2,17 +2,23 @@ from __future__ import annotations
 
 import argparse
 
-from lrgsglib.config.progargs import (
+# Import directly from config modules to avoid loading entire lrgsglib package
+# (which would import statsys → numba/cupy, very slow on cluster)
+from lrgsglib.config.progargs.SlaplSpect import (
     MCG_SlaplSpect_srun_description,
     MCG_SlaplSpect_srun_optional_args_dict,
     MCG_MCGSS_progname,
     MCG_MCGSS_progname_shrt,
-    srun_action_args,
-    srun_opt_args,
-    MC_args,
-    MC_opt_args,
     MCG_SlaplSpect_optional_args_dict,
     MCG_SlaplSpect_action_args_dict,
+)
+from lrgsglib.config.progargs.common import (
+    srun_action_args,
+    srun_opt_args,
+)
+from lrgsglib.config.progargs.MultiplicativeCascade import (
+    MC_args,
+    MC_opt_args,
 )
 from parsers.shared import CustomHelpAction
 

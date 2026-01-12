@@ -20,7 +20,8 @@ from parsers.MCG_SlaplSpect_Serializer import (
     MCG_MCGSS_progname_shrt,
     parser,
 )
-from lrgsglib.config.progargs import (
+# Import directly from config modules to avoid loading entire lrgsglib package
+from lrgsglib.config.progargs.SlaplSpect import (
     DEFAULT_MCG_SLAPLSPECT_SRUN_MATRIX_LIST,
     DEFAULT_MCG_SLAPLSPECT_SRUN_FRACTION_LIST,
     DEFAULT_MCG_SLAPLSPECT_SRUN_ITERATIONS_LIST,
