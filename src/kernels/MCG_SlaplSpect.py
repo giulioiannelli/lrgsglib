@@ -213,7 +213,13 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
     # Compute eigenvalues based on mode
     if mode == 'full':
         # Use eigenvalues-only computation (faster, no eigenvectors)
-        # Try GPU, fall back to CPU if OOM
+        # CRITICAL: For full spectrum (k=N or k=N-2), MUST use dense method
+        # Sparse ARPACK with k≈N allocates N×N workspace, defeating the purpose!
+        if actual_keep_sparse is None:
+            actual_keep_sparse = False  # Force dense for full spectrum
+            if verbose:
+                print(f"[INFO] Forcing keep_sparse=False for full spectrum (sparse with k≈N is inefficient)", flush=True)
+
         if verbose:
             print(f"[STEP 2/5] Computing Laplacian spectrum (backend={actual_backend}, keep_sparse={actual_keep_sparse})...", flush=True)
             matrix_gb = (G.N ** 2 * 8) / (1024**3)
@@ -221,7 +227,7 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
 
         try:
             G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
-            eigvals = G.eigv  # Full spectrum (or N-2 if sparse)
+            eigvals = G.eigv  # Full spectrum
 
             if verbose:
                 try:
