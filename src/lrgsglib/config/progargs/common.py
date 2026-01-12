@@ -48,6 +48,12 @@ srun_opt_args = {
         'default': DEFAULT_GPUTYPE,
         'choices': ['a100', 'fermi', 'fermi:2']
     },
+    tuple(['--partition']): {
+        'help': phelp_partition,
+        'type': str,
+        'default': DEFAULT_PARTITION,
+        'choices': ['AMD', None]
+    },
 }
 # Serializers program arguments
 srun_action_args = {
@@ -70,10 +76,5 @@ srun_action_args = {
         'help': phelp_short,
         'action': argparse.BooleanOptionalAction,
         'default': DEFAULT_SHORT
-    },
-    tuple(['--gpu']): {
-        'help': phelp_gpu,
-        'action': argparse.BooleanOptionalAction,
-        'default': DEFAULT_GPU
     },
 }

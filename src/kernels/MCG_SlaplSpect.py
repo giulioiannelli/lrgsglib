@@ -59,9 +59,17 @@ def select_optimal_backend(N, E, requested_backend='cupy', verbose=False):
     dense_gb = (N ** 2 * 8) / (1024 ** 3)
     sparse_mb = (E * 16) / (1024 ** 2)
 
-    # A100 VRAM limit (conservative: 60GB out of 80GB to account for workspace)
-    # Dense eigenvalue decomposition needs extra workspace (~2-3x matrix size)
-    GPU_VRAM_LIMIT_GB = 60.0
+    # Detect GPU memory if cupy is available
+    GPU_VRAM_LIMIT_GB = 70.0  # Default for A100-80GB cluster
+    if requested_backend == 'cupy':
+        try:
+            import cupy as cp
+            gpu_mem_bytes = cp.cuda.Device(0).mem_info[1]  # Total memory
+            gpu_mem_gb = gpu_mem_bytes / (1024 ** 3)
+            # Use 87.5% of available GPU memory (leave ~10-12.5% for overhead)
+            GPU_VRAM_LIMIT_GB = gpu_mem_gb * 0.875
+        except:
+            pass  # Fall back to default if cupy not available
 
     # CPU RAM limit (conservative, assumes ~200GB available on cluster nodes)
     CPU_RAM_LIMIT_GB = 150.0
@@ -73,7 +81,7 @@ def select_optimal_backend(N, E, requested_backend='cupy', verbose=False):
     # Strategy 1: Dense GPU if requested and fits
     if requested_backend == 'cupy' and dense_gb < GPU_VRAM_LIMIT_GB:
         if verbose:
-            print(f"Backend auto-select: Dense GPU (cupy) - {dense_gb:.1f}GB < {GPU_VRAM_LIMIT_GB}GB limit")
+            print(f"Backend auto-select: Dense GPU (cupy) - {dense_gb:.1f}GB < {GPU_VRAM_LIMIT_GB:.1f}GB limit")
         return ('cupy', False, f'denseGPU')
 
     # Strategy 2: Dense CPU if fits in RAM and not too large
@@ -88,7 +96,7 @@ def select_optimal_backend(N, E, requested_backend='cupy', verbose=False):
         print(f"Backend auto-select: Sparse CPU (scipy) - N={N:,} too large for dense")
         print(f"  Dense would be: {dense_gb:.1f}GB")
         print(f"  Sparse uses: {sparse_mb:.1f}MB")
-        print(f"  Will compute N-2 = {N-2:,} eigenvalues (missing 2/{N} = {2/N*100:.4f}%)")
+        print(f"  Will compute N-2 = {N-2:,} eigenvalues (missing 2/{N} = {2/N*100:.1f}%)")
     return ('scipy', True, f'sparseCPU_N-2')
 
 
@@ -159,8 +167,12 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
 
     if backend == 'cupy' and keep_sparse is None:
         # Use intelligent backend selection
-        N = G.N
-        E = G.gr['G'].number_of_edges()
+        # Must access graph first to trigger generation and populate G.N
+        graph = G.gr['G']
+        N = graph.number_of_nodes()  # Get N directly from graph, not G.N
+        E = graph.number_of_edges()
+        if verbose:
+            print(f"[DEBUG] Graph has N={N:,} nodes, E={E:,} edges, G.N={G.N}")
         actual_backend, actual_keep_sparse, backend_suffix = select_optimal_backend(
             N, E, requested_backend=backend, verbose=verbose
         )
@@ -478,6 +490,158 @@ def perform_spectral_calculations(args):
                     print(f"Removed last checkpoint: {prev_file.name}")
             if prev_metadata.exists():
                 prev_metadata.unlink()
+
+    elif args.mode == "entropy":
+        # Entropy mode: compute entropy observables from eigenvalues
+        # Uses full spectrum decomposition (much faster than expm_multiply for tau ranges up to 10^7)
+
+        from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
+        from lrgsglib.config.const import DEFAULT_P_FSTR_FMT
+
+        pflip_str = f"p={args.pflip:{DEFAULT_P_FSTR_FMT}}"
+        fname_base = f"mc_entropy_{pflip_str}"
+
+        # Get entropy-specific parameters from args
+        entropy_steps = getattr(args, 'entropy_steps', 600)
+        entropy_t1 = getattr(args, 'entropy_t1', -2)
+        entropy_t2 = getattr(args, 'entropy_t2', 5)
+        entropy_seed = getattr(args, 'entropy_seed', None)
+        entropy_norm = getattr(args, 'entropy_norm', 'complement')
+        specific_heat_scale = getattr(args, 'specific_heat_scale', 'logN')
+        spectral_backend = getattr(args, 'spectral_backend', 'scipy')  # scipy, numpy, or cupy
+
+        # Get working path
+        working_path = get_mc_spectrum_path(args)
+
+        # Check for existing data
+        existing_file, start_idx, should_skip = find_existing_data_by_na(
+            working_path, fname_base, args.number_of_averages, args.verbose
+        )
+
+        if should_skip:
+            return
+
+        # Load existing data or start fresh
+        entropy_list = []
+        tau_scale = None  # Will be set from first computation
+
+        if start_idx > 0 and existing_file is not None:
+            try:
+                with open(existing_file, "rb") as f:
+                    data = pk.load(f)
+                    if isinstance(data, tuple) and len(data) == 2:
+                        entropy_list, tau_scale = data
+                    else:
+                        # Old format fallback
+                        entropy_list = data if isinstance(data, list) else []
+                if args.verbose:
+                    print(f"Loaded {len(entropy_list)} existing entropy profiles")
+            except Exception as e:
+                if args.verbose:
+                    print(f"Warning: Could not load {existing_file}: {e}")
+                    print("Starting from scratch")
+                entropy_list = []
+                tau_scale = None
+                start_idx = 0
+
+        # Compute remaining realizations
+        last_saved_na = start_idx
+
+        for idx in range(start_idx, args.number_of_averages):
+            # Generate graph
+            from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+
+            if entropy_seed is not None:
+                # Use deterministic seed sequence
+                realization_seed = entropy_seed + idx
+            else:
+                realization_seed = None
+
+            if realization_seed is not None:
+                np.random.seed(realization_seed)
+                random.seed(realization_seed)
+
+            out_suffix = getattr(args, 'out_suffix', '')
+
+            G = MultiplicativeCascadeGraph(
+                p1=args.p1, p2=args.p2, p3=args.p3, p4=args.p4,
+                fraction=args.fraction,
+                iterations=args.iterations,
+                stochastic=args.stochastic,
+                periodic=args.periodic,
+                variant=args.variant,
+                pflip=args.pflip,
+                out_suffix=out_suffix
+            )
+
+            # Compute Laplacian spectrum
+            G.compute_laplacian_spectrum(backend=spectral_backend)
+
+            if G.eigv is None:
+                raise ValueError(f"Eigenvalue computation failed for realization {idx}")
+
+            # Compute entropy observables from eigenvalues
+            entropy, specific_heat, variance, time_grid = compute_entropy_observables_from_eigenvalues(
+                eigenvalues=G.eigv,
+                num_nodes=G.N,
+                steps=entropy_steps,
+                t1=entropy_t1,
+                t2=entropy_t2,
+                entropy_norm=entropy_norm,
+                specific_heat_scale=specific_heat_scale
+            )
+
+            if idx == start_idx and args.verbose:
+                print(f"  Computed entropy for N={G.N} nodes")
+                print(f"  Eigenvalue range: [{np.min(G.eigv):.6f}, {np.max(G.eigv):.6f}]")
+                print(f"  Tau range: [{time_grid[0]:.2e}, {time_grid[-1]:.2e}]")
+
+            # Store tau_scale from first realization (same for all)
+            if tau_scale is None:
+                tau_scale = time_grid
+
+            # Accumulate results
+            entropy_list.append({
+                'entropy': entropy,
+                'specific_heat': specific_heat,
+                'variance': variance,
+                'num_nodes': G.N,
+                'realization_idx': idx
+            })
+
+            # Periodic saving
+            if (idx + 1) % args.save_frequency == 0 and (idx + 1) < args.number_of_averages:
+                current_count = idx + 1
+                save_with_na((entropy_list, tau_scale), working_path, fname_base, current_count,
+                           metadata=None, verbose=args.verbose)
+
+                # Clean up previous checkpoint
+                if last_saved_na > 0 and last_saved_na < current_count:
+                    prev_file = working_path / f"{fname_base}_na={last_saved_na}.pkl"
+                    if prev_file.exists():
+                        prev_file.unlink()
+                        if args.verbose:
+                            print(f"Removed previous checkpoint: {prev_file.name}")
+
+                last_saved_na = current_count
+
+        # Save final result
+        save_with_na((entropy_list, tau_scale), working_path, fname_base, args.number_of_averages,
+                   metadata=None, verbose=args.verbose)
+
+        # Clean up last checkpoint
+        if last_saved_na > 0 and last_saved_na < args.number_of_averages:
+            prev_file = working_path / f"{fname_base}_na={last_saved_na}.pkl"
+            if prev_file.exists():
+                prev_file.unlink()
+                if args.verbose:
+                    print(f"Removed last checkpoint: {prev_file.name}")
+
+        if args.verbose:
+            print(f"\nEntropy mode completed:")
+            print(f"  - Computed {len(entropy_list)} realizations")
+            print(f"  - Time points: {len(tau_scale)}")
+            print(f"  - Saved to: {fname_base}_na={args.number_of_averages}.pkl")
 
 
 # ============================================================================

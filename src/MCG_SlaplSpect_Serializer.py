@@ -127,24 +127,44 @@ def main() -> None:
 
     total_printed = total_executed = 0
 
-    def estimate_memory_mb(p1: float, p2: float, p3: float, p4: float,
-                           fraction: float, iterations: int) -> int:
+    def estimate_memory_and_backend(p1: float, p2: float, p3: float, p4: float,
+                                     fraction: float, iterations: int) -> tuple[int, str, bool]:
         """
-        Estimate memory requirement in MB using analytical formulas.
+        Estimate memory requirement and determine optimal backend.
 
-        No graph generation needed - uses deterministic size formulas:
+        Uses analytical formulas with giant component correction:
         - SIZE = 2^(iterations + 1)
-        - N = max(1, round(fraction × SIZE²))
-        - E ≈ 2 × N (approximate for grid-based graphs)
+        - N_grid = fraction × SIZE²
+        - N_actual ≈ N_grid for fraction ≥ 0.6 (giant component ≈ full graph)
+        - N_actual << N_grid for fraction < 0.6 (but already small, so conservative overestimate is safe)
 
-        Uses same backend selection logic as MCG_SlaplSpect.py:
-        - Dense GPU (< 60GB matrix): 2GB safety margin
-        - Dense CPU (60-150GB, N < 75k): allocate for dense matrix + workspace
-        - Sparse CPU (N > 75k): allocate for sparse matrix + workspace
+        Returns
+        -------
+        tuple[int, str, bool]
+            (memory_mb, backend, use_gpu_node)
+            - memory_mb: RAM to allocate
+            - backend: 'cupy' or 'scipy'
+            - use_gpu_node: whether to request GPU node from slanzarv
         """
-        # Compute graph size analytically (no graph generation)
+        # Compute graph size analytically
         SIZE = 2 ** (iterations + 1)
-        N = max(1, round(fraction * SIZE * SIZE))
+        N_grid = max(1, round(fraction * SIZE * SIZE))
+
+        # Apply giant component correction
+        # For fraction ≥ 0.6: giant component ≈ 95-100% of selected nodes
+        # For fraction < 0.6: giant component < 60%, but already small so overestimate is safe
+        #
+        # P-matrix impact (measured at fraction=0.7, it=7):
+        # - User's matrices (p1=1.0, p2=p3∈[0.7,0.9], p4=0.9): N ∈ [42.7k, 44.8k], ~3% variation
+        # - Overall variation across realistic matrices: ~10% coefficient of variation
+        # - Safety margin: 1.15× accounts for p-matrix uncertainty
+        if fraction >= 0.6:
+            # Apply 15% safety margin for p-matrix variability
+            N = int(N_grid * 1.15)
+        else:
+            # Conservative overestimate (actual will be much smaller, but allocate for full size)
+            N = int(N_grid * 1.15)
+
         E_approx = 2 * N  # Approximate for grid-based graphs
 
         # Calculate matrix sizes
@@ -152,24 +172,28 @@ def main() -> None:
         sparse_mb = (E_approx * 16) / (1024 ** 2)
 
         # Apply same thresholds as select_optimal_backend
-        GPU_VRAM_LIMIT_GB = 60.0
+        # A100-80GB: Use 70GB limit (leave 10GB for workspace/overhead)
+        # Dense matrix + workspace ≈ 3× matrix size, so N_max ≈ sqrt(70/3) ≈ 48k nodes
+        GPU_VRAM_LIMIT_GB = 70.0
         CPU_RAM_LIMIT_GB = 150.0
         SPARSE_CROSSOVER_N = 75000
 
         if dense_gb < GPU_VRAM_LIMIT_GB:
-            # Dense GPU will be used, allocate minimal CPU memory for safety
-            return 2048  # 2GB safety margin
+            # Dense GPU: CPU builds graph, GPU computes eigenvalues
+            # Allocate 2x dense matrix size for graph construction + workspace
+            memory_mb = int(dense_gb * 1024 * 2.0)
+            return (max(memory_mb, 2048), 'cupy', True)  # Request GPU node
         elif dense_gb < CPU_RAM_LIMIT_GB and N < SPARSE_CROSSOVER_N:
             # Dense CPU fallback: matrix + 2x workspace for eigensolver
             memory_mb = int(dense_gb * 1024 * 3.0)  # 3x for matrix + workspace
-            return min(memory_mb, 150 * 1024)  # Cap at 150GB
+            return (min(memory_mb, 150 * 1024), 'scipy', False)  # CPU-only node
         else:
             # Sparse CPU: For nearly-full spectrum (k=N-2), eigsh workspace
             # needs approximately (k + 8) * N * 8 bytes ≈ N² * 8 bytes
             k = N - 2  # eigsh with sparse gets N-2 eigenvalues
             workspace_gb = (k + 8) * N * 8 / (1024 ** 3)
             memory_mb = int(workspace_gb * 1024 * 1.2)  # +20% safety margin
-            return min(max(memory_mb, 4096), 300 * 1024)  # 4GB min, 300GB max
+            return (min(max(memory_mb, 4096), 300 * 1024), 'scipy', False)  # CPU-only node
 
     def dispatch(p1: float, p2: float, p3: float, p4: float,
                  fraction: float, iterations: int, pflip: float) -> None:
@@ -188,13 +212,73 @@ def main() -> None:
             _format_value_consistently(pflip, pflip_precision),
         ]
 
-        # Add backend argument (default to cupy for cluster; can be overridden in unknown)
-        cmd = ["python", str(script_path), *prog_args, "--backend", "cupy", *unknown]
+        # Check if user specified backend in unknown args
+        user_backend = None
+        for i, arg in enumerate(unknown):
+            if arg == '--backend' and i + 1 < len(unknown):
+                user_backend = unknown[i + 1]
+                break
+
+        # Determine optimal backend and memory allocation
+        memory_mb, backend, use_gpu_node = estimate_memory_and_backend(
+            p1, p2, p3, p4, fraction, iterations
+        )
+
+        # If user specified backend, use that for slanzarv decisions
+        if user_backend is not None:
+            backend = user_backend
+            # Recalculate use_gpu_node based on user's backend choice
+            use_gpu_node = (backend == 'cupy')
+
+            # If user wants scipy, recalculate memory for CPU
+            if backend == 'scipy' and not use_gpu_node:
+                SIZE = 2 ** (iterations + 1)
+                N_grid = max(1, round(fraction * SIZE * SIZE))
+                N = int(N_grid * 1.15)
+                dense_gb = (N ** 2 * 8) / (1024 ** 3)
+
+                if dense_gb < 150.0 and N < 75000:
+                    memory_mb = int(dense_gb * 1024 * 3.0)
+                    memory_mb = min(memory_mb, 150 * 1024)
+                else:
+                    k = N - 2
+                    workspace_gb = (k + 8) * N * 8 / (1024 ** 3)
+                    memory_mb = int(workspace_gb * 1024 * 1.2)
+                    memory_mb = min(max(memory_mb, 4096), 300 * 1024)
+
+        # Build explicit command with all options visible
+        # Start with backend (determined or user-specified)
+        explicit_opts = ["--backend", backend]
+
+        # Parse unknown args to extract user-specified options
+        user_opts = {}
+        i = 0
+        while i < len(unknown):
+            if unknown[i].startswith('--'):
+                key = unknown[i]
+                # Check if next arg is a value (not another flag)
+                if i + 1 < len(unknown) and not unknown[i + 1].startswith('--'):
+                    user_opts[key] = unknown[i + 1]
+                    i += 2
+                else:
+                    # Boolean flag or flag without value
+                    user_opts[key] = True
+                    i += 1
+            else:
+                i += 1
+
+        # Add user-specified options explicitly (skip --backend if already added)
+        for key, value in user_opts.items():
+            if key != '--backend':
+                if value is True:
+                    explicit_opts.append(key)
+                else:
+                    explicit_opts.extend([key, str(value)])
+
+        cmd = ["python", str(script_path), *prog_args, *explicit_opts]
 
         final_cmd = cmd
         if use_slanzarv:
-            # Estimate memory based on actual graph parameters
-            memory_mb = estimate_memory_mb(p1, p2, p3, p4, fraction, iterations)
             slanz_opts = ["-m", str(memory_mb)]
             if args.nomail:
                 slanz_opts.append("--nomail")
@@ -202,7 +286,19 @@ def main() -> None:
                 slanz_opts.append("--short")
             if args.moretime:
                 slanz_opts.extend(["--time", str(args.moretime)])
-            if args.gpu:
+
+            # Determine partition: AMD for high-memory jobs (>100GB)
+            # User can override with --partition flag
+            partition = args.partition
+            if partition is None and memory_mb > 100 * 1024:  # 100GB in MB
+                partition = 'AMD'
+
+            if partition is not None:
+                slanz_opts.extend(["--partition", partition])
+
+            # Automatically request GPU node when backend='cupy'
+            # Backend is determined by graph size or user override via --backend
+            if use_gpu_node and backend == 'cupy':
                 slanz_opts.append("--gpu")
 
                 # Select GPU type
@@ -210,11 +306,15 @@ def main() -> None:
                     gputype = args.gputype
                 else:
                     # Default to A100 (compatible with CUDA 12.x in current conda environment)
-                    # Backend auto-selection inside MCG_SlaplSpect.py will handle fallback
-                    # to CPU if graph is too large for GPU (printed to slanzarv output file)
                     gputype = 'a100'
 
                 slanz_opts.extend(["--gputype", gputype])
+            else:
+                # CPU-only job: specify core count based on job size
+                # Smaller jobs (< 50GB): 4 cores
+                # Larger jobs (>= 50GB): 8 cores
+                cores = 4 if memory_mb < 50 * 1024 else 8
+                slanz_opts.extend(["-c", str(cores)])
 
             # Build job name with matrix hash for uniqueness
             matrix_hash = f"{_format_value_consistently(p1, p_precision)}" \

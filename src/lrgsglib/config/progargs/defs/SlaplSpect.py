@@ -9,3 +9,12 @@ DEFAULT_SLAPLSPECT_BACKEND = 'scipy'  # Conservative default; cluster will use '
 
 # Sparse eigendecomposition strategy
 DEFAULT_KEEP_SPARSE = None  # Auto-select based on N and sparsity
+
+# Entropy mode defaults (expm_multiply approach)
+DEFAULT_ENTROPY_STEPS = 600
+DEFAULT_ENTROPY_T1 = -2
+DEFAULT_ENTROPY_T2 = 5
+DEFAULT_NUM_SAMPLES = 30
+DEFAULT_ENTROPY_SEED = None
+DEFAULT_ENTROPY_NORM = "complement"
+DEFAULT_SPECIFIC_HEAT_SCALE = "logN"

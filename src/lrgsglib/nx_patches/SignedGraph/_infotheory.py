@@ -33,6 +33,8 @@ def compute_signed_laplacian_entropy(
     lanczos_steps: int = 50,
     num_samples: int = 30,
     slq_seed: Optional[int] = None,
+    tau_cutoff: Optional[float] = None,
+    auto_cutoff_factor: float = 10.0,
 ) -> None:
     """
     Compute the Shannon entropy profile of the signed Laplacian spectrum.
@@ -79,6 +81,14 @@ def compute_signed_laplacian_entropy(
         Number of random probe vectors used by SLQ.
     slq_seed : int, optional
         Random seed for SLQ probe generation.
+    tau_cutoff : float, optional
+        Manual cutoff for numerical stability in SLQ mode. If None (default),
+        automatically estimates from spectral gap (recommended). For tau > tau_cutoff,
+        uses analytical limiting values. Set to float('inf') to disable cutoff (risky).
+    auto_cutoff_factor : float, default 10.0
+        When tau_cutoff is None, sets cutoff to auto_cutoff_factor / lambda_min
+        where lambda_min is the spectral gap. Larger = more conservative.
+        Typical range: 10-100.
 
     Warns
     -----
@@ -188,6 +198,8 @@ def compute_signed_laplacian_entropy(
                 lanczos_steps=lanczos_steps,
                 num_samples=num_samples,
                 seed=slq_seed,
+                tau_cutoff=tau_cutoff,
+                auto_cutoff_factor=auto_cutoff_factor,
             )
         )
 

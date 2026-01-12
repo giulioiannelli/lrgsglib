@@ -85,6 +85,44 @@ MCG_SlaplSpect_optional_args_dict = {
         'help': phelp_mcgsspect_mode,
         'type': str,
         'default': DEFAULT_MCGSSPECT_MODE
+    },
+    # Entropy-specific parameters
+    tuple(['--entropy-steps']): {
+        'help': phelp_entropy_steps,
+        'type': int,
+        'default': DEFAULT_ENTROPY_STEPS
+    },
+    tuple(['--entropy-t1']): {
+        'help': phelp_entropy_t1,
+        'type': int,
+        'default': DEFAULT_ENTROPY_T1
+    },
+    tuple(['--entropy-t2']): {
+        'help': phelp_entropy_t2,
+        'type': int,
+        'default': DEFAULT_ENTROPY_T2
+    },
+    tuple(['--num-samples']): {
+        'help': phelp_num_samples,
+        'type': int,
+        'default': DEFAULT_NUM_SAMPLES
+    },
+    tuple(['--entropy-seed']): {
+        'help': phelp_entropy_seed,
+        'type': int,
+        'default': DEFAULT_ENTROPY_SEED
+    },
+    tuple(['--entropy-norm']): {
+        'help': phelp_entropy_norm,
+        'type': str,
+        'default': DEFAULT_ENTROPY_NORM,
+        'choices': ['standard', 'complement']
+    },
+    tuple(['--specific-heat-scale']): {
+        'help': phelp_specific_heat_scale,
+        'type': str,
+        'default': DEFAULT_SPECIFIC_HEAT_SCALE,
+        'choices': ['logN', 'none']
     }
 }
 MCG_SlaplSpect_action_args_dict = {}
