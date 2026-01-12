@@ -147,11 +147,30 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
     """
     from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
 
+    # Memory tracking for debugging OOM issues
+    if verbose:
+        try:
+            import psutil
+            import os
+            process = psutil.Process(os.getpid())
+            def get_mem_gb():
+                return process.memory_info().rss / (1024**3)
+            mem_start = get_mem_gb()
+            print(f"[MEM] Start: {mem_start:.2f} GB")
+        except ImportError:
+            verbose_mem = False
+            print("[WARNING] psutil not available, memory tracking disabled")
+    else:
+        verbose_mem = False
+
     if seed is not None:
         np.random.seed(seed)
         random.seed(seed)
 
     # Generate graph
+    if verbose:
+        print(f"[STEP 1/5] Creating MultiplicativeCascadeGraph (p1={p1}, p2={p2}, p3={p3}, p4={p4}, fraction={fraction}, it={iterations})...")
+
     G = MultiplicativeCascadeGraph(
         p1=p1, p2=p2, p3=p3, p4=p4,
         fraction=fraction,
@@ -162,6 +181,14 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
         pflip=pflip,
         out_suffix=out_suffix
     )
+
+    if verbose:
+        try:
+            mem_after_graph = get_mem_gb()
+            print(f"[MEM] After graph creation: {mem_after_graph:.2f} GB (+{mem_after_graph - mem_start:.2f} GB)")
+            print(f"[INFO] Graph: N={G.N:,} nodes, E={G.Ne:,} edges")
+        except:
+            pass
 
     # Auto-select optimal backend if cupy requested and keep_sparse not specified
     actual_backend = backend
@@ -187,9 +214,22 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
     if mode == 'full':
         # Use eigenvalues-only computation (faster, no eigenvectors)
         # Try GPU, fall back to CPU if OOM
+        if verbose:
+            print(f"[STEP 2/5] Computing Laplacian spectrum (backend={actual_backend}, keep_sparse={actual_keep_sparse})...")
+            matrix_gb = (G.N ** 2 * 8) / (1024**3)
+            print(f"[INFO] Dense matrix size: {matrix_gb:.1f} GB")
+
         try:
-            G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse)
+            G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
             eigvals = G.eigv  # Full spectrum (or N-2 if sparse)
+
+            if verbose:
+                try:
+                    mem_after_spectrum = get_mem_gb()
+                    print(f"[MEM] After spectrum computation: {mem_after_spectrum:.2f} GB (+{mem_after_spectrum - mem_after_graph:.2f} GB)")
+                    print(f"[INFO] Computed {len(eigvals)} eigenvalues")
+                except:
+                    pass
         except Exception as e:
             # Check if it's a GPU OOM error
             if 'cupy' in str(type(e).__module__) and 'OutOfMemory' in str(type(e).__name__):

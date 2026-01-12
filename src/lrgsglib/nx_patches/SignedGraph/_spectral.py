@@ -27,6 +27,7 @@ def compute_laplacian_spectrum(
     typf: type = np.float64,
     backend: Optional[str] = None,
     keep_sparse: bool = None,
+    verbose: bool = False,
 ):
     """
     Compute eigenvalues only of the signed Laplacian (no eigenvectors).
@@ -169,6 +170,18 @@ def compute_laplacian_spectrum(
         "with_eigvectors": False,
     }
 
+    # Memory tracking for debugging
+    if verbose:
+        try:
+            import psutil
+            import os
+            process = psutil.Process(os.getpid())
+            mem_before_spectrum = process.memory_info().rss / (1024**3)
+            print(f"[MEM-SPECTRAL] Before spectrum computation: {mem_before_spectrum:.2f} GB")
+            print(f"[INFO-SPECTRAL] N={self.N:,}, backend={backend_obj.name}, keep_sparse={keep_sparse}")
+        except:
+            pass
+
     if keep_sparse:
         # Use sparse methods - gets N-2 eigenvalues, discards eigenvectors
         # Cast to correct dtype only if needed
@@ -181,6 +194,15 @@ def compute_laplacian_spectrum(
     else:
         # Convert to dense for full eigenvalue computation
         # CRITICAL: Avoid intermediate copies to minimize peak memory
+        if verbose:
+            try:
+                print(f"[STEP 3/5] Converting sparse Laplacian to dense ({self.N}×{self.N})...")
+                sparse_mb = (self.slp.nnz * 16) / (1024**2) if hasattr(self.slp, 'nnz') else 0
+                dense_mb = (self.N ** 2 * 8) / (1024**2)
+                print(f"[INFO-SPECTRAL] Sparse: {sparse_mb:.1f} MB → Dense: {dense_mb:.1f} MB")
+            except:
+                pass
+
         if hasattr(self.slp, "toarray"):
             # Sparse matrix: check dtype before converting
             if self.slp.dtype == typf:
@@ -191,20 +213,47 @@ def compute_laplacian_spectrum(
                 # Cast sparse first (cheap), then convert to dense
                 dense_laplacian = self.slp.astype(typf).toarray()
 
+            if verbose:
+                try:
+                    mem_after_dense = process.memory_info().rss / (1024**3)
+                    print(f"[MEM-SPECTRAL] After dense conversion: {mem_after_dense:.2f} GB (+{mem_after_dense - mem_before_spectrum:.2f} GB)")
+                except:
+                    pass
+
             # CRITICAL: Explicitly clear sparse Laplacian to free memory before eigval computation
             # For very large matrices (N>100k), this can save 10-50GB of heap space
             # The sparse matrix is no longer needed after dense conversion
             sparse_key = self.on_g
             if sparse_key in self.signed_laplacian_matrices:
                 del self.signed_laplacian_matrices[sparse_key]
+                if verbose:
+                    print(f"[INFO-SPECTRAL] Deleted sparse Laplacian from cache")
             import gc
             gc.collect()  # Force garbage collection to reclaim sparse matrix memory
+
+            if verbose:
+                try:
+                    mem_after_gc = process.memory_info().rss / (1024**3)
+                    print(f"[MEM-SPECTRAL] After GC: {mem_after_gc:.2f} GB (freed {mem_after_dense - mem_after_gc:.2f} GB)")
+                except:
+                    pass
         else:
             # Already dense: just cast if needed
             dense_laplacian = np.asarray(self.slp, dtype=typf)
 
         # Use eigvalsh (eigenvalues only, faster than eigh)
+        if verbose:
+            print(f"[STEP 4/5] Computing eigenvalues with {backend_obj.name}.eigvalsh...")
+
         self.eigv = backend_obj.eigvalsh(dense_laplacian)
+
+        if verbose:
+            try:
+                mem_after_eigvalsh = process.memory_info().rss / (1024**3)
+                print(f"[MEM-SPECTRAL] After eigvalsh: {mem_after_eigvalsh:.2f} GB")
+                print(f"[STEP 5/5] Eigenvalue computation complete: {len(self.eigv)} values")
+            except:
+                pass
 #
 def compute_k_eigvV(
     self: "SignedGraph",
