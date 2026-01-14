@@ -287,15 +287,15 @@ def compute_k_eigvV(
     which : str, default 'SM'
         Which eigenvalues to find ('SM' = smallest magnitude).
     """
-    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy", flush=True)
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     solver = solver.lower()
     if solver not in {"eigsh", "lobpcg"}:
-        raise ValueError("solver must be 'eigsh' or 'lobpcg'.", flush=True)
+        raise ValueError("solver must be 'eigsh' or 'lobpcg'.")
 
     if solver == "lobpcg":
         import warnings
         if k > self.N // 2:
-            raise ValueError("lobpcg is intended for small k (k <= N/2).", flush=True)
+            raise ValueError("lobpcg is intended for small k (k <= N/2).")
 
         if which in {"SM", "SA"}:
             if which == "SM":
@@ -314,7 +314,7 @@ def compute_k_eigvV(
                 )
             largest = True
         else:
-            raise ValueError("lobpcg supports which in {'SM','SA','LM','LA'}.", flush=True)
+            raise ValueError("lobpcg supports which in {'SM','SA','LM','LA'}.")
 
         if backend_name == "cupy":
             import cupy as cp
@@ -345,7 +345,7 @@ def compute_k_eigvV(
             X = np.eye(self.N, k, dtype=typf)
             eigvals, eigvecs = lobpcg(laplacian, X, largest=largest)
         else:
-            raise ValueError("lobpcg is supported only for scipy or cupy backends.", flush=True)
+            raise ValueError("lobpcg is supported only for scipy or cupy backends.")
 
         order = np.argsort(eigvals)
         if largest:
@@ -418,7 +418,7 @@ def compute_k_adj_eigvV(
             "Adjacency matrix is not initialized; build it before computing "
             "adjacency eigenpairs."
         )
-    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy", flush=True)
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     if (backend_name in ['numpy', 'cupy']) or k > self.N // 2:
         compute_adjacency_spectrum_weigV(
             self, backend=backend_name, transpose=transpose,
@@ -566,7 +566,7 @@ def compute_laplacian_spectrum_weigV(
     >>> compute_laplacian_spectrum_weigV(graph, transpose=False)
     >>> v0 = graph.eigV[:, 0]  # First eigenvector
     """
-    logger.info("Computing eigenvectors for the signed graph Laplacian.", flush=True)
+    logger.info("Computing eigenvectors for the signed graph Laplacian.")
     
     cached_eigv = getattr(self, "eigv", None)
     cached_eigV = getattr(self, "eigV", None)
@@ -579,7 +579,7 @@ def compute_laplacian_spectrum_weigV(
     )
     
     if cached_ready:
-        logger.debug("Using cached signed Laplacian spectrum.", flush=True)
+        logger.debug("Using cached signed Laplacian spectrum.")
         eigv_transposed = getattr(self, "_eigV_is_transposed", False)
         if transpose and not eigv_transposed:
             make_eigV_transposed(self)
@@ -618,7 +618,7 @@ def compute_laplacian_spectrum_weigV(
     
     if keep_sparse:
         # Use sparse iterative methods (computes N-2 eigenpairs)
-        logger.info(f"Using sparse methods for large system (N={self.N})", flush=True)
+        logger.info(f"Using sparse methods for large system (N={self.N})")
         if backend_obj.name == 'cupy' and self.N < 10000:
             logger.warning(
                 f"CuPy with sparse mode for N={self.N}. Consider using dense "
@@ -669,7 +669,7 @@ def compute_adjacency_spectrum_weigV(
             "adjacency eigenpairs."
         )
 
-    logger.info("Computing eigenvectors for the adjacency matrix.", flush=True)
+    logger.info("Computing eigenvectors for the adjacency matrix.")
 
     cached_eigv = getattr(self, "adj_eigv", None)
     cached_eigV = getattr(self, "adj_eigV", None)
@@ -681,7 +681,7 @@ def compute_adjacency_spectrum_weigV(
     )
 
     if cached_ready:
-        logger.debug("Using cached adjacency spectrum.", flush=True)
+        logger.debug("Using cached adjacency spectrum.")
         eigv_transposed = getattr(self, "_adj_eigV_is_transposed", False)
         if transpose and not eigv_transposed:
             make_adj_eigV_transposed(self)
@@ -754,9 +754,9 @@ def get_eigV_squeezed(self: "SignedGraph", which: int = 0):
         try: 
             return self.eigV[which].squeeze()
         except IndexError:
-            raise IndexError("Eigenvector index out of range.", flush=True)
+            raise IndexError("Eigenvector index out of range.")
     else:
-        raise AttributeError("eigV not found in SignedGraph instance.", flush=True)
+        raise AttributeError("eigV not found in SignedGraph instance.")
 #
 def get_eigV_binarized(self: "SignedGraph", which: int = 0):
     """
@@ -977,7 +977,7 @@ def get_eigV_check(
     >>> # Request with specific precision
     >>> v1 = get_eigV_check(graph, which=1, typf=np.float32)
     """
-    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy", flush=True)
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     if not hasattr(self, "eigV") or which >= len(self.eigV):
         if which < self.N // 2:
             compute_k_eigvV(
@@ -1070,7 +1070,7 @@ def get_eigV_bin_check(
     >>> # Use GPU acceleration
     >>> v2_bin = get_eigV_bin_check(graph, which=2, backend='cupy')
     """
-    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy", flush=True)
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     return get_eigV_check(
         self, which=which, binarize=True, reshaped=reshaped,
         backend=backend_name, typf=typf, transpose=transpose, flip_to_pos=flip_to_pos
@@ -1197,7 +1197,7 @@ def get_eigV_check_list(
     
     # Retrieve eigenvectors using the established method
     # Note: get_eigV_check already handles computation checks automatically
-    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy", flush=True)
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     eigvec_list = [
         get_eigV_check(
             self, i, binarize=binarize, reshaped=reshaped, backend=backend_name, 
@@ -1299,7 +1299,7 @@ def get_eigV_bin_check_list(
     ...     graph, custom_slice=slice(10), backend='cupy', asarray=True
     ... )
     """
-    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy", flush=True)
+    backend_name = backend if backend is not None else getattr(self, "_backend_name", "scipy")
     return get_eigV_check_list(
         self, custom_slice=custom_slice, binarize=True, 
         reshaped=reshaped, asarray=asarray,
@@ -1465,7 +1465,7 @@ def quantum_walk_probabilities(
         )
 
     if init_node < 0 or init_node >= self.N:
-        raise ValueError(f"init_node={init_node} out of range [0, {self.N})", flush=True)
+        raise ValueError(f"init_node={init_node} out of range [0, {self.N})")
 
     from ...utils.lrg.quantum import quantum_probability_distribution
     return quantum_probability_distribution(
