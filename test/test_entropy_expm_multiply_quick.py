@@ -60,7 +60,7 @@ def test_basic_computation():
         print(f"  {status} {name}")
         all_pass = all_pass and result
 
-    return all_pass
+    assert all_pass, "Some basic checks failed"
 
 
 def test_deterministic():
@@ -84,7 +84,7 @@ def test_deterministic():
     match = np.allclose(S1, S2, rtol=1e-14)
     print(f"  {'✓' if match else '✗'} Identical results with same seed")
 
-    return match
+    assert match, "Same seed should produce identical results"
 
 
 def test_error_convergence():
@@ -108,7 +108,7 @@ def test_error_convergence():
 
     # Just verify we got results (convergence test needs ground truth)
     print("  ✓ Computed entropy for different sample sizes")
-    return True
+    assert len(results) == 3, "Should have computed 3 results"
 
 
 def main():

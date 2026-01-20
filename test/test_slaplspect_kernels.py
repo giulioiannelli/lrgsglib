@@ -289,7 +289,7 @@ class TestProcessEigenDistribution:
         final_file = tmp_path / "test_resume_na=10.pkl"
         assert final_file.exists()
 
-        # Old checkpoint should still exist (it gets renamed)
+        # Old checkpoint should be removed after completion
         assert not checkpoint_file.exists()
 
 
