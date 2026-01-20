@@ -548,10 +548,12 @@ def process_eigen_distribution(
         return
 
     # Load existing data or compute initial data if no files exist
+    resumed_from_checkpoint = None  # Track checkpoint used for resuming
     if navg_done > 0 and existing_file is not None:
         bin_counter, initial_data = load_existing_data(
             existing_file, args.mode, args.verbose
         )
+        resumed_from_checkpoint = existing_file  # Remember for cleanup later
     else:
         initial_data = initial_data_fn(args)
         if initial_data is None:
@@ -610,3 +612,17 @@ def process_eigen_distribution(
                 print(f"Removed last checkpoint: {prev_file.name}")
         if prev_metadata.exists():
             prev_metadata.unlink()
+
+    # Clean up the checkpoint used for resuming (if different from final)
+    if resumed_from_checkpoint is not None and resumed_from_checkpoint.exists():
+        final_file = working_path / f"{fname_base}_na={args.number_of_averages}.pkl"
+        if resumed_from_checkpoint != final_file:
+            resumed_from_checkpoint.unlink()
+            if args.verbose:
+                print(f"Removed resumed checkpoint: {resumed_from_checkpoint.name}")
+            # Also remove metadata if exists
+            resumed_metadata = resumed_from_checkpoint.with_name(
+                resumed_from_checkpoint.stem + "_metadata.pkl"
+            )
+            if resumed_metadata.exists():
+                resumed_metadata.unlink()

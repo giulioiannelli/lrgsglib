@@ -26,11 +26,17 @@ def run_simulation(args):
         isdy.init_ising_dynamics(exName=isdy.run_id)
         match args.runlang:
             case 'C4'|'C1':
-                lattice.export_ising_clust(exName=isdy.run_id, 
+                lattice.export_ising_clust(exName=isdy.run_id,
                                         NoClust=NoClust)
                 if args.runlang == 'C4':
                     lattice._export_eigV(number, exName=isdy.run_id, verbose=args.verbose)
-        isdy.run(verbose=args.verbose)
+        # Run in appropriate mode (equilibrium, SA, or PT)
+        if getattr(args, 'pt_mode', False):
+            isdy.run(pt_mode=True, verbose=args.verbose)
+        elif getattr(args, 'sa_mode', False):
+            isdy.run(sa_mode=True, verbose=args.verbose)
+        else:
+            isdy.run(verbose=args.verbose)
         if args.remove_files:
             isdy.remove_run_c_files(remove_stderr=True)
             lattice.remove_exported_files()

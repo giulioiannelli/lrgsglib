@@ -251,13 +251,19 @@ def main() -> None:
         explicit_opts = ["--backend", backend]
 
         # Parse unknown args to extract user-specified options
+        # Handle both long flags (--flag) and short flags (-f)
         user_opts = {}
         i = 0
         while i < len(unknown):
-            if unknown[i].startswith('--'):
-                key = unknown[i]
+            arg = unknown[i]
+            # Check if it's a flag (starts with - or --)
+            is_long_flag = arg.startswith('--')
+            is_short_flag = arg.startswith('-') and not is_long_flag and len(arg) > 1
+
+            if is_long_flag or is_short_flag:
+                key = arg
                 # Check if next arg is a value (not another flag)
-                if i + 1 < len(unknown) and not unknown[i + 1].startswith('--'):
+                if i + 1 < len(unknown) and not unknown[i + 1].startswith('-'):
                     user_opts[key] = unknown[i + 1]
                     i += 2
                 else:
