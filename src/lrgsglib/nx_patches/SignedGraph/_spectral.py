@@ -140,6 +140,10 @@ def compute_laplacian_spectrum(
     # Always go through BackendManager for consistent validation and fallback
     backend_obj = BackendManager.get_backend(backend, fallback=True)
 
+    # Ensure signed Laplacian matrix is computed
+    if self.slp is None:
+        self.upd_graph_matrices()
+
     # Determine if we should use sparse methods
     if keep_sparse is None:
         # Auto-decide based on size and sparsity
@@ -154,9 +158,9 @@ def compute_laplacian_spectrum(
             # Dense matrix
             sparsity = 1.0
 
-        # For CuPy backend, prefer dense unless matrix is very large
+        # For CuPy backend, always use dense (full spectrum needed for entropy)
         if backend_obj.name == 'cupy':
-            keep_sparse = self.N > 10000 and sparsity < 0.3
+            keep_sparse = False
         else:
             keep_sparse = self.N > 5000 and sparsity < 0.3
 
@@ -596,13 +600,17 @@ def compute_laplacian_spectrum_weigV(
         from ._backend import BackendManager
         backend_obj = BackendManager.get_backend(backend, fallback=True)
 
+    # Ensure signed Laplacian matrix is computed
+    if self.slp is None:
+        self.upd_graph_matrices()
+
     # Determine if we should use sparse methods
     if keep_sparse is None:
         # Auto-decide based on size and sparsity
         sparsity = self.slp.nnz / (self.N * self.N) if hasattr(self.slp, 'nnz') else 1.0
-        # For CuPy backend, prefer dense unless matrix is very large
+        # For CuPy backend, always use dense (full spectrum needed for entropy)
         if backend_obj.name == 'cupy':
-            keep_sparse = self.N > 10000 and sparsity < 0.3
+            keep_sparse = False
         else:
             keep_sparse = self.N > 5000 and sparsity < 0.3
     
