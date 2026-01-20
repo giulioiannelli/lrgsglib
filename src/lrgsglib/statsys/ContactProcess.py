@@ -168,8 +168,7 @@ class ContactProcessBase(BinDynSys):
             if self.rndStr and not exName:
                 exName = self.run_id
             exName_arg = exName if exName else self.run_id
-            # allow empty exName; SignedGraph._export_edgel_bin will add
-            # the required trailing underscore when needed
+            # Export uses build_p_fname which handles underscore via join_non_empty
             self.sg._export_edgel_bin(exName=exName_arg)
         self.sini = self.s.copy()
 
@@ -245,8 +244,8 @@ class ContactProcessBase(BinDynSys):
             f"{self.sg.pflip:.12g}",
             str(datdir),
             syshape,
-            self.run_id,
-            self.out_id,
+            self._c_suffix_arg(self.run_id),
+            self._c_suffix_arg(self.out_id),
         ]
 
     def _build_c_arglist(self) -> list[str]:

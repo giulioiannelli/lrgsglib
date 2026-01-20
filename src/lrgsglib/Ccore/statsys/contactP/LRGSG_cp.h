@@ -4,9 +4,9 @@
 #include "LRGSG_binsys.h"
 
 #define CP_DIR "%s/cntct/%s/"
-#define SINI_FNAME CP_DIR "s_" PSTR "_%s" BINX
-#define SOUT_FNAME CP_DIR "sout_" PSTR "_%s" BINX
-#define DENS_FNAME CP_DIR "dens_" PSTR "_%s" BINX
+#define SINI_FNAME CP_DIR "s_" PSTR "%s" BINX
+#define SOUT_FNAME CP_DIR "sout_" PSTR "%s" BINX
+#define DENS_FNAME CP_DIR "dens_" PSTR "%s" BINX
 
 typedef struct cp_frontier_t cp_frontier_t;
 

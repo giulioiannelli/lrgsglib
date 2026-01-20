@@ -82,6 +82,7 @@ class VoterModel(BinDynSys):
             self.export_s_init()
             if self.rndStr and not exName:
                 exName = self.run_id
+            # Export uses build_p_fname which handles underscore via join_non_empty
             self.sg._export_edgel_bin(exName=self.run_id)
             self.sg.export_adj_bin(exName=self.run_id)
         self.sini = self.s.copy()
@@ -148,8 +149,8 @@ class VoterModel(BinDynSys):
             f"{self.steps}",
             str(datdir),
             syshape,
-            self.run_id,
-            self.out_id,
+            self._c_suffix_arg(self.run_id),
+            self._c_suffix_arg(self.out_id),
         ]
         
         # Add extra arguments for VoterSimulator1 and above

@@ -283,13 +283,20 @@ class BinDynSys:
 
     def run_c(self):
         raise NotImplementedError("Subclasses must implement this method")
+
+    @staticmethod
+    def _c_suffix_arg(s: str) -> str:
+        """Format suffix for C programs: add underscore prefix when non-empty.
+
+        This ensures consistent filename construction:
+        - Empty suffix: no trailing underscore (e.g., s_p=0.1.bin)
+        - Non-empty suffix: underscore separator (e.g., s_p=0.1_abc.bin)
+        """
+        return f"_{s}" if s else ""
     #
     def export_s_init(self):
         out_suffix = self.run_id or ''
         fname = self.sg.get_p_fname('s', out_suffix=out_suffix)
-        if not out_suffix:
-            # ensure a single trailing underscore when run_id is empty (C expects '_')
-            fname = Path(fname.stem + '_' + fname.suffix)
         self.sfout = self.dynpath / fname
         self.s.astype('int8').tofile(open(self.sfout, 'wb'))
         self.s_0 = self.s.copy()
@@ -297,7 +304,5 @@ class BinDynSys:
     def export_hfield(self):
         out_suffix = self.run_id or ''
         fname = self.sg.get_p_fname('h', out_suffix=out_suffix)
-        if not out_suffix:
-            fname = Path(fname.stem + '_' + fname.suffix)
         self.hfout = self.dynpath / fname
         self.field.astype('float64').tofile(open(self.hfout, 'wb'))
