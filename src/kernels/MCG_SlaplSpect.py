@@ -237,19 +237,27 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
                 except:
                     pass
         except Exception as e:
-            # Check if it's a GPU OOM error
-            if 'cupy' in str(type(e).__module__) and 'OutOfMemory' in str(type(e).__name__):
-                print(f"GPU Out of Memory! Falling back to Dense CPU", flush=True)
+            # Check if it's a GPU error that we can recover from
+            error_str = str(e).lower()
+            error_type = str(type(e))
+            is_gpu_oom = 'cupy' in str(type(e).__module__) and 'OutOfMemory' in str(type(e).__name__)
+            is_cusolver_limit = 'CUSOLVERError' in error_type or 'CUSOLVER_STATUS_INVALID_VALUE' in str(e)
+
+            if is_gpu_oom or is_cusolver_limit:
+                if is_gpu_oom:
+                    print(f"GPU Out of Memory! Falling back to Dense CPU", flush=True)
+                else:
+                    print(f"cuSolver limit exceeded (N={G.N:,} too large for 32-bit API)! Falling back to Dense CPU", flush=True)
                 print(f"  Error: {e}", flush=True)
                 # Fall back to dense CPU
                 actual_backend = 'scipy'
                 actual_keep_sparse = False
                 backend_suffix = 'denseCPU_fallback'
                 G.out_suffix = f"{out_suffix}_{backend_suffix}" if out_suffix else backend_suffix
-                G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse)
+                G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
                 eigvals = G.eigv
             else:
-                # Re-raise if not OOM
+                # Re-raise if not a recoverable GPU error
                 raise
     elif mode.startswith('some'):
         k = int(mode.split('_')[1])
