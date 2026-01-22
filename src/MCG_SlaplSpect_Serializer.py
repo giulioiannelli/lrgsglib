@@ -179,11 +179,21 @@ def main() -> None:
         # High-memory CPU nodes (Nix/Orion) have 768-1536 GB RAM
         CPU_RAM_LIMIT_GB = 500.0
 
+        # CRITICAL: cuSolver 32-bit API limit
+        # cuSolver's xsyevd has a workspace limit of 2^31 elements.
+        # For float64 eigenvalue decomposition, this fails around N≈26k-46k.
+        # Conservative limit based on testing and documented failures:
+        # - JAX reports failures at N≈26,732 for float64
+        # - User tested: iter=6 (N≈10-12k) works, iter=7 (N≈44k) fails
+        # Using 30,000 as conservative limit (can be adjusted based on GPU/driver)
+        # See: https://github.com/jax-ml/jax/issues/23410
+        CUSOLVER_N_LIMIT = 30000
+
         # NOTE: This is for FULL SPECTRUM (--howmany 0)
         # For full spectrum, dense is ALWAYS better than sparse
         # (sparse with k≈N allocates N×N workspace)
 
-        if dense_gb < GPU_VRAM_LIMIT_GB:
+        if dense_gb < GPU_VRAM_LIMIT_GB and N <= CUSOLVER_N_LIMIT:
             # Dense GPU: CPU builds graph, GPU computes eigenvalues
             # Allocate 2x dense matrix size for graph construction + workspace
             memory_mb = int(dense_gb * 1024 * 2.0)
