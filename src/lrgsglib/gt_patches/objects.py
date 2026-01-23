@@ -1,9 +1,12 @@
-from ..config.const import *
-from ..config.errwar import *
-from ..config.funcs import *
-from ..shared import *
-#
-from graph_tool.all import Graph, lattice
-#
-from .WeightedGraph import WeightedGraph
-from .LatticeND import LatticeND
+"""
+gt_patches objects module.
+
+Common imports for graph-tool patches.
+"""
+try:
+    from graph_tool.all import Graph, lattice
+    GT_AVAILABLE = True
+except ImportError:
+    GT_AVAILABLE = False
+    Graph = None
+    lattice = None
