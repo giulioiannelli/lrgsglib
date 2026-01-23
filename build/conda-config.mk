@@ -1,5 +1,5 @@
 # conda paths
-CONDA_PREFIX	= $(shell conda info --root)/envs/$(CONDA_ENV_NAME)
+CONDA_PREFIX	= $(shell conda info --base)/envs/$(CONDA_ENV_NAME)
 CONDA_BIN		= $(CONDA_PREFIX)/bin
 ACTIVATE_D		= $(CONDA_PREFIX)/etc/conda/activate.d
 DEACTIVATE_D	= $(CONDA_PREFIX)/etc/conda/deactivate.d
