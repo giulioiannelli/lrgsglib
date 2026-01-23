@@ -13,6 +13,7 @@ SlaplSpect_progName = 'SlaplSpect'
 
 # Generic spectral analysis parameters (shared across L2D, MCG, etc.)
 SlaplSpect_common_optional_args_dict = {
+    **common_opt_args,  # Inherit common optional args (out_suffix, workdir)
     tuple(['-bc', '--bins_count']): {
         'help': phelp_binsc,
         'type': int,

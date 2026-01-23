@@ -5,7 +5,20 @@ from .phelp.generic import *
 from .defs.generic import *
 ## argparse tools
 from .tools import *
-# Program arguments
+# Common optional arguments (apply to all programs)
+common_opt_args = {
+    tuple(['-os', '--out_suffix']): {
+        'help': phelp_outsuffix,
+        'type': str,
+        'default': DEFAULT_OUTSFFX
+    },
+    tuple(['-wd', '--workdir']): {
+        'help': phelp_workdir,
+        'type': str,
+        'default': DEFAULT_WORKDIR
+    },
+}
+# Program arguments (action flags)
 action_args_dict = {
     tuple(['-rf', '--remove_files']): {
         'help': phelp_remove_files,

@@ -403,6 +403,8 @@ def perform_spectral_calculations(args):
     """
 
     # Determine mode and process accordingly
+    out_suffix = getattr(args, 'out_suffix', '')
+
     if args.mode.endswith("dist"):
         if args.mode == "eigvec_dist":
             fname_base = build_eigvec_fname_base(
@@ -414,6 +416,10 @@ def perform_spectral_calculations(args):
             fname_base = build_eigval_fname_base("mc_", args.pflip)
             initial_fn = eigval_initial_data
             update_fn = eigval_update_data
+
+        # Append out_suffix to fname_base if provided
+        if out_suffix:
+            fname_base = f"{fname_base}_{out_suffix}"
 
         # Process distribution using generic framework
         process_eigen_distribution(
@@ -440,10 +446,11 @@ def perform_spectral_calculations(args):
             eig_mode = f'some_{args.howmany}'
 
         # Build filename base (without na suffix)
-        fname_base = f"mc_eigvals_{pflip_str}"
-
-        # Get out_suffix
-        out_suffix = getattr(args, 'out_suffix', '')
+        # Include out_suffix in filename if provided
+        if out_suffix:
+            fname_base = f"mc_eigvals_{pflip_str}_{out_suffix}"
+        else:
+            fname_base = f"mc_eigvals_{pflip_str}"
 
         # Get working path
         working_path = get_mc_spectrum_path(args)
@@ -556,7 +563,12 @@ def perform_spectral_calculations(args):
         from lrgsglib.config.const import DEFAULT_P_FSTR_FMT
 
         pflip_str = f"p={args.pflip:{DEFAULT_P_FSTR_FMT}}"
-        fname_base = f"mc_entropy_{pflip_str}"
+
+        # Build filename base with out_suffix if provided
+        if out_suffix:
+            fname_base = f"mc_entropy_{pflip_str}_{out_suffix}"
+        else:
+            fname_base = f"mc_entropy_{pflip_str}"
 
         # Get entropy-specific parameters from args
         entropy_steps = getattr(args, 'entropy_steps', 600)
@@ -617,8 +629,6 @@ def perform_spectral_calculations(args):
             if realization_seed is not None:
                 np.random.seed(realization_seed)
                 random.seed(realization_seed)
-
-            out_suffix = getattr(args, 'out_suffix', '')
 
             G = MultiplicativeCascadeGraph(
                 p1=args.p1, p2=args.p2, p3=args.p3, p4=args.p4,
