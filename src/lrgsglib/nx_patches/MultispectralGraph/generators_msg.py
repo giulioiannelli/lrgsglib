@@ -135,27 +135,31 @@ def multiplicative_cascade_probability_matrix(
         matrix = base.copy()
 
         for _ in range(iterations):
-            previous = matrix
-            size = previous.shape[0]
-            expanded = np.zeros((size * 2, size * 2), dtype=float)
-            for i in range(size):
-                for j in range(size):
-                    expanded[2 * i : 2 * i + 2, 2 * j : 2 * j + 2] += base * previous[i, j]
-            matrix = expanded
+            matrix = np.kron(matrix, base)
         return matrix
 
     # stochastic path
     A = np.random.choice([p1, p2, p3, p4], (2, 2)).astype(float)
     A_new = A.copy()
     for _ in range(iterations):
-        A = A_new.copy()
+        A = A_new
         L_old = A.shape[0]
         L_new = L_old * 2
-        A_new = np.zeros((L_new, L_new), dtype=float)
-        for i in range(L_old):
-            for j in range(L_old):
-                seed = np.random.choice([p1, p2, p3, p4], (2, 2)).astype(float)
-                A_new[2 * i : 2 * i + 2, 2 * j : 2 * j + 2] += seed * A[i, j]
+        if L_old <= 512:
+            # Vectorized block expansion is faster but uses more memory.
+            seeds = np.random.choice(
+                [p1, p2, p3, p4], size=(L_old, L_old, 2, 2)
+            ).astype(float)
+            blocks = A[:, :, None, None] * seeds
+            A_new = blocks.transpose(0, 2, 1, 3).reshape(L_new, L_new)
+        else:
+            A_new = np.zeros((L_new, L_new), dtype=float)
+            for i in range(L_old):
+                for j in range(L_old):
+                    seed = np.random.choice(
+                        [p1, p2, p3, p4], (2, 2)
+                    ).astype(float)
+                    A_new[2 * i : 2 * i + 2, 2 * j : 2 * j + 2] += seed * A[i, j]
     return A_new
 
 

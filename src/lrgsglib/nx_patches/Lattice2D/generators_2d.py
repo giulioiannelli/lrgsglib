@@ -571,88 +571,76 @@ def rhomb_octagonal_graph_FastPatch(
 
     N = 4 * m * n
     G = empty_graph(0, create_using)
-    
+
     # Add all nodes
     G.add_nodes_from(range(N))
-    
+
     # Add edges within each rhomb
     # Each rhomb has nodes arranged as: 3(top), 1(right), 0(bottom), 2(left)
     # Connect each node to its two neighbors in the rhomb cycle: 0-1-3-2-0
+    intra_edges = []
     for rhomb_idx in range(m * n):
         base = rhomb_idx * 4
         # Intra-rhomb edges forming a 4-cycle: 0-1-3-2-0
-        G.add_edge(base + 0, base + 1)  # bottom to right
-        G.add_edge(base + 1, base + 3)  # right to top
-        G.add_edge(base + 3, base + 2)  # top to left
-        G.add_edge(base + 2, base + 0)  # left to bottom
-    
+        intra_edges.extend(
+            [
+                (base + 0, base + 1),  # bottom to right
+                (base + 1, base + 3),  # right to top
+                (base + 3, base + 2),  # top to left
+                (base + 2, base + 0),  # left to bottom
+            ]
+        )
+    G.add_edges_from(intra_edges)
+
     # Add inter-rhomb edges
+    inter_edges = []
     for rhomb_row in range(m):
+        row_base = rhomb_row * n
         for rhomb_col in range(n):
-            rhomb_idx = rhomb_row * n + rhomb_col
-            base = rhomb_idx * 4
-            
+            base = (row_base + rhomb_col) * 4
+
             # Connect to rhomb to the right (horizontally)
             if rhomb_col < n - 1:
-                right_rhomb_idx = rhomb_row * n + (rhomb_col + 1)
-                right_rhomb_base = right_rhomb_idx * 4
-                G.add_edge(base + 2, right_rhomb_base + 1)  # right node to left node of next rhomb
+                right_rhomb_base = (row_base + rhomb_col + 1) * 4
+                inter_edges.append(
+                    (base + 2, right_rhomb_base + 1)
+                )  # right to left
             elif periodic and n > 1:
-                # Wrap around: rightmost rhomb's right node connects to leftmost rhomb's left node
-                leftmost_rhomb_idx = rhomb_row * n + 0
-                leftmost_rhomb_base = leftmost_rhomb_idx * 4
-                G.add_edge(base + 2, leftmost_rhomb_base + 1)
-            
+                leftmost_rhomb_base = row_base * 4
+                inter_edges.append((base + 2, leftmost_rhomb_base + 1))
+
             # Connect to rhomb above (vertically)
             if rhomb_row < m - 1:
-                above_rhomb_idx = (rhomb_row + 1) * n + rhomb_col
-                above_rhomb_base = above_rhomb_idx * 4
-                G.add_edge(base + 3, above_rhomb_base + 0)  # top node to bottom node of rhomb above
+                above_rhomb_base = ((rhomb_row + 1) * n + rhomb_col) * 4
+                inter_edges.append((base + 3, above_rhomb_base + 0))
             elif periodic and m > 1:
-                # Wrap around to bottom row
-                bottom_rhomb_idx = 0 * n + rhomb_col
-                bottom_rhomb_base = bottom_rhomb_idx * 4
-                G.add_edge(base + 3, bottom_rhomb_base + 0)
-    
+                bottom_rhomb_base = rhomb_col * 4
+                inter_edges.append((base + 3, bottom_rhomb_base + 0))
+    G.add_edges_from(inter_edges)
+
     # Add position attributes if requested
     if with_positions:
         pos = {}
-        
+
         # Scale factor for spacing between rhombs
         rhomb_size = 0.4  # Half-distance from center to edge
         rhomb_spacing = 4.0 * rhomb_size  # Rhombs touch edge-to-edge
-        
-        for node in range(N):
-            # Determine which rhomb this node belongs to
-            rhomb_idx = node // 4
-            node_in_rhomb = node % 4
-            
-            # Calculate rhomb position in the m x n grid
-            rhomb_row = rhomb_idx // n
-            rhomb_col = rhomb_idx % n
-            
-            # Base position of the rhomb center
-            base_x = rhomb_col * rhomb_spacing
-            base_y = rhomb_row * rhomb_spacing
-            
-            # Apply bend positions if requested
-            if periodic and bend_positions:
-                base_x += 0.02 * rhomb_row * rhomb_row
-                base_y += 0.02 * rhomb_col * rhomb_col
-            
-            # Offset within the rhomb for each of the 4 nodes  
-            # Layout: 3=top, 2=right, 0=bottom, 1=left to match connectivity
-            if node_in_rhomb == 0:  # Bottom node
-                offset_x, offset_y = 0, -rhomb_size
-            elif node_in_rhomb == 1:  # Left node
-                offset_x, offset_y = -rhomb_size, 0
-            elif node_in_rhomb == 2:  # Right node
-                offset_x, offset_y = rhomb_size, 0
-            else:  # node_in_rhomb == 3, Top node
-                offset_x, offset_y = 0, rhomb_size
-            
-            pos[node] = (base_x + offset_x, base_y + offset_y)
-        
+
+        for rhomb_row in range(m):
+            for rhomb_col in range(n):
+                base_x = rhomb_col * rhomb_spacing
+                base_y = rhomb_row * rhomb_spacing
+
+                if periodic and bend_positions:
+                    base_x += 0.02 * rhomb_row * rhomb_row
+                    base_y += 0.02 * rhomb_col * rhomb_col
+
+                base = (rhomb_row * n + rhomb_col) * 4
+                pos[base + 0] = (base_x, base_y - rhomb_size)
+                pos[base + 1] = (base_x - rhomb_size, base_y)
+                pos[base + 2] = (base_x + rhomb_size, base_y)
+                pos[base + 3] = (base_x, base_y + rhomb_size)
+
         set_node_attributes(G, pos, "pos")
-    
+
     return G

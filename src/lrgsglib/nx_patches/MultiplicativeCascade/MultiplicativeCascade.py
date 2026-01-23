@@ -70,16 +70,14 @@ class MultiplicativeCascadeGraph(MultispectralGraph):
         mode_str = "stochastic" if stochastic else "regular"
 
         # Build syshapePth with proper ordering
+        # Note: out_suffix is NOT part of syshapePth (folder path)
+        # out_suffix goes in file names, workdir controls folder path
         self.syshapePth = (
             f"i={iterations}_"
             f"f={fmtfunc(fraction)}_"
             f"P={fmtfunc(p1)}_{fmtfunc(p2)}_{fmtfunc(p3)}_{fmtfunc(p4)}_"
             f"{mode_str}"
         )
-
-        # Append out_suffix if provided
-        if out_suffix:
-            self.syshapePth += f"_{out_suffix}"
 
         super().__init__(
             stdFnameSFFX=stdFnameSFFX,
