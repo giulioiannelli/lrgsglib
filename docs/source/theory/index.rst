@@ -1,68 +1,205 @@
 Theoretical Background
 ======================
 
-This section provides theoretical background on the mathematical and physical concepts underlying lrgsglib.
+This section provides theoretical background on the mathematical and physical
+concepts underlying lrgsglib.
 
-.. note::
-   This section is currently under development. For detailed theoretical background,
-   please refer to the academic papers listed in the references below.
+.. toctree::
+   :maxdepth: 2
 
-Topics
-------
+   signed_graphs
+   lrg_theory
+   stat_phys
 
-The theory section will cover:
+Overview
+--------
 
-- Laplacian Renormalization Group framework
-- Signed graph theory and balance
-- Spectral properties of signed graphs
-- Statistical physics models on networks
-- Frustration and ground states
+lrgsglib implements the **Laplacian Renormalization Group for Signed Graphs**,
+a framework that connects network structure to dynamical processes through
+spectral analysis.
 
-Laplacian Renormalization Group
---------------------------------
+Core Concepts
+~~~~~~~~~~~~~
 
-The Laplacian Renormalization Group (LRG) for signed graphs is a theoretical framework for analyzing the spectral properties of networks with both positive and negative edges.
+**Signed Graphs**
+   Networks where edges carry signs (+1 or -1) representing positive or
+   negative interactions. Unlike standard graphs, signed graphs can exhibit
+   frustration when constraints cannot all be satisfied.
 
-Key concepts:
+**Spectral Analysis**
+   The eigenvalues and eigenvectors of the signed Laplacian encode structural
+   information about the network, including frustration levels, community
+   structure, and diffusion properties.
 
-- **Signed Laplacian**: Generalization of the graph Laplacian to signed graphs
-- **Frustration**: Measure of incompatibility with balanced partitions
-- **Spectral flow**: Evolution of eigenvalues under renormalization
-- **Coarse-graining**: Reduction of graph complexity while preserving spectral properties
+**Laplacian Renormalization**
+   A coarse-graining procedure that reveals how network properties change
+   across scales, connecting microscopic structure to macroscopic behavior.
 
-Signed Graph Theory
--------------------
+**Statistical Physics**
+   Models like the Ising model, contact process, and voter model study how
+   local interactions on networks lead to emergent collective behavior.
 
-Signed graphs extend ordinary graphs by allowing edge weights of +1 (positive) or -1 (negative).
+Mathematical Framework
+----------------------
 
-- **Balance**: A graph is balanced if it can be partitioned into two sets with all positive edges within sets and negative edges between sets
-- **Frustration index**: Minimum number of edges to remove to achieve balance
-- **Structural balance theory**: Social and physical interpretations
+The Signed Laplacian
+~~~~~~~~~~~~~~~~~~~~
 
-Statistical Physics on Networks
---------------------------------
+For a signed graph G with N nodes and signed adjacency matrix A:
 
-lrgsglib implements several statistical physics models:
+.. math::
 
-- **Ising model**: Spin dynamics with ferromagnetic/antiferromagnetic interactions
-- **Contact process**: Epidemic spreading with recovery
-- **Voter model**: Opinion dynamics and consensus formation
+   L = D - A
+
+where D is the absolute degree matrix. Key properties:
+
+- Symmetric for undirected graphs
+- Can have negative eigenvalues (frustration signature)
+- Spectral gap controls mixing/diffusion times
+
+See :doc:`signed_graphs` for complete theory.
+
+Information from Spectra
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The spectral density matrix:
+
+.. math::
+
+   \rho(\tau) = \frac{e^{-\tau L}}{\text{Tr}[e^{-\tau L}]}
+
+yields the Von Neumann entropy:
+
+.. math::
+
+   S(\tau) = -\text{Tr}[\rho \log \rho]
+
+The spectral dimension :math:`d_s` characterizes scaling:
+
+.. math::
+
+   S(\tau) \sim \frac{d_s}{2} \log \tau
+
+See :doc:`lrg_theory` for the renormalization framework.
+
+Dynamical Models
+~~~~~~~~~~~~~~~~
+
+**Ising Model:**
+
+.. math::
+
+   H = -\sum_{(i,j)} J_{ij} s_i s_j, \quad s_i \in \{-1, +1\}
+
+**Contact Process:**
+
+- Infection: S → I at rate λ × (infected neighbors)
+- Recovery: I → S at rate μ
+
+**Voter Model:**
+
+- Agent adopts neighbor's opinion (modified by edge sign)
+
+See :doc:`stat_phys` for detailed formulations.
+
+Quick Reference
+---------------
+
+Key Equations
+~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+
+   * - Quantity
+     - Definition
+     - Equation
+   * - Signed Laplacian
+     - L = D - A
+     - :math:`L_{ij} = \delta_{ij} d_i - A_{ij}`
+   * - Spectral entropy
+     - Von Neumann entropy
+     - :math:`S = -\sum_i p_i \log p_i`
+   * - Spectral dimension
+     - Scaling exponent
+     - :math:`d_s = 2 \lim_{\tau \to \infty} C(\tau)`
+   * - Frustration index
+     - Min edges to balance
+     - :math:`\phi(G) = \min_{\sigma'} |E_{\text{wrong}}|`
+
+Key Results
+~~~~~~~~~~~
+
+- **Balanced graphs**: All eigenvalues ≥ 0, λ₁ = 0
+- **Frustrated graphs**: Negative eigenvalues, |λ₁| measures frustration
+- **Spectral gap**: Controls relaxation times: τ ∼ 1/Δλ
+- **Localization**: Frustration can localize eigenvectors
+
+Connections to Physics
+----------------------
+
+Spin Glasses
+~~~~~~~~~~~~
+
+Signed graphs naturally model spin glass systems:
+
+- Positive edges = ferromagnetic (align)
+- Negative edges = antiferromagnetic (anti-align)
+- Frustration = competing interactions
+
+The ground state problem maps to balance optimization.
+
+Network Science
+~~~~~~~~~~~~~~~
+
+Spectral methods connect to:
+
+- Community detection (spectral clustering)
+- Diffusion processes (random walks)
+- Epidemic spreading (contact process)
+- Opinion dynamics (voter model)
+
+Renormalization
+~~~~~~~~~~~~~~~
+
+The LRG framework draws from statistical physics:
+
+- Coarse-graining preserves essential structure
+- Fixed points identify universal behavior
+- Spectral dimension generalizes embedding dimension
+
+Implementation Notes
+--------------------
+
+lrgsglib provides:
+
+1. **Graph types** - SignedGraph, Lattice2D/3D, ErdosRenyi, etc.
+2. **Spectral analysis** - Eigenvalue/eigenvector computation with multiple backends
+3. **Entropy calculation** - Von Neumann entropy and specific heat
+4. **Dynamics simulation** - Ising, contact process, voter model with C backends
+
+See the :doc:`/user_guide/index` for practical usage.
 
 References
 ----------
 
-Key papers on the Laplacian Renormalization Group and signed graphs:
+Key papers on signed graphs and spectral methods:
 
 .. note::
-   References will be added in the theory section development phase.
 
-Coming Soon
------------
+   A comprehensive bibliography is planned for future releases.
+   Key topics include:
 
-Detailed sections on:
+   - Structural balance theory (Heider, Cartwright-Harary)
+   - Spectral graph theory (Chung, Mohar)
+   - Spin glasses (Edwards-Anderson, Sherrington-Kirkpatrick)
+   - Contact process (Harris, Liggett)
+   - Renormalization group (Wilson, Kadanoff)
 
-- Mathematical formulation of the LRG
-- Spectral properties and eigenvalue bounds
-- Statistical physics models: formulation and analysis
-- Numerical methods and algorithms
-- Connection to renormalization group theory in physics
+Further Reading
+---------------
+
+- :doc:`/user_guide/spectral` - Practical spectral analysis
+- :doc:`/user_guide/dynamics` - Running simulations
+- :doc:`/user_guide/examples` - End-to-end examples
+- :doc:`/api/index` - API reference
