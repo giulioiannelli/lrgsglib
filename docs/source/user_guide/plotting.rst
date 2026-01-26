@@ -453,6 +453,57 @@ For time-evolving visualizations, create animations:
    ani.save('ising_animation.gif', writer='pillow', fps=10)
    plt.show()
 
+High-Level Animation API
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+For convenience, lrgsglib provides a high-level animation API in
+``lrgsglib.nx_patches.Lattice2D._animations``:
+
+.. code-block:: python
+
+   import matplotlib.pyplot as plt
+   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.nx_patches.Lattice2D._animations import (
+       make_lattice2d_animation,
+       save_animation,
+   )
+
+   # Create lattice
+   lattice = Lattice2D(side1=32, geo='sqr', seed=42)
+
+   # Generate example frames (e.g., from simulation)
+   import numpy as np
+   frames = [np.random.randn(lattice.N) for _ in range(50)]
+
+   # Create animation with one call
+   fig, ax = plt.subplots(figsize=(8, 8))
+   result = make_lattice2d_animation(
+       lattice=lattice,
+       fig=fig,
+       ax=ax,
+       frames=frames,
+       interval_ms=100,
+       cmap='viridis',
+       add_colorbar=True,
+       autoscale=True,  # Adjust color limits per frame
+   )
+
+   # Save to file
+   save_animation(result.animation, 'lattice_anim.gif', fps=10, dpi=150)
+   plt.show()
+
+The ``make_lattice2d_animation`` function returns a ``LatticeAnimationResult``
+containing the animation, image, and optional colorbar objects.
+
+**Parameters:**
+
+- ``lattice``: A Lattice2D instance (needs ``syshape`` and ``N`` attributes)
+- ``frames``: Sequence of 1D vectors (length N) or 2D arrays (shape syshape)
+- ``interval_ms``: Delay between frames in milliseconds
+- ``cmap``: Matplotlib colormap name
+- ``autoscale``: If True, update color limits per frame
+- ``vmin``, ``vmax``: Fixed color limits when autoscale=False
+
 Publication-Quality Figures
 ---------------------------
 

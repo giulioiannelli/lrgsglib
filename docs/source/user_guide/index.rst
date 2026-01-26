@@ -8,6 +8,7 @@ This guide provides comprehensive tutorials and examples for using lrgsglib. Eac
 
    graphs
    lattices
+   advanced_graphs
    spectral
    dynamics
    plotting
@@ -23,6 +24,9 @@ The user guide is organized into the following sections:
 
 **Lattices**
    Work with 2D and 3D lattices including square, triangular, hexagonal, and cubic geometries
+
+**Advanced Graphs**
+   Hierarchical and fractal structures: multiplicative cascades, Vicsek graphs, and Dirac lattices
 
 **Spectral Analysis**
    Compute Laplacian spectra, analyze frustration, and perform renormalization group transformations
