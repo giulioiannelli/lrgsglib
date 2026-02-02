@@ -12,7 +12,21 @@ except ImportError:
     CUPY_AVAILABLE = False
 #
 from ..basic.linalg import compute_recon_ultra, compute_recon
-#
+
+__all__ = [
+    "compose_product_ising_states",
+    "compose_weighted_ising_state",
+    "compose_xor_ising_state",
+    "compute_ising_pairwise_energy",
+    "spin_overlap",
+    "spin_matching_fraction",
+    "spin_matching_fraction_fromovp",
+    "compute_spin_overlap_series",
+    "compute_spin_match_series",
+    "ising_spinglass_pmJ_2D_Tcrit",
+]
+
+
 def compose_product_ising_states(
     states: Sequence[NDArray[np.int8]]
 ) -> NDArray[np.int8]:

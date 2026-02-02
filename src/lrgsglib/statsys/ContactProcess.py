@@ -29,7 +29,6 @@ Use the excitation-inhibition C backend (requires compiled C cores):
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import Any, Iterable, Literal, cast
 
@@ -37,10 +36,9 @@ import numpy as np
 import tqdm
 from numba import njit
 
+from ._c_backend import CBackendMixin
 from .BinDynSys import BinDynSys
-from ..config.const import LOG, LRGSG_CCORE_BIN, LRGSG_LOG
 from ..nx_patches import SignedGraph
-from ..utils.basic.strings import join_non_empty
 from ..utils.tools.chronometer import time_function_accumulate
 
 
@@ -89,7 +87,7 @@ def _activation_tanh(lambda_val: float) -> float:
     return (1.0 + np.tanh(lambda_val)) / 2.0
 
 
-class ContactProcessBase(BinDynSys):
+class ContactProcessBase(CBackendMixin, BinDynSys):
     """Shared utilities for contact-process dynamics.
 
     Parameters
@@ -104,6 +102,9 @@ class ContactProcessBase(BinDynSys):
 
     dyn_UVclass = "contact_process"
     s_t: list[np.ndarray] = []
+
+    # CBackendMixin configuration
+    _c_program_name_template = "ContactSimulator{}"
     _allowed_c_keys: tuple[str, ...] = ()
 
     def __init__(
@@ -173,9 +174,10 @@ class ContactProcessBase(BinDynSys):
         self.sini = self.s.copy()
 
     def check_attribute(self) -> None:
-        try:
-            getattr(self, "CbaseName")
-        except AttributeError:
+        """Initialize dynamics if not already done."""
+        # Check sini (set at end of init_contact_dynamics) rather than CbaseName
+        # because CbaseName has a class-level default from CBackendMixin
+        if not hasattr(self, 'sini') or self.sini is None:
             self.init_contact_dynamics()
 
     def initialize_run_parameters(self, steps: int | None = None, simref: float | None = None) -> None:
@@ -198,16 +200,23 @@ class ContactProcessBase(BinDynSys):
         self.contact_sampling(tqdm_on)
 
     # ------------------------------------------------------------------
-    # C backend integration
+    # C backend integration (via CBackendMixin)
     # ------------------------------------------------------------------
-    def _c_program_key(self) -> str:
-        if not self.runlang or not self.runlang.upper().startswith("C"):
-            raise ValueError("C backend requested but runlang is not a C variant.")
-        suffix = self.runlang[1:]
-        key = "C0" if suffix == "" else f"C{suffix.upper()}"
-        if self._allowed_c_keys and key not in self._allowed_c_keys:
-            raise ValueError(f"runlang '{self.runlang}' not supported for {self.__class__.__name__}.")
-        return key
+    def _c_program_suffix(self) -> str:
+        """Extract program suffix for ContactSimulator.
+
+        Maps: C0 -> "0", C1 -> "1", C1A -> "1a", C1C -> "1c", etc.
+        """
+        key = self._c_program_key()
+        if key == "C0":
+            return "0"
+        elif key == "C1":
+            return "1"
+        return key[1:].lower()
+
+    def _get_cleanup_paths(self) -> list[Path | None]:
+        """Return paths to clean up after C run."""
+        return [getattr(self, 'sfout', None)]
 
     @staticmethod
     def _validate_activation(activation: str) -> Literal["tanh", "relu"]:
@@ -227,98 +236,24 @@ class ContactProcessBase(BinDynSys):
 
     def _build_out_id(self) -> str:
         """Build identifier used by C backends for output files."""
-
+        from ..utils.basic.strings import join_non_empty
         return join_non_empty("_", self._dynamics_out_label(), self.out_suffix, self.run_id)
 
     def _build_c_arglist_base(self) -> list[str]:
         """Build base argument list common to all ContactSimulator variants."""
-
-        try:
-            datdir = self.sg.path_sgdata.relative_to(Path.cwd())
-        except ValueError:
-            datdir = self.sg.path_sgdata
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
         self.out_id = self._build_out_id()
         return [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
-            str(datdir),
+            self._get_datdir_arg(),
             syshape,
             self._c_suffix_arg(self.run_id),
-            self._c_suffix_arg(self.out_id),
+            self.out_id,  # out_id already formatted by _build_out_id()
         ]
 
     def _build_c_arglist(self) -> list[str]:
         raise NotImplementedError("Subclasses must provide C argument lists.")
-
-    def build_cprogram_command(self) -> None:
-        c_key = self._c_program_key()
-        if c_key == "C0":
-            program_suffix = "0"
-        elif c_key == "C1":
-            program_suffix = "1"
-        else:
-            program_suffix = c_key[1:].lower()
-        self.CbaseName = f"ContactSimulator{program_suffix}"
-        arglist = self._build_c_arglist()
-        self.cprogram = [LRGSG_CCORE_BIN / self.CbaseName] + arglist
-
-    def setup_stderr_logging(self) -> None:
-        fname = join_non_empty(
-            '_',
-            f"err{self.CbaseName}",
-            f"{self.N}",
-            self.run_id,
-            self.out_suffix,
-        ) + LOG
-        self.stderr_path = LRGSG_LOG / fname
-        self.stderr_path.parent.mkdir(parents=True, exist_ok=True)
-        self.stderr_fopen = open(self.stderr_path, 'w')
-
-    def run_cprogram(self, verbose: bool = False) -> None:
-        if not self.cprogram:
-            raise RuntimeError("C program command has not been initialised.")
-        binary_path = Path(self.cprogram[0])
-        if not binary_path.exists():
-            if self.stderr_fopen and not self.stderr_fopen.closed:
-                self.stderr_fopen.close()
-            self.stderr_fopen = None
-            raise FileNotFoundError(
-                f"C backend executable '{binary_path}' was not found. "
-                "Build the C components (e.g. via `make c-make`) before running the C backend."
-            )
-        result = subprocess.run(
-            self.cprogram,
-            stderr=self.stderr_fopen,
-            stdout=subprocess.PIPE,
-            check=False,
-        )
-        if self.stderr_fopen and not self.stderr_fopen.closed:
-            self.stderr_fopen.close()
-        self.stderr_fopen = None
-        state = np.frombuffer(result.stdout, dtype=np.int8)
-        if state.size != self.N:
-            raise RuntimeError("C backend returned an invalid state configuration.")
-        self.s = state.copy()
-
-    def _remove_sfout(self) -> None:
-        try:
-            self.sfout.unlink()
-        except FileNotFoundError:
-            pass
-
-    def _remove_stderr(self) -> None:
-        if not self.stderr_path:
-            return
-        try:
-            self.stderr_path.unlink()
-        except FileNotFoundError:
-            pass
-
-    def remove_run_c_files(self, remove_stderr: bool = True) -> None:
-        self._remove_sfout()
-        if remove_stderr:
-            self._remove_stderr()
 
     # ------------------------------------------------------------------
     # Public interface

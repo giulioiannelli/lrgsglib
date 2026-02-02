@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 
+@pytest.mark.filterwarnings("ignore:Animation was deleted without rendering")
 def test_collect_frames_and_make_animation(tmp_path):
     mpl = pytest.importorskip("matplotlib")
     mpl.use("Agg")
@@ -64,3 +65,4 @@ def test_collect_frames_and_make_animation(tmp_path):
     fig, ax = plt.subplots()
     result = lattice.make_animation(fig, ax, out.frames, add_colorbar=False)
     assert hasattr(result.animation, "save")
+    plt.close(fig)

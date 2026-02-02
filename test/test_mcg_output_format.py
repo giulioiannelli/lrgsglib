@@ -25,7 +25,7 @@ from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenva
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
-def get_output_dir(fraction: float, iterations: int) -> Path:
+def get_output_dir(fraction: float = 0.7, iterations: int = 4) -> Path:
     """Get the output directory for test files."""
     G = MultiplicativeCascadeGraph(
         p1=0.8, p2=0.6, p3=0.6, p4=0.8,
@@ -43,18 +43,19 @@ def test_file_format():
     print("="*70)
 
     # First, run the program to generate a test file
+    # Using small graph (iterations=4 -> ~256 nodes) and few realizations for speed
     print("\nStep 1: Generating test eigenvalue file...")
     cmd = [
         "python", str(MCG_SCRIPT),
         "0.8", "0.6", "0.6", "0.8",  # p1, p2, p3, p4
         "0.7",                        # fraction
-        "5",                          # iterations (716 nodes with frac=0.7)
+        "4",                          # iterations (small graph for fast test)
         "--pflip", "0.05",            # pflip
-        "-na", "4",                   # number_of_averages
+        "-na", "2",                   # number_of_averages (reduced for speed)
         "-m", "eigvals",              # mode
         "--backend", "scipy",         # backend
         "--howmany", "0",             # full spectrum
-        "--save_frequency", "2",       # save every 2 iterations
+        "--save_frequency", "1",       # save every iteration
         "--verbose"
     ]
 
@@ -68,8 +69,8 @@ def test_file_format():
     print("✓ Program ran successfully")
 
     # Load the saved file
-    output_dir = get_output_dir(fraction=0.7, iterations=5)
-    test_file = output_dir / "mc_eigvals_p=0.05_na=4.pkl"  # pflip=0.05, navg=4
+    output_dir = get_output_dir(fraction=0.7, iterations=4)
+    test_file = output_dir / "mc_eigvals_p=0.05_na=2.pkl"  # pflip=0.05, navg=2
 
     if not test_file.exists():
         print(f"❌ FAILED: Output file not found: {test_file}")
@@ -98,9 +99,9 @@ def test_file_format():
 
     print(f"✓ File contains a list with {len(eigvlist)} elements")
 
-    if len(eigvlist) != 4:
-        print(f"❌ FAILED: Expected 4 realizations, got {len(eigvlist)}")
-        assert False, f"Expected 4 realizations, got {len(eigvlist)}"
+    if len(eigvlist) != 2:
+        print(f"❌ FAILED: Expected 2 realizations, got {len(eigvlist)}")
+        assert False, f"Expected 2 realizations, got {len(eigvlist)}"
 
     print(f"✓ Correct number of realizations: {len(eigvlist)}")
 

@@ -82,7 +82,7 @@ def test_serializer_print():
         ("0.5", "fraction parameter"),
         ("-p", "pflip flag"),
         ("--backend", "backend flag"),
-        ("cupy", "backend value (cupy)"),
+        # Note: backend can be cupy OR scipy depending on graph size
         ("-m", "mode flag"),
         ("eigvals", "mode value"),
         ("--howmany", "howmany flag"),
@@ -126,6 +126,14 @@ def test_serializer_print():
         else:
             print(f"  ✓ All required components present")
 
+        # Verify backend is either cupy or scipy (both are valid)
+        if "cupy" in cmd_line or "scipy" in cmd_line:
+            backend = "cupy" if "cupy" in cmd_line else "scipy"
+            print(f"  ✓ Backend: {backend}")
+        else:
+            print(f"  ❌ Missing backend (expected cupy or scipy)")
+            all_valid = False
+
         # Verify iterations parameter (should be 6 or 7)
         tokens = python_cmd.split()
         try:
@@ -163,6 +171,11 @@ def test_serializer_print():
         assert False, "Some commands have missing or incorrect components"
 
     print("✓ All commands have correct structure")
+
+    # Verify at least one backend is used (cupy or scipy)
+    has_valid_backends = all(("cupy" in cmd or "scipy" in cmd) for cmd in full_commands)
+    assert has_valid_backends, "All commands should have a valid backend (cupy or scipy)"
+    print("✓ All commands have valid backend")
 
     # Verify parameter sweep coverage
     print("\nVerifying parameter sweep coverage...")
@@ -215,7 +228,7 @@ def test_serializer_print():
     print("="*70)
     print("\nSummary:")
     print(f"  ✓ Generated {len(full_commands)} commands correctly")
-    print("  ✓ All commands include --backend cupy")
+    print("  ✓ All commands include --backend (cupy or scipy)")
     print("  ✓ All commands include mode, howmany, and other parameters")
     print("  ✓ Parameter sweep covers all combinations")
     print("\nConclusion: Serializer is ready for cluster deployment!")

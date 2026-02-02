@@ -1,41 +1,69 @@
-import subprocess
-import tqdm
-#
-import numpy as np
-#
+"""Ising model dynamics with Metropolis, Simulated Annealing, and Parallel Tempering."""
+
+from __future__ import annotations
+
+from pathlib import Path
 from typing import Any, Literal
-#
+
+import numpy as np
+import tqdm
+
+from ._c_backend import CBackendMixin
 from .BinDynSys import BinDynSys
-#
-from ..config.const import *
+from ..config.const import BIN, SG_REPR
 from ..config.funcs import build_pT_fname
 from ..nx_patches import SignedGraph, get_kth_order_neighbours
-from ..utils.basic.strings import generate_random_id, join_non_empty
 from ..utils.lrg.ising import compute_ising_pairwise_energy
 from ..utils.statsys import boltzmann_factor
 from ..utils.tools.chronometer import time_function_accumulate
-
 
 # Type aliases for cooling/ladder schedules
 CoolingSchedule = Literal["linear", "exponential", "logarithmic", "custom"]
 LadderType = Literal["geometric", "linear", "custom"]
 
 
-class IsingDynamics(BinDynSys):
-    """
-    Ising model dynamics with Glauber-Metropolis, Simulated Annealing, and Parallel Tempering.
+class IsingDynamics(CBackendMixin, BinDynSys):
+    """Ising model dynamics with Metropolis, Simulated Annealing, and Parallel Tempering.
 
     Naming convention for C backends:
         - Number = Algorithm: 1=Metropolis, 3=SA, 4=PT
         - Letter = Output: a=final, b=E/M, c=snapshots, d=clusters, e=eigvec, f=exchange
 
-    Examples:
-        - runlang="C0" or "C1b": Metropolis with E/M output (legacy: C0)
-        - runlang="C3b": Simulated Annealing with E/M output
-        - runlang="C4b": Parallel Tempering with E/M output
+    Parameters
+    ----------
+    sg : SignedGraph
+        The signed graph to run dynamics on.
+    T : float, optional
+        Temperature for equilibrium simulations.
+    steps : int, optional
+        Number of Monte Carlo sweeps.
+    simref : float, optional
+        Size-normalized time (steps = simref * N).
+    sa_enabled : bool, optional
+        Enable simulated annealing mode.
+    pt_enabled : bool, optional
+        Enable parallel tempering mode.
+    **kwargs
+        Additional arguments passed to BinDynSys.
+
+    Examples
+    --------
+    >>> ising = IsingDynamics(lattice, T=2.0, steps=1000, runlang='C1b')
+    >>> ising.init_ising_dynamics()
+    >>> ising.run(verbose=False)
+
+    Notes
+    -----
+    C backend variants:
+        - ``runlang="C1b"``: Metropolis with E/M output
+        - ``runlang="C3b"``: Simulated Annealing with E/M output
+        - ``runlang="C4b"``: Parallel Tempering with E/M output
     """
 
-    # Whitelist of allowed C variant keys
+    dyn_UVclass = "ising_dynamics"
+
+    # CBackendMixin configuration
+    _c_program_name_template = "IsingSimulator{}"
     _allowed_c_keys: tuple[str, ...] = (
         # New Metropolis variants
         "C1B",
@@ -177,10 +205,11 @@ class IsingDynamics(BinDynSys):
             self.sg._export_edgel_bin(exName=exName_arg)
         self.sini = self.s.copy()
     #
-    def check_attribute(self):
-        try:
-            getattr(self, f"CbaseName")
-        except AttributeError:
+    def check_attribute(self) -> None:
+        """Initialize dynamics if not already done."""
+        # Check sini (set at end of init_ising_dynamics) rather than CbaseName
+        # because CbaseName has a class-level default from CBackendMixin
+        if not hasattr(self, 'sini') or self.sini is None:
             self.init_ising_dynamics()
 
     def initialize_run_parameters(
@@ -195,12 +224,36 @@ class IsingDynamics(BinDynSys):
         chosen_steps = steps if steps is not None else eqSTEP
         self._set_time_controls(steps=chosen_steps, simref=simref)
 
+    # ------------------------------------------------------------------
+    # C backend configuration (overrides CBackendMixin)
+    # ------------------------------------------------------------------
     def _c_program_key(self) -> str:
-        """Convert runlang to internal key (e.g., 'c1b' -> 'C1B')."""
-        if not self.runlang.upper().startswith("C"):
+        """Convert runlang to internal key (e.g., 'c1b' -> 'C1B').
+
+        Overrides mixin to default to C1B when no suffix is provided.
+        """
+        if not self.runlang or not self.runlang.upper().startswith("C"):
             raise ValueError("C backend requires runlang starting with 'C'")
         suffix = self.runlang[1:]
-        return f"C{suffix.upper()}" if suffix else "C1B"  # Default to 1b
+        key = f"C{suffix.upper()}" if suffix else "C1B"  # Default to C1B
+        if self._allowed_c_keys and key not in self._allowed_c_keys:
+            raise ValueError(
+                f"runlang '{self.runlang}' not supported for {self.__class__.__name__}. "
+                f"Allowed: {self._allowed_c_keys}"
+            )
+        return key
+
+    def _c_program_suffix(self) -> str:
+        """Extract program suffix for IsingSimulator (handles legacy variants).
+
+        Legacy single-digit variants (C0-C5) map to simple digits.
+        New variants (C1B, C3B, etc.) use lowercase suffix.
+        """
+        key = self._c_program_key()
+        legacy_map = {"C0": "0", "C1": "1", "C2": "2", "C3": "3", "C4": "4", "C5": "5"}
+        if key in legacy_map:
+            return legacy_map[key]
+        return key[1:].lower()  # "C1B" -> "1b", "C3B" -> "3b"
 
     def _is_sa_variant(self) -> bool:
         """Check if current runlang is simulated annealing."""
@@ -212,21 +265,9 @@ class IsingDynamics(BinDynSys):
         key = self._c_program_key()
         return key.startswith("C4") and key != "C4"  # C4 is legacy
 
-    def build_cprogram_command(self):
-        """Build command for C backend execution."""
-        key = self._c_program_key()
-
-        # Handle legacy single-digit variants
-        legacy_map = {"C0": "0", "C1": "1", "C2": "2", "C3": "3", "C4": "4", "C5": "5"}
-        if key in legacy_map:
-            program_suffix = legacy_map[key]
-        else:
-            program_suffix = key[1:].lower()  # "C1B" -> "1b", "C3B" -> "3b"
-
-        self.CbaseName = f"IsingSimulator{program_suffix}"
-        arglist = self._build_c_arglist()
-        self.cprogram = [LRGSG_CCORE_BIN / self.CbaseName] + arglist
-
+    # ------------------------------------------------------------------
+    # Argument building (model-specific)
+    # ------------------------------------------------------------------
     def _build_c_arglist(self) -> list[str]:
         """Build argument list based on variant type."""
         if self._is_pt_variant():
@@ -235,13 +276,6 @@ class IsingDynamics(BinDynSys):
             return self._build_sa_arglist()
         else:
             return self._build_equilibrium_arglist()
-
-    def _get_datdir_arg(self) -> str:
-        """Get data directory path suitable for C program arguments."""
-        try:
-            return str(self.sg.path_sgdata.relative_to(Path.cwd()))
-        except ValueError:
-            return str(self.sg.path_sgdata)
 
     def _build_equilibrium_arglist(self) -> list[str]:
         """Arguments for standard Metropolis equilibrium variants."""
@@ -297,25 +331,34 @@ class IsingDynamics(BinDynSys):
             self._c_suffix_arg(self.out_suffix),
             self.upd_mode,
         ]
-    #
-    def setup_stderr_logging(self):
-        fname = join_non_empty(
-            '_', 
-            f"err{self.CbaseName}",
-            f"{self.N}",
-            f"{self.run_id}",
-            f"{self.out_suffix}"
-        ) + LOG
-        self.stderr_path = LRGSG_LOG / fname
-        self.stderr_fopen = open(self.stderr_path, 'w')
-    #
-    def run_cprogram(self, verbose: bool = False):
-        result = subprocess.run(self.cprogram, stderr=self.stderr_fopen,
-                                stdout=subprocess.PIPE)
-        self.s = np.frombuffer(result.stdout, dtype=np.int8)
+    # ------------------------------------------------------------------
+    # C backend execution (overrides CBackendMixin)
+    # ------------------------------------------------------------------
+    def run_cprogram(self, verbose: bool = False) -> None:
+        """Execute C backend and read model-specific output files.
+
+        Calls parent implementation for subprocess execution and state parsing,
+        then reads energy/magnetization files for variants that output them.
+        """
+        super().run_cprogram(verbose)
         # Read energy/magnetization files for 'b' variants
         if self._output_includes_em():
             self._read_c_em_output()
+
+    def _get_cleanup_paths(self) -> list[Path | None]:
+        """Return paths to clean up after C run.
+
+        Includes model-specific output files (energy, magnetization, etc.)
+        in addition to standard state output.
+        """
+        paths: list[Path | None] = [
+            getattr(self, 'sfout', None),
+            getattr(self, 'hfout', None),
+        ]
+        # Add E/M output files if they exist
+        if hasattr(self, '_c_output_paths'):
+            paths.extend(self._c_output_paths)
+        return paths
     #
     def _output_includes_em(self) -> bool:
         """Check if current variant outputs energy/magnetization time series."""
@@ -718,52 +761,3 @@ class IsingDynamics(BinDynSys):
             result_array[row, col] = sublist[1]
         self.mapping = result_array
 
-    def _remove_sout(self):
-        if not hasattr(self, 'sfout') or self.sfout is None:
-            return
-        try:
-            self.sfout.unlink()
-        except FileNotFoundError:
-            pass
-
-    def _remove_hfout(self):
-        if not hasattr(self, 'hfout') or self.hfout is None:
-            return
-        try:
-            self.hfout.unlink()
-        except FileNotFoundError:
-            pass
-
-    def _remove_stderr(self):
-        if not hasattr(self, 'stderr_path') or self.stderr_path is None:
-            return
-        try:
-            self.stderr_path.unlink()
-        except FileNotFoundError:
-            pass
-
-    def remove_run_c_files(self, remove_stderr: bool = True):
-        """
-        Remove the output files generated by the C program run.
-
-        Parameters
-        ----------
-        remove_stderr : bool, optional
-            If True, removes the stderr file. Default is True.
-        """
-        self._remove_sout()
-        self._remove_hfout()
-        self._remove_c_output_files()
-        if remove_stderr:
-            self._remove_stderr()
-
-    def _remove_c_output_files(self):
-        """Remove energy/magnetization and other C backend output files."""
-        if not hasattr(self, '_c_output_paths'):
-            return
-        for path in self._c_output_paths:
-            try:
-                if path.exists():
-                    path.unlink()
-            except (FileNotFoundError, OSError):
-                pass

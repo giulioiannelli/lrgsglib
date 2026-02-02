@@ -1,7 +1,18 @@
-from ...shared import *
-from ...nx_patches.funcs import *
-from .spectral import *
-from .infocomm import *
+from typing import Dict, List, Tuple
+
+import networkx as nx
+import numpy as np
+from scipy.cluster.hierarchy import linkage
+
+from ...nx_patches.funcs.spectral import signed_laplacian_matrix
+from .infocomm import lapl_dists
+
+__all__ = [
+    "MakeLinkageMatrix",
+    "compute_normalized_linkage",
+    "compute_optimal_threshold",
+    "circular_layout_by_cluster",
+]
 
 def MakeLinkageMatrix(G: nx.Graph, tau: float = 1e-2, is_signed: bool = False, method: str = "ward") -> Tuple[np.ndarray, np.ndarray]:
     """

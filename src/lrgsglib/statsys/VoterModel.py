@@ -3,23 +3,59 @@
 from __future__ import annotations
 
 import random
-import subprocess
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import tqdm
 
+from ._c_backend import CBackendMixin
 from .BinDynSys import BinDynSys
-from ..config.const import LOG, LRGSG_CCORE_BIN, LRGSG_LOG
-from ..utils.basic.strings import join_non_empty
 from ..utils.tools.chronometer import time_function_accumulate
 
 
-class VoterModel(BinDynSys):
-    """Binary voter dynamics with optional C backend."""
+class VoterModel(CBackendMixin, BinDynSys):
+    """Binary voter dynamics with optional C backend.
+
+    In voter dynamics, each node copies the state of a randomly chosen
+    neighbor, modified by the edge sign (weight). This creates consensus
+    or polarization patterns depending on the graph structure.
+
+    Parameters
+    ----------
+    sg : SignedGraph
+        The signed graph to run dynamics on.
+    steps : int, optional
+        Number of Monte Carlo sweeps.
+    simref : float, optional
+        Size-normalized time (steps = simref * N).
+    eqSTEP : int, optional
+        Legacy alias for steps.
+    save_magnetization : bool, optional
+        If True, record magnetization at each step.
+    upd_mode : str, optional
+        Update mode ('asynchronous' or 'synchronous').
+    freq : int, optional
+        Recording frequency.
+    nSampleLog : int, optional
+        Number of log-spaced samples (for C backend).
+    **kwargs
+        Additional arguments passed to BinDynSys.
+
+    Examples
+    --------
+    >>> voter = VoterModel(lattice, steps=100, runlang='py')
+    >>> voter.init_voter_dynamics()
+    >>> voter.run(tqdm_on=False)
+    """
 
     dyn_UVclass = "voter_model"
+
+    # CBackendMixin configuration
+    _c_program_name_template = "VoterSimulator{}"
+    _allowed_c_keys = ("C0", "C1")
+
+    # Class-level observable defaults (will be overwritten per instance)
     magn: list[float] = []
     s_t: list[np.ndarray] = []
 
@@ -45,16 +81,12 @@ class VoterModel(BinDynSys):
         self.nSampleLog = nSampleLog
         self.reset_observables()
         self.sini: np.ndarray | None = None
-        self.stderr_path: Path | None = None
-        self.stderr_fopen = None
-        self.cprogram: list[str | Path] = []
         self.out_id: str = self.out_suffix
         self.magn_path: Path | None = None
 
     @property
     def eqSTEP(self) -> int:
         """Compatibility alias for the configured number of sweeps."""
-
         return self.steps
 
     @eqSTEP.setter
@@ -66,13 +98,11 @@ class VoterModel(BinDynSys):
     # ------------------------------------------------------------------
     def reset_observables(self) -> None:
         """Reset cached observables collected during a run."""
-
         self.magn = []
         self.s_t = []
 
     def init_voter_dynamics(self, custom: Any = None, exName: str = "") -> None:
         """Initialise the spin configuration and export data if required."""
-
         self.reset_observables()
         self.init_s(custom)
         self.s = self.s.astype(np.int8, copy=False)
@@ -88,9 +118,10 @@ class VoterModel(BinDynSys):
         self.sini = self.s.copy()
 
     def check_attribute(self) -> None:
-        try:
-            getattr(self, "CbaseName")
-        except AttributeError:
+        """Initialize dynamics if not already done."""
+        # Check sini (set at end of init_voter_dynamics) rather than CbaseName
+        # because CbaseName has a class-level default from CBackendMixin
+        if self.sini is None:
             self.init_voter_dynamics()
 
     def initialize_run_parameters(
@@ -130,10 +161,15 @@ class VoterModel(BinDynSys):
         self.voter_sampling(tqdm_on)
 
     # ------------------------------------------------------------------
-    # C backend integration
+    # C backend integration (via CBackendMixin)
     # ------------------------------------------------------------------
-    def build_cprogram_command(self) -> None:
-        self.CbaseName = f"VoterSimulator{self.runlang[-1]}"
+    def _c_program_suffix(self) -> str:
+        """Extract suffix for VoterSimulator (e.g., 'C1' -> '1')."""
+        # VoterSimulator uses single digit: VoterSimulator0, VoterSimulator1
+        return self.runlang[-1]
+
+    def _build_c_arglist(self) -> list[str]:
+        """Build argument list for VoterSimulator."""
         try:
             datdir = self.sg.path_sgdata.relative_to(Path.cwd())
         except ValueError:
@@ -141,7 +177,7 @@ class VoterModel(BinDynSys):
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
         self.out_id = self.out_suffix
         self.magn_path = self.dynpath / self.sg.get_p_fname('m', self.out_id)
-        
+
         # Base arguments common to all simulators
         arglist = [
             f"{self.N}",
@@ -152,78 +188,27 @@ class VoterModel(BinDynSys):
             self._c_suffix_arg(self.run_id),
             self._c_suffix_arg(self.out_id),
         ]
-        
+
         # Add extra arguments for VoterSimulator1 and above
         if self.runlang[-1] != "0":
             arglist.append(f"{self.nSampleLog}")
-        
-        self.cprogram = [LRGSG_CCORE_BIN / self.CbaseName] + arglist
 
-    def setup_stderr_logging(self) -> None:
-        fname = join_non_empty(
-            '_',
-            f"err{self.CbaseName}",
-            f"{self.N}",
-            self.run_id,
-            self.out_suffix,
-        ) + LOG
-        self.stderr_path = LRGSG_LOG / fname
-        self.stderr_path.parent.mkdir(parents=True, exist_ok=True)
-        self.stderr_fopen = open(self.stderr_path, 'w')
+        return arglist
 
     def run_cprogram(self, verbose: bool = False) -> None:
-        if not self.cprogram:
-            raise RuntimeError("C program command has not been initialised.")
-        binary_path = Path(self.cprogram[0])
-        if not binary_path.exists():
-            if self.stderr_fopen and not self.stderr_fopen.closed:
-                self.stderr_fopen.close()
-            raise FileNotFoundError(
-                f"C backend executable '{binary_path}' was not found. Build the "
-                "C components (e.g. via `make c-make`) before running the C backend."
-            )
-        result = subprocess.run(
-            self.cprogram,
-            stderr=self.stderr_fopen,
-            stdout=subprocess.PIPE,
-            check=False,
-        )
-        if self.stderr_fopen and not self.stderr_fopen.closed:
-            self.stderr_fopen.close()
-        state = np.frombuffer(result.stdout, dtype=np.int8)
-        if state.size != self.N:
-            raise RuntimeError("C backend returned an invalid spin configuration.")
-        self.s = state.copy()
+        """Execute C backend and read magnetization output."""
+        # Call parent implementation for subprocess execution
+        super().run_cprogram(verbose)
+        # Read magnetization file if it exists
         if self.magn_path and self.magn_path.exists():
             self.magn = np.fromfile(self.magn_path, dtype=np.float64).tolist()
 
-    def _remove_sfout(self) -> None:
-        try:
-            self.sfout.unlink()
-        except FileNotFoundError:
-            pass
-
-    def _remove_magn(self) -> None:
-        if not self.magn_path:
-            return
-        try:
-            self.magn_path.unlink()
-        except FileNotFoundError:
-            pass
-
-    def _remove_stderr(self) -> None:
-        if not self.stderr_path:
-            return
-        try:
-            self.stderr_path.unlink()
-        except FileNotFoundError:
-            pass
-
-    def remove_run_c_files(self, remove_stderr: bool = True) -> None:
-        self._remove_sfout()
-        self._remove_magn()
-        if remove_stderr:
-            self._remove_stderr()
+    def _get_cleanup_paths(self) -> list[Path | None]:
+        """Return paths to clean up after C run."""
+        return [
+            getattr(self, 'sfout', None),
+            self.magn_path,
+        ]
 
     # ------------------------------------------------------------------
     # Public interface
@@ -238,6 +223,23 @@ class VoterModel(BinDynSys):
         verbose: bool = False,
         clean_export: bool = True,
     ) -> None:
+        """Run voter model dynamics.
+
+        Parameters
+        ----------
+        tqdm_on : bool
+            Show progress bar.
+        steps : int, optional
+            Override number of steps.
+        simref : float, optional
+            Size-normalized time.
+        eqSTEP : int, optional
+            Legacy alias for steps.
+        verbose : bool
+            Verbose output.
+        clean_export : bool
+            Remove exported files after run.
+        """
         self.check_attribute()
         self.initialize_run_parameters(steps=steps, simref=simref, eqSTEP=eqSTEP)
         if self.runlang.startswith("C"):

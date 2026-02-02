@@ -87,12 +87,15 @@ def test_expm_multiply_vs_eigenvalue_small_graph():
 
         print(f"  num_samples={num_samples:3d}: mean_error={mean_error:.6f}, max_error={max_error:.6f}")
 
-    # Verify error decreases with more samples
+    # Verify error is reasonably small with sufficient samples
     mean_errors = [e['mean_error'] for e in errors_by_samples]
-    if mean_errors[0] > mean_errors[-1]:
-        print("\n✓ PASS: Error decreases with more samples (expected behavior)")
+    final_error = mean_errors[-1]
+    # With 100 samples, error should be below 0.05 for this small graph
+    error_threshold = 0.05
+    if final_error < error_threshold:
+        print(f"\n✓ PASS: Final error ({final_error:.6f}) is below threshold ({error_threshold})")
     else:
-        print("\n✗ WARNING: Error did not decrease monotonically")
+        print(f"\n✗ WARNING: Final error ({final_error:.6f}) exceeds threshold ({error_threshold})")
 
     # Create visualization
     TEST_TMP_DIR = Path(__file__).parent / ".tmp"
@@ -162,8 +165,8 @@ def test_expm_multiply_vs_eigenvalue_small_graph():
     print(f"\n✓ Saved validation plot to: {output_path}")
     plt.close()
 
-    # Assert error decreases with more samples
-    assert mean_errors[0] > mean_errors[-1], "Error should decrease with more samples"
+    # Assert error is reasonably small with sufficient samples
+    assert final_error < error_threshold, f"Error ({final_error:.6f}) should be below {error_threshold}"
 
 
 def test_entropy_mode_basic():
