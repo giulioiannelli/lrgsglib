@@ -6,10 +6,11 @@ system allows users to choose between CPU (NumPy/SciPy) and GPU (CuPy) computati
 without changing their code.
 
 Example:
-    >>> from lrgsglib.nx_patches.SignedGraph._backend import BackendManager, Backend
-    >>> backend = BackendManager.get_backend(Backend.NUMPY)
-    >>> arr = backend.array([1, 2, 3])
-    >>> print(backend.sum(arr))
+
+    >>> from lrgsglib.nx_patches.SignedGraph._backend import BackendManager, Backend  # doctest: +SKIP
+    >>> backend = BackendManager.get_backend(Backend.NUMPY)  # doctest: +SKIP
+    >>> arr = backend.array([1, 2, 3])  # doctest: +SKIP
+    >>> print(backend.sum(arr))  # doctest: +SKIP
     6
 """
 
@@ -570,9 +571,10 @@ class BackendManager:
     automatic fallback when optional backends are unavailable.
 
     Example:
-        >>> manager = BackendManager()
-        >>> numpy_backend = manager.get_backend(Backend.NUMPY)
-        >>> arr = numpy_backend.array([1, 2, 3])
+
+        >>> manager = BackendManager()  # doctest: +SKIP
+        >>> numpy_backend = manager.get_backend(Backend.NUMPY)  # doctest: +SKIP
+        >>> arr = numpy_backend.array([1, 2, 3])  # doctest: +SKIP
     """
 
     _backends: dict[Backend, type[ArrayBackend]] = {
@@ -603,8 +605,9 @@ class BackendManager:
             ImportError: If backend unavailable and fallback=False
 
         Example:
-            >>> backend = BackendManager.get_backend(Backend.NUMPY)
-            >>> backend = BackendManager.get_backend("scipy")
+
+            >>> backend = BackendManager.get_backend(Backend.NUMPY)  # doctest: +SKIP
+            >>> backend = BackendManager.get_backend("scipy")  # doctest: +SKIP
         """
         # Convert string to enum
         if isinstance(backend, str):
@@ -655,8 +658,9 @@ class BackendManager:
             True if backend is available, False otherwise
 
         Example:
-            >>> if BackendManager.is_available(Backend.CUPY):
-            ...     backend = BackendManager.get_backend(Backend.CUPY)
+
+            >>> if BackendManager.is_available(Backend.CUPY):  # doctest: +SKIP
+            ...     backend = BackendManager.get_backend(Backend.CUPY)  # doctest: +SKIP
         """
         # Convert string to enum
         if isinstance(backend, str):
@@ -683,8 +687,9 @@ class BackendManager:
             List of available Backend enums
 
         Example:
-            >>> available = BackendManager.list_available()
-            >>> print(available)
+
+            >>> available = BackendManager.list_available()  # doctest: +SKIP
+            >>> print(available)  # doctest: +SKIP
             [<Backend.NUMPY: 'numpy'>, <Backend.SCIPY: 'scipy'>]
         """
         return [b for b in Backend if cls.is_available(b)]

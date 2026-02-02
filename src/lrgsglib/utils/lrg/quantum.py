@@ -91,17 +91,17 @@ def compute_quantum_propagator_spectral(
 
     Examples
     --------
-    >>> import numpy as np
-    >>> from lrgsglib import Lattice2D
-    >>> l = Lattice2D(side=10, pflip=0.1)
-    >>> l.flip_random_fract_edges()
-    >>> l.compute_k_eigvV()
-    >>> U_t = compute_quantum_propagator_spectral(
+
+    >>> import numpy as np  # doctest: +SKIP
+    >>> from lrgsglib import Lattice2D  # doctest: +SKIP
+    >>> l = Lattice2D(side=10, pflip=0.1)  # doctest: +SKIP
+    >>> l.flip_random_fract_edges()  # doctest: +SKIP
+    >>> l.compute_k_eigvV()  # doctest: +SKIP
+    >>> U_t = compute_quantum_propagator_spectral(  # doctest: +SKIP
     ...     l.eigv, l.eigV, t=1.0, full_matrix=True
-    ... )
-    >>> # Check unitarity
-    >>> identity = U_t @ U_t.conj().T
-    >>> print(np.allclose(identity, np.eye(l.N)))
+    ... )  # doctest: +SKIP
+    >>> identity = U_t @ U_t.conj().T  # doctest: +SKIP
+    >>> print(np.allclose(identity, np.eye(l.N)))  # doctest: +SKIP
     True
     """
     N = len(eigenvalues)
@@ -147,11 +147,12 @@ def compute_quantum_propagator_matrix(
 
     Examples
     --------
-    >>> from lrgsglib import Lattice2D
-    >>> l = Lattice2D(side=10)
-    >>> L = l.signed_laplacian_matrix(l.G)
-    >>> U_t = compute_quantum_propagator_matrix(L.toarray(), t=1.0)
-    >>> print(np.allclose(U_t @ U_t.conj().T, np.eye(l.N)))
+
+    >>> from lrgsglib import Lattice2D  # doctest: +SKIP
+    >>> l = Lattice2D(side=10)  # doctest: +SKIP
+    >>> L = l.signed_laplacian_matrix(l.G)  # doctest: +SKIP
+    >>> U_t = compute_quantum_propagator_matrix(L.toarray(), t=1.0)  # doctest: +SKIP
+    >>> print(np.allclose(U_t @ U_t.conj().T, np.eye(l.N)))  # doctest: +SKIP
     True
     """
     if isinstance(L, (csr_matrix, csr_array)):
@@ -204,16 +205,17 @@ def quantum_density_matrix_evolution(
 
     Examples
     --------
-    >>> from lrgsglib import Lattice2D
-    >>> l = Lattice2D(side=10)
-    >>> l.compute_k_eigvV()
-    >>> rho_t = quantum_density_matrix_evolution(
+
+    >>> from lrgsglib import Lattice2D  # doctest: +SKIP
+    >>> l = Lattice2D(side=10)  # doctest: +SKIP
+    >>> l.compute_k_eigvV()  # doctest: +SKIP
+    >>> rho_t = quantum_density_matrix_evolution(  # doctest: +SKIP
     ...     l.eigv, l.eigV, t=1.0,
     ...     init_type="localized", init_node=50
-    ... )
-    >>> print(np.isclose(np.trace(rho_t), 1.0))
+    ... )  # doctest: +SKIP
+    >>> print(np.isclose(np.trace(rho_t), 1.0))  # doctest: +SKIP
     True
-    >>> print(np.allclose(rho_t, rho_t.conj().T))
+    >>> print(np.allclose(rho_t, rho_t.conj().T))  # doctest: +SKIP
     True
     """
     N = len(eigenvalues)

@@ -66,6 +66,48 @@ The simplest way to compute a spectrum:
 - ``'networkx'`` or ``'nx'``: NetworkX's built-in function
 - ``'cupy'`` or ``'cp'``: GPU-accelerated (requires CuPy)
 
+Signed vs Unsigned Laplacian
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default, ``get_graph_lspectrum()`` uses NetworkX's unsigned Laplacian, which
+ignores edge signs (weights are converted to absolute values). For graphs with
+negative edge weights (antiferromagnetic/repulsive interactions), use the
+``signed=True`` parameter:
+
+.. code-block:: python
+
+   import networkx as nx
+   from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
+
+   # Create a graph with negative edges
+   G = nx.Graph()
+   G.add_edge(0, 1, weight=-1)  # Antiferromagnetic edge
+   G.add_edge(1, 2, weight=1)
+   G.add_edge(2, 0, weight=1)
+
+   # Unsigned Laplacian (ignores signs)
+   L_unsigned, eigv_unsigned = get_graph_lspectrum(G, signed=False)
+
+   # Signed Laplacian (preserves signs)
+   L_signed, eigv_signed = get_graph_lspectrum(G, signed=True)
+
+   print(f"Unsigned eigenvalues: {sorted(eigv_unsigned.real)}")
+   print(f"Signed eigenvalues: {sorted(eigv_signed.real)}")
+
+The signed Laplacian is computed as :math:`L_s = D - A_s` where:
+
+- :math:`D` is the degree matrix using **absolute** edge weights
+- :math:`A_s` preserves the original edge signs
+
+This convention ensures that the signed Laplacian correctly captures frustration
+in antiferromagnetic systems while maintaining proper graph connectivity.
+
+.. note::
+
+   The ``signed_laplacian_matrix()`` function from ``nx_patches.funcs.spectral``
+   is the canonical implementation for signed Laplacian matrix construction.
+   ``get_graph_lspectrum(..., signed=True)`` uses this implementation internally.
+
 Using SignedGraph Methods
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 

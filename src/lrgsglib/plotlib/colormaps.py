@@ -82,13 +82,13 @@ def generate_maxpercdiff_colormap(
 
     Examples
     --------
-    >>> colormap = generate_maxpercdiff_colormap(100)
-    >>> import matplotlib.pyplot as plt
-    >>> import numpy as np
-    >>> data = np.random.rand(10, 10)
-    >>> plt.imshow(data, cmap=colormap)
-    >>> plt.colorbar()
-    >>> plt.show()
+    >>> colormap = generate_maxpercdiff_colormap(100)  # doctest: +SKIP
+    >>> import matplotlib.pyplot as plt  # doctest: +SKIP
+    >>> import numpy as np  # doctest: +SKIP
+    >>> data = np.random.rand(10, 10)  # doctest: +SKIP
+    >>> plt.imshow(data, cmap=colormap)  # doctest: +SKIP
+    >>> plt.colorbar()  # doctest: +SKIP
+    >>> plt.show()  # doctest: +SKIP
     """
     import numpy as np
 

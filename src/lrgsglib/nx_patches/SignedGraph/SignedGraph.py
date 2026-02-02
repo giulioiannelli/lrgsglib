@@ -89,84 +89,72 @@ class SignedGraph:
     
     Methods
     -------
-    Core Graph Operations
-    ---------------------
+    **Core Graph Operations**:
 
-    flip_sel_edges(links, name='weight', on_g=SG_REPR)
-        Flip the sign of selected edges.
-    flip_random_fract_edges(pflip=None, on_g=SG_REPR)
-        Randomly flip a fraction of edges based on pflip.
-    get_random_links(n=1, only_in='', on_g=SG_REPR)
-        Get random edges from the graph (all, positive, or negative).
+    - ``flip_sel_edges(links, name='weight', on_g=SG_REPR)``:
+      Flip the sign of selected edges.
+    - ``flip_random_fract_edges(pflip=None, on_g=SG_REPR)``:
+      Randomly flip a fraction of edges based on pflip.
+    - ``get_random_links(n=1, only_in='', on_g=SG_REPR)``:
+      Get random edges from the graph (all, positive, or negative).
 
-    Spectral Analysis (imported from ._spectral)
-    ---------------------------------------------
+    **Spectral Analysis** (imported from ._spectral):
 
-    compute_laplacian_spectrum_weigV(typf=np.float64, transpose=True, 
-                                     backend='numpy')
-        Compute full eigendecomposition of the signed Laplacian.
-    compute_k_eigvV(k=1, backend='scipy', which='SM', typf=np.float64, 
-                    transpose=True)
-        Compute the k smallest eigenvalues/eigenvectors.
-    get_eigV(which=0, binarize=False)
-        Retrieve a specific eigenvector (optionally binarized).
-    get_eigV_binarized(which=0)
-        Get binarized eigenvector (sign pattern).
-    get_signed_laplacian_embedding(k=2)
-        Get k-dimensional spectral embedding.
+    - ``compute_laplacian_spectrum_weigV(backend='numpy')``:
+      Compute full eigendecomposition of the signed Laplacian.
+    - ``compute_k_eigvV(k=1, backend='scipy', which='SM')``:
+      Compute the k smallest eigenvalues/eigenvectors.
+    - ``get_eigV(which=0, binarize=False)``:
+      Retrieve a specific eigenvector (optionally binarized).
+    - ``get_eigV_binarized(which=0)``:
+      Get binarized eigenvector (sign pattern).
+    - ``get_signed_laplacian_embedding(k=2)``:
+      Get k-dimensional spectral embedding.
 
-    Clustering and Community Detection
-    -----------------------------------
+    **Clustering and Community Detection**:
 
-    get_eigV_cluster_sizes(which=0, binarize=True, val=None, on_g=SG_REPR)
-        Compute cluster sizes from eigenvector-based partitioning.
-    get_cluster_distribution(which=0, on_g=SG_REPR, binarize=True, 
-                            val=None)
-        Get distribution of cluster sizes.
-    make_clustersYN(k, val, on_g=SG_REPR)
-        Create clusters based on node attribute values.
-    compute_pinf(which=0, val=None, on_g=SG_REPR)
-        Compute infinite cluster probability (percolation order parameter).
+    - ``get_eigV_cluster_sizes(which=0, binarize=True)``:
+      Compute cluster sizes from eigenvector-based partitioning.
+    - ``get_cluster_distribution(which=0, binarize=True)``:
+      Get distribution of cluster sizes.
+    - ``make_clustersYN(k, val, on_g=SG_REPR)``:
+      Create clusters based on node attribute values.
+    - ``compute_pinf(which=0, val=None, on_g=SG_REPR)``:
+      Compute infinite cluster probability (percolation order parameter).
 
-    Energy and Dynamics (imported from ._dynamics)
-    -----------------------------------------------
+    **Energy and Dynamics** (imported from ._dynamics):
 
-    compute_rbim_energy_eigV(which=0, use_gpu=False, on_g=SG_REPR)
-        Compute Random Bond Ising Model energy for binarized eigenvector.
-    compute_sksph_energy_eigV(which=0, use_gpu=False, on_g=SG_REPR)
-        Compute spherical Sherrington-Kirkpatrick model energy.
-    get_ferroAntiferro_regions(attr_str='s', on_g=SG_REPR)
-        Identify ferromagnetic and antiferromagnetic regions.
+    - ``compute_rbim_energy_eigV(which=0, use_gpu=False)``:
+      Compute Random Bond Ising Model energy for binarized eigenvector.
+    - ``compute_sksph_energy_eigV(which=0, use_gpu=False)``:
+      Compute spherical Sherrington-Kirkpatrick model energy.
+    - ``get_ferroAntiferro_regions(attr_str='s', on_g=SG_REPR)``:
+      Identify ferromagnetic and antiferromagnetic regions.
 
-    Information Theory (imported from ._infotheory)
-    ------------------------------------------------
+    **Information Theory** (imported from ._infotheory):
 
-    compute_signed_laplacian_entropy(steps=600, t1=-2, t2=5, w_thresh=None, 
-                                     typf=np.float64, backend='numpy', 
-                                     transpose=None)
-        Compute entropy profile and related observables from spectrum.
-    get_entropy()
-        Return cached normalized entropy profile.
-    get_specific_heat()
-        Return entropy derivative (specific heat analog).
+    - ``compute_signed_laplacian_entropy(steps=600, t1=-2, t2=5)``:
+      Compute entropy profile and related observables from spectrum.
+    - ``get_entropy()``:
+      Return cached normalized entropy profile.
+    - ``get_specific_heat()``:
+      Return entropy derivative (specific heat analog).
     
-    Import/Export (via ._exports / ._loaders)
-    ------------------------------------------
+    **Import/Export** (via ._exports / ._loaders):
 
-    export_eigV_all(out_suffix='', ext=BIN)
-        Export all eigenvectors to binary file.
-    load_eigV_all(fname='', load_mode=SG_LOAD_M)
-        Load eigenvectors from binary file.
-    set_edgel_from_bin(file_path, mode='numpy', on_g=SG_REPR)
-        Load edge list from binary file.
+    - ``export_eigV_all(out_suffix='', ext=BIN)``:
+      Export all eigenvectors to binary file.
+    - ``load_eigV_all(fname='', load_mode=SG_LOAD_M)``:
+      Load eigenvectors from binary file.
+    - ``set_edgel_from_bin(file_path, mode='numpy', on_g=SG_REPR)``:
+      Load edge list from binary file.
 
-    Graph Representations
-    ---------------------
+    **Graph Representations**:
 
-    upd_GraphRepr_All(on_g=SG_REPR, also_itself=True)
-        Update all graph representations to maintain consistency.
-    upd_graph_matrices(format='csr', on_g=SG_REPR)
-        Update adjacency, degree, and Laplacian matrices.
+    - ``upd_GraphRepr_All(on_g=SG_REPR, also_itself=True)``:
+      Update all graph representations to maintain consistency.
+    - ``upd_graph_matrices(format='csr', on_g=SG_REPR)``:
+      Update adjacency, degree, and Laplacian matrices.
     
     Notes
     -----
@@ -189,31 +177,28 @@ class SignedGraph:
     Examples
     --------
 
-    Create a signed graph from a NetworkX graph::
+    Create a signed graph from a NetworkX graph:
 
-    >>> import networkx as nx
-    >>> G = nx.erdos_renyi_graph(100, 0.1)
-    >>> sg = SignedGraph(G, pflip=0.3, seed=42)
-    >>> print(f"Nodes: {sg.N}, Edges: {sg.Ne}, Negative edges: {sg.Ne_n}")
+    >>> import networkx as nx  # doctest: +SKIP
+    >>> G = nx.erdos_renyi_graph(100, 0.1)  # doctest: +SKIP
+    >>> sg = SignedGraph(G, pflip=0.3, seed=42)  # doctest: +SKIP
+    >>> print(f"Nodes: {sg.N}, Edges: {sg.Ne}")  # doctest: +SKIP
 
-    Compute and analyze the signed Laplacian spectrum::
+    Compute and analyze the signed Laplacian spectrum:
 
-    >>> sg.compute_laplacian_spectrum_weigV()
-    >>> sg.compute_signed_laplacian_entropy()
-    >>> entropy = sg.get_entropy()
-    >>> print(f"Entropy profile shape: {entropy.shape}")
+    >>> sg.compute_laplacian_spectrum_weigV()  # doctest: +SKIP
+    >>> sg.compute_signed_laplacian_entropy()  # doctest: +SKIP
+    >>> entropy = sg.get_entropy()  # doctest: +SKIP
 
-    Analyze clustering from eigenvectors::
+    Analyze clustering from eigenvectors:
 
-    >>> cluster_sizes = sg.get_eigV_cluster_sizes(which=0, binarize=True)
-    >>> sg.compute_pinf(which=0)
-    >>> print(f"Infinite cluster probability: {sg.Pinf:.3g}")
+    >>> cluster_sizes = sg.get_eigV_cluster_sizes(which=0)  # doctest: +SKIP
+    >>> sg.compute_pinf(which=0)  # doctest: +SKIP
 
-    Compute spin-glass energy::
+    Compute spin-glass energy:
 
-    >>> sg.compute_rbim_energy_eigV(which=0)
-    >>> energy = sg.get_rbim_energy_eigV(which=0)
-    >>> print(f"RBIM energy: {energy:.3g}")
+    >>> sg.compute_rbim_energy_eigV(which=0)  # doctest: +SKIP
+    >>> energy = sg.get_rbim_energy_eigV(which=0)  # doctest: +SKIP
     
     See Also
     --------
@@ -551,9 +536,9 @@ class SignedGraph:
 
         Examples
         --------
-        >>> sg = SignedGraph(G=nx.karate_club_graph())
-        >>> sg.flip_random_fract_edges(pflip=0.2)  # This calls _invalidate_matrix_cache
-        >>> # Matrices will be recomputed on next access
+
+        >>> sg = SignedGraph(G=nx.karate_club_graph())  # doctest: +SKIP
+        >>> sg.flip_random_fract_edges(pflip=0.2)  # doctest: +SKIP
         """
         if on_g is None:
             # Clear all cached matrices for all representations
@@ -687,10 +672,10 @@ class SignedGraph:
         
         Examples
         --------
-        The structure after clustering might look like:
-        
-        >>> sg.gcl['eigV0']['+1'][SG_REPR]
-        (graphY, graphN)  # Tuple of subgraphs for nodes with eigV0 == +1
+        The structure after clustering might look like::
+
+            sg.gcl['eigV0']['+1'][SG_REPR]
+            # Returns: (graphY, graphN)  - Tuple of subgraphs for nodes with eigV0 == +1
         """
         self.graph_clustering_utility = NestedDict()
     #

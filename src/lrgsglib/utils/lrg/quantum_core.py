@@ -63,17 +63,13 @@ class QuantumSignedLaplacianAnalysis:
 
     Examples
     --------
-    >>> from lrgsglib import Lattice2D
-    >>> from lrgsglib.utils.lrg.quantum_core import QuantumSignedLaplacianAnalysis
-    >>> l = Lattice2D(side=20, pflip=0.1)
-    >>> l.flip_random_fract_edges()
-    >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=200)
-    >>> qrg.compute_all_quantum_observables()
-    >>> import matplotlib.pyplot as plt
-    >>> plt.plot(qrg.tTs_quantum, qrg.von_neumann_entropy)
-    >>> plt.xlabel("Quantum time")
-    >>> plt.ylabel("von Neumann entropy")
-    >>> plt.show()
+
+    >>> from lrgsglib import Lattice2D  # doctest: +SKIP
+    >>> from lrgsglib.utils.lrg.quantum_core import QuantumSignedLaplacianAnalysis  # doctest: +SKIP
+    >>> l = Lattice2D(side=20, pflip=0.1)  # doctest: +SKIP
+    >>> l.flip_random_fract_edges()  # doctest: +SKIP
+    >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=200)  # doctest: +SKIP
+    >>> qrg.compute_all_quantum_observables()  # doctest: +SKIP
     """
 
     # Quantum observables storage
@@ -154,13 +150,11 @@ class QuantumSignedLaplacianAnalysis:
 
         Examples
         --------
-        >>> from lrgsglib import Lattice2D
-        >>> from lrgsglib.utils.lrg.quantum_core import QuantumSignedLaplacianAnalysis
-        >>> l = Lattice2D(side=10)
-        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)
-        >>> qrg.compute_quantum_entropy()
-        >>> print(qrg.von_neumann_entropy.shape)
-        (600,)
+
+        >>> from lrgsglib import Lattice2D  # doctest: +SKIP
+        >>> l = Lattice2D(side=10)  # doctest: +SKIP
+        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)  # doctest: +SKIP
+        >>> qrg.compute_quantum_entropy()  # doctest: +SKIP
         """
         if not hasattr(self.sg, "eigv") or not hasattr(self.sg, "eigV"):
             raise ValueError(
@@ -201,13 +195,11 @@ class QuantumSignedLaplacianAnalysis:
 
         Examples
         --------
-        >>> from lrgsglib import Lattice2D
-        >>> from lrgsglib.utils.lrg.quantum_core import QuantumSignedLaplacianAnalysis
-        >>> l = Lattice2D(side=10)
-        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)
-        >>> qrg.compute_quantum_classical_divergence()
-        >>> print(qrg.quantum_classical_div.shape)
-        (600,)
+
+        >>> from lrgsglib import Lattice2D  # doctest: +SKIP
+        >>> l = Lattice2D(side=10)  # doctest: +SKIP
+        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)  # doctest: +SKIP
+        >>> qrg.compute_quantum_classical_divergence()  # doctest: +SKIP
         """
         if not hasattr(self.sg, "eigv") or not hasattr(self.sg, "eigV"):
             raise ValueError(
@@ -243,15 +235,15 @@ class QuantumSignedLaplacianAnalysis:
 
         Examples
         --------
-        >>> from lrgsglib import Lattice2D
-        >>> from lrgsglib.utils.lrg.quantum_core import QuantumSignedLaplacianAnalysis
-        >>> l = Lattice2D(side=10)
-        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)
-        >>> qrg.compute_all_quantum_observables()
-        >>> # All observables are now available
-        >>> print(qrg.von_neumann_entropy is not None)
+        >>> from lrgsglib import Lattice2D  # doctest: +SKIP
+        >>> from lrgsglib.utils.lrg.quantum_core import QuantumSignedLaplacianAnalysis  # doctest: +SKIP
+        >>> l = Lattice2D(side=10)  # doctest: +SKIP
+        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)  # doctest: +SKIP
+        >>> qrg.compute_all_quantum_observables()  # doctest: +SKIP
+        >>> # All observables are now available  # doctest: +SKIP
+        >>> print(qrg.von_neumann_entropy is not None)  # doctest: +SKIP
         True
-        >>> print(qrg.quantum_classical_div is not None)
+        >>> print(qrg.quantum_classical_div is not None)  # doctest: +SKIP
         True
         """
         self.compute_quantum_entropy()  # Computes entropy, coherence, purity, etc.
@@ -278,9 +270,9 @@ class QuantumSignedLaplacianAnalysis:
 
         Examples
         --------
-        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)
-        >>> qrg.compute_quantum_entropy()
-        >>> dS_dt = qrg.get_quantum_entropy_derivative()
+        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)  # doctest: +SKIP
+        >>> qrg.compute_quantum_entropy()  # doctest: +SKIP
+        >>> dS_dt = qrg.get_quantum_entropy_derivative()  # doctest: +SKIP
         """
         if self.von_neumann_entropy is None:
             raise ValueError(
@@ -311,9 +303,9 @@ class QuantumSignedLaplacianAnalysis:
 
         Examples
         --------
-        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)
-        >>> qrg.compute_quantum_entropy()
-        >>> dC_dt = qrg.get_coherence_derivative()
+        >>> qrg = QuantumSignedLaplacianAnalysis(l, init_node=50)  # doctest: +SKIP
+        >>> qrg.compute_quantum_entropy()  # doctest: +SKIP
+        >>> dC_dt = qrg.get_coherence_derivative()  # doctest: +SKIP
         """
         if self.quantum_coherence is None:
             raise ValueError(

@@ -14,9 +14,11 @@ __all__ = [
     "compute_laplacian_properties",
 ]
 
+
 def get_graph_lspectrum(
     G: nx.Graph,
     library: str = "numpy",
+    signed: bool = False,
 ) -> tuple[NDArray, NDArray]:
     """
     Compute the Laplacian matrix and its spectrum for a given graph.
@@ -29,6 +31,11 @@ def get_graph_lspectrum(
         The library to use for eigenvalue computation. Options include
         ``"numpy"``, ``"networkx"``/``"nx"``, ``"scipy"``/``"sp"``,
         and ``"cupy"``/``"cp"``. Defaults to ``"numpy"``.
+    signed : bool, optional
+        If True, compute the signed Laplacian (L = D - A where D uses absolute
+        degrees and A preserves edge signs). This is appropriate for graphs with
+        negative edge weights representing antiferromagnetic/repulsive interactions.
+        If False (default), uses NetworkX's standard unsigned Laplacian.
 
     Returns
     -------
@@ -43,8 +50,12 @@ def get_graph_lspectrum(
 
     Notes
     -----
-    - The Laplacian matrix is computed using NetworkX's `laplacian_matrix`.
-    - The spectrum is computed using the specified library for eigenvalue computation.
+    - When ``signed=False``, the Laplacian is computed using NetworkX's
+      ``laplacian_matrix``, which ignores edge signs.
+    - When ``signed=True``, uses ``signed_laplacian_matrix`` from
+      ``nx_patches.funcs.spectral``, which correctly handles negative edge weights.
+    - For signed graphs (with negative edges), the signed Laplacian may have
+      negative eigenvalues, unlike the standard Laplacian which is always PSD.
     - If ``"cupy"`` is selected, ensure that CuPy is installed and a compatible
       GPU is available.
 
@@ -60,27 +71,51 @@ def get_graph_lspectrum(
      [ 0  0 -1  1]]
     >>> print(w)
     [0. 0.58578644 2. 3.41421356]
+
+    For signed graphs with negative edges:
+
+    >>> G = nx.Graph()
+    >>> G.add_edge(0, 1, weight=-1)  # antiferromagnetic edge
+    >>> G.add_edge(1, 2, weight=1)
+    >>> L, w = get_graph_lspectrum(G, library='numpy', signed=True)
     """
-    L = nx.laplacian_matrix(G)
+    if signed:
+        # Import signed Laplacian from canonical location
+        from lrgsglib.nx_patches.funcs.spectral import signed_laplacian_matrix
+
+        L = signed_laplacian_matrix(G)
+    else:
+        L = nx.laplacian_matrix(G)
 
     match library:
-        case 'numpy':
+        case "numpy":
             L = L.toarray()
             w = np.linalg.eigvals(L)
-        case 'networkx'|'nx'|'scipy'|'sp'|'cupy'|'cp':
+        case "networkx" | "nx" | "scipy" | "sp" | "cupy" | "cp":
             match library:
-                case 'networkx'|'nx':
-                    w = nx.laplacian_spectrum(G)
-                case 'scipy'|'sp':
+                case "networkx" | "nx":
+                    if signed:
+                        # networkx.laplacian_spectrum ignores signs, compute directly
+                        L = L.toarray()
+                        w = np.linalg.eigvals(L)
+                    else:
+                        w = nx.laplacian_spectrum(G)
+                        L = L.toarray()
+                case "scipy" | "sp":
                     from scipy.linalg import eigvals
+
+                    L = L.toarray()
                     w = eigvals(L)
-                case 'cupy':
+                case "cupy" | "cp":
                     import cupy as cp
+
+                    L = L.toarray()
                     L_gpu = cp.asarray(L)
                     w = cp.linalg.eigvals(L_gpu).get()
-            L = L.toarray()
         case _:
-            raise ValueError("Unsupported library. Choose from 'numpy', 'networkx', 'scipy', or 'cupy'.")
+            raise ValueError(
+                "Unsupported library. Choose from 'numpy', 'networkx', 'scipy', or 'cupy'."
+            )
 
     return L, w
 
@@ -126,6 +161,7 @@ def get_graph_lspectrum_rw(
 def compute_laplacian_properties(
     G: nx.Graph,
     tau: Optional[float] = None,
+    signed: bool = False,
 ) -> tuple[NDArray, NDArray, NDArray, NDArray, float]:
     """
     Computes the Laplacian spectrum, Laplacian matrix, rho, and Trho for graph G.
@@ -136,7 +172,10 @@ def compute_laplacian_properties(
         The input graph.
     tau : float, optional
         Scale parameter for the matrix exponential. If None, uses
-        ``1 / max(spectrum)``.
+        ``1 / max(abs(spectrum))``.
+    signed : bool, optional
+        If True, compute the signed Laplacian (L = D - A where D uses absolute
+        degrees and A preserves edge signs). Default is False.
 
     Returns
     -------
@@ -151,17 +190,31 @@ def compute_laplacian_properties(
         with its diagonal set to 0.
     tau : float
         The value of ``tau`` used in the computation.
+
+    Notes
+    -----
+    When ``signed=True``, the signed Laplacian may have negative eigenvalues.
+    The tau parameter is computed from ``max(abs(spectrum))`` to handle this case.
     """
-    spectrum = nx.laplacian_spectrum(G)
-    L_sparse = nx.laplacian_matrix(G)
-    L = L_sparse.todense()
-    tau = tau or 1/max(spectrum)
+    if signed:
+        from lrgsglib.nx_patches.funcs.spectral import signed_laplacian_matrix
+
+        L_sparse = signed_laplacian_matrix(G)
+        L = np.asarray(L_sparse.todense())
+        spectrum = np.linalg.eigvalsh(L)
+    else:
+        spectrum = nx.laplacian_spectrum(G)
+        L_sparse = nx.laplacian_matrix(G)
+        L = np.asarray(L_sparse.todense())
+
+    # Use absolute value of spectrum for tau calculation (handles negative eigenvalues)
+    tau = tau or 1 / max(np.abs(spectrum))
     num = expm(-tau * L)
     den = np.trace(num)
     rho = num / den
     Trho = np.copy(1.0 / rho)
     Trho = np.maximum(Trho, Trho.T)
     np.fill_diagonal(Trho, 0)
-    
+
     return spectrum, L, rho, Trho, tau
 

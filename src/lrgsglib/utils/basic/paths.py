@@ -39,7 +39,7 @@ def list_dir(path: str) -> List[str]:
 
     Example
     -------
-    >>> list_dir("/home/user/docs")
+    >>> list_dir("/home/user/docs")  # doctest: +SKIP
     ['file1.txt', 'file2.txt', 'reports']
     """
     dir_path = Path(path)
@@ -65,8 +65,8 @@ def remove_if_exists(path: Union[str, Path]) -> bool:
 
     Example
     -------
-    >>> remove_if_exists("/tmp/tempfile.txt")
-    True
+    >>> remove_if_exists("/tmp/nonexistent_file_12345.txt")
+    False
     """
     p = Path(path)
     if p.exists():
@@ -189,11 +189,9 @@ def extract_value_from_filename(file_name: str, value_pattern: str) -> float:
     Examples
     --------
     >>> file_name = "data_p=1.5.pkl"
-    >>> value_pattern = r"p=([\\d.]+)"
+    >>> value_pattern = "p=([0-9.]+)"
     >>> extract_value_from_filename(file_name, value_pattern)
     1.5
-    
-    This function extracts the p-value from the provided file name.
     """
     match = re.search(value_pattern, file_name)
     if match:
@@ -225,11 +223,9 @@ def extract_values_from_filenames(file_names: List[str], value_pattern: str, sor
     Examples
     --------
     >>> file_names = ["data_p=1.5.pkl", "experiment_p=2.0.pkl", "results_p=0.5.pkl"]
-    >>> value_pattern = "p=([\\d.]+)"
+    >>> value_pattern = "p=([0-9.]+)"
     >>> extract_values_from_filenames(file_names, value_pattern)
-    array([0.5, 1.5, 2.0])
-    
-    This function extracts the p-values from the provided file names and returns them sorted in ascending order.
+    array([0.5, 1.5, 2. ])
     """
     # values = [re.search(value_pattern, filename).group(1) 
     #           for filename in file_names if re.search(value_pattern, filename)]

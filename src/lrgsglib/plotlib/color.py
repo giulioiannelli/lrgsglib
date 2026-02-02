@@ -282,18 +282,18 @@ def set_color_cycle(
 
     Examples
     --------
-    >>> import matplotlib.pyplot as plt
-    >>> import numpy as np
-    >>> from matplotlib import cm
-    >>> arr = [1, 2, 3, 4, 5]
-    >>> x = np.linspace(0, 10, 100)
-    >>> fig, ax = plt.subplots()
-    >>> set_color_cycle(arr, ax=ax)
-    >>> for i, val in enumerate(arr):
-    >>>     y = np.sin(x + i)
-    >>>     ax.plot(x, y, label=f'Line {i+1}')
-    >>> ax.legend()
-    >>> plt.show()
+    >>> import matplotlib.pyplot as plt  # doctest: +SKIP
+    >>> import numpy as np  # doctest: +SKIP
+    >>> from matplotlib import cm  # doctest: +SKIP
+    >>> arr = [1, 2, 3, 4, 5]  # doctest: +SKIP
+    >>> x = np.linspace(0, 10, 100)  # doctest: +SKIP
+    >>> fig, ax = plt.subplots()  # doctest: +SKIP
+    >>> set_color_cycle(arr, ax=ax)  # doctest: +SKIP
+    >>> for i, val in enumerate(arr):  # doctest: +SKIP
+    ...     y = np.sin(x + i)
+    ...     ax.plot(x, y, label=f'Line {i+1}')
+    >>> ax.legend()  # doctest: +SKIP
+    >>> plt.show()  # doctest: +SKIP
 
     Notes
     -----

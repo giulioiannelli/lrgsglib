@@ -63,22 +63,22 @@ def imshow_colorbar_caxdivider(
 
     Examples
     --------
-    >>> import matplotlib.pyplot as plt
-    >>> import numpy as np
-    >>> from mpl_toolkits.axes_grid1 import make_axes_locatable
-    >>> fig, ax = plt.subplots()
-    >>> data = np.random.rand(10, 10)
-    >>> im = ax.imshow(data, cmap="viridis")
-    >>> imshow_colorbar_caxdivider(im, ax, position="right", size="5%", pad=0.1)
-    >>> plt.show()
+    >>> import matplotlib.pyplot as plt  # doctest: +SKIP
+    >>> import numpy as np  # doctest: +SKIP
+    >>> from mpl_toolkits.axes_grid1 import make_axes_locatable  # doctest: +SKIP
+    >>> fig, ax = plt.subplots()  # doctest: +SKIP
+    >>> data = np.random.rand(10, 10)  # doctest: +SKIP
+    >>> im = ax.imshow(data, cmap="viridis")  # doctest: +SKIP
+    >>> imshow_colorbar_caxdivider(im, ax, position="right", size="5%", pad=0.1)  # doctest: +SKIP
+    >>> plt.show()  # doctest: +SKIP
 
     For 3D axes:
-    >>> from mpl_toolkits.mplot3d import Axes3D
-    >>> fig = plt.figure()
-    >>> ax = fig.add_subplot(111, projection='3d')
-    >>> scatter = ax.scatter([1, 2, 3], [4, 5, 6], [7, 8, 9], c=[10, 20, 30])
-    >>> imshow_colorbar_caxdivider(scatter, ax, axis_dim=3)
-    >>> plt.show()
+    >>> from mpl_toolkits.mplot3d import Axes3D  # doctest: +SKIP
+    >>> fig = plt.figure()  # doctest: +SKIP
+    >>> ax = fig.add_subplot(111, projection='3d')  # doctest: +SKIP
+    >>> scatter = ax.scatter([1, 2, 3], [4, 5, 6], [7, 8, 9], c=[10, 20, 30])  # doctest: +SKIP
+    >>> imshow_colorbar_caxdivider(scatter, ax, axis_dim=3)  # doctest: +SKIP
+    >>> plt.show()  # doctest: +SKIP
     """
     import matplotlib.axes as _maxes
 

@@ -26,14 +26,30 @@ Example
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ..config.const import LOG, LRGSG_CCORE_BIN, LRGSG_LOG
+from ..config.const import LOG, LRGSG_LOG
 from ..utils.basic.strings import join_non_empty
+
+
+def _get_ccore_bin() -> str:
+    """Get C core binary directory path at runtime.
+
+    Reads from environment variable to allow test isolation.
+    Falls back to configured constant if not set.
+    """
+    env_val = os.environ.get("LRGSG_CCORE_BIN")
+    if env_val:
+        return env_val
+    # Fall back to configured value from lrgsg_env
+    from ..config.lrgsg_env import LRGSG_CCORE_BIN
+
+    return LRGSG_CCORE_BIN
 
 if TYPE_CHECKING:
     from .BinDynSys import BinDynSys
@@ -122,7 +138,7 @@ class CBackendMixin:
         suffix = self._c_program_suffix()
         self.CbaseName = self._c_program_name_template.format(suffix)
         arglist = self._build_c_arglist()
-        self.cprogram = [Path(LRGSG_CCORE_BIN) / self.CbaseName] + arglist
+        self.cprogram = [Path(_get_ccore_bin()) / self.CbaseName] + arglist
 
     def _build_c_arglist(self: "BinDynSys") -> list[str]:
         """Build argument list for C program.
