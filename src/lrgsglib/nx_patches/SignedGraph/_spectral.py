@@ -1,4 +1,3 @@
-import logging
 import numpy as np
 from typing import List, Union, Optional, TYPE_CHECKING
 from numpy.typing import NDArray
@@ -13,9 +12,10 @@ from ...utils.basic import (
     normalize_array,
     dtype_numerical_precision,
 )
+from ...utils.tools.loglib import get_logger
 # info-theory helpers moved to _infotheory
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from .SignedGraph import SignedGraph
@@ -27,7 +27,7 @@ def compute_laplacian_spectrum(
     typf: type = np.float64,
     backend: Optional[str] = None,
     keep_sparse: bool = None,
-    verbose: bool = False,
+    verbose: bool = False,  # Deprecated: use enable_logging() instead
 ):
     """
     Compute eigenvalues only of the signed Laplacian (no eigenvectors).
@@ -41,6 +41,8 @@ def compute_laplacian_spectrum(
     typf : type, default np.float64
         Data type for computation (e.g., np.float32 for memory savings,
         np.float64 for higher precision).
+    verbose : bool, default False
+        Deprecated. Use ``lrgsglib.utils.tools.loglib.enable_logging()`` instead.
     backend : str, optional
         Override the instance backend ('numpy', 'scipy', or 'cupy').
         Defaults to the backend selected on the graph instance.
@@ -174,17 +176,11 @@ def compute_laplacian_spectrum(
         "with_eigvectors": False,
     }
 
-    # Memory tracking for debugging
-    if verbose:
-        try:
-            import psutil
-            import os
-            process = psutil.Process(os.getpid())
-            mem_before_spectrum = process.memory_info().rss / (1024**3)
-            print(f"[MEM-SPECTRAL] Before spectrum computation: {mem_before_spectrum:.2f} GB", flush=True)
-            print(f"[INFO-SPECTRAL] N={self.N:,}, backend={backend_obj.name}, keep_sparse={keep_sparse}", flush=True)
-        except:
-            pass
+    # Log spectral computation info
+    logger.debug(
+        "Starting spectrum computation: N=%d, backend=%s, keep_sparse=%s",
+        self.N, backend_obj.name, keep_sparse
+    )
 
     if keep_sparse:
         # Use sparse methods - gets N-2 eigenvalues, discards eigenvectors
@@ -198,14 +194,9 @@ def compute_laplacian_spectrum(
     else:
         # Convert to dense for full eigenvalue computation
         # CRITICAL: Avoid intermediate copies to minimize peak memory
-        if verbose:
-            try:
-                print(f"[STEP 3/5] Converting sparse Laplacian to dense ({self.N}×{self.N})...", flush=True)
-                sparse_mb = (self.slp.nnz * 16) / (1024**2) if hasattr(self.slp, 'nnz') else 0
-                dense_mb = (self.N ** 2 * 8) / (1024**2)
-                print(f"[INFO-SPECTRAL] Sparse: {sparse_mb:.1f} MB → Dense: {dense_mb:.1f} MB", flush=True)
-            except:
-                pass
+        logger.debug(
+            "Converting sparse Laplacian to dense (%d x %d)", self.N, self.N
+        )
 
         if hasattr(self.slp, "toarray"):
             # Sparse matrix: check dtype before converting
@@ -217,12 +208,7 @@ def compute_laplacian_spectrum(
                 # Cast sparse first (cheap), then convert to dense
                 dense_laplacian = self.slp.astype(typf).toarray()
 
-            if verbose:
-                try:
-                    mem_after_dense = process.memory_info().rss / (1024**3)
-                    print(f"[MEM-SPECTRAL] After dense conversion: {mem_after_dense:.2f} GB (+{mem_after_dense - mem_before_spectrum:.2f} GB)", flush=True)
-                except:
-                    pass
+            logger.debug("Dense conversion complete")
 
             # CRITICAL: Explicitly clear sparse Laplacian to free memory before eigval computation
             # For very large matrices (N>100k), this can save 10-50GB of heap space
@@ -230,34 +216,19 @@ def compute_laplacian_spectrum(
             sparse_key = self.on_g
             if sparse_key in self.signed_laplacian_matrices:
                 del self.signed_laplacian_matrices[sparse_key]
-                if verbose:
-                    print(f"[INFO-SPECTRAL] Deleted sparse Laplacian from cache", flush=True)
+                logger.debug("Deleted sparse Laplacian from cache")
             import gc
             gc.collect()  # Force garbage collection to reclaim sparse matrix memory
-
-            if verbose:
-                try:
-                    mem_after_gc = process.memory_info().rss / (1024**3)
-                    print(f"[MEM-SPECTRAL] After GC: {mem_after_gc:.2f} GB (freed {mem_after_dense - mem_after_gc:.2f} GB)", flush=True)
-                except:
-                    pass
         else:
             # Already dense: just cast if needed
             dense_laplacian = np.asarray(self.slp, dtype=typf)
 
         # Use eigvalsh (eigenvalues only, faster than eigh)
-        if verbose:
-            print(f"[STEP 4/5] Computing eigenvalues with {backend_obj.name}.eigvalsh...", flush=True)
+        logger.debug("Computing eigenvalues with %s.eigvalsh", backend_obj.name)
 
         self.eigv = backend_obj.eigvalsh(dense_laplacian)
 
-        if verbose:
-            try:
-                mem_after_eigvalsh = process.memory_info().rss / (1024**3)
-                print(f"[MEM-SPECTRAL] After eigvalsh: {mem_after_eigvalsh:.2f} GB", flush=True)
-                print(f"[STEP 5/5] Eigenvalue computation complete: {len(self.eigv)} values", flush=True)
-            except:
-                pass
+        logger.debug("Eigenvalue computation complete: %d values", len(self.eigv))
 #
 def compute_k_eigvV(
     self: "SignedGraph",

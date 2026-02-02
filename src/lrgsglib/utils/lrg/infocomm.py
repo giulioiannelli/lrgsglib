@@ -11,7 +11,10 @@ from scipy.sparse.linalg import expm as sparse_expm, expm_multiply
 from scipy.spatial.distance import squareform
 #
 from ..basic import dtype_numerical_precision
+from ..tools.loglib import get_logger
 from .spectral import *
+#
+logger = get_logger(__name__)
 #
 __all__ = [
     "extract_ultrametric_matrix",
@@ -553,7 +556,8 @@ def compute_entropy_observables_expm_multiply(
     specific_heat_scale : str, optional
         Scaling: "logN" (remove size dependence) or "none". Default: "logN".
     verbose : bool, optional
-        Print warnings for numerical issues. Default: False.
+        Deprecated. Use ``lrgsglib.utils.tools.loglib.enable_logging()`` instead.
+        Default: False.
 
     Returns
     -------
@@ -617,22 +621,21 @@ def compute_entropy_observables_expm_multiply(
     entropy_profile = np.zeros(steps, dtype=typf)
 
     # Main loop: compute entropy for each time point
-    # Add timing instrumentation
-    import time as time_module
-    tau_times = []
+    tau_cutoff = 5000  # Aggressive cutoff for tractable computation
+    _logged_cutoff = False
 
     for idx, tau in enumerate(time_grid):
-        t_start = time_module.time()
-
         # For very large tau, skip expensive computation (would take minutes)
         # Use analytical limiting behavior: S(tau → ∞) = 0 for connected graphs
-        tau_cutoff = 5000  # Aggressive cutoff for tractable computation
         if tau > tau_cutoff:
             # At large tau, exp(-tau*L) → 0, so S → 0 for connected graph
             entropy_profile[idx] = 0.0
-            tau_times.append(0.0)
-            if verbose and idx > 0 and time_grid[idx-1] <= tau_cutoff:
-                print(f"  Using limiting value S=0 for tau > {tau_cutoff} (avoids slow computation)")
+            if not _logged_cutoff:
+                logger.debug(
+                    "Using limiting value S=0 for tau > %d (avoids slow computation)",
+                    tau_cutoff
+                )
+                _logged_cutoff = True
             continue
 
         # Matrix exponential action: Y = exp(-τL) Z
@@ -640,8 +643,7 @@ def compute_entropy_observables_expm_multiply(
         try:
             Y = expm_multiply(A, Z)  # Shape (N, num_samples)
         except Exception as e:
-            if verbose:
-                print(f"Warning: expm_multiply failed at τ={tau:.2e}: {e}")
+            logger.warning("expm_multiply failed at tau=%.2e: %s", tau, e)
             entropy_profile[idx] = np.nan
             continue
 
@@ -655,28 +657,12 @@ def compute_entropy_observables_expm_multiply(
 
         # Sanity check (defensive programming)
         if not np.isfinite(trK) or trK <= 0:
-            if verbose:
-                print(f"Warning: Invalid partition function Z(τ={tau:.2e}) = {trK:.2e}")
+            logger.warning("Invalid partition function Z(tau=%.2e) = %.2e", tau, trK)
             entropy_profile[idx] = np.nan
             continue
 
         # Compute entropy: S(τ) = log Z(τ) + τ · Tr[L exp(-τL)] / Z(τ)
         entropy_profile[idx] = np.log(trK) + tau * (trLK / trK)
-
-        # Track timing
-        t_end = time_module.time()
-        tau_times.append(t_end - t_start)
-
-        # Print timing for slow points
-        if verbose and (t_end - t_start) > 1.0:
-            print(f"  tau={tau:.2e} took {t_end-t_start:.2f}s (slow!)")
-
-    # Print timing summary
-    if verbose and tau_times:
-        total_time = sum(tau_times)
-        max_time = max(tau_times)
-        print(f"  Total computation time: {total_time:.2f}s")
-        print(f"  Max time per tau: {max_time:.2f}s")
 
     # Normalize entropy
     log_N = np.log(typf(num_nodes)) if num_nodes > 0 else typf(1)
