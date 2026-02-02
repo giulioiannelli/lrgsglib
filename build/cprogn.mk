@@ -36,6 +36,9 @@ FN_VMSIM0   = VoterSimulator0
 FN_VMSIM1   = VoterSimulator1
 
 # Contact Process Simulators
+# Unified simulator (consolidates 1, 1a-1g)
+FN_CPSIM    = ContactSimulator
+# Legacy variants (kept for backwards compatibility, deprecated)
 FN_CPSIM0   = ContactSimulator0
 FN_CPSIM1   = ContactSimulator1
 FN_CPSIM1A  = ContactSimulator1a
@@ -59,8 +62,10 @@ SFMTSRC     = SFMT
 
 # ============================================================================
 # All programs to build
+# Note: FN_CPSIM (unified) replaces legacy FN_CPSIM1, FN_CPSIM1A-1G
+# Legacy variants still built for backwards compatibility
 FNS := $(FNS_ISING_LEGACY) $(FNS_ISING_NEW) \
-       $(FN_VMSIM0) $(FN_VMSIM1) $(FN_CPSIM0) $(FN_CPSIM1) \
+       $(FN_VMSIM0) $(FN_VMSIM1) $(FN_CPSIM) $(FN_CPSIM0) $(FN_CPSIM1) \
        $(FN_CPSIM1A) $(FN_CPSIM1B) $(FN_CPSIM1C) $(FN_CPSIM1D) $(FN_CPSIM1E) $(FN_CPSIM1F) $(FN_CPSIM1G)
 # only these go into PROGS
 PROGS := $(addprefix $(LRGSG_CCORE_BIN)/, $(FNS))

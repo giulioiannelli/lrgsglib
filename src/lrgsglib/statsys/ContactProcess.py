@@ -205,13 +205,15 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
     def _c_program_suffix(self) -> str:
         """Extract program suffix for ContactSimulator.
 
-        Maps: C0 -> "0", C1 -> "1", C1A -> "1a", C1C -> "1c", etc.
+        Maps: C0 -> "0", C1 -> "1", C1A -> "1a", CU -> "" (unified).
         """
         key = self._c_program_key()
         if key == "C0":
             return "0"
         elif key == "C1":
             return "1"
+        elif key == "CU":
+            return ""  # Unified binary: ContactSimulator (no suffix)
         return key[1:].lower()
 
     def _get_cleanup_paths(self) -> list[Path | None]:
@@ -345,21 +347,35 @@ class ContactProcessEI(ContactProcessBase):
         Non-linearity used by the C1 kernels; ignored by other backends.
     num_log_samples : int, optional
         Number of log samples used by the ``C1c``, ``C1d``, ``C1e``, ``C1f``, and ``C1g`` variants.
+    update_mode : {"naive", "cached", "frontier", "adaptive", "gillespie"}, optional
+        Update strategy for the unified ``CU`` backend (default: "naive").
+    output_mode : {"final", "density", "snapshots"}, optional
+        Output mode for the unified ``CU`` backend (default: "final").
 
     Notes
     -----
     This class is intended for the C backends (``runlang`` starting with
-    ``C1``). Python dynamics are not provided for the excitation-inhibition
-    path. The ``C1d`` variant uses adaptive frontier optimization for improved
-    performance when density is low (< 0.15). The ``C1e`` variant reuses the
-    cached-``lambda`` update scheme without maintaining a frontier and shares
-    the ``num_log_samples`` argument with ``C1c`` and ``C1d``. The ``C1f``
-    variant introduces a Gillespie-style event-driven loop over the frontier
-    for low-density regimes. The ``C1g`` variant combines ``C1e``'s cached-lambda
-    updates with configuration snapshots at log-spaced intervals (like ``C1a``).
+    ``C1`` or ``CU`` for the unified backend). The ``CU`` runlang targets
+    the unified ``ContactSimulator`` binary which supports all update and
+    output mode combinations. Legacy runlang values map to specific combinations:
+
+    - ``C1``, ``C1B``: naive + final
+    - ``C1A``: naive + snapshots
+    - ``C1C``: naive + density
+    - ``C1D``: adaptive + density
+    - ``C1E``: cached + density
+    - ``C1F``: gillespie + density
+    - ``C1G``: cached + snapshots
+
+    Python dynamics are also available (``runlang="py"``).
     """
 
-    _allowed_c_keys = ("C1", "C1A", "C1B", "C1C", "C1D", "C1E", "C1F", "C1G")
+    _allowed_c_keys = ("C1", "C1A", "C1B", "C1C", "C1D", "C1E", "C1F", "C1G", "CU")
+
+    # Valid update modes for unified ContactSimulator
+    _valid_update_modes = frozenset({"naive", "cached", "frontier", "adaptive", "gillespie"})
+    # Valid output modes for unified ContactSimulator
+    _valid_output_modes = frozenset({"final", "density", "snapshots"})
 
     def __init__(
         self,
@@ -368,6 +384,8 @@ class ContactProcessEI(ContactProcessBase):
         gamma: float,
         activation: Literal["tanh", "relu"] = "tanh",
         num_log_samples: int = 1000,
+        update_mode: Literal["naive", "cached", "frontier", "adaptive", "gillespie"] = "naive",
+        output_mode: Literal["final", "density", "snapshots"] = "final",
         runlang: str | None = None,
         **kwargs: Any,
     ) -> None:
@@ -381,6 +399,14 @@ class ContactProcessEI(ContactProcessBase):
         self.gamma_eff = self.gamma / k
         self.activation = self._validate_activation(activation)
         self.num_log_samples = int(num_log_samples)
+
+        # Unified backend parameters
+        if update_mode not in self._valid_update_modes:
+            raise ValueError(f"update_mode must be one of {self._valid_update_modes}")
+        if output_mode not in self._valid_output_modes:
+            raise ValueError(f"output_mode must be one of {self._valid_output_modes}")
+        self.update_mode = update_mode
+        self.output_mode = output_mode
 
         # Lambda caching data structures (initialized in init_contact_dynamics)
         # Numba-compatible contiguous arrays for Python backend
@@ -577,6 +603,26 @@ class ContactProcessEI(ContactProcessBase):
     def _build_c_arglist(self) -> list[str]:
         base_args = self._build_c_arglist_base()
         key = self._c_program_key()
+
+        if key == "CU":
+            # Unified ContactSimulator argument format:
+            # N p gamma steps datdir syshape run_id out_id activation update_mode output_mode [num_samples]
+            args = [
+                base_args[0],  # N
+                base_args[1],  # p
+                f"{self.gamma_eff:.12g}",
+                f"{self.steps}",
+            ] + base_args[2:] + [
+                self.activation,
+                self.update_mode,
+                self.output_mode,
+            ]
+            # Add num_samples for density/snapshots modes
+            if self.output_mode in ("density", "snapshots"):
+                args.append(f"{self.num_log_samples}")
+            return args
+
+        # Legacy ContactSimulator1* argument format
         args = [
             base_args[0],  # N
             base_args[1],  # p
@@ -602,7 +648,7 @@ class ContactProcessEI(ContactProcessBase):
         verbose: bool = False,
         clean_export: bool = True,
     ) -> None:
-        """Run contact process dynamics (C1* or Python backend).
+        """Run contact process dynamics (C1*, CU, or Python backend).
 
         Parameters
         ----------
@@ -619,8 +665,8 @@ class ContactProcessEI(ContactProcessBase):
         """
         runlang_upper = self.runlang.upper()
 
-        if runlang_upper.startswith("C1"):
-            # Use C backend
+        if runlang_upper.startswith("C1") or runlang_upper == "CU":
+            # Use C backend (legacy C1* or unified CU)
             super().run(
                 tqdm_on=tqdm_on,
                 steps=steps,
@@ -653,7 +699,7 @@ class ContactProcessEI(ContactProcessBase):
                 )
         else:
             raise ValueError(
-                f"ContactProcessEI supports C1* or 'py' backends, got '{self.runlang}'"
+                f"ContactProcessEI supports C1*, 'CU', or 'py' backends, got '{self.runlang}'"
             )
 
 
@@ -661,7 +707,7 @@ def ContactProcess(sg: SignedGraph, *args: Any, **kwargs: Any):
     """
     Factory for contact-process variants.
 
-    Uses ContactProcessEI when gamma/activation/C1 backends are requested,
+    Uses ContactProcessEI when gamma/activation/C1/CU backends are requested,
     otherwise falls back to ContactProcessSIR.
     """
     runlang = kwargs.get("runlang")
@@ -669,7 +715,11 @@ def ContactProcess(sg: SignedGraph, *args: Any, **kwargs: Any):
         "gamma" in kwargs
         or "activation" in kwargs
         or "num_log_samples" in kwargs
-        or (isinstance(runlang, str) and runlang.upper().startswith("C1"))
+        or "update_mode" in kwargs
+        or "output_mode" in kwargs
+        or (isinstance(runlang, str) and (
+            runlang.upper().startswith("C1") or runlang.upper() == "CU"
+        ))
     ):
         return ContactProcessEI(sg, *args, **kwargs)
     return ContactProcessSIR(sg, *args, **kwargs)

@@ -324,6 +324,108 @@ class TestContactProcess(unittest.TestCase):
             model.remove_run_c_files(remove_stderr=True)
             model.sg.remove_exported_files()
 
+    def test_cu_unified_builder_arguments(self):
+        """Test that CU runlang builds correct unified ContactSimulator args."""
+        path_graph = nx.path_graph(4)
+        for u, v in path_graph.edges:
+            path_graph[u][v]["weight"] = 1.0
+        sg = self.SignedGraph(
+            path_graph,
+            pflip=0.0,
+            init_nw_dict=False,
+            path_data=self.data_dir,
+            path_plot=self.log_dir,
+        )
+        model = self.ContactProcessEI(
+            sg,
+            runlang="CU",
+            gamma=0.5,
+            activation="tanh",
+            update_mode="cached",
+            output_mode="density",
+            num_log_samples=50,
+            seed=0,
+            steps=1,
+        )
+        model._set_time_controls(steps=100)
+        model.init_contact_dynamics()
+        try:
+            # Unified binary: ContactSimulator (no suffix)
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator")
+            self.assertEqual(model.cprogram[1], str(model.N))
+            self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
+            self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
+            self.assertEqual(model.cprogram[4], f"{model.steps}")
+            # datdir, syshape, run_id, out_id
+            self.assertEqual(model.cprogram[8], model.out_id)
+            # activation, update_mode, output_mode, num_samples
+            self.assertEqual(model.cprogram[9], "tanh")
+            self.assertEqual(model.cprogram[10], "cached")
+            self.assertEqual(model.cprogram[11], "density")
+            self.assertEqual(model.cprogram[12], "50")
+        finally:
+            if model.stderr_fopen and not model.stderr_fopen.closed:
+                model.stderr_fopen.close()
+            model.remove_run_c_files(remove_stderr=True)
+            model.sg.remove_exported_files()
+
+    def test_cu_unified_builder_final_mode_no_samples(self):
+        """Test that CU with final output mode omits num_samples."""
+        path_graph = nx.path_graph(3)
+        for u, v in path_graph.edges:
+            path_graph[u][v]["weight"] = 1.0
+        sg = self.SignedGraph(
+            path_graph,
+            pflip=0.0,
+            init_nw_dict=False,
+            path_data=self.data_dir,
+            path_plot=self.log_dir,
+        )
+        model = self.ContactProcessEI(
+            sg,
+            runlang="CU",
+            gamma=0.3,
+            activation="relu",
+            update_mode="naive",
+            output_mode="final",
+            seed=1,
+            steps=1,
+        )
+        model._set_time_controls(steps=50)
+        model.init_contact_dynamics()
+        try:
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator")
+            self.assertEqual(model.cprogram[9], "relu")
+            self.assertEqual(model.cprogram[10], "naive")
+            self.assertEqual(model.cprogram[11], "final")
+            # No num_samples for final mode
+            self.assertEqual(len(model.cprogram), 12)
+        finally:
+            if model.stderr_fopen and not model.stderr_fopen.closed:
+                model.stderr_fopen.close()
+            model.remove_run_c_files(remove_stderr=True)
+            model.sg.remove_exported_files()
+
+    def test_update_mode_validation(self):
+        """Test that invalid update_mode raises ValueError."""
+        sg = self._make_graph()
+        with self.assertRaises(ValueError):
+            self.ContactProcessEI(
+                sg,
+                gamma=0.5,
+                update_mode="invalid",
+            )
+
+    def test_output_mode_validation(self):
+        """Test that invalid output_mode raises ValueError."""
+        sg = self._make_graph()
+        with self.assertRaises(ValueError):
+            self.ContactProcessEI(
+                sg,
+                gamma=0.5,
+                output_mode="invalid",
+            )
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

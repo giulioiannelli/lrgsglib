@@ -76,6 +76,15 @@ $(LRGSG_CCORE_BIN)/VoterSimulator%: $(LRGSG_STATSYS_VM)/VoterSimulator%.c \
 		@printf "Compiling VoterSimulator%s...\n" "$*"
 		$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
 
+# special rule for unified ContactSimulator (no suffix)
+$(LRGSG_CCORE_BIN)/ContactSimulator: $(LRGSG_STATSYS_CP)/ContactSimulator.c \
+                                                       $(PATH_SRCC_FILES) \
+                                                       $(PATH_SRCC_CP) \
+                                                       $(PATH_SFMT_FILES) \
+                                                       $(PATH_SRCC_BINDYNSYS)
+	@printf "Compiling ContactSimulator (unified)...\n"
+	$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+
 # pattern rule for ContactSimulator variants
 $(LRGSG_CCORE_BIN)/ContactSimulator%: $(LRGSG_STATSYS_CP)/ContactSimulator%.c \
                                                        $(PATH_SRCC_FILES) \
