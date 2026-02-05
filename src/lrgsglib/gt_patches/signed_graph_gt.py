@@ -14,9 +14,14 @@ Example
 >>> sg_gt = SignedGraphGT.from_networkx(nx_signed_graph)
 """
 
-from typing import Any, Optional, Union
+from __future__ import annotations
+
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
+from numpy.typing import NDArray
+from scipy.sparse import csr_matrix, diags
+from scipy.sparse.linalg import eigsh
 
 try:
     import graph_tool as gt
@@ -111,6 +116,57 @@ class SignedGraphGT:
     def num_edges(self) -> int:
         """Number of edges."""
         return self.G.num_edges()
+
+    @property
+    def Ne(self) -> int:
+        """Number of edges (alias for num_edges, NX compatibility)."""
+        return self.G.num_edges()
+
+    @property
+    def Ne_n(self) -> int:
+        """Number of negative edges."""
+        return self.count_negative_edges()
+
+    @property
+    def gr(self) -> Dict[str, "Graph"]:
+        """Dictionary of graph representations (NX compatibility).
+
+        Returns dict with 'G' key for primary graph. GT doesn't use
+        multiple representations like NX.
+        """
+        return {"G": self.G}
+
+    @property
+    def eigv(self) -> Optional[NDArray[np.floating]]:
+        """Cached eigenvalues of signed Laplacian."""
+        return getattr(self, "_eigv", None)
+
+    @eigv.setter
+    def eigv(self, value: NDArray[np.floating]) -> None:
+        self._eigv = value
+
+    @property
+    def eigV(self) -> Optional[NDArray[np.floating]]:
+        """Cached eigenvectors of signed Laplacian."""
+        return getattr(self, "_eigV", None)
+
+    @eigV.setter
+    def eigV(self, value: NDArray[np.floating]) -> None:
+        self._eigV = value
+
+    @property
+    def slp(self) -> Optional[NDArray[np.floating]]:
+        """Signed Laplacian matrix (cached on first access)."""
+        if not hasattr(self, "_slp") or self._slp is None:
+            self._slp = self.get_signed_laplacian()
+        return self._slp
+
+    @property
+    def adj(self) -> Optional[NDArray[np.floating]]:
+        """Signed adjacency matrix (cached on first access)."""
+        if not hasattr(self, "_adj") or self._adj is None:
+            self._adj = self.get_signed_adjacency()
+        return self._adj
 
     @classmethod
     def from_networkx(
@@ -250,6 +306,9 @@ class SignedGraphGT:
         for e in self._flip_edges:
             sign_prop[e] = -1
 
+        # Invalidate cached matrices
+        self.invalidate_cache()
+
     def flip_edge(self, u: int, v: int) -> None:
         """
         Flip sign of a specific edge.
@@ -262,6 +321,78 @@ class SignedGraphGT:
         e = self.G.edge(u, v)
         if e is not None:
             self.G.edge_properties["sign"][e] *= -1
+            self.invalidate_cache()
+
+    def flip_sel_edges(
+        self,
+        edges: List[Tuple[int, int]],
+    ) -> None:
+        """
+        Flip signs of selected edges.
+
+        Parameters
+        ----------
+        edges : list of (u, v) tuples
+            Edges to flip.
+        """
+        sign_prop = self.G.edge_properties["sign"]
+
+        for u, v in edges:
+            e = self.G.edge(u, v)
+            if e is not None:
+                sign_prop[e] = -sign_prop[e]
+
+        self.invalidate_cache()
+
+    def unflip_all(self) -> None:
+        """Reset all edge signs to positive (+1)."""
+        sign_prop = self.G.edge_properties["sign"]
+
+        for e in self.G.edges():
+            sign_prop[e] = 1
+
+        self._flip_edges = set()
+        self.invalidate_cache()
+
+    def get_random_links(
+        self,
+        n: int = 1,
+        only_in: Literal["", "all", "+", "positive", "-", "negative"] = "",
+    ) -> List[Tuple[int, int]]:
+        """
+        Get random edges from the graph.
+
+        Parameters
+        ----------
+        n : int, default 1
+            Number of random edges to return.
+        only_in : str, default ''
+            Filter: '', 'all' (any edge), '+', 'positive' (positive only),
+            '-', 'negative' (negative only).
+
+        Returns
+        -------
+        list of (u, v) tuples
+            Randomly selected edges.
+        """
+        sign_prop = self.G.edge_properties["sign"]
+
+        if only_in in ("", "all"):
+            edges = list(self.G.edges())
+        elif only_in in ("+", "positive", "+1", "plus"):
+            edges = [e for e in self.G.edges() if sign_prop[e] == 1]
+        elif only_in in ("-", "negative", "-1", "minus"):
+            edges = [e for e in self.G.edges() if sign_prop[e] == -1]
+        else:
+            edges = list(self.G.edges())
+
+        if not edges:
+            return []
+
+        n = min(n, len(edges))
+        indices = self._rng.choice(len(edges), size=n, replace=False)
+
+        return [(int(edges[i].source()), int(edges[i].target())) for i in indices]
 
     def get_edge_sign(self, u: int, v: int) -> int:
         """
@@ -316,6 +447,17 @@ class SignedGraphGT:
         """
         return adjacency(self.G, weight=self.G.edge_properties["sign"]).toarray()
 
+    def get_adjacency_matrix(self) -> np.ndarray:
+        """
+        Get unsigned adjacency matrix.
+
+        Returns
+        -------
+        np.ndarray
+            Adjacency matrix (1 for edges, 0 otherwise).
+        """
+        return adjacency(self.G).toarray()
+
     def get_signed_laplacian(self) -> np.ndarray:
         """
         Get signed Laplacian matrix.
@@ -323,9 +465,95 @@ class SignedGraphGT:
         Returns
         -------
         np.ndarray
-            Signed Laplacian L = D - A_signed.
+            Signed Laplacian L_s = D_s - A_signed where D_s[i,i] = sum_j |A_ij|.
+
+        Notes
+        -----
+        The signed Laplacian uses absolute degree values to ensure
+        proper spectral properties. This matches nx_patches.SignedGraph.
         """
-        return get_laplacian_matrix_gt(self.G, signed=True)
+        # Get signed adjacency
+        A_signed = self.get_signed_adjacency()
+
+        # Compute absolute degree (sum of absolute edge weights)
+        degrees = np.sum(np.abs(A_signed), axis=1)
+
+        # Build signed Laplacian: L_s = D_s - A_signed
+        D_s = np.diag(degrees)
+        return D_s - A_signed
+
+    def get_laplacian(self) -> np.ndarray:
+        """
+        Get unsigned Laplacian matrix.
+
+        Returns
+        -------
+        np.ndarray
+            Standard Laplacian L = D - A.
+        """
+        return laplacian(self.G).toarray()
+
+    def get_degree_matrix(self) -> np.ndarray:
+        """
+        Get degree matrix.
+
+        Returns
+        -------
+        np.ndarray
+            Diagonal matrix with node degrees.
+        """
+        degrees = np.array([v.out_degree() for v in self.G.vertices()])
+        return np.diag(degrees)
+
+    def get_abs_degree_matrix(self) -> np.ndarray:
+        """
+        Get absolute degree matrix (for signed Laplacian).
+
+        Returns
+        -------
+        np.ndarray
+            Diagonal matrix with sum of absolute edge weights.
+        """
+        A_signed = self.get_signed_adjacency()
+        degrees = np.sum(np.abs(A_signed), axis=1)
+        return np.diag(degrees)
+
+    def get_nodes_list(self) -> List[int]:
+        """
+        Get list of node indices.
+
+        Returns
+        -------
+        list[int]
+            Node indices [0, 1, ..., N-1].
+        """
+        return list(range(self.N))
+
+    def get_edges_list(self) -> List[Tuple[int, int]]:
+        """
+        Get list of edges as (source, target) tuples.
+
+        Returns
+        -------
+        list of tuples
+            All edges in the graph.
+        """
+        return [(int(e.source()), int(e.target())) for e in self.G.edges()]
+
+    def get_edge_signs(self) -> Dict[Tuple[int, int], int]:
+        """
+        Get dictionary mapping edges to their signs.
+
+        Returns
+        -------
+        dict
+            {(u, v): sign} for all edges.
+        """
+        sign_prop = self.G.edge_properties["sign"]
+        return {
+            (int(e.source()), int(e.target())): sign_prop[e]
+            for e in self.G.edges()
+        }
 
     def get_laplacian_spectrum(self, k: Optional[int] = None) -> np.ndarray:
         """
@@ -348,13 +576,176 @@ class SignedGraphGT:
             eigenvalues = np.linalg.eigvalsh(L)
         else:
             # Partial spectrum using scipy sparse
-            from scipy.sparse.linalg import eigsh
-            from scipy.sparse import csr_matrix
-
             L_sparse = csr_matrix(L)
-            eigenvalues, _ = eigsh(L_sparse, k=k, which='SM')
+            eigenvalues, _ = eigsh(L_sparse, k=k, which="SM")
 
         return np.sort(eigenvalues)
+
+    def compute_laplacian_spectrum_weigV(
+        self,
+        backend: Literal["numpy", "scipy", "cupy"] = "numpy",
+    ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
+        """
+        Compute full eigendecomposition of the signed Laplacian.
+
+        Parameters
+        ----------
+        backend : str, default 'numpy'
+            Computation backend. 'numpy' uses np.linalg.eigh.
+            'scipy' uses scipy.linalg.eigh.
+            'cupy' uses GPU acceleration if available.
+
+        Returns
+        -------
+        tuple[ndarray, ndarray]
+            (eigenvalues, eigenvectors) where eigenvalues are sorted
+            ascending and eigenvectors are column-major (eigV[:, i] is
+            the i-th eigenvector).
+
+        Notes
+        -----
+        Results are cached in self.eigv and self.eigV.
+        """
+        L = self.get_signed_laplacian()
+
+        if backend == "numpy":
+            eigenvalues, eigenvectors = np.linalg.eigh(L)
+        elif backend == "scipy":
+            from scipy.linalg import eigh
+
+            eigenvalues, eigenvectors = eigh(L)
+        elif backend == "cupy":
+            try:
+                import cupy as cp
+
+                L_gpu = cp.asarray(L)
+                eigenvalues, eigenvectors = cp.linalg.eigh(L_gpu)
+                eigenvalues = cp.asnumpy(eigenvalues)
+                eigenvectors = cp.asnumpy(eigenvectors)
+            except ImportError:
+                # Fallback to numpy
+                eigenvalues, eigenvectors = np.linalg.eigh(L)
+        else:
+            raise ValueError(f"Unknown backend: {backend}")
+
+        # Sort by eigenvalue (ascending)
+        idx = np.argsort(eigenvalues)
+        self.eigv = eigenvalues[idx]
+        self.eigV = eigenvectors[:, idx]
+
+        return self.eigv, self.eigV
+
+    def compute_k_eigvV(
+        self,
+        k: int = 1,
+        which: Literal["SM", "LM"] = "SM",
+    ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
+        """
+        Compute k smallest or largest eigenvalues/eigenvectors.
+
+        Parameters
+        ----------
+        k : int, default 1
+            Number of eigenvalues to compute.
+        which : str, default 'SM'
+            'SM' for smallest magnitude, 'LM' for largest magnitude.
+
+        Returns
+        -------
+        tuple[ndarray, ndarray]
+            (eigenvalues, eigenvectors) with k values.
+        """
+        L = self.get_signed_laplacian()
+        L_sparse = csr_matrix(L)
+
+        eigenvalues, eigenvectors = eigsh(L_sparse, k=k, which=which)
+
+        # Sort by eigenvalue
+        idx = np.argsort(eigenvalues) if which == "SM" else np.argsort(-eigenvalues)
+        return eigenvalues[idx], eigenvectors[:, idx]
+
+    def get_eigV(
+        self,
+        which: int = 0,
+        binarize: bool = False,
+    ) -> NDArray[np.floating]:
+        """
+        Get a specific eigenvector.
+
+        Parameters
+        ----------
+        which : int, default 0
+            Index of eigenvector (0 = smallest eigenvalue).
+        binarize : bool, default False
+            If True, return sign(eigenvector).
+
+        Returns
+        -------
+        ndarray
+            The eigenvector (or its binarization).
+
+        Raises
+        ------
+        ValueError
+            If eigenvectors haven't been computed.
+        """
+        if self.eigV is None:
+            raise ValueError(
+                "Eigenvectors not computed. "
+                "Call compute_laplacian_spectrum_weigV() first."
+            )
+
+        eigvec = self.eigV[:, which]
+
+        if binarize:
+            return np.sign(eigvec).astype(np.int8)
+        return eigvec
+
+    def get_eigV_binarized(self, which: int = 0) -> NDArray[np.int8]:
+        """
+        Get binarized eigenvector (sign pattern).
+
+        Parameters
+        ----------
+        which : int, default 0
+            Index of eigenvector.
+
+        Returns
+        -------
+        ndarray
+            Array of +1/-1 values.
+        """
+        return self.get_eigV(which, binarize=True)
+
+    def get_signed_laplacian_embedding(
+        self,
+        k: int = 2,
+    ) -> NDArray[np.floating]:
+        """
+        Get k-dimensional spectral embedding from signed Laplacian.
+
+        Parameters
+        ----------
+        k : int, default 2
+            Number of dimensions (eigenvectors to use).
+
+        Returns
+        -------
+        ndarray
+            N x k embedding matrix.
+        """
+        if self.eigV is None or self.eigV.shape[1] < k:
+            self.compute_laplacian_spectrum_weigV()
+
+        # Use first k non-trivial eigenvectors (skip index 0 if it's trivial)
+        return self.eigV[:, :k]
+
+    def invalidate_cache(self) -> None:
+        """Clear cached matrices and spectral data."""
+        self._slp = None
+        self._adj = None
+        self._eigv = None
+        self._eigV = None
 
     def get_frustration_index(self) -> float:
         """

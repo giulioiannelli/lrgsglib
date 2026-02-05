@@ -47,15 +47,32 @@ if GT_AVAILABLE:
     from .converters import nx_to_gt, gt_to_nx, GTNXConverter
     from .WeightedGraph import WeightedGraph
     from .LatticeND import LatticeND
+    from .Lattice2DGT import Lattice2DGT
+    from .Lattice3DGT import Lattice3DGT
+
+    # C++ extension functions (may fail if not built)
+    try:
+        from .cpp import create_triangular_lattice
+        _CPP_EXT_AVAILABLE = True
+    except ImportError:
+        _CPP_EXT_AVAILABLE = False
+
+        def create_triangular_lattice(*args, **kwargs):
+            raise ImportError(
+                "C++ extensions not built. Run 'make cpp-make' from lrgsglib root."
+            )
 
     __all__ = [
         "SignedGraphGT",
+        "Lattice2DGT",
+        "Lattice3DGT",
         "WeightedGraph",
         "LatticeND",
         "nx_to_gt",
         "gt_to_nx",
         "GTNXConverter",
         "GT_AVAILABLE",
+        "create_triangular_lattice",
     ]
 else:
     # Provide stubs that raise ImportError with helpful message

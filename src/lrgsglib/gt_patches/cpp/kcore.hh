@@ -1,3 +1,6 @@
+// K-core decomposition for graph-tool graphs
+// Based on graph-tool's internal implementation (graph_kcore.hh)
+
 #include "graph_tool.hh"
 
 using namespace graph_tool;
@@ -11,11 +14,14 @@ using namespace std;
 template <typename Graph, typename CoreMap>
 void kcore_decomposition(Graph& g, CoreMap core_map)
 {
-    // Create some auxiliary property maps
-    typedef typename vprop_map_t<size_t>::unchecked_t vmap_t;
+    auto vertex_index = get(vertex_index_t(), g);
 
-    vmap_t deg(num_vertices(g));  // Remaining degree
-    vmap_t pos(num_vertices(g));  // Position in bin (core)
+    // Create some auxiliary property maps
+    // Note: vprop_map_t<T>::type::unchecked_t is the correct type for internal use
+    typedef typename vprop_map_t<size_t>::type::unchecked_t vmap_t;
+
+    vmap_t deg(vertex_index, num_vertices(g));  // Remaining degree
+    vmap_t pos(vertex_index, num_vertices(g));  // Position in bin (core)
 
     typedef typename graph_traits<Graph>::vertex_descriptor vertex_t;
 
@@ -25,7 +31,7 @@ void kcore_decomposition(Graph& g, CoreMap core_map)
     // Put each vertex to the bin corresponding to its degree
     for (auto v : vertices_range(g))
     {
-        size_t k = out_degree(v, g);
+        size_t k = degree(v, g);
         deg[v] = k;
         if (k >= bins.size())
             bins.resize(k + 1);
@@ -34,7 +40,7 @@ void kcore_decomposition(Graph& g, CoreMap core_map)
     }
 
     // Proceed from smallest bin to largest. For each vertex in bin, check the
-    // neighbours; if any of them have a larger remaining degree, reduce it by
+    // neighbors; if any of them have a larger remaining degree, reduce it by
     // one, and put it in the correct bin.
     for (size_t k = 0; k < bins.size(); ++k)
     {
@@ -44,9 +50,8 @@ void kcore_decomposition(Graph& g, CoreMap core_map)
             auto v = bins_k.back();
             bins_k.pop_back();
             core_map[v] = k;
-            for (auto e : out_edges_range(v, g))
+            for (auto u : all_neighbors_range(v, g))
             {
-                auto u = target(e, g);
                 auto& ku = deg[u];
                 if (ku > deg[v])
                 {
@@ -55,10 +60,10 @@ void kcore_decomposition(Graph& g, CoreMap core_map)
                     auto pos_w = pos[w] = pos[u];
                     bins_ku[pos_w] = w;
                     bins_ku.pop_back();
-                    auto& bins_ku_m = bins[ku - 1];
+                    --ku;
+                    auto& bins_ku_m = bins[ku];
                     bins_ku_m.push_back(u);
                     pos[u] = bins_ku_m.size() - 1;
-                    --ku;
                 }
             }
         }
