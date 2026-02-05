@@ -1,7 +1,22 @@
-"""Dirac lattice graph module."""
+"""Dirac lattice graph module.
 
-from .DiracLattice import DiracLatticeGraph
-from .DiracComb import DiracCombGraph
-from .DiracBrush import DiracBrushGraph
+DEPRECATED: This module re-exports from lrgsglib.graphs.nx.
+Import directly from lrgsglib.graphs.nx instead.
+"""
+
+import warnings
+
+warnings.warn(
+    "Importing from lrgsglib.nx_patches.DiracLattice is deprecated. "
+    "Use lrgsglib.graphs.nx instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+from ...graphs.nx.DiracLatticeNX import (
+    DiracLatticeGraphNX as DiracLatticeGraph,
+    DiracCombGraphNX as DiracCombGraph,
+    DiracBrushGraphNX as DiracBrushGraph,
+)
 
 __all__ = ["DiracLatticeGraph", "DiracCombGraph", "DiracBrushGraph"]

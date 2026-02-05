@@ -1,19 +1,37 @@
-"""Multispectral graph generators and SignedGraph subclasses."""
+"""Multispectral graph generators and SignedGraph subclasses.
 
-from .MultispectralGraph import MultispectralGraph
-from ..MultiplicativeCascade import MultiplicativeCascadeGraph
-from ..HierarchicalModular import HierarchicalModularNetwork
-from ..Vicsek import VicsekGraph
-from ..DiracLattice import DiracLatticeGraph, DiracCombGraph, DiracBrushGraph
+DEPRECATED: This module re-exports from lrgsglib.graphs.nx.
+Import directly from lrgsglib.graphs.nx instead.
+"""
+
+import warnings
+
+warnings.warn(
+    "Importing from lrgsglib.nx_patches.MultispectralGraph is deprecated. "
+    "Use lrgsglib.graphs.nx instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+# Re-export from graphs.nx to avoid circular imports
+from ...graphs.nx.MultispectralGraphNX import MultispectralGraphNX as MultispectralGraph
+from ...graphs.nx.MultiplicativeCascadeNX import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
+from ...graphs.nx.HierarchicalModularNX import HierarchicalModularNetworkNX as HierarchicalModularNetwork
+from ...graphs.nx.VicsekNX import VicsekGraphNX as VicsekGraph
+from ...graphs.nx.DiracLatticeNX import (
+    DiracLatticeGraphNX as DiracLatticeGraph,
+    DiracCombGraphNX as DiracCombGraph,
+    DiracBrushGraphNX as DiracBrushGraph,
+)
 
 # Also export generator functions for backward compatibility
-from .generators_msg import (
+from ...graphs.nx.MultispectralGraphNX.generators_msg import (
     multiplicative_cascade_probability_matrix,
     multiplicative_cascade_graph,
     dirac_comb_graph,
     dirac_brush_graph,
 )
-from ..HierarchicalModular.generators_hmn import hierarchical_modular_network
+from ...graphs.nx.HierarchicalModularNX.generators_hmn import hierarchical_modular_network
 
 __all__ = [
     # Main classes
