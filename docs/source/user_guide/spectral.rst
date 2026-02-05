@@ -104,7 +104,7 @@ in antiferromagnetic systems while maintaining proper graph connectivity.
 
 .. note::
 
-   The ``signed_laplacian_matrix()`` function from ``nx_patches.funcs.spectral``
+   The ``signed_laplacian_matrix()`` function from ``graphs.nx.funcs.spectral``
    is the canonical implementation for signed Laplacian matrix construction.
    ``get_graph_lspectrum(..., signed=True)`` uses this implementation internally.
 
@@ -115,7 +115,7 @@ For class-based workflows with caching and more control:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs.Lattice2D import Lattice2D
 
    # Create a 2D lattice with signed edges
    lattice = Lattice2D(side1=16, geo='sqr', pflip=0.3, seed=42)
@@ -143,7 +143,7 @@ Choose the backend based on your needs:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+   from lrgsglib.graphs.MultiplicativeCascade import MultiplicativeCascadeGraph
 
    # Create a cascade graph
    mc = MultiplicativeCascadeGraph(p1=0.8, p2=0.6, fraction=0.4, seed=42)
@@ -182,7 +182,7 @@ The standard approach computes entropy from the full spectrum:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+   from lrgsglib.graphs.MultiplicativeCascade import MultiplicativeCascadeGraph
    from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
    from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 
@@ -302,7 +302,7 @@ Computing Eigenvectors
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs.Lattice2D import Lattice2D
 
    # Create frustrated lattice
    lattice = Lattice2D(side1=32, geo='sqr', pflip=0.2, seed=42)
@@ -368,7 +368,7 @@ Detecting Frustration
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.ErdosRenyi import ErdosRenyi
+   from lrgsglib.graphs.ErdosRenyi import ErdosRenyi
 
    # Create signed Erdos-Renyi graph
    er = ErdosRenyi(nnodes=100, prob=0.1, pflip=0.3, seed=42)
@@ -412,7 +412,7 @@ MultiplicativeCascade (Hierarchical)
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+   from lrgsglib.graphs.MultiplicativeCascade import MultiplicativeCascadeGraph
 
    mc = MultiplicativeCascadeGraph(
        p1=0.8, p2=0.6, p3=0.6, p4=0.8,
@@ -434,8 +434,8 @@ Lattice2D/3D (Regular Grids)
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
-   from lrgsglib.nx_patches.Lattice3D import Lattice3D
+   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs.Lattice3D import Lattice3D
 
    # 2D square lattice
    l2d = Lattice2D(side1=32, geo='sqr', pflip=0.2, seed=42)
@@ -488,4 +488,4 @@ API Reference
 
    - :mod:`lrgsglib.utils.lrg.spectral` - Utility functions
    - :mod:`lrgsglib.utils.lrg.infocomm` - Entropy computations
-   - :class:`lrgsglib.nx_patches.SignedGraph.SignedGraph` - Base class methods
+   - :class:`lrgsglib.graphs.SignedGraph.SignedGraph` - Base class methods

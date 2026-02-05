@@ -56,7 +56,7 @@ Basic Usage
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
    from lrgsglib.statsys.IsingDynamics import IsingDynamics
 
    # Create a frustrated lattice
@@ -188,7 +188,7 @@ Maps to the optimized C1* backends:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
    from lrgsglib.statsys.ContactProcess import ContactProcessEI
 
    # Create graph
@@ -262,7 +262,7 @@ Basic Usage
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
    from lrgsglib.statsys.VoterModel import VoterModel
 
    # Create graph

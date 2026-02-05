@@ -6,7 +6,7 @@ This section contains the detailed API documentation for all modules, classes, a
 .. toctree::
    :maxdepth: 2
 
-   nx_patches
+   graphs
    utils
    statsys
    plotlib
@@ -15,8 +15,9 @@ This section contains the detailed API documentation for all modules, classes, a
 Module Overview
 ---------------
 
-**nx_patches**
-   NetworkX extensions for signed graphs, lattices, and specialized topologies
+**graphs**
+   Unified graph interface with multi-engine support (NetworkX, graph-tool).
+   Provides lattice graphs, random graphs, and signed graph operations.
 
 **utils**
    Utility functions for spectral analysis, basic operations, and reconstruction algorithms
@@ -35,9 +36,9 @@ Quick Links
 
 Common modules:
 
-- :py:mod:`lrgsglib.nx_patches.Lattice2D` - 2D lattice generation
-- :py:mod:`lrgsglib.nx_patches.Lattice3D` - 3D lattice generation
-- :py:mod:`lrgsglib.nx_patches.ErdosRenyi` - Random graph generation
+- :py:mod:`lrgsglib.graphs` - Unified graph interface (Lattice2D, ErdosRenyi, etc.)
+- :py:mod:`lrgsglib.graphs.nx` - NetworkX implementations
+- :py:mod:`lrgsglib.graphs.gt` - graph-tool implementations
 - :py:mod:`lrgsglib.utils.lrg.spectral` - Spectral analysis functions
 - :py:mod:`lrgsglib.statsys` - Statistical physics simulations
 

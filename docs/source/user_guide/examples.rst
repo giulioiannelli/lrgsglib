@@ -23,7 +23,7 @@ Create a random signed graph and analyze its spectral properties.
    """
    import numpy as np
    import matplotlib.pyplot as plt
-   from lrgsglib.nx_patches.ErdosRenyi import ErdosRenyi
+   from lrgsglib.graphs.ErdosRenyi import ErdosRenyi
    from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
 
    # Create signed Erdos-Renyi graph
@@ -87,7 +87,7 @@ Simulate excitation-inhibition dynamics near the critical point.
    """
    import numpy as np
    import matplotlib.pyplot as plt
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs.Lattice2D import Lattice2D
    from lrgsglib.statsys.ContactProcess import ContactProcessEI
 
    # Create a 64x64 square lattice with 20% frustrated edges
@@ -145,7 +145,7 @@ Compute entropy observables from the full Laplacian spectrum.
    """
    import numpy as np
    import matplotlib.pyplot as plt
-   from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+   from lrgsglib.graphs.MultiplicativeCascade import MultiplicativeCascadeGraph
    from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
    from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 
@@ -231,7 +231,7 @@ Study the ferromagnetic-paramagnetic phase transition on a frustrated lattice.
    """
    import numpy as np
    import matplotlib.pyplot as plt
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs.Lattice2D import Lattice2D
    from lrgsglib.statsys.IsingDynamics import IsingDynamics
 
    # Create 32x32 lattice with moderate frustration
@@ -315,7 +315,7 @@ Demonstrate the performance difference between Python and C backends.
    """
    import time
    import numpy as np
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs.Lattice2D import Lattice2D
    from lrgsglib.statsys.IsingDynamics import IsingDynamics
 
    # Create lattice
@@ -379,7 +379,7 @@ Analyze spectral properties of a 3D cubic lattice.
    """
    import numpy as np
    import matplotlib.pyplot as plt
-   from lrgsglib.nx_patches.Lattice3D import Lattice3D
+   from lrgsglib.graphs.Lattice3D import Lattice3D
    from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 
    # Create 10x10x10 cubic lattice with signed edges
@@ -462,7 +462,7 @@ Build a complete analysis pipeline for signed graph research.
    """
    import numpy as np
    import matplotlib.pyplot as plt
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs.Lattice2D import Lattice2D
    from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
    from lrgsglib.utils.lrg.infocomm import (
        compute_entropy_observables_from_eigenvalues,

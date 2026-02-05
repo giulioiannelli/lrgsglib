@@ -11,7 +11,7 @@ Let's start by creating a simple signed Erdős-Rényi random graph:
 .. code-block:: python
 
    import numpy as np
-   from lrgsglib.nx_patches import ErdosRenyi
+   from lrgsglib.graphs import ErdosRenyi
 
    # Set random seed for reproducibility
    np.random.seed(42)
@@ -40,7 +40,7 @@ Create and manipulate 2D lattices with signed edges:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches import Lattice2D
+   from lrgsglib.graphs import Lattice2D
    import numpy as np
 
    # Create a square lattice with some negative edges
@@ -69,7 +69,7 @@ Analyze the Laplacian spectrum of signed graphs:
 
    from lrgsglib.utils.lrg import spectral
    import numpy as np
-   from lrgsglib.nx_patches import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
    # Create a small lattice
    np.random.seed(42)
@@ -97,7 +97,7 @@ Simulate the contact process on a signed lattice:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches import Lattice2D
+   from lrgsglib.graphs import Lattice2D
    from lrgsglib.statsys import ContactProcess
    import numpy as np
 
@@ -139,7 +139,7 @@ Plot signed graphs and lattices:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches import Lattice2D
+   from lrgsglib.graphs import Lattice2D
    from lrgsglib.plotlib import lattices
    import matplotlib.pyplot as plt
    import numpy as np
@@ -167,7 +167,7 @@ Create and analyze 3D cubic lattices:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches import Lattice3D
+   from lrgsglib.graphs import Lattice3D
    import numpy as np
 
    # Create a 3D cubic lattice
@@ -195,12 +195,12 @@ lrgsglib supports various graph topologies:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches import (
+   from lrgsglib.graphs import (
        ErdosRenyi,
        Lattice2D,
        Lattice3D,
-       WeightedGraph
    )
+   from lrgsglib.graphs.nx import WeightedGraph
    import numpy as np
 
    np.random.seed(42)
@@ -233,7 +233,7 @@ lrgsglib provides multiple backends for simulations:
 .. code-block:: python
 
    from lrgsglib.statsys import ContactProcess
-   from lrgsglib.nx_patches import Lattice2D
+   from lrgsglib.graphs import Lattice2D
    import numpy as np
 
    np.random.seed(42)

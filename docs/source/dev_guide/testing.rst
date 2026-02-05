@@ -144,7 +144,7 @@ Basic Test Structure
    import pytest
    import numpy as np
    from lrgsglib.statsys.ContactProcess import ContactProcessEI
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs.Lattice2D import Lattice2D
 
 
    @pytest.fixture

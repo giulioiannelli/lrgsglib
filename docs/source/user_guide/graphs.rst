@@ -3,7 +3,7 @@ Signed Graphs
 
 Signed graphs represent networks with positive and negative relationships.
 In ``lrgsglib``, a signed graph is a NetworkX graph with a ``weight`` edge
-attribute, and the :py:class:`lrgsglib.nx_patches.SignedGraph.SignedGraph`
+attribute, and the :py:class:`lrgsglib.graphs.SignedGraph.SignedGraph`
 class adds utility methods for sign flips, spectral analysis, and dynamics.
 
 This section covers the core concepts and the most common creation paths.
@@ -26,7 +26,7 @@ From a NetworkX graph:
 .. code-block:: python
 
    import networkx as nx
-   from lrgsglib.nx_patches import SignedGraph
+   from lrgsglib.graphs import SignedGraph
 
    G = nx.path_graph(6)
    sg = SignedGraph(G, pflip=0.25, seed=123)
@@ -38,7 +38,7 @@ From built-in generators:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches import ErdosRenyi
+   from lrgsglib.graphs import ErdosRenyi
 
    er = ErdosRenyi(n=200, p=0.05, pflip=0.2, seed=7)
    er.flip_random_fract_edges()

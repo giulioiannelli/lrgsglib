@@ -3,8 +3,8 @@ Lattices
 
 ``lrgsglib`` provides 2D and 3D lattice generators that build signed graphs
 with convenient coordinate representations and plotting-ready positions.
-The primary entry points are :py:class:`lrgsglib.nx_patches.Lattice2D.Lattice2D`
-and :py:class:`lrgsglib.nx_patches.Lattice3D.Lattice3D`.
+The primary entry points are :py:class:`lrgsglib.graphs.Lattice2D.Lattice2D`
+and :py:class:`lrgsglib.graphs.Lattice3D.Lattice3D`.
 
 2D Lattices
 -----------
@@ -13,7 +13,7 @@ Create a square lattice and apply sign flips:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
    lat = Lattice2D(side1=20, geo="sqr", pflip=0.2, seed=1)
    lat.flip_random_fract_edges()
@@ -38,7 +38,7 @@ Create a simple cubic lattice:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches import Lattice3D
+   from lrgsglib.graphs import Lattice3D
 
    lat3 = Lattice3D(dim=8, geo="sc", pflip=0.1, seed=3)
    lat3.flip_random_fract_edges()

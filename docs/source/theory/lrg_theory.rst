@@ -249,7 +249,7 @@ Implementation in lrgsglib
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.Lattice2D import Lattice2D
+   from lrgsglib.graphs.Lattice2D import Lattice2D
    from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
    from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 
