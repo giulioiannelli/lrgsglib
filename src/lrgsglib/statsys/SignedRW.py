@@ -11,7 +11,7 @@ import numpy as np
 from .BinDynSys import BinDynSys
 
 if TYPE_CHECKING:
-    from ..nx_patches import SignedGraph
+    from ..graphs.nx import SignedGraphNX as SignedGraph
 
 
 class SignedRW(BinDynSys):

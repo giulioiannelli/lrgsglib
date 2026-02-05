@@ -81,7 +81,7 @@ def get_graph_lspectrum(
     """
     if signed:
         # Import signed Laplacian from canonical location
-        from lrgsglib.nx_patches.funcs.spectral import signed_laplacian_matrix
+        from lrgsglib.graphs.nx.funcs.spectral import signed_laplacian_matrix
 
         L = signed_laplacian_matrix(G)
     else:
@@ -197,7 +197,7 @@ def compute_laplacian_properties(
     The tau parameter is computed from ``max(abs(spectrum))`` to handle this case.
     """
     if signed:
-        from lrgsglib.nx_patches.funcs.spectral import signed_laplacian_matrix
+        from lrgsglib.graphs.nx.funcs.spectral import signed_laplacian_matrix
 
         L_sparse = signed_laplacian_matrix(G)
         L = np.asarray(L_sparse.todense())

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 Typical usage from a notebook:
 
-    from lrgsglib.nx_patches.Lattice2D import Lattice2D
+    from lrgsglib.graphs.nx import Lattice2D
     from lrgsglib.statsys.ContactProcess import ContactProcessEI
     from lrgsglib.animations import collect_contact_process_frames, animate_contact_process_on_lattice2d
 
@@ -224,7 +224,7 @@ def animate_contact_process_on_lattice2d(
     )
 
     if out_path is not None:
-        from ..nx_patches.Lattice2D._animations import save_animation
+        from ..graphs.nx.Lattice2DNX._animations import save_animation
 
         save_animation(result.animation, out_path, fps=fps, dpi=dpi, writer=writer)
 

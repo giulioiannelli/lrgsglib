@@ -3,7 +3,7 @@ import networkx as nx
 from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import dendrogram, fcluster
 
-from ..nx_patches import get_giant_component
+from ..graphs.nx.funcs import get_giant_component
 from ..utils.lrg import entropy, compute_laplacian_properties,\
     compute_normalized_linkage, compute_optimal_threshold
 #

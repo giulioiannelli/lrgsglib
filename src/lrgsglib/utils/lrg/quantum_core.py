@@ -7,7 +7,7 @@ and quantum information-theoretic observables.
 """
 
 import numpy as np
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from numpy.typing import NDArray
 
 from .quantum import (
@@ -15,16 +15,17 @@ from .quantum import (
     quantum_classical_divergence,
 )
 
-# Import base class - will be imported from core module
-# from ...core import SignedLaplacianAnalysis
-# For now, we'll import the necessary components
+# Import constants
 try:
     from ...config.const import LRSG_ENTROPY_STEP, DEFAULT_MAX_THRESHOLD
-    from ...nx_patches.SignedGraph import SignedGraph
 except ImportError:
     # Fallback for testing
     LRSG_ENTROPY_STEP = 600
     DEFAULT_MAX_THRESHOLD = 0.1
+
+# TYPE_CHECKING import to avoid circular imports
+if TYPE_CHECKING:
+    from ...graphs.nx import SignedGraphNX as SignedGraph
 
 __all__ = ["QuantumSignedLaplacianAnalysis"]
 
@@ -82,7 +83,7 @@ class QuantumSignedLaplacianAnalysis:
 
     def __init__(
         self,
-        sg: SignedGraph,
+        sg: "SignedGraph",
         tstep: int = LRSG_ENTROPY_STEP,
         tlex: float = -2,
         thex: float = 5,

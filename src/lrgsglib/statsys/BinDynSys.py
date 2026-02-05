@@ -6,15 +6,17 @@ import os
 import random
 import time
 from pathlib import Path
-from typing import Any, Iterable, Literal
+from typing import TYPE_CHECKING, Any, Iterable, Literal
 
 import numpy as np
 from numpy.typing import NDArray
 
 from ..config.const import *
 from ..config.funcs import peq_fstr
-from ..nx_patches import SignedGraph
 from ..utils.basic.strings import generate_random_id, join_non_empty
+
+if TYPE_CHECKING:
+    from ..graphs.nx import SignedGraphNX as SignedGraph
 
 ZERO_FIELD = lambda N: np.zeros(N, dtype=np.float64)
 
@@ -49,7 +51,7 @@ class BinDynSys:
 
     def __init__(
         self,
-        sg: SignedGraph,
+        sg: "SignedGraph",
         ic: str = "uniform",
         field: NDArray = None,
         runlang: str = "py",
@@ -286,13 +288,14 @@ class BinDynSys:
 
     @staticmethod
     def _c_suffix_arg(s: str) -> str:
-        """Format suffix for C programs: add underscore prefix when non-empty.
+        """Format suffix for C programs.
 
-        This ensures consistent filename construction:
-        - Empty suffix: no trailing underscore (e.g., s_p=0.1.bin)
-        - Non-empty suffix: underscore separator (e.g., s_p=0.1_abc.bin)
+        Returns the suffix as-is. The C code's build_str_id() function
+        is responsible for adding the underscore prefix when constructing
+        filenames. This ensures consistent filename construction between
+        Python exports and C program reads.
         """
-        return f"_{s}" if s else ""
+        return s
     #
     def export_s_init(self):
         out_suffix = self.run_id or ''

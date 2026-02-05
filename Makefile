@@ -27,7 +27,8 @@ basic-config: path-config env-config create-dirs chmod-scripts
 conda-config: print-conda-prefix configure-conda-environment
 full-config: basic-config conda-config
 c-make: $(PROGS)
-all: full-config c-make 
+cpp-make: sub_make
+all: full-config c-make cpp-make 
 
 # Generic IsingSimulator pattern rule (for legacy and Metropolis variants)
 $(LRGSG_CCORE_BIN)/IsingSimulator%: $(LRGSG_RBIM_SIMC)/IsingSimulator%.c \

@@ -4,7 +4,7 @@ import networkx as nx
 import numpy as np
 from scipy.cluster.hierarchy import linkage
 
-from ...nx_patches.funcs.spectral import signed_laplacian_matrix
+from ...graphs.nx.funcs.spectral import signed_laplacian_matrix
 from .infocomm import lapl_dists
 
 __all__ = [

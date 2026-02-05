@@ -30,7 +30,7 @@ Use the excitation-inhibition C backend (requires compiled C cores):
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Iterable, Literal, cast
+from typing import TYPE_CHECKING, Any, Iterable, Literal, cast
 
 import numpy as np
 import tqdm
@@ -38,8 +38,10 @@ from numba import njit
 
 from ._c_backend import CBackendMixin
 from .BinDynSys import BinDynSys
-from ..nx_patches import SignedGraph
 from ..utils.tools.chronometer import time_function_accumulate
+
+if TYPE_CHECKING:
+    from ..graphs.nx import SignedGraphNX as SignedGraph
 
 
 # ========================================================================
@@ -109,7 +111,7 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
 
     def __init__(
         self,
-        sg: SignedGraph,
+        sg: "SignedGraph",
         *,
         state_type: Literal["binary", "bipolar"] | None = None,
         **kwargs: Any,
@@ -293,7 +295,7 @@ class ContactProcessSIR(ContactProcessBase):
 
     def __init__(
         self,
-        sg: SignedGraph,
+        sg: "SignedGraph",
         mu: float = 1.0,
         **kwargs: Any,
     ) -> None:
@@ -379,7 +381,7 @@ class ContactProcessEI(ContactProcessBase):
 
     def __init__(
         self,
-        sg: SignedGraph,
+        sg: "SignedGraph",
         *,
         gamma: float,
         activation: Literal["tanh", "relu"] = "tanh",
@@ -703,7 +705,7 @@ class ContactProcessEI(ContactProcessBase):
             )
 
 
-def ContactProcess(sg: SignedGraph, *args: Any, **kwargs: Any):
+def ContactProcess(sg: "SignedGraph", *args: Any, **kwargs: Any):
     """
     Factory for contact-process variants.
 

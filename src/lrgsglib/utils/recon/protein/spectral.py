@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ....nx_patches import Lattice2D, Lattice3D, ErdosRenyi
+from ....graphs.nx import Lattice2D, Lattice3D, ErdosRenyi
 from .feature_extraction import create_enhanced_feature_vector
 from .reconstruction import safe_reconstruct_coordinates_from_features
 

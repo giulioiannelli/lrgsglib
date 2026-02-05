@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import tqdm
@@ -12,10 +12,13 @@ from ._c_backend import CBackendMixin
 from .BinDynSys import BinDynSys
 from ..config.const import BIN, SG_REPR
 from ..config.funcs import build_pT_fname
-from ..nx_patches import SignedGraph, get_kth_order_neighbours
+from ..graphs.nx.funcs import get_kth_order_neighbours
 from ..utils.lrg.ising import compute_ising_pairwise_energy
 from ..utils.statsys import boltzmann_factor
 from ..utils.tools.chronometer import time_function_accumulate
+
+if TYPE_CHECKING:
+    from ..graphs.nx import SignedGraphNX as SignedGraph
 
 # Type aliases for cooling/ladder schedules
 CoolingSchedule = Literal["linear", "exponential", "logarithmic", "custom"]
@@ -82,7 +85,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
     def __init__(
         self,
-        sg: SignedGraph,
+        sg: "SignedGraph",
         T: float = 0.,
         *,
         NoClust: int = 1,
@@ -256,9 +259,13 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         return key[1:].lower()  # "C1B" -> "1b", "C3B" -> "3b"
 
     def _is_sa_variant(self) -> bool:
-        """Check if current runlang is simulated annealing."""
+        """Check if current runlang is simulated annealing (new variant only).
+
+        Note: C3 is a legacy variant that uses equilibrium arguments.
+        Only C3B uses the new simulated annealing argument format.
+        """
         key = self._c_program_key()
-        return key.startswith("C3")
+        return key.startswith("C3") and key != "C3"  # C3 is legacy
 
     def _is_pt_variant(self) -> bool:
         """Check if current runlang is parallel tempering."""

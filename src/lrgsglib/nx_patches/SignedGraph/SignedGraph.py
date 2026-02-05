@@ -488,6 +488,11 @@ class SignedGraph:
         return self.gr[self.on_g].number_of_edges()
 
     @property
+    def num_edges(self) -> int:
+        """Number of edges (alias for Ne, GT compatibility)."""
+        return self.gr[self.on_g].number_of_edges()
+
+    @property
     def Ne_n(self) -> int:
         """Number of negative edges in the primary graph representation.
 
@@ -497,6 +502,49 @@ class SignedGraph:
             Count of edges with negative weights.
         """
         return len(self.fleset[self.on_g])
+
+    def count_negative_edges(self) -> int:
+        """Count number of negative edges (GT compatibility).
+
+        Returns
+        -------
+        int
+            Number of edges with negative weight.
+        """
+        return len(self.fleset[self.on_g])
+
+    def count_positive_edges(self) -> int:
+        """Count number of positive edges (GT compatibility).
+
+        Returns
+        -------
+        int
+            Number of edges with positive weight.
+        """
+        return len(self.lfeset[self.on_g])
+
+    def get_signed_adjacency(self) -> Any:
+        """Get signed adjacency matrix (GT compatibility).
+
+        Returns
+        -------
+        ndarray
+            Signed adjacency matrix with +1/-1 edge weights.
+        """
+        return self.adj.toarray() if hasattr(self.adj, 'toarray') else self.adj
+
+    def to_networkx(self) -> Graph:
+        """Return the underlying NetworkX graph (GT compatibility).
+
+        For NX-based graphs, this returns the primary graph representation.
+        Edge weights are stored in the 'weight' attribute.
+
+        Returns
+        -------
+        nx.Graph
+            The NetworkX graph object.
+        """
+        return self.gr[self.on_g]
 
     @property
     def edges_with_data(self) -> Any:
