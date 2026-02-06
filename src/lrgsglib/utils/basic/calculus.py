@@ -101,12 +101,12 @@ def model_1r(x, C_1, C_2):
     Returns:
     --------
     float or numpy.ndarray
-        The calculated values based on the model C_2 * (1 - C_1 / (|x| * C_2)).
+        The calculated values based on the model C_2 * (1 - C_1 / (abs(x) * C_2)).
 
     Notes:
     ------
     - This model is commonly used for fitting percolation defect profiles.
-    - The model has the form: C_2 * (1 - C_1 / (|x| * C_2)) = C_2 - C_1 / |x|
+    - The model has the form: C_2 * (1 - C_1 / (abs(x) * C_2)) = C_2 - C_1 / abs(x)
     - The absolute value of x is used to handle both positive and negative inputs.
 
     Example:

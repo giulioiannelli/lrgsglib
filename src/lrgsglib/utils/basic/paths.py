@@ -3,6 +3,7 @@ from .iterables import uniques
 #
 __all__ = [
     'list_dir',
+    'remove_if_exists',
     'remove_directory_if_empty',
     'remove_empty_dirs',
     'find_matching_files',
@@ -38,7 +39,7 @@ def list_dir(path: str) -> List[str]:
 
     Example
     -------
-    >>> list_dir("/home/user/docs")
+    >>> list_dir("/home/user/docs")  # doctest: +SKIP
     ['file1.txt', 'file2.txt', 'reports']
     """
     dir_path = Path(path)
@@ -47,6 +48,35 @@ def list_dir(path: str) -> List[str]:
     if not dir_path.is_dir():
         raise NotADirectoryError(f"Not a directory: {path}")
     return sorted(entry.name for entry in dir_path.iterdir())
+#
+def remove_if_exists(path: Union[str, Path]) -> bool:
+    """
+    Remove a file if it exists.
+
+    Parameters
+    ----------
+    path : Union[str, Path]
+        Path to the file to remove.
+
+    Returns
+    -------
+    bool
+        True if the file existed and was removed; False otherwise.
+
+    Example
+    -------
+    >>> remove_if_exists("/tmp/nonexistent_file_12345.txt")
+    False
+    """
+    p = Path(path)
+    if p.exists():
+        try:
+            p.unlink()
+            return True
+        except OSError as e:
+            logger.error(f"Failed to remove {p!r}: {e}")
+            return False
+    return False
 #
 def remove_directory_if_empty(path: Union[str, Path]) -> bool:
     """
@@ -159,11 +189,9 @@ def extract_value_from_filename(file_name: str, value_pattern: str) -> float:
     Examples
     --------
     >>> file_name = "data_p=1.5.pkl"
-    >>> value_pattern = r"p=([\\d.]+)"
+    >>> value_pattern = "p=([0-9.]+)"
     >>> extract_value_from_filename(file_name, value_pattern)
     1.5
-    
-    This function extracts the p-value from the provided file name.
     """
     match = re.search(value_pattern, file_name)
     if match:
@@ -195,11 +223,9 @@ def extract_values_from_filenames(file_names: List[str], value_pattern: str, sor
     Examples
     --------
     >>> file_names = ["data_p=1.5.pkl", "experiment_p=2.0.pkl", "results_p=0.5.pkl"]
-    >>> value_pattern = "p=([\\d.]+)"
+    >>> value_pattern = "p=([0-9.]+)"
     >>> extract_values_from_filenames(file_names, value_pattern)
-    array([0.5, 1.5, 2.0])
-    
-    This function extracts the p-values from the provided file names and returns them sorted in ascending order.
+    array([0.5, 1.5, 2. ])
     """
     # values = [re.search(value_pattern, filename).group(1) 
     #           for filename in file_names if re.search(value_pattern, filename)]

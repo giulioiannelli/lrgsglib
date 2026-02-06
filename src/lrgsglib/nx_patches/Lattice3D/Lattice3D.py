@@ -18,6 +18,55 @@ from ..SignedGraph.SignedGraph import SignedGraph
 from .generators_3d import *
 
 class Lattice3D(SignedGraph):
+    """
+    Signed 3D lattice with optional periodic boundary conditions.
+
+    The lattice is built in two representations:
+    - ``H``: coordinate-labeled nodes (tuples)
+    - ``G``: integer-labeled nodes (default representation)
+
+    Parameters
+    ----------
+    dim : int | tuple[int, int, int], default L3D_DIM
+        Lattice dimensions. If an int is provided, it is used for all axes.
+    geo : str, default L3D_GEO
+        Lattice geometry. Common values: ``"sc"``, ``"bcc"``, ``"fcc"``
+        or their full names (``"simple_cubic"``, ``"body_centered"``,
+        ``"face_centered"``).
+    pbc : bool, default L3D_PBC
+        Whether to use periodic boundary conditions.
+    fbc_val : float, default L3D_FBCV
+        Fixed boundary value passed to lattice generators when applicable.
+    stdFnameSFFX : str, default L3D_STDFN
+        Filename suffix used in on-disk exports.
+    sgpathn : str, default L3D_SGPATH
+        Subpath for storing lattice data.
+    with_positions : bool, default L3D_WITH_POS
+        Whether to store projected node positions for plotting.
+    pdil : float, default L3D_PDIL
+        Edge dilution probability for the simple cubic lattice.
+    theta : float, default L3D_THETA
+        Polar angle for 3D -> 2D projection when ``with_positions`` is True.
+    phi : float, default L3D_PHI
+        Azimuthal angle for 3D -> 2D projection when ``with_positions`` is True.
+    only_const_mode : bool, default L3D_ONLY_CONST_MODE
+        If True, do not build the graph; only populate metadata.
+    **kwargs : Any
+        Forwarded to ``SignedGraph`` (e.g., ``pflip``, ``seed``,
+        ``init_nw_dict``, ``path_data``, ``path_plot``).
+
+    Notes
+    -----
+    ``pflip`` defines how many edges are marked for sign flips, but weights
+    are not set negative until you call ``flip_random_fract_edges`` or
+    ``flip_sel_edges``, unless weights already exist on the input graph.
+
+    Examples
+    --------
+    >>> from lrgsglib.nx_patches import Lattice3D
+    >>> lat = Lattice3D(dim=6, geo="sc", pflip=0.1, seed=7)
+    >>> lat.flip_random_fract_edges()  # apply sign flips
+    """
     def __init__(
         self,
         dim: Union[int, Tuple[int, int, int]] = L3D_DIM,
@@ -63,6 +112,10 @@ class Lattice3D(SignedGraph):
                 self.syshapePth = f"{dim_part}_N={total_nodes}"
             self.G = Graph()
         super(Lattice3D, self).__init__(self.G, **kwargs)
+        
+        # Set positions after SignedGraph initialization to preserve them
+        if not only_const_mode and self.with_positions:
+            self._set_positions()
     #
     def __init_dim__(self, dim: Union[int, Tuple[int, int, int]]) -> None:
         if is_positive_int(dim):
@@ -122,17 +175,27 @@ class Lattice3D(SignedGraph):
         self.H = nxfunc(self.dim, periodic=self.pbc)
         self.G = convert_node_labels_to_integers(self.H)
 
-        if self.with_positions:
-            self._set_positions()
-
     def get_expected_num_nodes(self) -> int:
         """Return the expected number of nodes for the 3D lattice."""
         return int(self.node_multiplier * np.prod(self.dim))
     #
     def _set_positions(self):
-        pos = {node: project_3d_to_2d(*node, self.theta, self.phi)
-               for node in self.H.nodes()}
-        set_node_attributes(self.H, pos, 'pos')
+        """Set 2D projected positions on both H and G graphs."""
+        # Set positions on H (tuple-labeled graph)
+        pos_H = {node: project_3d_to_2d(*node, self.theta, self.phi)
+                 for node in self.H.nodes()}
+        set_node_attributes(self.H, pos_H, 'pos')
+        
+        # Also set positions on G (integer-labeled graph) using the node mapping
+        # The mapping is stored in self.map_node after SignedGraph initialization
+        if hasattr(self, 'map_node') and 'G' in self.map_node and 'H' in self.map_node['G']:
+            node_mapping = self.map_node['G']['H']  # Maps H nodes -> G nodes
+            pos_G = {node_mapping[h_node]: position 
+                     for h_node, position in pos_H.items()}
+            set_node_attributes(self.G, pos_G, 'pos')
+            # Update the graph representation dictionary to reflect the changes
+            self.gr['G'] = self.G
+            self.gr['H'] = self.H
 
 
     def get_central_edge(self, on_g: str = L3D_ONREP):
@@ -192,4 +255,3 @@ class Lattice3D(SignedGraph):
                                 _ += 1
             return list(set(patternList))
         
-

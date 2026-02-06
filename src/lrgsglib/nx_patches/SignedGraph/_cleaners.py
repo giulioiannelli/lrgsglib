@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -7,16 +8,32 @@ if TYPE_CHECKING:
 
 def remove_ising_clust_files(self: "SignedGraph"):
     for pname in self.clPname:
-        os.remove(pname)
+        if os.path.exists(pname):
+            try:
+                os.remove(pname)
+            except Exception as e:
+                print(f"Warning: Could not remove Ising cluster file: {e}", file=sys.stderr)
 
 def remove_edgl_file(self: "SignedGraph"):
-    os.remove(self.path_exp_edgl)
+    if os.path.exists(self.path_exp_edgl):
+        try:
+            os.remove(self.path_exp_edgl)
+        except Exception as e:
+            print(f"Warning: Could not remove edgelist file: {e}", file=sys.stderr)
 
 def remove_eigV_file(self: "SignedGraph"):
-    os.remove(self.eigVPname)
+    if os.path.exists(self.eigVPname):
+        try:
+            os.remove(self.eigVPname)
+        except Exception as e:
+            print(f"Warning: Could not remove eigenvector file: {e}", file=sys.stderr)
 
 def remove_adj_file(self: "SignedGraph"):
-    os.remove(self.path_exp_adj)
+    if os.path.exists(self.path_exp_adj):
+        try:
+            os.remove(self.path_exp_adj)
+        except Exception as e:
+            print(f"Warning: Could not remove adjacency file: {e}", file=sys.stderr)
 
 def remove_exported_files(self: "SignedGraph"):
     if hasattr(self, "path_exp_edgl"):

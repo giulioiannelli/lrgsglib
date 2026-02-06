@@ -2,7 +2,21 @@ from typing import Any, Callable, Union, Optional
 import operator
 from numbers import Number
 
-__all__ = ["ConditionalPartitioning", "_normalize_conditional_partitioning"]
+# Type alias for inputs that can be normalized to ConditionalPartitioning
+# Note: Using int and float explicitly instead of Number for better type checking compatibility
+ConditionalPartitioningInput = Union[
+    "ConditionalPartitioning", 
+    int,
+    float,
+    str, 
+    Callable[[Any], bool]
+]
+
+__all__ = [
+    "ConditionalPartitioning", 
+    "ConditionalPartitioningInput",
+    "_normalize_conditional_partitioning"
+]
 
 class ConditionalPartitioning:
     def __init__(self, condition: Union[Callable[[Any], bool], str, Any]):
@@ -91,7 +105,7 @@ class ConditionalPartitioning:
             )
         
 
-    def key_to_cond(self) -> Callable[[Any], bool]:
+    def key_to_cond(self) -> Union[Callable[[Any], bool], int, float, str]:
         """
         Convert the stored key representation into a condition callable.
 
@@ -102,9 +116,9 @@ class ConditionalPartitioning:
 
         Returns
         -------
-        Union[Callable[[Any], bool], Any]
+        Union[Callable[[Any], bool], int, float, str]
             A lambda function representing the condition if an operator is present,
-            or the direct value if not.
+            or the direct value (int, float, or str) if not.
         """
         op_map = {
             "<=": operator.le,
@@ -137,8 +151,8 @@ class ConditionalPartitioning:
 
 
 def _normalize_conditional_partitioning(
-    val: Union["ConditionalPartitioning", Number, str, Callable[[Any], bool], None]
-) -> Optional["ConditionalPartitioning"]:
+    val: ConditionalPartitioningInput
+) -> "ConditionalPartitioning":
     """
     Normalize various input types to a ConditionalPartitioning object.
     
@@ -148,18 +162,17 @@ def _normalize_conditional_partitioning(
     
     Parameters
     ----------
-    val : Union[ConditionalPartitioning, Number, str, Callable, None]
+    val : ConditionalPartitioningInput
         Input value that can be:
         - A ConditionalPartitioning object (returned as-is)
         - A number (int/float) - converted to equality condition (e.g., 1 → "=1")
         - A string with operator (e.g., '>0', '<=10', '!=5')
         - A callable (e.g., lambda x: x > 0)
-        - None (returned as None)
     
     Returns
     -------
-    Optional[ConditionalPartitioning]
-        Normalized ConditionalPartitioning object or None if input was None.
+    ConditionalPartitioning
+        Normalized ConditionalPartitioning object.
         
     Raises
     ------
@@ -172,36 +185,30 @@ def _normalize_conditional_partitioning(
     Examples
     --------
     >>> # From a number
-    >>> cp = normalize_conditional_partitioning(1)
+    >>> cp = _normalize_conditional_partitioning(1)
     >>> cp.key
     '=1'
     >>> cp.cond_func(1)
     True
     
     >>> # From a string operator
-    >>> cp = normalize_conditional_partitioning('>0')
+    >>> cp = _normalize_conditional_partitioning('>0')
     >>> cp.key
     '>0'
     >>> cp.cond_func(5)
     True
     
     >>> # From a lambda
-    >>> cp = normalize_conditional_partitioning(lambda x: x > 0)
+    >>> cp = _normalize_conditional_partitioning(lambda x: x > 0)
     >>> cp.cond_func(5)
     True
     
     >>> # Already a ConditionalPartitioning (returns same object)
     >>> original = ConditionalPartitioning('>0')
-    >>> result = normalize_conditional_partitioning(original)
+    >>> result = _normalize_conditional_partitioning(original)
     >>> result is original
     True
-    
-    >>> # None input
-    >>> normalize_conditional_partitioning(None)
-    None
     """
-    if val is None:
-        return None
     if isinstance(val, ConditionalPartitioning):
         return val
     if isinstance(val, Number):
@@ -212,6 +219,6 @@ def _normalize_conditional_partitioning(
     # If we get here, it's an unsupported type
     raise TypeError(
         f"Cannot normalize value of type {type(val).__name__} to ConditionalPartitioning. "
-        f"Expected: ConditionalPartitioning, Number, string (e.g., '>0'), callable, or None. "
+        f"Expected: ConditionalPartitioning, Number, string (e.g., '>0'), or callable. "
         f"Got: {val}"
     )

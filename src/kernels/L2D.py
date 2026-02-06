@@ -75,14 +75,14 @@ def adjust_eigV_for_lattice2D(leigV: NDArray) -> NDArray:
 def eigV_for_lattice2D_ptch(**kwargs) -> NDArray:
     return adjust_eigV_for_lattice2D(eigV_for_lattice2D(**kwargs))
 
-def eigv_for_lattice2D(side, mode: str = "full", **kwargs) -> NDArray:
+def eigv_for_lattice2D(side, mode: str = "full", backend='scipy', keep_sparse=None, **kwargs) -> NDArray:
     l = Lattice2D(side, **kwargs)
     l.flip_random_fract_edges()
     match mode:
         case "full":
-            l.compute_laplacian_spectrum_weigV()
+            l.compute_laplacian_spectrum_weigV(backend=backend, keep_sparse=keep_sparse)
         case _ if mode.startswith("some"):
             k = int(mode.split("_")[-1])
-            l.compute_k_eigvV(k=k)
+            l.compute_k_eigvV(k=k, backend=backend)
     return l.eigv
 

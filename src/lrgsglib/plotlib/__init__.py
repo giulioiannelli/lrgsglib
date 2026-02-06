@@ -4,6 +4,7 @@ from .color import *
 from .colorbars import *
 from .colormaps import *
 from .const_plotlib import *
+from .formatter import *
 from .lattices import *
 from .mathplot import *
 from .tilings import *

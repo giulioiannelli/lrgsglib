@@ -171,9 +171,11 @@ def symmetric_logarithm_unchecked(
     """
     Compute a symmetric logarithmic function without safety adjustments.
 
-    This applies
-        a * log( b * (|x| - d) ) + c
-    directly, which may produce invalid values if |x| ≤ d.
+    This applies::
+
+        a * log( b * (abs(x) - d) ) + c
+
+    directly, which may produce invalid values if abs(x) ≤ d.
 
     Parameters
     ----------
@@ -186,12 +188,12 @@ def symmetric_logarithm_unchecked(
     c : float
         Additive constant.
     d : float
-        Offset subtracted from |x| before taking the log.
+        Offset subtracted from abs(x) before taking the log.
 
     Returns
     -------
     array-like or float
-        Result of the expression; may contain NaN or -inf where |x| ≤ d.
+        Result of the expression; may contain NaN or -inf where abs(x) ≤ d.
     """
     return a * np.log(b * (np.abs(x) - d)) + c
 #
@@ -220,9 +222,9 @@ def symmetric_logarithm(
     c : float
         Additive constant.
     d : float
-        Offset subtracted from |x| before taking the log.
+        Offset subtracted from abs(x) before taking the log.
     tol : float, optional
-        Small positive tolerance to ensure |x| - d ≥ tol (default: 1e-10).
+        Small positive tolerance to ensure abs(x) - d ≥ tol (default: 1e-10).
 
     Returns
     -------

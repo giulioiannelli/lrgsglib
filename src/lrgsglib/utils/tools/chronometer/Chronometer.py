@@ -104,6 +104,33 @@ class Chronometer:
         """
         cls.enabled = True
 
+    @classmethod
+    def print_all_chronometers(cls) -> None:
+        """
+        Print a table of accumulated timings to stdout.
+
+        This is an alias for summary() but prints to stdout instead of logging.
+        Sorted by descending average duration.
+        """
+        if not cls._data:
+            print("\nNo chronometer data collected.")
+            return
+
+        print("\nSummary of all Chronometers:")
+        header = f"{'Function':<25} {'Total Time (s)':<20} {'Calls':<10} {'Average Time (s)':<20}"
+        print(header)
+        print("-" * len(header))
+
+        rows = []
+        for name, d in cls._data.items():
+            avg = d["total_time"] / d["count"]
+            rows.append((name, d["total_time"], d["count"], avg))
+        rows.sort(key=lambda x: x[3], reverse=True)
+
+        for name, total, count, avg in rows:
+            formatted_line = f"{name:<25} {total:<20.4g} {count:<10} {avg:<20.4g}"
+            print(formatted_line)
+
 
 # def _generate_id(length: int = 8) -> str:
 #     """Return a random alphanumeric ID."""

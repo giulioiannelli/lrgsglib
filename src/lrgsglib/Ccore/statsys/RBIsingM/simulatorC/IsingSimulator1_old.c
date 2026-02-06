@@ -5,8 +5,8 @@
 
 #define MOD_SAVE 1
 
-#define T_THERM_STEP (thSTEP * N)
-#define T_EQ_STEP (eqSTEP * N)
+#define T_THERM_STEP (thSTEP)
+#define T_EQ_STEP (eqSTEP)
 
 #define ISNG_DIR "%sising/"
 #define SINI_FNAME ISNG_DIR "N=%zu/s_%s" BINX

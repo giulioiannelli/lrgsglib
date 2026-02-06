@@ -27,14 +27,36 @@ basic-config: path-config env-config create-dirs chmod-scripts
 conda-config: print-conda-prefix configure-conda-environment
 full-config: basic-config conda-config
 c-make: $(PROGS)
-all: full-config c-make 
+cpp-make: sub_make
+all: full-config c-make cpp-make 
 
+# Generic IsingSimulator pattern rule (for legacy and Metropolis variants)
 $(LRGSG_CCORE_BIN)/IsingSimulator%: $(LRGSG_RBIM_SIMC)/IsingSimulator%.c \
 									$(PATH_SRCC_FILES) \
 									$(PATH_SRCC_RBIM) \
 									$(PATH_SFMT_FILES) \
 									$(PATH_SRCC_BINDYNSYS)
 	@printf "Compiling IsingSimulator%s...\n" "$*"
+	$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+
+# Simulated Annealing variants (need LRGSG_sa)
+$(LRGSG_CCORE_BIN)/IsingSimulator3b: $(LRGSG_RBIM_SIMC)/IsingSimulator3b.c \
+									$(PATH_SRCC_FILES) \
+									$(PATH_SRCC_RBIM) \
+									$(PATH_SRCC_SA) \
+									$(PATH_SFMT_FILES) \
+									$(PATH_SRCC_BINDYNSYS)
+	@printf "Compiling IsingSimulator3b (SA)...\n"
+	$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+
+# Parallel Tempering variants (need LRGSG_pt)
+$(LRGSG_CCORE_BIN)/IsingSimulator4b: $(LRGSG_RBIM_SIMC)/IsingSimulator4b.c \
+									$(PATH_SRCC_FILES) \
+									$(PATH_SRCC_RBIM) \
+									$(PATH_SRCC_PT) \
+									$(PATH_SFMT_FILES) \
+									$(PATH_SRCC_BINDYNSYS)
+	@printf "Compiling IsingSimulator4b (PT)...\n"
 	$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
 
 # special rule for VoterSimulator0
@@ -55,13 +77,23 @@ $(LRGSG_CCORE_BIN)/VoterSimulator%: $(LRGSG_STATSYS_VM)/VoterSimulator%.c \
 		@printf "Compiling VoterSimulator%s...\n" "$*"
 		$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
 
-# special rule for contact_process
-$(LRGSG_CCORE_BIN)/contact_process: $(LRGSG_CCORE_STATSYS)/contactP/contact_process.c\
-							$(PATH_SRCC_FILES) \
-							$(PATH_SFMT_FILES) \
-							$(PATH_SRCC_BINDYNSYS)
-		@printf "Compiling contact_process...\n"
-		$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+# special rule for unified ContactSimulator (no suffix)
+$(LRGSG_CCORE_BIN)/ContactSimulator: $(LRGSG_STATSYS_CP)/ContactSimulator.c \
+                                                       $(PATH_SRCC_FILES) \
+                                                       $(PATH_SRCC_CP) \
+                                                       $(PATH_SFMT_FILES) \
+                                                       $(PATH_SRCC_BINDYNSYS)
+	@printf "Compiling ContactSimulator (unified)...\n"
+	$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+
+# pattern rule for ContactSimulator variants
+$(LRGSG_CCORE_BIN)/ContactSimulator%: $(LRGSG_STATSYS_CP)/ContactSimulator%.c \
+                                                       $(PATH_SRCC_FILES) \
+                                                       $(PATH_SRCC_CP) \
+                                                       $(PATH_SFMT_FILES) \
+                                                       $(PATH_SRCC_BINDYNSYS)
+	@printf "Compiling ContactSimulator%s...\n" "$*"
+	$(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
 
 rootp-file:
 	@echo "Creating .isrootf file..."

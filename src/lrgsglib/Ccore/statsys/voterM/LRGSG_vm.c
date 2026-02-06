@@ -1,6 +1,5 @@
 #include "LRGSG_vm.h"
 
-sfmt_t sfmt;
 uint32_t *seed_rand;
 
 /** 

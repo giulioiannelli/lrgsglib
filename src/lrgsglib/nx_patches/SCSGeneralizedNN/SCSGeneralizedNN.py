@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 from ..FullyConnected import FullyConnected
 from .generators_scs import generate_scs_generalized_graph
@@ -40,14 +42,17 @@ class SCSGeneralizedNN(FullyConnected):
         seed = kwargs.get('seed', None)
         self._rng = np.random.default_rng(seed)
         
-        # Set sgpathn before calling parent __init__
-        # Use parent's FC_SGPATH if sgpathn not provided, or SCS-specific path
+        # Set sgpathn with intermediate folder (like Lattice2D does with L2D_PATH_DICT)
+        # This ensures output goes to data/<workdir>/scs_nn/ instead of data/<workdir>/
         from ...config.const import SCS_SGPATH, SCS_PHTABB, FC_SGPATH
         if sgpathn is None:
             sgpathn = SCS_SGPATH if SCS_SGPATH else FC_SGPATH
-        
-        # Store sgpathn before parent init, but don't pass it (parent will set it)
-        _sgpathn = SCS_PHTABB if not sgpathn else sgpathn
+
+        # Add intermediate folder 'scs_nn' to match Lattice2D structure
+        if sgpathn:
+            _sgpathn = str(Path(sgpathn) / SCS_PHTABB)
+        else:
+            _sgpathn = SCS_PHTABB
         
         super().__init__(
             N=N, 
@@ -56,7 +61,9 @@ class SCSGeneralizedNN(FullyConnected):
             only_const_mode=only_const_mode, 
             **kwargs
         )
-        base_fname = f"scs_nn_N={self._N}_gamma={self.gamma:.3f}"
+        # std_fname should only contain parameters not already in directory path
+        # (scs_nn and N are already in the path: data/.../scs_nn/.../N=<N>/)
+        base_fname = f"gamma={self.gamma:.3g}"
         suffix = getattr(self, "peq_str", "")
         self.std_fname = f"{base_fname}_{suffix}" if suffix else base_fname
 
@@ -74,7 +81,7 @@ class SCSGeneralizedNN(FullyConnected):
     def __repr__(self) -> str:
         return (
             "SCSGeneralizedNN("
-            f"N={self._N}, gamma={self.gamma:.3f}, J0={self.J0:.3g}, J={self.J:.3g}, g={self.g:.3g}"
+            f"N={self._N}, gamma={self.gamma:.3g}, J0={self.J0:.3g}, J={self.J:.3g}, g={self.g:.3g}"
             ")"
         )
 

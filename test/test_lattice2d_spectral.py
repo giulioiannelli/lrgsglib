@@ -45,7 +45,7 @@ def test_basic_lattice_generation():
         print(f"  Edges: {lat.Ne}")
         print(f"  Negative edges: {lat.Ne_n}")
         print(f"  Coordination number: {lat.z}")
-        print(f"  pflip: {lat.pflip:.3f}")
+        print(f"  pflip: {lat.pflip:.3g}")
         print(f"  Shape path: {lat.syshapePth}")
         
         # Verify graph is properly constructed

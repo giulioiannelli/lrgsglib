@@ -220,9 +220,9 @@ def scheme_Lattice2DSquared_v01(
 
     Examples
     --------
-    >>> fig, ax = plt.subplots()
-    >>> scheme_Lattice2DSquared(ax, size=5, pec='green', cpec='magenta')
-    >>> plt.show()
+    >>> fig, ax = plt.subplots()  # doctest: +SKIP
+    >>> scheme_Lattice2DSquared(ax, size=5, pec='green', cpec='magenta')  # doctest: +SKIP
+    >>> plt.show()  # doctest: +SKIP
 
     This will plot a 5x5 lattice with green and magenta lines, default node 
     style, and default external line style.

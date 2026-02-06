@@ -34,6 +34,7 @@ dependencies = [
     "cupy>=9.0.0",
     "pybind11>=2.10.0",
     "joblib>=1.0.0",
+    "numba>=0.58.0",  # JIT compilation for Python backend contact process
 ]
 
 [project.optional-dependencies]
@@ -48,6 +49,15 @@ jupyter = [
     "jupyter>=1.0.0",
     "ipykernel>=6.0.0",
     "ipywidgets>=7.0.0",
+]
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=2.0.0",
+    "sphinx-autodoc-typehints>=1.24.0",
+    "myst-parser>=2.0.0",
+    "sphinx-copybutton>=0.5.0",
+    "sphinxcontrib-bibtex>=2.6.0",
+    "sphinx-autobuild>=2021.3.14",
 ]
 
 [project.urls]
@@ -93,3 +103,13 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests that invoke scripts or cross-module workflows",
+    "slow: tests that may take longer or write larger artifacts",
+    "gpu: tests requiring a CUDA-capable device",
+    "code: Just-code tests (imports, instantiation, execution)",
+    "physical: Scientific correctness tests (invariants, known regimes)",
+    "visual: Tests that generate plots or animations for inspection",
+]

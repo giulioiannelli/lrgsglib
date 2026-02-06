@@ -167,6 +167,9 @@ def load_or_compute_Lattice2D(
         match compute:
             case _ if compute.startswith('spectrum'):
                 routine = compute.split('_')[1] if '_' in compute else 'numpy'
+                lattice.compute_laplacian_spectrum(backend=routine)
+            case _ if compute.startswith('eigenmodes'):
+                routine = compute.split('_')[1] if '_' in compute else 'numpy'
                 lattice.compute_laplacian_spectrum_weigV(backend=routine)
             case _ if compute.startswith('energy'):
                 routine = compute.split('_')[1] if '_' in compute else 'numpy'

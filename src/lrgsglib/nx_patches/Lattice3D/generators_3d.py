@@ -36,6 +36,7 @@ def generate_bcc_lattice(dim, periodic: bool) -> Graph:
              for ox, oy, oz in offsets
              for x, y, z in cProd_Iter_adj(dim, range_adjust)]
     G.add_nodes_from(nodes)
+    node_set = set(nodes)
 
     edges = [((x + dx, y + dy, z + dz), 
               (x + ddx + dx, y + ddy + dy, z + ddz + dz), 
@@ -43,7 +44,7 @@ def generate_bcc_lattice(dim, periodic: bool) -> Graph:
              for x, y, z in cProd_Iter(dim) 
              for dx, dy, dz in offsets
              for ddx, ddy, ddz in offsets2
-             if (x + ddx + dx, y + ddy + dy, z + ddz + dz) in G.nodes()]
+             if (x + ddx + dx, y + ddy + dy, z + ddz + dz) in node_set]
 
     G.add_edges_from(edges)
     edges = [((x + dx, y + dy, z + dz), 
@@ -52,7 +53,7 @@ def generate_bcc_lattice(dim, periodic: bool) -> Graph:
              for x, y, z in cProd_Iter(dim) 
              for dx, dy, dz in offsets
              for ddx, ddy, ddz in [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
-             if (x + ddx + dx, y + ddy + dy, z + ddz + dz) in G.nodes()]
+             if (x + ddx + dx, y + ddy + dy, z + ddz + dz) in node_set]
 
     G.add_edges_from(edges)
 
@@ -109,13 +110,14 @@ def generate_fcc_lattice(dim: Tuple[int, int, int], periodic: bool) -> Graph:
              for ox, oy, oz in offsets
              for x, y, z in cProd_Iter_adj(dim, range_adjust)]
     G.add_nodes_from(nodes)
+    node_set = set(nodes)
 
     edges = [((x + dx, y + dy, z + dz), 
               (x + ddx + dx, y + ddy + dy, z + ddz + dz))
              for x, y, z in cProd_Iter(dim) 
              for dx, dy, dz in offsets
              for ddx, ddy, ddz in [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
-             if (x + ddx + dx, y + ddy + dy, z + ddz + dz) in G.nodes()]
+             if (x + ddx + dx, y + ddy + dy, z + ddz + dz) in node_set]
 
     G.add_edges_from(edges)
 

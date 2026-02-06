@@ -122,9 +122,9 @@ def avgeq_fstr(avg: int) -> str:
     Example
     -------
     >>> avgeq_fstr(10)
-    'avg=10'
+    'na=10'
     """
-    return f"avg={avg:d}"
+    return f"na={avg:d}"
 
 def build_p_fname(
     base: str,

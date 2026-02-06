@@ -1,7 +1,8 @@
 import logging
 import random
 import networkx as nx
-from typing import Any, TYPE_CHECKING
+import numpy as np
+from typing import Any, Optional, TYPE_CHECKING
 from numpy.typing import NDArray
 
 from ...config.const import SG_REPR, SG_ERRMSG_NFLIP
@@ -41,20 +42,69 @@ def flip_sel_edges(
     self.upd_graph_matrices(on_g)
 
 
+def get_random_edges_from_set(
+        self: "SignedGraph",
+        n: int = 1,
+        edge_set: Optional[set] = None,
+        on_g: str = SG_REPR
+) -> list:
+    """
+    Get n random edges from a specified edge set efficiently.
+    
+    This method uses NumPy's random choice for efficient sampling from large
+    edge sets without replacement. For large graphs, this is significantly
+    faster than converting to list and using random.sample().
+    
+    Performance:
+    - O(n) for conversion to array
+    - O(k) for random selection where k is the sample size
+    - Much faster than random.sample() for large edge sets
+    
+    Parameters
+    ----------
+    n : int, default 1
+        Number of random edges to return.
+    edge_set : set, optional
+        The set of edges to sample from. If None, uses all edges (self.eset).
+    on_g : str, default SG_REPR
+        Graph representation to use.
+        
+    Returns
+    -------
+    list
+        List of randomly selected edges as tuples.
+    """
+    if edge_set is None:
+        edge_set = self.eset[on_g]
+    
+    # Convert set to numpy array for efficient indexing
+    edge_array = np.array(list(edge_set), dtype=object)
+    
+    # Use numpy's random choice for efficient sampling without replacement
+    # This is faster than random.sample for large sets
+    indices = np.random.choice(len(edge_array), size=n, replace=False)
+    
+    # Return as list of tuples
+    return [tuple(edge_array[i]) for i in indices]
+
+
 def flip_random_fract_edges(
-    self: "SignedGraph",
-    pflip: float = None, 
-    on_g: str = SG_REPR
+        self: "SignedGraph",
+        pflip: Optional[float] = None, 
+        on_g: str = SG_REPR
 ) -> None:
     try:
         if pflip:
             self.pflip = pflip
             self.Ne_flips = int(self.pflip * self.Ne)
             self.check_Ne_flips()
-            self.flip_sel_edges(
-                self.get_random_links(self.Ne_flips, on_g), 
-                on_g=on_g
+            # Use the new method to get random edges
+            edges_to_flip = self.get_random_edges_from_set(
+                self.Ne_flips, 
+                self.eset[on_g], 
+                on_g
             )
+            self.flip_sel_edges(edges_to_flip, on_g=on_g)
         else:
             self.Ne_flips = int(self.pflip * self.Ne)
             self.check_Ne_flips()
@@ -65,7 +115,42 @@ def flip_random_fract_edges(
 
 
 def unflip_all(self: "SignedGraph", on_g: str = SG_REPR):
-    self.flip_sel_edges(1, on_g=on_g)
+    """
+    Flip all negative edges back to positive.
+
+    This reverses all edge sign flips, restoring the graph to all positive edges.
+
+    Parameters
+    ----------
+    on_g : str, default SG_REPR
+        Graph representation identifier.
+
+    Notes
+    -----
+    This method flips all edges currently in fleset[on_g] (negative edges)
+    back to positive, effectively restoring the base graph state.
+    """
+    # Create a copy of fleset to avoid modification during iteration
+    edges_to_flip = set(self.fleset[on_g])
+    if edges_to_flip:
+        # Set all edges to positive weight (+1)
+        import networkx as nx
+        pos_weights_dict = {
+            (u, v): 1.0
+            for u, v in edges_to_flip
+        }
+        nx.set_edge_attributes(
+            self.gr[on_g],
+            values=pos_weights_dict,
+            name='weight'
+        )
+
+        # Update the edge sets (opposite of flip_sel_edges)
+        self.fleset[on_g].difference_update(edges_to_flip)
+        self.lfeset[on_g].update(edges_to_flip)
+
+        self.upd_GraphRepr_All(on_g)
+        self.upd_graph_matrices(on_g)
 
 
 def set_edges_random_normal(
@@ -78,7 +163,11 @@ def set_edges_random_normal(
         edge: random.normalvariate(mu, sigma) 
         for edge in self.gr[on_g].edges()
     }
-    self.set_edge_weights_wij(weights, on_g)
+    nx.set_edge_attributes(
+        self.gr[on_g], 
+        values=weights, 
+        name='weight'
+    )
 
 
 def load_vec_on_nodes(
@@ -103,12 +192,18 @@ def load_eigV_on_graph(
         eigV = _spectral.get_eigV_bin_check(self, which=which)
     else:
         try:
-            eigV = self.eigV[which]
+            eigV = getattr(self, 'eigV', None)
+            if eigV is None:
+                raise AttributeError
+            eigV = eigV[which]
         except (IndexError, AttributeError):
             _spectral.compute_k_eigvV(self, k=which + 1)
-            eigV = self.eigV[which]
+            eigV = getattr(self, 'eigV', None)
+            if eigV is not None:
+                eigV = eigV[which]
 
-    load_vec_on_nodes(self, eigV, f"eigV{which}", on_g)
+    if eigV is not None:
+        load_vec_on_nodes(self, eigV, f"eigV{which}", on_g)
 
 
 def set_node_attributes(

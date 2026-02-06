@@ -129,10 +129,10 @@ def set_ax_ratio_1_withlim(
 
     Examples
     --------
-    >>> fig, ax = plt.subplots()
-    >>> ax.plot([0, 1], [0, 2])
-    >>> set_ax_ratio_1_withlim(ax, margin=0.1)
-    >>> plt.show()
+    >>> fig, ax = plt.subplots()  # doctest: +SKIP
+    >>> ax.plot([0, 1], [0, 2])  # doctest: +SKIP
+    >>> set_ax_ratio_1_withlim(ax, margin=0.1)  # doctest: +SKIP
+    >>> plt.show()  # doctest: +SKIP
     """
     # Calculate the ranges and centers
     x_min, x_max = ax.get_xlim()

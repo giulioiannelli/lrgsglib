@@ -88,6 +88,8 @@ def export_ising_clust(
 
     Files are named using the standard convention via `build_p_fname`,
     e.g., `cl{i}_peq{...}[_{exName}].bin` and written under `self.path_ising`.
+    
+    Note: The path_ising directory will be created if it doesn't exist.
 
     Parameters
     ----------
@@ -96,6 +98,9 @@ def export_ising_clust(
     exName : str
         Optional suffix appended in the generated filename.
     """
+    # Ensure the ising directory exists before writing
+    self.path_ising.mkdir(parents=True, exist_ok=True)
+    
     self.clPname = []
     for i in range(NoClust):
         fname = build_p_fname(f"cl{i}", self.pflip, out_suffix=exName, ext=BIN)

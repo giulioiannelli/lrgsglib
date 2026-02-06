@@ -7,13 +7,14 @@ SCSGeneralized_args = {
         'help': phelp_scs_N,
         'type': int,
     },
-    'gamma': {
-        'help': phelp_scs_gamma,
-        'type': float,
-    },
 }
 
 SCSGeneralized_optional_args_dict = {
+    tuple(['--gamma']): {
+        'help': phelp_scs_gamma,
+        'type': float,
+        'default': DEFAULT_SCS_NN_GAMMA,
+    },
     tuple(['--J']): {
         'help': phelp_scs_J,
         'type': float,

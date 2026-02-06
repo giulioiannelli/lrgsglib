@@ -5,8 +5,8 @@
 //
 #define EXPECTED_ARGC 12
 //
-#define T_THERM_STEP (thSTEP * N)
-#define T_EQ_STEP (eqSTEP * N)
+#define T_THERM_STEP (thSTEP)
+#define T_EQ_STEP (eqSTEP)
 #define T_STEPS (T_THERM_STEP + T_EQ_STEP)
 //
 sfmt_t sfmt;

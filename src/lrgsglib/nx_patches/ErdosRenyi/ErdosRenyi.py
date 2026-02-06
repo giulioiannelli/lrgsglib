@@ -4,6 +4,41 @@ from ..SignedGraph.SignedGraph import SignedGraph
 
 
 class ErdosRenyi(SignedGraph):
+    """
+    Signed Erdos-Renyi graph generator (largest connected component).
+
+    Parameters
+    ----------
+    n : int
+        Number of nodes in the initial Erdos-Renyi graph.
+    p : float
+        Edge probability for the Erdos-Renyi model.
+    sgpathn : str, default ER_SGPATH
+        Subpath for storing graph data.
+    stdFnameSFFX : str, default ER_STDFN
+        Filename suffix used in on-disk exports.
+    only_const_mode : bool, default False
+        If True, do not build the graph; only populate metadata.
+    **kwargs : Any
+        Forwarded to ``SignedGraph`` (e.g., ``pflip``, ``seed``,
+        ``init_nw_dict``, ``path_data``, ``path_plot``).
+
+    Notes
+    -----
+    The graph is generated with NetworkX and then reduced to its largest
+    connected component before initializing ``SignedGraph``. This ensures
+    that most downstream algorithms operate on a connected graph.
+
+    ``pflip`` defines how many edges are marked for sign flips, but weights
+    are not set negative until you call ``flip_random_fract_edges`` or
+    ``flip_sel_edges``, unless weights already exist on the input graph.
+
+    Examples
+    --------
+    >>> from lrgsglib.nx_patches import ErdosRenyi
+    >>> er = ErdosRenyi(n=200, p=0.05, pflip=0.2, seed=1)
+    >>> er.flip_random_fract_edges()  # apply sign flips
+    """
     def __init__(
         self,
         n: int,

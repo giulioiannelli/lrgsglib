@@ -3,32 +3,61 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - graph-tool
-  - lmfit
+  # Core scientific stack
+  - python=3.12
+  - numpy
+  - scipy
+  - pandas
   - matplotlib
   - networkx
-  - numpy
-  - powerlaw
-  - python=3.12
-  - scipy
+  - scikit-learn
   - tqdm
-  - pandas
-  - ipykernel
+
+  # Graph analysis
+  - graph-tool
+
+  # Specialized scientific packages
+  - lmfit
+  - powerlaw
+  - nilearn
+  - emd
+
+  # Performance and compilation
+  - cupy
+  - numba
+  - joblib
+  - pybind11
   - boost
   - boost-cpp
   - libboost
-  - pybind11
-  - plotly
-  - nbformat
-  - ipywidgets
+
+  # C/C++ compilers
+  - gcc
   - gcc_linux-64
   - gxx_linux-64
-  - black
+
+  # Jupyter environment
   - notebook
-  - python-dotenv
-  - scikit-learn
+  - ipykernel
+  - ipywidgets
   - ipympl
-  - gcc
-  - cupy
-  - nilearn
-  - emd
+  - nbformat
+  - plotly
+
+  # Development tools
+  - pytest
+  - black
+  - isort
+  - flake8
+  - mypy
+
+  # Documentation
+  - sphinx
+  - sphinx-rtd-theme
+  - sphinx-autodoc-typehints
+  - myst-parser
+  - sphinx-copybutton
+  - sphinxcontrib-bibtex
+
+  # Environment management
+  - python-dotenv

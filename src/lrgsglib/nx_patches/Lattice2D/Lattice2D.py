@@ -4,6 +4,55 @@ from ..SignedGraph.SignedGraph import SignedGraph
 from .generators_2d import *
 #
 class Lattice2D(SignedGraph):
+    """
+    Signed 2D lattice with optional periodic boundary conditions.
+
+    The lattice is built in two representations:
+    - ``H``: coordinate-labeled nodes (tuples)
+    - ``G``: integer-labeled nodes (default representation)
+
+    Parameters
+    ----------
+    side1 : int, default L2D_SIDE1
+        Primary side length. If ``side2`` is provided, the larger of the two
+        becomes ``side1``.
+    geo : str, default L2D_GEO
+        Lattice geometry. Common values: ``"sqr"``, ``"tri"``, ``"hex"``,
+        ``"sqr_sw"``, ``"tri_sw"``, ``"oct_sqr"``.
+    side2 : int, default L2D_SIDE2
+        Secondary side length. If omitted, a square lattice is used.
+    pbc : bool, default L2D_PBC
+        Whether to use periodic boundary conditions.
+    fbc_val : float, default L2D_FBCV
+        Fixed boundary value passed to lattice generators when applicable.
+    stdFnameSFFX : str, default L2D_STDFN
+        Filename suffix used in on-disk exports.
+    sgpathn : str, default L2D_SGPATH
+        Subpath for storing lattice data.
+    with_positions : bool, default L2D_WITH_POS
+        Whether to store node positions for plotting.
+    bend_positions : bool, default L2D_BEND_POS
+        Whether to bend positions for certain lattice geometries.
+    prew : float, default L2D_PREW
+        Rewiring probability for small-world variants.
+    only_const_mode : bool, default L2D_ONLY_CONST_MODE
+        If True, do not build the graph; only populate metadata.
+    **kwargs : Any
+        Forwarded to ``SignedGraph`` (e.g., ``pflip``, ``seed``,
+        ``init_nw_dict``, ``path_data``, ``path_plot``).
+
+    Notes
+    -----
+    ``pflip`` defines how many edges are marked for sign flips, but weights
+    are not set negative until you call ``flip_random_fract_edges`` or
+    ``flip_sel_edges``, unless weights already exist on the input graph.
+
+    Examples
+    --------
+    >>> from lrgsglib.nx_patches import Lattice2D
+    >>> lat = Lattice2D(side1=10, geo="sqr", pflip=0.2, seed=1)
+    >>> lat.flip_random_fract_edges()  # apply sign flips
+    """
     eta_c = 1.128
     #
     def __init__(
@@ -324,7 +373,35 @@ class Lattice2D(SignedGraph):
                      for neighbor in graph.neighbors(node)}
             return links
     #     # #
-    # def make_animation(self, fig, ax, frames):
+    def make_animation(
+        self,
+        fig,
+        ax,
+        frames,
+        *,
+        interval_ms: int = 50,
+        cmap: str = "viridis",
+        add_colorbar: bool = True,
+        autoscale: bool = False,
+        vmin: float | None = None,
+        vmax: float | None = None,
+        blit: bool = False,
+    ):
+        from ._animations import make_lattice2d_animation
+
+        return make_lattice2d_animation(
+            self,
+            fig,
+            ax,
+            frames,
+            interval_ms=interval_ms,
+            cmap=cmap,
+            add_colorbar=add_colorbar,
+            autoscale=autoscale,
+            vmin=vmin,
+            vmax=vmax,
+            blit=blit,
+        )
 
     #     cv0 = frames[0].reshape(self.syshape)
     #     im = ax.imshow(cv0)  # Here make an AxesImage rather than contour

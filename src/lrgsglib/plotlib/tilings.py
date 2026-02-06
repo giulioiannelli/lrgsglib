@@ -8,6 +8,7 @@ from .const_plotlib import *
 __all__ = [
     'plot_honeycomb_grid',
     'plot_honeycomb_grid_fast',
+    'plot_tri_tiling_from_nodes',
     'plot_hex_tiling_from_nodes',
     'plot_hex_tiling_from_pos',
     'plot_octagonal_square_tiling_from_nodes',
@@ -16,7 +17,8 @@ __all__ = [
 #
 def plot_honeycomb_grid(
     data: NDArray,
-    ax: Any,
+    fig: Any = None,
+    ax: Any = None,
     triangle_size: float = 1.0,
     cmap: Union[Colormap, str] = 'viridis',
     rotation: float = 0.0
@@ -28,12 +30,22 @@ def plot_honeycomb_grid(
     ----------
     data : NDArray
         2D array of values.
+    fig : matplotlib.figure.Figure, optional
+        Deprecated compatibility parameter for older call signatures.
+    ax : matplotlib.axes.Axes, optional
+        Axis to plot on. If None and ``fig`` is an Axes, ``fig`` is used.
     triangle_size : float
         Side length of each equilateral triangle.
     cmap : Colormap or str
     rotation : float
         Angle in degrees to rotate the entire grid (counter-clockwise).
     """
+    if ax is None and isinstance(fig, Axes):
+        ax = fig
+        fig = None
+    if ax is None:
+        raise ValueError("ax must be provided to plot the honeycomb grid.")
+
     n_rows, n_cols = data.shape
     cmap_fun = plt.get_cmap(cmap) if isinstance(cmap, str) else cmap
     h = (np.sqrt(3) / 2) * triangle_size
@@ -320,6 +332,95 @@ def plot_honeycomb_grid_fast(
     ax.set_aspect('equal')
 
 
+def plot_tri_tiling_from_nodes(
+    x: NDArray,
+    y: NDArray,
+    vals: NDArray,
+    ax: Any = None,
+    triangle_size: float = 1.0,
+    cmap: Union[Colormap, str] = 'viridis',
+    rotation: float = 0.0,
+):
+    """
+    Plot a triangular tiling from node coordinates.
+
+    Parameters
+    ----------
+    x, y : array-like
+        Node coordinates on the triangular lattice.
+    vals : array-like
+        A value per node used for coloring.
+    ax : matplotlib.axes.Axes, optional
+        Axis to plot on; a new figure is created if None.
+    triangle_size : float
+        Side length of each equilateral triangle.
+    cmap : Colormap or str
+        Colormap for the triangles.
+    rotation : float
+        Angle in degrees to rotate the entire grid (counter-clockwise).
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(8, 8))
+
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    vals = np.asarray(vals)
+
+    h = (np.sqrt(3) / 2) * triangle_size
+    half = triangle_size / 2
+
+    # Infer lattice indices to choose triangle orientation.
+    row_idx = np.rint(y / h).astype(int)
+    col_idx = np.rint(x / half).astype(int)
+    parity = (row_idx + col_idx) % 2
+
+    up_template = np.array([
+        [0, h / 2],
+        [-half, -h / 2],
+        [half, -h / 2],
+    ])
+    down_template = np.array([
+        [0, -h / 2],
+        [-half, h / 2],
+        [half, h / 2],
+    ])
+
+    if rotation != 0.0:
+        theta = np.deg2rad(rotation)
+        c, s = np.cos(theta), np.sin(theta)
+        rot = np.array([[c, -s], [s, c]])
+    else:
+        rot = None
+
+    polys = []
+    for idx in range(x.size):
+        template = up_template if parity[idx] == 0 else down_template
+        tri = template + np.array([x[idx], y[idx]])
+        if rot is not None:
+            tri = tri @ rot.T
+        polys.append(tri)
+
+    norm = Normalize(vmin=np.min(vals), vmax=np.max(vals))
+    colormap = plt.get_cmap(cmap) if isinstance(cmap, str) else cmap
+    facecolors = colormap(norm(vals))
+
+    coll = PolyCollection(
+        polys,
+        facecolors=facecolors,
+        edgecolors='none',
+        antialiased=False,
+    )
+    ax.add_collection(coll)
+
+    all_verts = np.vstack(polys)
+    min_x, max_x = np.min(all_verts[:, 0]), np.max(all_verts[:, 0])
+    min_y, max_y = np.min(all_verts[:, 1]), np.max(all_verts[:, 1])
+    ax.set_xlim(min_x, max_x)
+    ax.set_ylim(min_y, max_y)
+    ax.set_aspect('equal')
+    return ax
+
+
 def plot_octagonal_square_tiling_from_nodes(x, y, vals, ax=None, cmap='viridis', 
                                            edgecolors='black', linewidths=0.1, padding=0.0):
     """
@@ -417,7 +518,7 @@ def plot_octagonal_square_tiling_from_nodes(x, y, vals, ax=None, cmap='viridis',
             oct2_y = (rhomb_row + 0.5) * rhomb_spacing
         else:
             # Fallback: shouldn't happen with correct rhomb-octagonal lattice
-            print(f"Warning: Node {i} at ({node_x:.3f}, {node_y:.3f}) doesn't match expected rhomb positions")
+            print(f"Warning: Node {i} at ({node_x:.3g}, {node_y:.3g}) doesn't match expected rhomb positions")
             # Use rhomb center as octagon centers (degenerate triangle)
             oct1_x = oct2_x = rhomb_center_x
             oct1_y = oct2_y = rhomb_center_y

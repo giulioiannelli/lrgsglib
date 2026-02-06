@@ -1,13 +1,17 @@
-# project root
+# project root (the lrgsglib submodule/package directory)
 LRGSG_ROOT := $(shell pwd)
-# default library base directory (overridable via `make LRGSG_LLIB=/custom/path`)
+# library base directory (overridable via `make LRGSG_LLIB=/custom/path`)
+# This is the outer project root when using lrgsglib as a submodule
+# Default: same as LRGSG_ROOT for standalone usage
 LRGSG_LLIB ?= $(LRGSG_ROOT)
 # define every LRGSG_<NAME> := $(LRGSG_<PARENT>)/<dirname> 
+# Note: DATA, IPYNB, and LOG are relative to LLIB (outer project)
+# while all other paths are relative to ROOT (lrgsglib submodule)
 LRGSG_PATHS := \
 	BUILD:build:ROOT \
-	DATA:data:ROOT \
-	IPYNB:ipynb:ROOT \
-	LOG:.log:ROOT \
+	DATA:data:LLIB \
+	IPYNB:ipynb:LLIB \
+	LOG:.log:LLIB \
 	SRC:src:ROOT \
 	TEST:test:ROOT \
 	TOOLS:tools:ROOT \

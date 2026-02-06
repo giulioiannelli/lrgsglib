@@ -247,7 +247,7 @@ def ultrametric_matrix_distance(
     >>> D1 = np.array([[0, 1, 2], [1, 0, 3], [2, 3, 0]])
     >>> D2 = np.array([[0, 1.5, 2.1], [1.5, 0, 2.9], [2.1, 2.9, 0]])
     >>> distance = ultrametric_matrix_distance(D1, D2)
-    >>> print(f"Euclidean distance: {distance:.3f}")
+    >>> print(f"Euclidean distance: {distance:.3g}")
     """
     # Extract upper triangular indices (excluding diagonal)
     triu_idx = np.triu_indices_from(D1, k=1)
@@ -280,8 +280,10 @@ def is_orthonormal(basis: NDArray, axis: int = 0) -> bool:
     -----
     The function checks orthonormality by computing the dot product of the basis
     vectors and comparing it to the identity matrix. The basis is considered
-    orthonormal if:
+    orthonormal if::
+
         basis @ basis.T == I
+
     where `I` is the identity matrix of appropriate size.
     """
     # Move the specified axis to the first dimension for easier computation
@@ -318,8 +320,10 @@ def matrix_projection(M: NDArray, basis: List[NDArray]) -> List[float]:
 
     Notes
     -----
-    The projection for each basis matrix B_i is computed as:
-        projection_i = (sum(M * B_i)) / ||B_i||_F,
+    The projection for each basis matrix B_i is computed as::
+
+        projection_i = (sum(M * B_i)) / ||B_i||_F
+
     where ||B_i||_F denotes the Frobenius norm of B_i.
     """
     projections = []

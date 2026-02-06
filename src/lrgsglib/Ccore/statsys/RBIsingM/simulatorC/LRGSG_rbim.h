@@ -4,8 +4,8 @@
 #define __LRGSGRBIMLIB_H_INC__
 //
 #define BOLTZMANN_FACTOR(DE, T) exp(-DE / T)
-#define T_THERM_STEP  (size_t)(thSTEP * N)
-#define T_EQ_STEP (size_t)(eqSTEP * N)
+#define T_THERM_STEP  (size_t)(thSTEP)
+#define T_EQ_STEP (size_t)(eqSTEP)
 #define T_STEPS (T_THERM_STEP + T_EQ_STEP)
 //
 #define TSTR "T=%.3g"

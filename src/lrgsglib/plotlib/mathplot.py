@@ -39,7 +39,7 @@ def plot_log_distribution(data, fig_ax=None, binnum=20,
     log_scale : bool, optional
         Whether to apply a logarithmic scale to the x-axis. Default is True.
 
-    **kwargs : optional
+    \\**kwargs : optional
         Additional keyword arguments for the `plt.bar` function to customize the
         plot appearance (e.g., `color`, `alpha`, etc.).
 

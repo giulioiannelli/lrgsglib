@@ -42,7 +42,13 @@ PATHNPHTR = 'phtra'
 PATHNPLOT = 'plot'
 PATHNSPEC = 'spect'
 PATHNVM = 'voter'
-PATHN_LIST = [PATHNGRPH, PATHNISNG, PATHNLRGS, PATHNPHTR, PATHNSPEC, PATHNVM]
+PATHNCP = 'cntct'
+# Graph-related paths (created by SignedGraph)
+PATHN_GRAPH_LIST = [PATHNGRPH, PATHNLRGS, PATHNPHTR, PATHNSPEC]
+# Dynamics-related paths (created by respective dynamics classes)
+PATHN_DYNAMICS_LIST = [PATHNISNG, PATHNVM, PATHNCP]
+# All paths (for backward compatibility)
+PATHN_LIST = PATHN_GRAPH_LIST + PATHN_DYNAMICS_LIST
 #
 PATHPLOT =  PATHDATA / Path(PATHNPLOT)
 PATHPAPER = PATHPLOT / Path(PATHNPAPR)
@@ -227,6 +233,26 @@ MSG_ONLY_CONST_MODE = False
 MSG_PHTABB = "msg_"
 MSG_PATH = "msg_multiplicative_cascade"
 MSG_PATHS = {MSG_DEFAULT_TYPE: MSG_PATH}
+
+# MultiplicativeCascade constants
+MC_STDFN = ""
+MC_SGPATH = "msg_mc"
+MC_PHTABB = "mc_"
+
+# Vicsek constants
+VCK_STDFN = ""
+VCK_SGPATH = "msg_plv"
+VCK_PHTABB = "vck_"
+
+# DiracComb constants
+DCOMB_STDFN = ""
+DCOMB_SGPATH = "msg_dcomb"
+DCOMB_PHTABB = "dcomb_"
+
+# DiracBrush constants
+DBRUSH_STDFN = ""
+DBRUSH_SGPATH = "msg_dbrush"
+DBRUSH_PHTABB = "dbrush_"
 L3D_PATH_DICT = {a: L3D_PHTABB + g for a,g in 
                  zip(L3D_GEO_SHRT_LIST+L3D_GEO_LIST, L3D_GEO_LIST*2)}
 #
@@ -249,6 +275,12 @@ DEFAULT_MAX_THRESHOLD = 2 * DEFAULT_SPIKE_THRESHOLD
 
 DEFAULT_LOG_DIR = LRGSG_LOG
 DEFAULT_P_FSTR_FMT = '.3g'
+
+# Logging configuration constants
+import logging as _logging
+LOG_DEFAULT_LEVEL = _logging.WARNING
+LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+LOG_BACKUP_COUNT = 3
 
 DEFAULT_MAX_DIGITS_ROUND_SIGFIG = 18
 
