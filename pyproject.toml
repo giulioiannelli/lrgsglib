@@ -109,4 +109,7 @@ markers = [
     "integration: tests that invoke scripts or cross-module workflows",
     "slow: tests that may take longer or write larger artifacts",
     "gpu: tests requiring a CUDA-capable device",
+    "code: Just-code tests (imports, instantiation, execution)",
+    "physical: Scientific correctness tests (invariants, known regimes)",
+    "visual: Tests that generate plots or animations for inspection",
 ]
