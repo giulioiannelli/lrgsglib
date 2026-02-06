@@ -106,6 +106,7 @@ from .ErdosRenyi import ErdosRenyi
 from .BarabasiAlbert import BarabasiAlbert
 from .WattsStrogatz import WattsStrogatz
 from .StochasticBlockModel import StochasticBlockModel
+from .GraphOfGraphs import GraphOfGraphs
 
 __all__ = [
     # Engine management
@@ -132,4 +133,6 @@ __all__ = [
     "BarabasiAlbert",
     "WattsStrogatz",
     "StochasticBlockModel",
+    # Graph types - Hierarchical
+    "GraphOfGraphs",
 ]
