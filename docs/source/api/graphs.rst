@@ -19,6 +19,7 @@ This module includes:
 - **Engine Management**: Select between NetworkX, graph-tool, and igraph backends
 - **Lattice Graphs**: 2D and 3D lattice generation with various geometries
 - **Random Graphs**: Erdos-Renyi, Barabasi-Albert, Watts-Strogatz, SBM
+- **Hierarchical Graphs**: GraphOfGraphs for generalized "graph of graphs" structures
 - **Protocols**: Type-safe interfaces for signed graph implementations
 - **Submodules**: Direct access to engine-specific implementations
 
@@ -27,7 +28,7 @@ Quick Start
 
 .. code-block:: python
 
-   from lrgsglib.graphs import Lattice2D, ErdosRenyi, set_default_engine
+   from lrgsglib.graphs import Lattice2D, ErdosRenyi, GraphOfGraphs, set_default_engine
 
    # Create graphs with explicit engine
    lat_nx = Lattice2D(side1=100, geo='sqr', engine='nx')
@@ -36,6 +37,12 @@ Quick Start
    # Or set global default
    set_default_engine('gt')
    lat = Lattice2D(side1=100, geo='sqr')  # Uses graph-tool
+
+   # Create hierarchical graph-of-graphs structures
+   gog = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 10},
+       fiber_graph_type='ErdosRenyi', fiber_params={'n': 20, 'p': 0.2}
+   )
 
 Engine Management
 -----------------
@@ -206,6 +213,90 @@ Stochastic Block Model with community structure.
 - ``seed`` (int, optional): Random seed
 - ``engine`` (str): Backend engine
 
+Hierarchical Graph Generators
+-----------------------------
+
+GraphOfGraphs
+~~~~~~~~~~~~~
+
+Generalized hierarchical "graph of graphs" structure where arbitrary graph
+types can be used as base and fiber components. This generalizes the Dirac
+lattice pattern (DiracComb, DiracBrush).
+
+.. autofunction:: GraphOfGraphs
+
+**Parameters:**
+
+- ``base_graph_type`` (str): Type of base graph ('Lattice2D', 'ErdosRenyi', etc.)
+- ``base_params`` (dict): Parameters for base graph constructor
+- ``fiber_graph_type`` (str): Type of fiber graph
+- ``fiber_params`` (dict or callable): Parameters for fiber graph, or callable(base_idx) -> dict
+- ``anchor_policy`` (str or callable): How to select anchor nodes ('first', 'center', 'last', 'random', or callable)
+- ``pflip`` (float): Fraction of edges to flip sign (0.0 to 1.0)
+- ``seed`` (int, optional): Random seed for reproducibility
+- ``engine`` (str): Backend engine ('nx', 'gt', or None for default)
+
+**Anchor Policies:**
+
++------------+--------------------------------------------------+
+| Policy     | Description                                      |
++============+==================================================+
+| ``first``  | Connect fiber node 0 to base (default)           |
++------------+--------------------------------------------------+
+| ``center`` | Connect middle node (N_fiber // 2)               |
++------------+--------------------------------------------------+
+| ``last``   | Connect last node (N_fiber - 1)                  |
++------------+--------------------------------------------------+
+| ``random`` | Random node per fiber (seeded)                   |
++------------+--------------------------------------------------+
+| callable   | Custom function(base_idx, N_fiber) -> anchor_idx |
++------------+--------------------------------------------------+
+
+**Example:**
+
+.. code-block:: python
+
+   from lrgsglib.graphs import GraphOfGraphs
+
+   # 2D lattice base with small lattice fibers
+   gog = GraphOfGraphs(
+       base_graph_type='Lattice2D',
+       base_params={'side1': 10, 'geo': 'sqr'},
+       fiber_graph_type='Lattice2D',
+       fiber_params={'side1': 5},
+       anchor_policy='first',
+       pflip=0.1,
+       seed=42,
+       engine='nx'
+   )
+
+   print(f"Total: {gog.N}, Base: {gog.N_base}, Fiber: {gog.N_fiber}")
+
+   # Access vertex indices
+   base_verts = gog.base_vertex_indices()
+   fiber_verts = gog.fiber_vertex_indices(0)  # Fiber attached to base node 0
+
+   # Efficient spectral computation when applicable
+   if gog.can_use_separated_spectrum():
+       spectrum = gog.compute_separated_spectrum()
+
+**Key Methods:**
+
+- ``N_base`` (property): Number of base nodes
+- ``N_fiber`` (property): Number of fiber nodes
+- ``base_vertex_indices()``: List of base vertex indices
+- ``fiber_vertex_indices(base_idx)``: List of fiber vertex indices for a base node
+- ``anchor_vertex(base_idx)``: Anchor vertex connecting fiber to base node
+- ``vertex_layer(v)``: Returns 'base' or 'fiber' for a vertex
+- ``can_use_separated_spectrum()``: Check if separated computation is valid
+- ``compute_separated_spectrum()``: Efficient spectrum computation
+- ``gog_structure``: Metadata dictionary about the structure
+
+**See Also:**
+
+- :doc:`../user_guide/advanced_graphs` for detailed usage guide
+- DiracCombGraph, DiracBrushGraph for specific Dirac lattice implementations
+
 Submodules
 ----------
 
@@ -226,6 +317,7 @@ For advanced use cases requiring direct access to engine-specific classes:
        BarabasiAlbertNX,
        WattsStrogatzNX,
        StochasticBlockModelNX,
+       GraphOfGraphsNX,
    )
 
 **graph-tool implementations:**
@@ -240,6 +332,7 @@ For advanced use cases requiring direct access to engine-specific classes:
        BarabasiAlbertGT,
        WattsStrogatzGT,
        StochasticBlockModelGT,
+       GraphOfGraphsGT,
    )
 
 .. note::

@@ -15,9 +15,10 @@ Overview
 Beyond standard lattices and random graphs, lrgsglib provides specialized
 graph generators for studying:
 
+- **Generalized hierarchical structures** via GraphOfGraphs (any base + fiber combination)
 - **Hierarchical structures** via multiplicative cascades
 - **Fractal graphs** via Kronecker products (Vicsek)
-- **Product structures** via Dirac combs and brushes
+- **Product structures** via Dirac combs and brushes (special cases of GraphOfGraphs)
 
 These graph types inherit from :class:`MultispectralGraph`, providing
 efficient spectral computation methods.
@@ -202,11 +203,199 @@ where :math:`(i_1, ..., i_k)` and :math:`(j_1, ..., j_k)` are the
 k-ary representations of i and j respectively.
 
 
+GraphOfGraphs - Generalized Hierarchical Structures
+---------------------------------------------------
+
+GraphOfGraphs is a generalized "graph of graphs" class that accepts arbitrary
+SignedGraph types as base and fiber components. This generalizes the Dirac
+lattice pattern (DiracComb, DiracBrush) to work with any graph types.
+
+Basic Usage
+^^^^^^^^^^^
+
+Create hierarchical structures by specifying base and fiber graph types:
+
+.. code-block:: python
+
+   from lrgsglib.graphs import GraphOfGraphs
+
+   # 2D lattice base with Erdos-Renyi fibers
+   gog = GraphOfGraphs(
+       base_graph_type='Lattice2D',
+       base_params={'side1': 10, 'geo': 'sqr'},
+       fiber_graph_type='ErdosRenyi',
+       fiber_params={'n': 50, 'p': 0.1},
+       anchor_policy='first',
+       pflip=0.1,
+       seed=42,
+       engine='nx'  # or 'gt' for graph-tool
+   )
+
+   print(f"Total nodes: {gog.N}")        # 100 + 100*50 = 5100
+   print(f"Base nodes: {gog.N_base}")    # 100 (10x10 lattice)
+   print(f"Fiber nodes: {gog.N_fiber}")  # ~50 (may vary due to giant component)
+
+Supported Graph Types
+^^^^^^^^^^^^^^^^^^^^^
+
+The following graph types can be used for base or fiber:
+
++----------------------+------------------------------------------+
+| Type Name            | Description                              |
++======================+==========================================+
+| ``Lattice2D``        | 2D lattice (sqr, tri, hex)               |
++----------------------+------------------------------------------+
+| ``Lattice3D``        | 3D lattice (cubic, bcc, fcc)             |
++----------------------+------------------------------------------+
+| ``ErdosRenyi``       | Random graph (giant component extracted) |
++----------------------+------------------------------------------+
+| ``BarabasiAlbert``   | Scale-free preferential attachment       |
++----------------------+------------------------------------------+
+| ``WattsStrogatz``    | Small-world network                      |
++----------------------+------------------------------------------+
+| ``StochasticBlockModel`` | Community structure                  |
++----------------------+------------------------------------------+
+
+Anchor Policies
+^^^^^^^^^^^^^^^
+
+The anchor policy determines which node in each fiber connects to its
+corresponding base node:
+
+.. code-block:: python
+
+   from lrgsglib.graphs import GraphOfGraphs
+
+   # 'first' - Connect fiber node 0 to base (default, matches Dirac)
+   gog_first = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 5},
+       fiber_graph_type='Lattice2D', fiber_params={'side1': 3},
+       anchor_policy='first'
+   )
+
+   # 'center' - Connect middle node of fiber
+   gog_center = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 5},
+       fiber_graph_type='Lattice2D', fiber_params={'side1': 3},
+       anchor_policy='center'
+   )
+
+   # 'last' - Connect last node of fiber
+   gog_last = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 5},
+       fiber_graph_type='Lattice2D', fiber_params={'side1': 3},
+       anchor_policy='last'
+   )
+
+   # 'random' - Random node per fiber (seeded)
+   gog_random = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 5},
+       fiber_graph_type='Lattice2D', fiber_params={'side1': 3},
+       anchor_policy='random',
+       seed=42
+   )
+
+   # Custom callable
+   def alternating(base_idx, n_fiber):
+       return 0 if base_idx % 2 == 0 else n_fiber - 1
+
+   gog_custom = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 5},
+       fiber_graph_type='Lattice2D', fiber_params={'side1': 3},
+       anchor_policy=alternating
+   )
+
+Vertex Layout
+^^^^^^^^^^^^^
+
+The composite graph follows a predictable vertex layout:
+
+.. code-block:: text
+
+   [--- Base nodes ---][--- Fiber 0 ---][--- Fiber 1 ---] ... [--- Fiber N_base-1 ---]
+      0 to N_base-1         N_fiber          N_fiber                  N_fiber
+
+   Total: N_base + N_base * N_fiber
+
+Access vertices by layer:
+
+.. code-block:: python
+
+   gog = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 3},
+       fiber_graph_type='Lattice2D', fiber_params={'side1': 2}
+   )
+
+   # Get base vertex indices
+   base_indices = gog.base_vertex_indices()  # [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+   # Get fiber vertex indices for base node 2
+   fiber_indices = gog.fiber_vertex_indices(2)  # [17, 18, 19, 20]
+
+   # Get anchor vertex connecting fiber to base node 2
+   anchor = gog.anchor_vertex(2)  # 17 (with 'first' policy)
+
+   # Check which layer a vertex belongs to
+   print(gog.vertex_layer(5))   # 'base'
+   print(gog.vertex_layer(20))  # 'fiber'
+
+Spectral Computation
+^^^^^^^^^^^^^^^^^^^^
+
+When fibers are homogeneous and anchor indices are uniform, use efficient
+separated spectrum computation:
+
+.. code-block:: python
+
+   gog = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 10, 'pbc': False},
+       fiber_graph_type='Lattice2D', fiber_params={'side1': 5, 'pbc': False},
+       anchor_policy='first'  # Uniform anchor required
+   )
+
+   # Check if separated spectrum is valid
+   if gog.can_use_separated_spectrum():
+       # O(N_base³ + N_base * N_fiber³) instead of O(N_total³)
+       spectrum = gog.compute_separated_spectrum()
+       print(f"Computed {len(spectrum)} eigenvalues efficiently")
+
+   # Access base and fiber components
+   base_eigenvalues = gog.compute_base_spectrum()
+   fiber_laplacian = gog.compute_fiber_laplacian()
+
+Backend Selection
+^^^^^^^^^^^^^^^^^
+
+GraphOfGraphs supports both NetworkX and graph-tool backends:
+
+.. code-block:: python
+
+   from lrgsglib.graphs import GraphOfGraphs
+
+   # NetworkX backend (default)
+   gog_nx = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 10},
+       fiber_graph_type='Lattice2D', fiber_params={'side1': 5},
+       engine='nx'
+   )
+
+   # graph-tool backend (faster for large graphs)
+   gog_gt = GraphOfGraphs(
+       base_graph_type='Lattice2D', base_params={'side1': 10},
+       fiber_graph_type='Lattice2D', fiber_params={'side1': 5},
+       engine='gt'
+   )
+
+   # Both produce equivalent structures
+   assert gog_nx.N == gog_gt.N
+
+
 Dirac Lattice Structures
 ------------------------
 
-Dirac lattices are product structures consisting of a base graph with
-fiber graphs attached to each base node. This structure enables
+Dirac lattices are a special case of GraphOfGraphs with specific base and
+fiber configurations. They are product structures consisting of a base graph
+with fiber graphs attached to each base node. This structure enables
 efficient spectral computation by separating the computation into
 base and fiber components.
 

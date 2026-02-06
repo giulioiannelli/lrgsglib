@@ -627,6 +627,195 @@ Build a complete analysis pipeline for signed graph research.
    print(f"Critical Ising magnetization: {avg_magn:.4f} +/- {std_magn:.4f}")
    print("=" * 50)
 
+Example 8: GraphOfGraphs - Hierarchical Networks
+-------------------------------------------------
+
+Build hierarchical "graph of graphs" structures with arbitrary base and fiber components.
+
+.. code-block:: python
+
+   """
+   GraphOfGraphs: Hierarchical Network Construction
+
+   This example demonstrates creating hierarchical structures
+   where a "fiber" graph is attached to each node of a "base" graph.
+   """
+   import numpy as np
+   import matplotlib.pyplot as plt
+   from lrgsglib.graphs import GraphOfGraphs, Lattice2D, ErdosRenyi
+
+   # =========================================================
+   # Example 1: Basic GraphOfGraphs creation
+   # =========================================================
+   print("Example 1: Basic Creation")
+   print("-" * 40)
+
+   # Create a 2D lattice base with small lattice fibers
+   gog = GraphOfGraphs(
+       base_graph_type='Lattice2D',
+       base_params={'side1': 5, 'geo': 'sqr'},      # 5x5 = 25 base nodes
+       fiber_graph_type='Lattice2D',
+       fiber_params={'side1': 4, 'geo': 'sqr'},     # 4x4 = 16 fiber nodes each
+       anchor_policy='first',                        # Connect fiber node 0 to base
+       pflip=0.1,                                    # 10% frustrated edges
+       seed=42,
+       engine='nx'                                   # Use NetworkX backend
+   )
+
+   print(f"Base nodes: {gog.N_base}")
+   print(f"Fiber nodes per base: {gog.N_fiber}")
+   print(f"Total nodes: {gog.N}")
+   print(f"Expected total: {gog.N_base} + {gog.N_base} * {gog.N_fiber} = {gog.N_base + gog.N_base * gog.N_fiber}")
+
+   # =========================================================
+   # Example 2: Different anchor policies
+   # =========================================================
+   print("\nExample 2: Anchor Policies")
+   print("-" * 40)
+
+   policies = ['first', 'center', 'last', 'random']
+   for policy in policies:
+       gog_p = GraphOfGraphs(
+           base_graph_type='Lattice2D',
+           base_params={'side1': 3},
+           fiber_graph_type='Lattice2D',
+           fiber_params={'side1': 3},
+           anchor_policy=policy,
+           seed=42,
+           engine='nx'
+       )
+       # Show anchor index for first few base nodes
+       anchors = [gog_p.anchor_vertex(i) for i in range(3)]
+       print(f"  Policy '{policy}': anchors = {anchors}")
+
+   # =========================================================
+   # Example 3: Mixed graph types
+   # =========================================================
+   print("\nExample 3: Mixed Graph Types")
+   print("-" * 40)
+
+   # 2D lattice base with Erdos-Renyi fibers
+   gog_mixed = GraphOfGraphs(
+       base_graph_type='Lattice2D',
+       base_params={'side1': 4, 'geo': 'sqr'},
+       fiber_graph_type='ErdosRenyi',
+       fiber_params={'nnodes': 20, 'prob': 0.15, 'extract_giant_component': False},
+       anchor_policy='first',
+       pflip=0.2,
+       seed=42,
+       engine='nx'
+   )
+
+   print(f"Lattice base + ER fibers: {gog_mixed.N} total nodes")
+   print(f"Structure: {gog_mixed.N_base} base + {gog_mixed.N_base} x {gog_mixed.N_fiber} fibers")
+
+   # =========================================================
+   # Example 4: Accessing structural information
+   # =========================================================
+   print("\nExample 4: Structural Access")
+   print("-" * 40)
+
+   # Get vertex indices for different parts
+   base_verts = gog.base_vertex_indices()
+   fiber_0_verts = gog.fiber_vertex_indices(0)  # Fiber attached to base node 0
+   fiber_5_verts = gog.fiber_vertex_indices(5)  # Fiber attached to base node 5
+
+   print(f"Base vertices: {base_verts[:5]}... ({len(base_verts)} total)")
+   print(f"Fiber 0 vertices: {fiber_0_verts[:5]}... ({len(fiber_0_verts)} total)")
+   print(f"Fiber 5 vertices: {fiber_5_verts[:5]}... ({len(fiber_5_verts)} total)")
+
+   # Determine which layer a vertex belongs to
+   for v in [0, gog.N_base - 1, gog.N_base, gog.N - 1]:
+       layer = gog.vertex_layer(v)
+       print(f"  Vertex {v}: {layer}")
+
+   # =========================================================
+   # Example 5: Spectral analysis
+   # =========================================================
+   print("\nExample 5: Spectral Analysis")
+   print("-" * 40)
+
+   # Check if separated spectrum computation is valid
+   can_separate = gog.can_use_separated_spectrum()
+   print(f"Can use separated spectrum: {can_separate}")
+
+   if can_separate:
+       # Efficient separated computation
+       # Returns N_base * N_fiber eigenvalues (Dirac formula)
+       separated_eigvals = gog.compute_separated_spectrum()
+       print(f"Separated eigenvalues: {len(separated_eigvals)}")
+       print(f"Eigenvalue range: [{separated_eigvals.min():.4f}, {separated_eigvals.max():.4f}]")
+
+   # Full spectrum for comparison
+   gog.compute_laplacian_spectrum()
+   print(f"Full eigenvalues: {len(gog.eigv)}")
+   print(f"Full range: [{gog.eigv.min():.4f}, {gog.eigv.max():.4f}]")
+
+   # =========================================================
+   # Example 6: Graph-tool backend
+   # =========================================================
+   print("\nExample 6: Multi-Backend Support")
+   print("-" * 40)
+
+   # Same structure with graph-tool backend
+   try:
+       gog_gt = GraphOfGraphs(
+           base_graph_type='Lattice2D',
+           base_params={'side1': 5},
+           fiber_graph_type='Lattice2D',
+           fiber_params={'side1': 4},
+           anchor_policy='first',
+           seed=42,
+           engine='gt'
+       )
+       print(f"graph-tool backend: {gog_gt.N} nodes")
+       print(f"NX and GT produce same structure: N={gog.N} == {gog_gt.N}")
+   except ImportError:
+       print("graph-tool not available, skipping GT backend example")
+
+   # =========================================================
+   # Example 7: Visualization
+   # =========================================================
+   print("\nExample 7: Visualization")
+   print("-" * 40)
+
+   # Create a small graph for visualization
+   gog_small = GraphOfGraphs(
+       base_graph_type='Lattice2D',
+       base_params={'side1': 3},
+       fiber_graph_type='Lattice2D',
+       fiber_params={'side1': 2},
+       anchor_policy='first',
+       seed=42,
+       engine='nx'
+   )
+
+   # Compute spectrum
+   gog_small.compute_laplacian_spectrum()
+
+   fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+   # Eigenvalue histogram
+   axes[0].hist(gog_small.eigv, bins=30, edgecolor='black', alpha=0.7)
+   axes[0].axvline(x=0, color='r', linestyle='--', label='Zero')
+   axes[0].set_xlabel('Eigenvalue')
+   axes[0].set_ylabel('Count')
+   axes[0].set_title(f'GraphOfGraphs Spectrum ({gog_small.N} nodes)')
+   axes[0].legend()
+
+   # Sorted eigenvalues
+   axes[1].plot(np.sort(gog_small.eigv), 'b-', linewidth=1)
+   axes[1].axhline(y=0, color='r', linestyle='--', alpha=0.5)
+   axes[1].set_xlabel('Index')
+   axes[1].set_ylabel('Eigenvalue')
+   axes[1].set_title('Sorted Eigenvalues')
+
+   plt.tight_layout()
+   plt.savefig('graph_of_graphs_spectrum.png', dpi=150)
+   plt.show()
+
+   print(f"\nMetadata: {gog_small.gog_structure.keys()}")
+
 Running the Examples
 --------------------
 
@@ -659,4 +848,5 @@ Common Issues
    - :doc:`spectral` - Detailed spectral analysis guide
    - :doc:`dynamics` - Statistical physics simulations
    - :doc:`graphs` - Graph creation and manipulation
+   - :doc:`advanced_graphs` - Hierarchical and multi-engine graph structures
    - :doc:`plotting` - Visualization techniques
