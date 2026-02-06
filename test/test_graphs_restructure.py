@@ -411,14 +411,14 @@ class TestGTFallbackClasses:
         """Test that fallback GT classes are aliases to NX classes."""
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            from lrgsglib.graphs.gt.complete import CompleteGraphGT
+            from lrgsglib.graphs.gt.CompleteGraphGT import CompleteGraphGT
             from lrgsglib.graphs.nx.complete import CompleteGraphNX
             # Fallback should be the same class as NX
             assert CompleteGraphGT is CompleteGraphNX
 
     def test_native_gt_not_alias(self):
         """Test that native GT classes are NOT aliases to NX classes."""
-        from lrgsglib.graphs.gt.random import ErdosRenyiGT
+        from lrgsglib.graphs.gt.ErdosRenyiGT import ErdosRenyiGT
         from lrgsglib.graphs.nx.random import ErdosRenyiNX
         # Native GT should be different from NX
         assert ErdosRenyiGT is not ErdosRenyiNX

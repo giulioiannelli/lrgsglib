@@ -39,7 +39,7 @@ def _get_nx_impl():
 
 def _get_gt_impl():
     """Lazy import for graph-tool implementation."""
-    from .gt.random import BarabasiAlbertGT
+    from .gt.BarabasiAlbertGT import BarabasiAlbertGT
 
     return BarabasiAlbertGT
 

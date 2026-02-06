@@ -16,7 +16,7 @@ class TestVicsekGraphGT:
 
     def test_creation(self):
         """Test basic graph creation."""
-        from lrgsglib.graphs.gt.multispectral import VicsekGraphGT
+        from lrgsglib.graphs.gt.VicsekGT import VicsekGraphGT
 
         v = VicsekGraphGT(N=100, k=3, m=3, seed=42)
         assert v.N == 100
@@ -25,7 +25,7 @@ class TestVicsekGraphGT:
 
     def test_probability_matrix(self):
         """Test probability matrix is computed."""
-        from lrgsglib.graphs.gt.multispectral import VicsekGraphGT
+        from lrgsglib.graphs.gt.VicsekGT import VicsekGraphGT
 
         v = VicsekGraphGT(N=50, k=2, m=3, seed=42)
         assert v.probability_matrix is not None
@@ -33,7 +33,7 @@ class TestVicsekGraphGT:
 
     def test_sign_flipping(self):
         """Test edge sign flipping works."""
-        from lrgsglib.graphs.gt.multispectral import VicsekGraphGT
+        from lrgsglib.graphs.gt.VicsekGT import VicsekGraphGT
 
         v = VicsekGraphGT(N=100, k=3, m=3, pflip=0.3, seed=42)
         neg_edges = v.count_negative_edges()
@@ -44,7 +44,7 @@ class TestVicsekGraphGT:
 
     def test_reproducibility(self):
         """Test same seed gives same graph."""
-        from lrgsglib.graphs.gt.multispectral import VicsekGraphGT
+        from lrgsglib.graphs.gt.VicsekGT import VicsekGraphGT
 
         v1 = VicsekGraphGT(N=50, k=2, m=3, seed=123)
         v2 = VicsekGraphGT(N=50, k=2, m=3, seed=123)
@@ -53,7 +53,7 @@ class TestVicsekGraphGT:
 
     def test_custom_pij(self):
         """Test with custom initial measure matrix."""
-        from lrgsglib.graphs.gt.multispectral import VicsekGraphGT
+        from lrgsglib.graphs.gt.VicsekGT import VicsekGraphGT
 
         pij = np.array([[0.9, 0.1], [0.1, 0.9]])
         v = VicsekGraphGT(N=50, k=3, pij=pij, seed=42)
@@ -66,7 +66,7 @@ class TestDiracCombGraphGT:
 
     def test_creation(self):
         """Test basic graph creation."""
-        from lrgsglib.graphs.gt.dirac import DiracCombGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracCombGraphGT
 
         dc = DiracCombGraphGT(base_nodes=10, fiber_nodes=5, seed=42)
         expected_nodes = 10 * (1 + 5)  # base + fibers
@@ -75,7 +75,7 @@ class TestDiracCombGraphGT:
 
     def test_expected_nodes(self):
         """Test expected node count calculation."""
-        from lrgsglib.graphs.gt.dirac import DiracCombGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracCombGraphGT
 
         dc = DiracCombGraphGT(base_nodes=8, fiber_nodes=4, seed=42)
         assert dc.get_expected_num_nodes() == 8 * (1 + 4)
@@ -83,7 +83,7 @@ class TestDiracCombGraphGT:
 
     def test_dirac_structure(self):
         """Test Dirac structure metadata."""
-        from lrgsglib.graphs.gt.dirac import DiracCombGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracCombGraphGT
 
         dc = DiracCombGraphGT(base_nodes=10, fiber_nodes=5, seed=42)
         assert dc.dirac_structure is not None
@@ -93,7 +93,7 @@ class TestDiracCombGraphGT:
 
     def test_vertex_indices(self):
         """Test base and fiber vertex index helpers."""
-        from lrgsglib.graphs.gt.dirac import DiracCombGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracCombGraphGT
 
         dc = DiracCombGraphGT(base_nodes=5, fiber_nodes=3, seed=42)
 
@@ -111,7 +111,7 @@ class TestDiracCombGraphGT:
 
     def test_sign_flipping(self):
         """Test edge sign flipping works."""
-        from lrgsglib.graphs.gt.dirac import DiracCombGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracCombGraphGT
 
         dc = DiracCombGraphGT(base_nodes=10, fiber_nodes=5, pflip=0.2, seed=42)
         neg_edges = dc.count_negative_edges()
@@ -119,7 +119,7 @@ class TestDiracCombGraphGT:
 
     def test_periodic_edges(self):
         """Test periodic boundary conditions add extra edges."""
-        from lrgsglib.graphs.gt.dirac import DiracCombGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracCombGraphGT
 
         dc_periodic = DiracCombGraphGT(base_nodes=5, fiber_nodes=3, periodic=True, seed=42)
         dc_open = DiracCombGraphGT(base_nodes=5, fiber_nodes=3, periodic=False, seed=42)
@@ -133,7 +133,7 @@ class TestDiracBrushGraphGT:
 
     def test_creation(self):
         """Test basic graph creation."""
-        from lrgsglib.graphs.gt.dirac import DiracBrushGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracBrushGraphGT
 
         db = DiracBrushGraphGT(base_x=4, base_y=4, fiber_nodes=3, seed=42)
         expected_nodes = 4 * 4 * (1 + 3)  # base + fibers
@@ -142,7 +142,7 @@ class TestDiracBrushGraphGT:
 
     def test_expected_nodes(self):
         """Test expected node count calculation."""
-        from lrgsglib.graphs.gt.dirac import DiracBrushGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracBrushGraphGT
 
         db = DiracBrushGraphGT(base_x=3, base_y=4, fiber_nodes=2, seed=42)
         assert db.get_expected_num_nodes() == 3 * 4 * (1 + 2)
@@ -150,7 +150,7 @@ class TestDiracBrushGraphGT:
 
     def test_dirac_structure(self):
         """Test Dirac structure metadata."""
-        from lrgsglib.graphs.gt.dirac import DiracBrushGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracBrushGraphGT
 
         db = DiracBrushGraphGT(base_x=5, base_y=6, fiber_nodes=4, seed=42)
         assert db.dirac_structure is not None
@@ -162,7 +162,7 @@ class TestDiracBrushGraphGT:
 
     def test_vertex_indices(self):
         """Test base and fiber vertex index helpers."""
-        from lrgsglib.graphs.gt.dirac import DiracBrushGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracBrushGraphGT
 
         db = DiracBrushGraphGT(base_x=3, base_y=3, fiber_nodes=2, seed=42)
 
@@ -181,7 +181,7 @@ class TestDiracBrushGraphGT:
 
     def test_sign_flipping(self):
         """Test edge sign flipping works."""
-        from lrgsglib.graphs.gt.dirac import DiracBrushGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracBrushGraphGT
 
         db = DiracBrushGraphGT(base_x=4, base_y=4, fiber_nodes=3, pflip=0.2, seed=42)
         neg_edges = db.count_negative_edges()
@@ -193,7 +193,7 @@ class TestMultiplicativeCascadeGraphGT:
 
     def test_creation_exp_clocks(self):
         """Test graph creation with exp_clocks variant."""
-        from lrgsglib.graphs.gt.multispectral import MultiplicativeCascadeGraphGT
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
 
         mc = MultiplicativeCascadeGraphGT(
             p1=0.8, p2=0.6, p3=0.6, p4=0.4,
@@ -207,7 +207,7 @@ class TestMultiplicativeCascadeGraphGT:
 
     def test_creation_standard(self):
         """Test graph creation with standard variant."""
-        from lrgsglib.graphs.gt.multispectral import MultiplicativeCascadeGraphGT
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
 
         mc = MultiplicativeCascadeGraphGT(
             p1=0.8, p2=0.6, p3=0.6, p4=0.4,
@@ -220,7 +220,7 @@ class TestMultiplicativeCascadeGraphGT:
 
     def test_probability_matrix(self):
         """Test probability matrix is computed."""
-        from lrgsglib.graphs.gt.multispectral import MultiplicativeCascadeGraphGT
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
 
         mc = MultiplicativeCascadeGraphGT(
             p1=0.8, p2=0.6, p3=0.6, p4=0.4,
@@ -233,7 +233,7 @@ class TestMultiplicativeCascadeGraphGT:
 
     def test_sign_flipping(self):
         """Test edge sign flipping works."""
-        from lrgsglib.graphs.gt.multispectral import MultiplicativeCascadeGraphGT
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
 
         mc = MultiplicativeCascadeGraphGT(
             p1=0.8, p2=0.6, p3=0.6, p4=0.4,
@@ -247,7 +247,7 @@ class TestMultiplicativeCascadeGraphGT:
 
     def test_reproducibility(self):
         """Test same seed gives same graph."""
-        from lrgsglib.graphs.gt.multispectral import MultiplicativeCascadeGraphGT
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
 
         mc1 = MultiplicativeCascadeGraphGT(
             p1=0.8, p2=0.6, p3=0.6, p4=0.4,
@@ -266,7 +266,7 @@ class TestMultiplicativeCascadeGraphGT:
 
     def test_periodic_boundary(self):
         """Test periodic vs non-periodic boundary conditions."""
-        from lrgsglib.graphs.gt.multispectral import MultiplicativeCascadeGraphGT
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
 
         mc_periodic = MultiplicativeCascadeGraphGT(
             p1=0.9, p2=0.7, p3=0.7, p4=0.5,
@@ -292,7 +292,7 @@ class TestGTNativeConsistency:
 
     def test_vicsek_node_count(self):
         """Verify VicsekGraphGT produces expected node count."""
-        from lrgsglib.graphs.gt.multispectral import VicsekGraphGT
+        from lrgsglib.graphs.gt.VicsekGT import VicsekGraphGT
 
         for N in [50, 100, 200]:
             v = VicsekGraphGT(N=N, k=3, m=3, seed=42)
@@ -300,7 +300,7 @@ class TestGTNativeConsistency:
 
     def test_dirac_comb_node_count(self):
         """Verify DiracCombGraphGT produces expected node count."""
-        from lrgsglib.graphs.gt.dirac import DiracCombGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracCombGraphGT
 
         for base, fiber in [(5, 3), (10, 5), (20, 10)]:
             dc = DiracCombGraphGT(base_nodes=base, fiber_nodes=fiber, seed=42)
@@ -309,7 +309,7 @@ class TestGTNativeConsistency:
 
     def test_dirac_brush_node_count(self):
         """Verify DiracBrushGraphGT produces expected node count."""
-        from lrgsglib.graphs.gt.dirac import DiracBrushGraphGT
+        from lrgsglib.graphs.gt.DiracLatticeGT import DiracBrushGraphGT
 
         for bx, by, fiber in [(3, 3, 2), (4, 4, 3), (5, 5, 4)]:
             db = DiracBrushGraphGT(base_x=bx, base_y=by, fiber_nodes=fiber, seed=42)

@@ -110,6 +110,12 @@ from .DiracLatticeNX import (
     DiracCombGraph,
 )
 
+# GraphOfGraphs
+from .GraphOfGraphsNX import (
+    GraphOfGraphsNX,
+    GraphOfGraphs as GraphOfGraphsNXAlias,
+)
+
 # Temporal
 from .TemporalGraphNX import TemporalGraphNX, TemporalGraph
 from .TemporalSignedGraphNX import TemporalSignedGraphNX, TemporalSignedGraph
@@ -193,6 +199,8 @@ __all__ = [
     "DiracBrushGraph",
     "DiracCombGraphNX",
     "DiracCombGraph",
+    # GraphOfGraphs
+    "GraphOfGraphsNX",
     # Temporal
     "TemporalGraphNX",
     "TemporalGraph",

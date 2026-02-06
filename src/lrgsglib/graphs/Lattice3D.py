@@ -38,7 +38,7 @@ def _get_nx_impl():
 
 def _get_gt_impl():
     """Lazy import for graph-tool implementation."""
-    from .gt.lattice import Lattice3DGT
+    from .gt.Lattice3DGT import Lattice3DGT
 
     return Lattice3DGT
 

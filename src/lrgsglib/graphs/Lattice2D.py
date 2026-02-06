@@ -31,14 +31,14 @@ if TYPE_CHECKING:
 
 def _get_nx_impl():
     """Lazy import for NetworkX implementation."""
-    from .nx.lattice import Lattice2DNX
+    from .nx.Lattice2DNX import Lattice2DNX
 
     return Lattice2DNX
 
 
 def _get_gt_impl():
     """Lazy import for graph-tool implementation."""
-    from .gt.lattice import Lattice2DGT
+    from .gt.Lattice2DGT import Lattice2DGT
 
     return Lattice2DGT
 
