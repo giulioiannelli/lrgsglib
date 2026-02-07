@@ -33,7 +33,19 @@ LRGSG_PATHS := \
         RBIM_BASE:base:STATSYS_RBIM \
 	RBIM_SIMC:simulatorC:STATSYS_RBIM \
 	RBIM_STORE:storer:STATSYS_RBIM \
-	SRW_LATT:Lattices:STATSYS_SRW
+	SRW_LATT:Lattices:STATSYS_SRW \
+	LIB_GRAPHS:graphs:LIB \
+	GRAPHS_GT:gt:LIB_GRAPHS \
+	GRAPHS_GT_BA:BarabasiAlbertGT:GRAPHS_GT \
+	GRAPHS_GT_BA_CPP:cpp:GRAPHS_GT_BA \
+	GRAPHS_GT_EBA:ExtendedBarabasiAlbertGT:GRAPHS_GT \
+	GRAPHS_GT_EBA_CPP:cpp:GRAPHS_GT_EBA \
+	GRAPHS_GT_DBA:DualBarabasiAlbertGT:GRAPHS_GT \
+	GRAPHS_GT_DBA_CPP:cpp:GRAPHS_GT_DBA \
+	GRAPHS_GT_FC:FullyConnectedGT:GRAPHS_GT \
+	GRAPHS_GT_FC_CPP:cpp:GRAPHS_GT_FC \
+	GRAPHS_GT_HK:HolmeKimGT:GRAPHS_GT \
+	GRAPHS_GT_HK_CPP:cpp:GRAPHS_GT_HK
 # make paths
 define mk_path
   $(eval LRGSG_$(word 1,$(subst :, ,$(1))) := \
@@ -53,7 +65,12 @@ echo-paths: $(ALL_PATHS)
 LRGSG_OBJ_DIRS := $(LRGSG_GT_PATCHES_CPP) \
            $(LRGSG_SRW_LATT) \
            $(LRGSG_RBIM_BASE) \
-           $(LRGSG_RBIM_STORE)
+           $(LRGSG_RBIM_STORE) \
+           $(LRGSG_GRAPHS_GT_BA_CPP) \
+           $(LRGSG_GRAPHS_GT_EBA_CPP) \
+           $(LRGSG_GRAPHS_GT_DBA_CPP) \
+           $(LRGSG_GRAPHS_GT_FC_CPP) \
+           $(LRGSG_GRAPHS_GT_HK_CPP)
 #
 CONFIG_SCRIPT_GEN			= $(LRGSG_TOOLS_SCRPT)/generate_config.sh
 CONFIG_SCRIPT_PATH			= $(LRGSG_TOOLS_SCRPT)/config_env.sh
