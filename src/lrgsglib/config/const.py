@@ -2,8 +2,6 @@ from pathlib import Path
 from typing import Union, Tuple
 from numpy import integer as np_int
 from numpy import pi as np_pi
-from dotenv import load_dotenv
-#
 from .lrgsg_env import *
 # types
 ColorType = Union[
@@ -24,8 +22,6 @@ PKL = ".pkl"
 TXT = ".txt"
 XML = ".xml"
 # paths
-load_dotenv()
-#
 PATHNLLIB: str = Path(LRGSG_LLIB).name
 #
 PATHDATA = Path(LRGSG_DATA)#

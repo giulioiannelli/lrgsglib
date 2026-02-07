@@ -35,6 +35,5 @@ data/plot/*/
 .env
 /tools/bash/config_env.sh
 /tools/bash/unconfig_env.sh
-/src/lrgsglib/config/lrgsg_env.py
 
 test/.tmp/
