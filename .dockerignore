@@ -1,0 +1,12 @@
+.git
+.agents
+*.pyc
+__pycache__
+*.egg-info
+build/
+dist/
+.pixi/
+.tox/
+.mypy_cache/
+data/
+.log/

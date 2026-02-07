@@ -1,0 +1,5 @@
+services:
+  lrgsglib:
+    build: .
+    volumes:
+      - ./data:/workspace/lrgsglib/data
