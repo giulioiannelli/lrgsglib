@@ -14,13 +14,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 MCG_SCRIPT = ROOT_DIR / "src" / "MCG_SlaplSpect.py"
 
-# Add src to path
-sys.path.insert(0, str(ROOT_DIR / "src"))
-
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]

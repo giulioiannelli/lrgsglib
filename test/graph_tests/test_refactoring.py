@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Test script for refactored MultispectralGraph hierarchy."""
 
-import sys
-sys.path.insert(0, 'lrgsglib/src')
-
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
-from lrgsglib.nx_patches.Vicsek import VicsekGraph
-from lrgsglib.nx_patches.DiracLattice import DiracCombGraph, DiracBrushGraph
+from lrgsglib.graphs.nx import (
+    MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph,
+    VicsekGraphNX as VicsekGraph,
+    DiracCombGraphNX as DiracCombGraph,
+    DiracBrushGraphNX as DiracBrushGraph,
+)
 
 def test_multiplicative_cascade():
     """Test MultiplicativeCascadeGraph."""
