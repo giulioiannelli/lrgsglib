@@ -14,13 +14,10 @@ from pathlib import Path
 import sys
 import pytest
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 MCG_SCRIPT = ROOT_DIR / "src" / "MCG_SlaplSpect.py"
 
-# Add src to path for imports
-sys.path.insert(0, str(ROOT_DIR / "src"))
-
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 

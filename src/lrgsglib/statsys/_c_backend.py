@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -37,7 +38,7 @@ from ..config.const import LOG, LRGSG_LOG
 from ..utils.basic.strings import join_non_empty
 
 
-def _get_ccore_bin() -> str:
+def _get_ccore_bin() -> Path:
     """Get C core binary directory path at runtime.
 
     Reads from environment variable to allow test isolation.
@@ -45,11 +46,21 @@ def _get_ccore_bin() -> str:
     """
     env_val = os.environ.get("LRGSG_CCORE_BIN")
     if env_val:
-        return env_val
+        return Path(env_val)
     # Fall back to configured value from lrgsg_env
     from ..config.lrgsg_env import LRGSG_CCORE_BIN
 
     return LRGSG_CCORE_BIN
+
+
+def _c_backend_available() -> bool:
+    """Check if compiled C backend directory exists.
+
+    Returns True if the Ccore/bin directory exists.  Individual binary
+    availability is checked later by ``run_cprogram()``.
+    """
+    bin_dir = _get_ccore_bin()
+    return bin_dir.is_dir()
 
 if TYPE_CHECKING:
     from .BinDynSys import BinDynSys
@@ -82,6 +93,36 @@ class CBackendMixin:
     cprogram: list[str | Path] = []
     stderr_path: Path | None = None
     stderr_fopen: Any = None
+
+    # ------------------------------------------------------------------
+    # C backend availability check
+    # ------------------------------------------------------------------
+    def _check_c_backend_or_fallback(self: "BinDynSys") -> None:
+        """Check if C backend is available; fall back to Python if not.
+
+        When ``runlang`` requests a C backend but compiled binaries are
+        missing, this method switches to the Python backend and emits a
+        ``RuntimeWarning``.  This makes ``pip install lrgsglib`` (without
+        a compiler) work seamlessly — dynamics run in Python mode with a
+        one-time warning.
+
+        Call this early in ``init_*_dynamics()`` before any C-specific
+        setup (export files, stderr logging, etc.).
+        """
+        if not self.runlang or not self.runlang.upper().startswith("C"):
+            return
+        if _c_backend_available():
+            return
+        bin_dir = _get_ccore_bin()
+        warnings.warn(
+            f"C backend requested (runlang='{self.runlang}') but compiled "
+            f"binaries not found at {bin_dir}. Falling back to Python "
+            f"backend. Install with pixi/conda and build C code, or use "
+            f"pre-compiled wheels, to get C backends.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        self.runlang = "Python"
 
     # ------------------------------------------------------------------
     # C program key validation

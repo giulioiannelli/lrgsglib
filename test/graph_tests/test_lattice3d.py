@@ -37,17 +37,14 @@ class TestLattice3D(unittest.TestCase):
         cls.ccore_dir.mkdir(parents=True, exist_ok=True)
         os.environ["LRGSG_CCORE_BIN"] = str(cls.ccore_dir)
 
-        cls.src_path = Path(__file__).resolve().parents[1] / "src"
-        sys.path.insert(0, str(cls.src_path))
-
         env_module = types.ModuleType("lrgsglib.config.lrgsg_env")
-        env_module.LRGSG_LLIB = str(cls.src_path / "lrgsglib")
+        env_module.LRGSG_LLIB = ""
         env_module.LRGSG_DATA = str(cls.data_dir)
         env_module.LRGSG_LOG = str(cls.log_dir)
         env_module.LRGSG_CCORE_BIN = str(cls.ccore_dir)
         sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
-        from lrgsglib.nx_patches.Lattice3D import Lattice3D
+        from lrgsglib.graphs.nx import Lattice3DNX as Lattice3D
 
         cls.Lattice3D = Lattice3D
 
@@ -55,8 +52,6 @@ class TestLattice3D(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up test fixtures."""
         cls._tmp_dir.cleanup()
-        if str(cls.src_path) in sys.path:
-            sys.path.remove(str(cls.src_path))
 
     # ------------------------------------------------------------------
     # Basic initialization tests
@@ -355,17 +350,14 @@ class TestLattice3DGeometries(unittest.TestCase):
         cls.ccore_dir.mkdir(parents=True, exist_ok=True)
         os.environ["LRGSG_CCORE_BIN"] = str(cls.ccore_dir)
 
-        cls.src_path = Path(__file__).resolve().parents[1] / "src"
-        sys.path.insert(0, str(cls.src_path))
-
         env_module = types.ModuleType("lrgsglib.config.lrgsg_env")
-        env_module.LRGSG_LLIB = str(cls.src_path / "lrgsglib")
+        env_module.LRGSG_LLIB = ""
         env_module.LRGSG_DATA = str(cls.data_dir)
         env_module.LRGSG_LOG = str(cls.log_dir)
         env_module.LRGSG_CCORE_BIN = str(cls.ccore_dir)
         sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
-        from lrgsglib.nx_patches.Lattice3D import Lattice3D
+        from lrgsglib.graphs.nx import Lattice3DNX as Lattice3D
 
         cls.Lattice3D = Lattice3D
 

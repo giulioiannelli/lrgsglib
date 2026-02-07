@@ -6,52 +6,73 @@ The C sources for the performance critical parts live in `src/lrgsglib/Ccore` an
 
 ## Installation
 
-1. **Clone the repository and initialise submodules**
-   ```bash
-   git clone https://github.com/giulioiannelli/lrgsglib
-   cd lrgsglib
-   git submodule init
-   git submodule update
-   ```
+Choose an installation path depending on your needs:
 
-2. **Create the conda environment** (default name: `lrgsgenv`)
-   ```bash
-   conda env create -f lrgsgenv.yml
-   conda activate lrgsgenv
-   ```
+| Path | C Backends | graph-tool | Compiler needed | Setup |
+|------|-----------|------------|-----------------|-------|
+| **pip install** | No (Python/numba fallback) | No | No | `pip install .` |
+| **pip wheel** (pre-compiled) | Yes (bundled) | No | No | `pip install lrgsglib` |
+| **pixi** (recommended) | Yes (from source) | Optional | Provided by pixi | `pixi install` |
+| **conda** | Yes (from source) | Optional | Provided by conda | `conda env create` |
 
-3. **Build the project**
+### Option 1: pip install (lightweight, no compiler)
 
-   **Standalone usage:**
-   ```bash
-   make all
-   ```
+```bash
+git clone --recursive https://github.com/giulioiannelli/lrgsglib
+cd lrgsglib
+pip install .
+```
 
-   **Submodule usage** (e.g., in `lrgsglib-ipynb`):
-   Configure paths relative to the outer project instead of the `lrgsglib` subdirectory:
-   ```bash
-   # From the lrgsglib subdirectory
-   make all LRGSG_LLIB=$(pwd)/.. CONDA_ENV_NAME=your_env_name
-   ```
+All spectral analysis, entropy, graph construction and plotting work. Dynamics
+simulations run via Python/numba backends (`runlang="Python"`). If C binaries
+are not found, the library warns and falls back to Python automatically.
 
-   **What this does:**
-   - Sets `LRGSG_LLIB` to the outer project root
-   - Configures data folder as `outer-project/data` (instead of `lrgsglib/data`)
-   - Configures notebooks as `outer-project/ipynb` (instead of `lrgsglib/ipynb`)
-   - Configures logs as `outer-project/.log` (instead of `lrgsglib/.log`)
-   - Keeps all library source code paths relative to `lrgsglib/`
-   - Uses your custom conda environment name instead of the default `lrgsgenv`
+### Option 2: pixi (recommended for development)
 
-   **Example for lrgsglib-ipynb:**
-   ```bash
-   cd lrgsglib
-   make all LRGSG_LLIB=$(pwd)/.. CONDA_ENV_NAME=lrgsgnb
-   ```
+```bash
+git clone --recursive https://github.com/giulioiannelli/lrgsglib
+cd lrgsglib
+pixi install              # Creates environment with GCC, pybind11, etc.
+pixi run build            # Compiles C code + installs editable
+pixi run test-quick       # Verify everything works
+```
 
-4. **Install in editable mode**
-   ```bash
-   pip install -e .
-   ```
+For graph-tool support: `pixi install -e full`
+
+### Option 3: conda (still supported)
+
+```bash
+git clone --recursive https://github.com/giulioiannelli/lrgsglib
+cd lrgsglib
+conda env create -f lrgsgenv.yml
+conda activate lrgsgnb
+pip install -e . --no-build-isolation
+```
+
+### Option 4: Makefile (manual build)
+
+For full control over the build process:
+
+```bash
+conda activate lrgsgnb
+make all                  # Standalone
+# or
+make all LRGSG_LLIB=$(pwd)/.. CONDA_ENV_NAME=lrgsgnb  # As submodule
+pip install -e .
+```
+
+### Docker (for reproducibility)
+
+A Dockerfile is provided for reproducible environments, CI, or sharing with
+collaborators who don't want to install anything locally:
+
+```bash
+docker build -t lrgsglib .
+docker run -it lrgsglib python -c "import lrgsglib; print('OK')"
+docker run -v ./scripts:/scripts lrgsglib python /scripts/my_analysis.py
+```
+
+This is not a development setup — use pixi or conda for active work.
 
 ## Documentation
 
@@ -107,11 +128,14 @@ The documentation includes:
   ising = IsingDynamics(sg=lattice, T=2.0, steps=10000, runlang='C1b')
   ```
 
+- **Graceful degradation**: If C binaries are missing, dynamics automatically fall back to Python with a warning. No manual configuration needed.
+
 ## Running Tests
 
 ```bash
 cd lrgsglib
 pytest test/
+pytest test/ --quick   # Fast subset (~5s)
 ```
 
 ## More Information

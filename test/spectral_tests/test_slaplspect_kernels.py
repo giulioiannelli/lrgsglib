@@ -13,7 +13,8 @@ from collections import Counter
 from types import SimpleNamespace
 
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# sys.path needed for kernels imports (not installed packages)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from kernels.SlaplSpect import (
     save_data,

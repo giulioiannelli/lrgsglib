@@ -38,12 +38,9 @@ class TestContactProcessLimitingCases(unittest.TestCase):
         cls.ccore_dir.mkdir(parents=True, exist_ok=True)
         os.environ["LRGSG_CCORE_BIN"] = str(cls.ccore_dir)
 
-        cls.src_path = Path(__file__).resolve().parents[1] / "src"
-        sys.path.insert(0, str(cls.src_path))
-
         # Mock environment module
         env_module = types.ModuleType("lrgsglib.config.lrgsg_env")
-        env_module.LRGSG_LLIB = str(cls.src_path / "lrgsglib")
+        env_module.LRGSG_LLIB = ""
         env_module.LRGSG_DATA = cls.data_dir  # Path object
         env_module.LRGSG_LOG = cls.log_dir  # Path object
         env_module.LRGSG_CCORE_BIN = cls.ccore_dir  # Path object
@@ -58,8 +55,6 @@ class TestContactProcessLimitingCases(unittest.TestCase):
     def tearDownClass(cls) -> None:
         """Clean up test environment."""
         cls._tmp_dir.cleanup()
-        if str(cls.src_path) in sys.path:
-            sys.path.remove(str(cls.src_path))
 
     def _make_small_lattice(self, geo='sqr', side=8, pflip=0.0):
         """Create a small test lattice."""
@@ -585,11 +580,8 @@ class TestContactProcessEdgeCases(unittest.TestCase):
         cls.ccore_dir.mkdir(parents=True, exist_ok=True)
         os.environ["LRGSG_CCORE_BIN"] = str(cls.ccore_dir)
 
-        cls.src_path = Path(__file__).resolve().parents[1] / "src"
-        sys.path.insert(0, str(cls.src_path))
-
         env_module = types.ModuleType("lrgsglib.config.lrgsg_env")
-        env_module.LRGSG_LLIB = str(cls.src_path / "lrgsglib")
+        env_module.LRGSG_LLIB = ""
         env_module.LRGSG_DATA = cls.data_dir  # Path object
         env_module.LRGSG_LOG = cls.log_dir  # Path object
         env_module.LRGSG_CCORE_BIN = cls.ccore_dir  # Path object
@@ -604,8 +596,6 @@ class TestContactProcessEdgeCases(unittest.TestCase):
     def tearDownClass(cls) -> None:
         """Clean up."""
         cls._tmp_dir.cleanup()
-        if str(cls.src_path) in sys.path:
-            sys.path.remove(str(cls.src_path))
 
     def test_invalid_activation_raises_error(self):
         """Test that invalid activation function raises error."""

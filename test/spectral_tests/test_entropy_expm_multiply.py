@@ -10,11 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-# Add src to path
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 from lrgsglib.utils.lrg.infocomm import (
     compute_entropy_observables_from_eigenvalues,
     compute_entropy_observables_expm_multiply
@@ -288,55 +284,66 @@ def test_deterministic_seeding():
     assert entropy_match and heat_match, "Seeding should produce deterministic results"
 
 
-def main():
-    """Run all tests."""
-    print("\n" + "="*70)
-    print("ENTROPY EXPM_MULTIPLY VALIDATION TESTS")
-    print("="*70)
+class TestEntropyExpmQuick:
+    """Quick lightweight tests (small graphs, few samples)."""
 
-    results = []
+    def _make_small_graph(self, pflip=0.1):
+        G = MultiplicativeCascadeGraph(
+            p1=0.8, p2=0.6, p3=0.6, p4=0.8,
+            fraction=0.3,
+            iterations=2,
+            pflip=pflip,
+            seed=42,
+        )
+        G.upd_graph_matrices()
+        return G
 
-    try:
-        results.append(("Small graph comparison", test_expm_multiply_vs_eigenvalue_small_graph()))
-    except Exception as e:
-        print(f"\n✗ Test 1 failed with exception: {e}")
-        import traceback
-        traceback.print_exc()
-        results.append(("Small graph comparison", False))
+    def test_basic_computation(self):
+        """Test that entropy computation runs without errors."""
+        G = self._make_small_graph()
 
-    try:
-        results.append(("Basic functionality", test_entropy_mode_basic()))
-    except Exception as e:
-        print(f"\n✗ Test 2 failed with exception: {e}")
-        import traceback
-        traceback.print_exc()
-        results.append(("Basic functionality", False))
+        S, C, V, tau = compute_entropy_observables_expm_multiply(
+            L=G.slp,
+            num_nodes=G.N,
+            steps=20,
+            t1=-1,
+            t2=2,
+            num_samples=10,
+            seed=42,
+        )
 
-    try:
-        results.append(("Deterministic seeding", test_deterministic_seeding()))
-    except Exception as e:
-        print(f"\n✗ Test 3 failed with exception: {e}")
-        import traceback
-        traceback.print_exc()
-        results.append(("Deterministic seeding", False))
+        assert len(S) == len(C) == len(V) == len(tau) == 20
+        assert not np.any(np.isnan(S))
+        assert np.all(np.isfinite(S))
+        assert np.all((S >= 0) & (S <= 1.5))
 
-    # Summary
-    print("\n" + "="*70)
-    print("SUMMARY")
-    print("="*70)
-    for test_name, passed in results:
-        status = "✓ PASS" if passed else "✗ FAIL"
-        print(f"{status}: {test_name}")
+    def test_deterministic(self):
+        """Test that seeding produces identical results."""
+        G = self._make_small_graph()
 
-    all_passed = all(passed for _, passed in results)
-    if all_passed:
-        print("\n✓✓✓ ALL TESTS PASSED ✓✓✓")
-        return 0
-    else:
-        print("\n✗✗✗ SOME TESTS FAILED ✗✗✗")
-        return 1
+        S1, C1, _, _ = compute_entropy_observables_expm_multiply(
+            L=G.slp, num_nodes=G.N, steps=20, num_samples=10, seed=100
+        )
+        S2, C2, _, _ = compute_entropy_observables_expm_multiply(
+            L=G.slp, num_nodes=G.N, steps=20, num_samples=10, seed=100
+        )
+
+        assert np.allclose(S1, S2, rtol=1e-14)
+
+    def test_error_convergence(self):
+        """Test that computation succeeds with different sample sizes."""
+        G = self._make_small_graph(pflip=0.0)
+
+        results = []
+        for m in [5, 10, 20]:
+            S, _, _, _ = compute_entropy_observables_expm_multiply(
+                L=G.slp, num_nodes=G.N, steps=20, num_samples=m, seed=42
+            )
+            results.append(S)
+
+        assert len(results) == 3
 
 
 if __name__ == "__main__":
-    import sys
-    sys.exit(main())
+    import pytest
+    pytest.main([__file__, "-v"])

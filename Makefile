@@ -1,3 +1,12 @@
+# ============================================================================
+# LEGACY BUILD SYSTEM
+# ============================================================================
+# The primary build system is now CMake + scikit-build-core (see CMakeLists.txt).
+# Use: pip install -e . --no-build-isolation
+# Or:  pixi run build
+#
+# This Makefile is kept as a supported alternative for users who prefer it.
+# ============================================================================
 # use bash for shell
 SHELL := /bin/bash
 # python includes and libraries

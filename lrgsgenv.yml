@@ -1,3 +1,5 @@
+# Conda environment for lrgsglib.
+# Alternative: `pixi install` (recommended, faster). See pixi.toml in project root.
 name: lrgsgenv
 channels:
   - conda-forge

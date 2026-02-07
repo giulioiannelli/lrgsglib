@@ -7,8 +7,8 @@ and other quantum mechanical properties.
 
 import numpy as np
 import pytest
-from lrgsglib.nx_patches.Lattice2D import Lattice2D
-from lrgsglib.nx_patches.ErdosRenyi import ErdosRenyi
+from lrgsglib.graphs.nx import Lattice2DNX as Lattice2D
+from lrgsglib.graphs.nx import ErdosRenyiNX as ErdosRenyi
 from lrgsglib.utils.lrg.quantum import (
     compute_quantum_propagator_spectral,
     compute_quantum_propagator_matrix,

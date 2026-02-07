@@ -106,15 +106,9 @@ py::list IsingModel::getFrameMagnetizations() const {
 }
 
 void IsingModel::initializeNeighborsAndSigns(py::list edge_list, py::list sign_list) {
-    std::vector<std::pair<int, int>> edges;
-    std::vector<int> signs_vec;
-
-    std::copy(py::stl_input_iterator<std::pair<int, int>>(edge_list), py::stl_input_iterator<std::pair<int, int>>(), std::back_inserter(edges));
-    std::copy(py::stl_input_iterator<int>(sign_list), py::stl_input_iterator<int>(), std::back_inserter(signs_vec));
-
-    for (size_t i = 0; i < edges.size(); ++i) {
-        auto edge = edges[i];
-        int sign = signs_vec[i];
+    for (size_t i = 0; i < static_cast<size_t>(py::len(edge_list)); ++i) {
+        auto edge = edge_list[i].cast<std::pair<int, int>>();
+        int sign = sign_list[i].cast<int>();
         auto normalized_edge = normalize_edge(edge.first, edge.second);
         neighbors[normalized_edge.first].push_back(normalized_edge.second);
         neighbors[normalized_edge.second].push_back(normalized_edge.first);

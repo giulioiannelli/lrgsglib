@@ -15,10 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-# Add parent directory to path to import lrgsglib
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from lrgsglib.nx_patches.Lattice2D import Lattice2D
+from lrgsglib.graphs.nx import Lattice2DNX as Lattice2D
 
 
 def test_basic_lattice_generation():

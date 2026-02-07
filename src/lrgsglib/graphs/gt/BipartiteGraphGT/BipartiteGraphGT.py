@@ -20,7 +20,6 @@ Example
 ... )
 >>> print(f"Nodes: {bg2.N}, Mode: {bg2.mode}")
 """
-
 from __future__ import annotations
 
 from typing import Optional, Sequence, Set, Tuple
