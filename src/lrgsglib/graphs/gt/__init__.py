@@ -42,8 +42,8 @@ Fractal:
     SierpinskiGraphGT : Sierpinski fractal graph (fallback to NX)
 
 Bipartite:
-    BipartiteGraphGT : Bipartite graph (fallback to NX)
-    BipartiteFromDegreeSequenceGT : Bipartite from degree sequence (fallback to NX)
+    BipartiteGraphGT : Bipartite graph (native GT, unified: random + degree-sequence modes)
+    BipartiteFromDegreeSequenceGT : Backward-compat alias for BipartiteGraphGT
 
 Multispectral:
     MultispectralGraphGT : Multispectral graph (fallback to NX)

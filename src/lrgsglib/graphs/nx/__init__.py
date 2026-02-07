@@ -33,7 +33,7 @@ Fractal:
     FractalGraphNX, DGMgraphNX, SierpinskiNX
 
 Bipartite:
-    BipartiteGraphNX, BipartiteFromDegreeSequenceNX
+    BipartiteGraphNX (unified: random + degree-sequence modes), BipartiteFromDegreeSequenceNX (alias)
 
 Multispectral:
     MultispectralGraphNX, MultiplicativeCascadeGraphNX, VicsekGraphNX, HierarchicalModularNetworkNX

@@ -1,2 +1,6 @@
 from .BipartiteGraphGT import BipartiteGraphGT
-__all__ = ["BipartiteGraphGT"]
+
+# Backward compatibility alias
+BipartiteFromDegreeSequenceGT = BipartiteGraphGT
+
+__all__ = ["BipartiteGraphGT", "BipartiteFromDegreeSequenceGT"]
