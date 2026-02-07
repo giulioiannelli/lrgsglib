@@ -45,7 +45,6 @@ class BarabasiAlbertGT(SignedGraphGT):
     Examples
     --------
     >>> ba = BarabasiAlbertGT(n=500, m=2, pflip=0.15, seed=42)
-    >>> ba.flip_random_fract_edges()
     >>> print(f"Nodes: {ba.N}, Edges: {ba.num_edges}")
     >>> hubs = ba.get_hub_nodes(top_k=5)
 
@@ -89,6 +88,10 @@ class BarabasiAlbertGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed)
+
+        # Apply sign flips if requested
+        if pflip > 0:
+            self.flip_random_fract_edges()
 
     def _generate_graph(self, seed: int) -> gt.Graph:
         """Generate Barabasi-Albert graph using C++ extension."""

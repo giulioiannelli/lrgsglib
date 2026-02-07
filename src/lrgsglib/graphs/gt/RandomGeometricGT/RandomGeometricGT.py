@@ -48,7 +48,6 @@ class RandomGeometricGT(SignedGraphGT):
     Examples
     --------
     >>> rgg = RandomGeometricGT(n=200, radius=0.15, dim=2, pflip=0.1, seed=42)
-    >>> rgg.flip_random_fract_edges()
 
     Notes
     -----
@@ -93,6 +92,10 @@ class RandomGeometricGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed)
+
+        # Apply sign flips if requested
+        if pflip > 0:
+            self.flip_random_fract_edges()
 
     def _generate_graph(self) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
         """Generate random geometric graph using graph-tool."""

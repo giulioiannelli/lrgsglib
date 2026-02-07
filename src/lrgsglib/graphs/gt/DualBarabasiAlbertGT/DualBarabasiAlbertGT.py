@@ -39,7 +39,6 @@ class DualBarabasiAlbertGT(SignedGraphGT):
     Examples
     --------
     >>> dba = DualBarabasiAlbertGT(n=500, m1=2, m2=5, p=0.7, pflip=0.15, seed=42)
-    >>> dba.flip_random_fract_edges()
     >>> print(f"Nodes: {dba.N}, Edges: {dba.num_edges}")
     """
 
@@ -78,6 +77,10 @@ class DualBarabasiAlbertGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed)
+
+        # Apply sign flips if requested
+        if pflip > 0:
+            self.flip_random_fract_edges()
 
     def _generate_graph(self, seed: int) -> gt.Graph:
         """Generate Dual BA graph using C++ extension."""

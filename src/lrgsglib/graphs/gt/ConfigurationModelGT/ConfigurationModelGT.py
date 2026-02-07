@@ -44,7 +44,6 @@ class ConfigurationModelGT(SignedGraphGT):
     --------
     >>> degrees = [3, 3, 3, 3, 4, 4, 4, 4, 5, 5]  # sum must be even
     >>> cm = ConfigurationModelGT(degree_sequence=degrees, pflip=0.1, seed=42)
-    >>> cm.flip_random_fract_edges()
 
     Notes
     -----
@@ -85,6 +84,10 @@ class ConfigurationModelGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed)
+
+        # Apply sign flips if requested
+        if pflip > 0:
+            self.flip_random_fract_edges()
 
     def _generate_graph(self) -> gt.Graph:
         """Generate configuration model graph using graph-tool's random_graph."""

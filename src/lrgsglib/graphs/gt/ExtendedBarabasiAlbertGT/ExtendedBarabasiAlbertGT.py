@@ -38,7 +38,6 @@ class ExtendedBarabasiAlbertGT(SignedGraphGT):
     Examples
     --------
     >>> eba = ExtendedBarabasiAlbertGT(n=500, m=2, a=1.0, pflip=0.15, seed=42)
-    >>> eba.flip_random_fract_edges()
     >>> print(f"Nodes: {eba.N}, Edges: {eba.num_edges}")
     """
 
@@ -74,6 +73,10 @@ class ExtendedBarabasiAlbertGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed)
+
+        # Apply sign flips if requested
+        if pflip > 0:
+            self.flip_random_fract_edges()
 
     def _generate_graph(self, seed: int) -> gt.Graph:
         """Generate Extended BA graph using C++ extension."""

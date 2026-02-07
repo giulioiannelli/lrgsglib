@@ -48,7 +48,6 @@ class HolmeKimGT(SignedGraphGT):
     Examples
     --------
     >>> hk = HolmeKimGT(n=500, m=3, p=0.8, pflip=0.1, seed=42)
-    >>> hk.flip_random_fract_edges()
     >>> print(f"Nodes: {hk.N}, Edges: {hk.num_edges}")
 
     Notes
@@ -97,6 +96,10 @@ class HolmeKimGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed)
+
+        # Apply sign flips if requested
+        if pflip > 0:
+            self.flip_random_fract_edges()
 
     def _generate_graph(self, seed: int) -> gt.Graph:
         """Generate Holme-Kim graph using C++ extension."""

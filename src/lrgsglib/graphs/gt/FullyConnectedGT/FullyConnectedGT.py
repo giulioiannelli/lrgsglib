@@ -46,7 +46,6 @@ class FullyConnectedGT(SignedGraphGT):
     Examples
     --------
     >>> fc = FullyConnectedGT(N=50, pflip=0.1, seed=42)
-    >>> fc.flip_random_fract_edges()
     >>> print(f"Nodes: {fc.N}, Edges: {fc.num_edges}")
     Nodes: 50, Edges: 1225
 
@@ -91,6 +90,10 @@ class FullyConnectedGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed)
+
+        # Apply sign flips if requested
+        if pflip > 0:
+            self.flip_random_fract_edges()
 
     def _generate_graph(self) -> gt.Graph:
         """Generate complete graph using C++ extension."""

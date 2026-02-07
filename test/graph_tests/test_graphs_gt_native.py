@@ -629,9 +629,7 @@ class TestConfigurationModelGT:
         """Test degree statistics computation."""
         from lrgsglib.graphs.gt.ConfigurationModelGT import ConfigurationModelGT
 
-        degrees = [2, 3, 4, 5, 6]  # ensure even sum
-        if sum(degrees) % 2:
-            degrees[-1] += 1
+        degrees = [2, 3, 2, 3, 4, 4, 2, 4, 2, 4]  # 10 nodes, sum=30 (even)
         cm = ConfigurationModelGT(degree_sequence=degrees, seed=42)
         stats = cm.get_degree_statistics()
         assert 'mean' in stats

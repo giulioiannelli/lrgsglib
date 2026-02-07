@@ -45,7 +45,6 @@ class kRegularGraphGT(SignedGraphGT):
     Examples
     --------
     >>> kreg = kRegularGraphGT(n=100, k=4, pflip=0.1, seed=42)
-    >>> kreg.flip_random_fract_edges()
     >>> all(v.out_degree() == 4 for v in kreg.G.vertices())
     True
 
@@ -87,6 +86,10 @@ class kRegularGraphGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed)
+
+        # Apply sign flips if requested
+        if pflip > 0:
+            self.flip_random_fract_edges()
 
     def _generate_graph(self) -> gt.Graph:
         """Generate k-regular graph using graph-tool's random_graph."""
