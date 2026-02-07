@@ -158,7 +158,7 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
 
     def init_contact_dynamics(self, custom: Any = None, exName: str = "") -> None:
         """Initialise the state and export data if required."""
-
+        self._check_c_backend_or_fallback()
         self.reset_observables()
         if custom is not None:
             self.ic = "custom"

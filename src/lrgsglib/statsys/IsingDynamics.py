@@ -195,6 +195,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         return -np.dot(self.s, neigh_energies)
     #
     def init_ising_dynamics(self, custom: Any = None, exName: str = ""):
+        self._check_c_backend_or_fallback()
         self.init_s(custom)
         if self.runlang.startswith("C"):
             self.build_cprogram_command()

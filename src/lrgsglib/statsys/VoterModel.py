@@ -103,6 +103,7 @@ class VoterModel(CBackendMixin, BinDynSys):
 
     def init_voter_dynamics(self, custom: Any = None, exName: str = "") -> None:
         """Initialise the spin configuration and export data if required."""
+        self._check_c_backend_or_fallback()
         self.reset_observables()
         self.init_s(custom)
         self.s = self.s.astype(np.int8, copy=False)
