@@ -1,14 +1,15 @@
 #ifndef ISING_MODEL_HPP
 #define ISING_MODEL_HPP
 
-#include <boost/python.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <vector>
 #include <map>
 #include <random>
 #include <string>
 
 
-namespace py = boost::python;
+namespace py = pybind11;
 
 std::pair<int, int> normalize_edge(int a, int b);
 

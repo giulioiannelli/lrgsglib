@@ -1,12 +1,17 @@
-#include <boost/python.hpp>
-#include "pair_conversion.hpp"
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include "ising_model_store.hpp"
 
-BOOST_PYTHON_MODULE(ising_model_store) {
-    py::to_python_converter<std::pair<int, int>, pair_to_python_tuple>();
-    pair_from_python_tuple();
+namespace py = pybind11;
 
-    py::class_<IsingModel>("IsingModel", py::init<py::list, py::list, int, int, double, py::optional<std::string>>())
+PYBIND11_MODULE(ising_model_store, m) {
+    m.doc() = "Ising model simulation with frame storage for animation";
+
+    py::class_<IsingModel>(m, "IsingModel")
+        .def(py::init<py::list, py::list, int, int, double, std::string>(),
+             py::arg("edge_list"), py::arg("sign_list"),
+             py::arg("width"), py::arg("height"),
+             py::arg("temperature"), py::arg("mode") = "sequential")
         .def("simulate", &IsingModel::simulate)
         .def("getSpins", &IsingModel::getSpins)
         .def("getEnergy", &IsingModel::getEnergy)

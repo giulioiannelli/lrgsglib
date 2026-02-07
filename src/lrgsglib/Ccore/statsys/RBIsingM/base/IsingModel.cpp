@@ -1,5 +1,5 @@
-#include <boost/python.hpp>
-#include <boost/python/stl_iterator.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <vector>
 #include <map>
 #include <cstdlib>
@@ -10,49 +10,11 @@
 #include <iostream>
 #include <random>
 
-namespace py = boost::python;
+namespace py = pybind11;
 
 // #define ENABLE_TIMING
 
-struct pair_to_python_tuple {
-    static PyObject* convert(const std::pair<int, int>& p) {
-        return py::incref(py::make_tuple(p.first, p.second).ptr());
-    }
-};
-
-struct pair_from_python_tuple {
-    pair_from_python_tuple() {
-        py::converter::registry::push_back(
-            &convertible,
-            &construct,
-            py::type_id<std::pair<int, int>>());
-    }
-
-    static void* convertible(PyObject* obj_ptr) {
-        if (!PyTuple_Check(obj_ptr)) return 0;
-        if (PyTuple_Size(obj_ptr) != 2) return 0;
-        return obj_ptr;
-    }
-
-    static void construct(PyObject* obj_ptr, py::converter::rvalue_from_python_stage1_data* data) {
-        void* storage = ((py::converter::rvalue_from_python_storage<std::pair<int, int>>*)data)->storage.bytes;
-        PyObject* first_obj = PyTuple_GetItem(obj_ptr, 0);
-        PyObject* second_obj = PyTuple_GetItem(obj_ptr, 1);
-        
-        if (!PyLong_Check(first_obj) || !PyLong_Check(second_obj)) {
-            PyErr_SetString(PyExc_TypeError, "Tuple elements must be integers");
-            py::throw_error_already_set();
-        }
-        
-        int first = static_cast<int>(PyLong_AsLong(first_obj));
-        int second = static_cast<int>(PyLong_AsLong(second_obj));
-
-        new (storage) std::pair<int, int>(first, second);
-        data->convertible = storage;
-    }
-};
-
-std::pair<int, int> normalize_edge(int a, int b) {
+static std::pair<int, int> normalize_edge(int a, int b) {
     return std::make_pair(std::min(a, b), std::max(a, b));
 }
 
@@ -124,15 +86,9 @@ private:
     std::uniform_real_distribution<> dist{0.0, 1.0};
 
     void initializeNeighborsAndSigns(py::list edge_list, py::list sign_list) {
-        std::vector<std::pair<int, int>> edges;
-        std::vector<int> signs_vec;
-
-        std::copy(py::stl_input_iterator<std::pair<int, int>>(edge_list), py::stl_input_iterator<std::pair<int, int>>(), std::back_inserter(edges));
-        std::copy(py::stl_input_iterator<int>(sign_list), py::stl_input_iterator<int>(), std::back_inserter(signs_vec));
-
-        for (size_t i = 0; i < edges.size(); ++i) {
-            auto edge = edges[i];
-            int sign = signs_vec[i];
+        for (size_t i = 0; i < static_cast<size_t>(py::len(edge_list)); ++i) {
+            auto edge = edge_list[i].cast<std::pair<int, int>>();
+            int sign = sign_list[i].cast<int>();
             auto normalized_edge = normalize_edge(edge.first, edge.second);
             neighbors[normalized_edge.first].push_back(normalized_edge.second);
             neighbors[normalized_edge.second].push_back(normalized_edge.first);
@@ -200,11 +156,14 @@ private:
     }
 };
 
-BOOST_PYTHON_MODULE(ising_model) {
-    py::to_python_converter<std::pair<int, int>, pair_to_python_tuple>();
-    pair_from_python_tuple();
+PYBIND11_MODULE(ising_model, m) {
+    m.doc() = "Ising model simulation with signed edges";
 
-    py::class_<IsingModel>("IsingModel", py::init<py::list, py::list, int, int, double, py::optional<std::string>>())
+    py::class_<IsingModel>(m, "IsingModel")
+        .def(py::init<py::list, py::list, int, int, double, std::string>(),
+             py::arg("edge_list"), py::arg("sign_list"),
+             py::arg("width"), py::arg("height"),
+             py::arg("temperature"), py::arg("mode") = "synchronous")
         .def("simulate", &IsingModel::simulate)
         .def("getSpins", &IsingModel::getSpins);
 }
