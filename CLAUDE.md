@@ -169,7 +169,11 @@ results_file = TEST_TMP_DIR / "bench_mcg_slaplspect_results.pkl"
   - `SignedGraph/`, `Lattice2D/`, `Lattice3D/`, `ErdosRenyi/`, `WeightedGraph/`, etc.
   - `funcs/` - Utility functions (spectral, thresholding, neighbors, lattice operations)
 
-- **`statsys/`** - Python wrappers for statistical physics simulations
+- **`statsys/`** - Statistical physics simulations (folder-per-class layout)
+  - Each model has its own subdirectory: `IsingDynamics/`, `ContactProcess/`, `VoterModel/`, etc.
+  - C backends live in `<Model>/ccore/` with compiled binaries in `<Model>/ccore/bin/`
+  - Shared C infrastructure in `_ccore/` (SFMT, utils, tier headers)
+  - `_c_backend.py` - CBackendMixin for C subprocess integration
 
 - **`plotlib/`** - Plotting utilities specialized for signed graphs and lattices
 
@@ -183,23 +187,32 @@ results_file = TEST_TMP_DIR / "bench_mcg_slaplspect_results.pkl"
 
 - **`loglib.py`**, **`proglib.py`** - Logging and program execution helpers
 
-### C/C++ Components (`src/lrgsglib/Ccore/`)
+### C/C++ Components (co-located with Python in `statsys/`)
 
-Performance-critical code lives here:
+Performance-critical C code lives alongside its Python class in a folder-per-class layout:
 
-- **`statsys/`** - Statistical physics simulators (compiled to `Ccore/bin/`)
-  - `RBIsingM/` - Random-bond Ising model (IsingSimulator variants)
-  - `voterM/` - Voter model dynamics (VoterSimulator variants)
-  - `contactP/` - Contact process (ContactSimulator variants)
-  - `signedRw/` - Signed random walks on lattices
+```
+statsys/
+├── _ccore/                    # Shared C infrastructure
+│   ├── SFMT/                  # SIMD-oriented Fast Mersenne Twister RNG
+│   ├── LRGSG_utils.{c,h}     # Common utilities
+│   ├── sfmtrng.{c,h}         # RNG wrapper
+│   ├── LRGSG_bindynsys.{c,h} # Binary dynamics system utilities
+│   ├── LRGSG_contdynsys.{c,h}# Continuous dynamics utilities
+│   └── LRGSG_vecdynsys.{c,h} # Vector dynamics utilities
+├── IsingDynamics/
+│   ├── IsingDynamics.py       # Python class
+│   └── ccore/                 # C source + compiled binaries
+│       ├── bin/               # IsingSimulator{0,1,1b,2,3,3b,4,4b,5}
+│       ├── LRGSG_rbim.{c,h}
+│       └── IsingSimulator*.c
+├── ContactProcess/ccore/      # ContactSimulator variants
+├── VoterModel/ccore/          # VoterSimulator variants
+└── ...                        # Same pattern for all 11 models
+```
 
-- **`SFMT/`** - SIMD-oriented Fast Mersenne Twister RNG
-
-- **`LRGSG_bindynsys.c/h`** - Binary dynamics system utilities
-
-**Build outputs:**
-- Binaries: `Ccore/bin/` (e.g., `IsingSimulator0`, `VoterSimulator1`, `ContactSimulator1d`)
-- Python extensions: `.so` files via pybind11
+**Build outputs:** Per-model `ccore/bin/` directories (gitignored)
+**Python extensions:** `.so` files via pybind11
 
 ### Build System
 
