@@ -50,14 +50,35 @@ FN_CPSIM1F  = ContactSimulator1f
 FN_CPSIM1G  = ContactSimulator1g
 
 # ============================================================================
+# Continuous Dynamics Simulators
+FN_KURSIM0    = KuramotoSimulator0
+FN_RDSIM0     = ReactionDiffusionSimulator0
+FN_CODESIM0   = CoupledODESimulator0
+
+# Vector Dynamics Simulators
+FN_POTTSSIM0  = PottsSimulator0
+FN_XYSIM0     = XYSimulator0
+FN_HBERGSIM0  = HeisenbergSimulator0
+FN_MSPECSIM0  = MultiSpeciesSimulator0
+
+# ============================================================================
 # Shared Source Files
 FN_LRGSGLIB = LRGSG_utils sfmtrng
-SRC_BINDYNSYS = LRGSG_bindynsys
+SRC_BINDYNSYS    = LRGSG_bindynsys
+SRC_CONTDYNSYS   = LRGSG_contdynsys
+SRC_VECDYNSYS    = LRGSG_vecdynsys
 SRC_RBIM    = LRGSG_rbim
 SRC_SA      = LRGSG_sa
 SRC_PT      = LRGSG_pt
 SRC_VM      = LRGSG_vm
 SRC_CP      = LRGSG_cp
+SRC_KURAMOTO = LRGSG_kuramoto
+SRC_RD       = LRGSG_rd
+SRC_CODE     = LRGSG_code
+SRC_POTTS    = LRGSG_potts
+SRC_XY       = LRGSG_xy
+SRC_HBERG    = LRGSG_heisenberg
+SRC_MSPEC    = LRGSG_multispec
 SFMTSRC     = SFMT
 
 # ============================================================================
@@ -66,7 +87,9 @@ SFMTSRC     = SFMT
 # Legacy variants still built for backwards compatibility
 FNS := $(FNS_ISING_LEGACY) $(FNS_ISING_NEW) \
        $(FN_VMSIM0) $(FN_VMSIM1) $(FN_CPSIM) $(FN_CPSIM0) $(FN_CPSIM1) \
-       $(FN_CPSIM1A) $(FN_CPSIM1B) $(FN_CPSIM1C) $(FN_CPSIM1D) $(FN_CPSIM1E) $(FN_CPSIM1F) $(FN_CPSIM1G)
+       $(FN_CPSIM1A) $(FN_CPSIM1B) $(FN_CPSIM1C) $(FN_CPSIM1D) $(FN_CPSIM1E) $(FN_CPSIM1F) $(FN_CPSIM1G) \
+       $(FN_KURSIM0) $(FN_RDSIM0) $(FN_CODESIM0) \
+       $(FN_POTTSSIM0) $(FN_XYSIM0) $(FN_HBERGSIM0) $(FN_MSPECSIM0)
 # only these go into PROGS
 PROGS := $(addprefix $(LRGSG_CCORE_BIN)/, $(FNS))
 # #

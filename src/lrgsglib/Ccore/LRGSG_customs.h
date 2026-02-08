@@ -67,6 +67,8 @@
 typedef double *double_p;
 typedef size_t *size_tp;
 typedef int8_t *spin_tp;
+typedef int32_t *state_i32_p;
+typedef double *state_f64_p;
 typedef struct {
     uint64_t u, v;
     double w;

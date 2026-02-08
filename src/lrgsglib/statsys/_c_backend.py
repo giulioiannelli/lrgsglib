@@ -1,14 +1,19 @@
-"""Mixin for C backend integration in binary dynamics systems.
+"""Mixin for C backend integration in dynamical systems.
 
 This module provides shared infrastructure for running C-based simulators
 from Python. The CBackendMixin class extracts common patterns from
 IsingDynamics, VoterModel, and ContactProcess to eliminate duplication
 while maintaining backward compatibility.
 
+The mixin is dtype-aware: it reads ``_state_dtype`` and ``_state_shape``
+from the host class (defined by :class:`DynSys` and its subclasses) so
+that continuous (float64) and vector (N x d) states are parsed correctly
+from C program stdout.
+
 Usage
 -----
 Subclasses should:
-1. Inherit from both CBackendMixin and BinDynSys (mixin first)
+1. Inherit from both CBackendMixin and a DynSys subclass (mixin first)
 2. Set `_c_program_name_template` class attribute
 3. Set `_allowed_c_keys` tuple if validation is needed
 4. Implement `_build_c_arglist()` for model-specific arguments
@@ -63,7 +68,7 @@ def _c_backend_available() -> bool:
     return bin_dir.is_dir()
 
 if TYPE_CHECKING:
-    from .BinDynSys import BinDynSys
+    from .DynSys import DynSys
 
 
 class CBackendMixin:
@@ -97,7 +102,7 @@ class CBackendMixin:
     # ------------------------------------------------------------------
     # C backend availability check
     # ------------------------------------------------------------------
-    def _check_c_backend_or_fallback(self: "BinDynSys") -> None:
+    def _check_c_backend_or_fallback(self: "DynSys") -> None:
         """Check if C backend is available; fall back to Python if not.
 
         When ``runlang`` requests a C backend but compiled binaries are
@@ -127,7 +132,7 @@ class CBackendMixin:
     # ------------------------------------------------------------------
     # C program key validation
     # ------------------------------------------------------------------
-    def _c_program_key(self: "BinDynSys") -> str:
+    def _c_program_key(self: "DynSys") -> str:
         """Validate and normalize C backend key from runlang.
 
         Converts runlang values like 'c1b', 'C1B', 'C0' to normalized
@@ -154,7 +159,7 @@ class CBackendMixin:
             )
         return key
 
-    def _c_program_suffix(self: "BinDynSys") -> str:
+    def _c_program_suffix(self: "DynSys") -> str:
         """Extract program suffix from runlang (e.g., 'C1c' -> '1c').
 
         Override this method for custom suffix extraction logic.
@@ -170,7 +175,7 @@ class CBackendMixin:
     # ------------------------------------------------------------------
     # Command building
     # ------------------------------------------------------------------
-    def build_cprogram_command(self: "BinDynSys") -> None:
+    def build_cprogram_command(self: "DynSys") -> None:
         """Build the C program command list.
 
         Sets `self.CbaseName` and `self.cprogram` using the template
@@ -181,7 +186,7 @@ class CBackendMixin:
         arglist = self._build_c_arglist()
         self.cprogram = [Path(_get_ccore_bin()) / self.CbaseName] + arglist
 
-    def _build_c_arglist(self: "BinDynSys") -> list[str]:
+    def _build_c_arglist(self: "DynSys") -> list[str]:
         """Build argument list for C program.
 
         Subclasses MUST override this method to provide model-specific
@@ -197,7 +202,7 @@ class CBackendMixin:
     # ------------------------------------------------------------------
     # Stderr logging
     # ------------------------------------------------------------------
-    def setup_stderr_logging(self: "BinDynSys") -> None:
+    def setup_stderr_logging(self: "DynSys") -> None:
         """Set up stderr logging file for C backend.
 
         Creates a log file in LRGSG_LOG directory with format:
@@ -214,7 +219,7 @@ class CBackendMixin:
         self.stderr_path.parent.mkdir(parents=True, exist_ok=True)
         self.stderr_fopen = open(self.stderr_path, 'w')
 
-    def _close_stderr_handle(self: "BinDynSys") -> None:
+    def _close_stderr_handle(self: "DynSys") -> None:
         """Close stderr file handle if open."""
         if self.stderr_fopen is not None and not self.stderr_fopen.closed:
             self.stderr_fopen.close()
@@ -223,7 +228,7 @@ class CBackendMixin:
     # ------------------------------------------------------------------
     # Program execution
     # ------------------------------------------------------------------
-    def run_cprogram(self: "BinDynSys", verbose: bool = False) -> None:
+    def run_cprogram(self: "DynSys", verbose: bool = False) -> None:
         """Execute the C backend and parse output state.
 
         Runs the C program via subprocess, captures stdout as the final
@@ -262,11 +267,22 @@ class CBackendMixin:
         )
         self._close_stderr_handle()
 
-        state = np.frombuffer(result.stdout, dtype=np.int8)
-        if state.size != self.N:
+        dtype = getattr(self, '_state_dtype', np.int8)
+        state = np.frombuffer(result.stdout, dtype=dtype)
+
+        expected_shape = getattr(self, '_state_shape', (self.N,))
+        expected_size = 1
+        for d in expected_shape:
+            expected_size *= d
+
+        if state.size != expected_size:
             raise RuntimeError(
-                f"C backend returned invalid state: expected {self.N}, got {state.size}"
+                f"C backend returned invalid state: expected {expected_size} "
+                f"elements ({expected_shape}, dtype={dtype}), got {state.size}"
             )
+
+        if len(expected_shape) > 1:
+            state = state.reshape(expected_shape)
         self.s = state.copy()
 
     # ------------------------------------------------------------------
@@ -288,7 +304,7 @@ class CBackendMixin:
         except (FileNotFoundError, OSError):
             pass
 
-    def _get_cleanup_paths(self: "BinDynSys") -> list[Path | None]:
+    def _get_cleanup_paths(self: "DynSys") -> list[Path | None]:
         """Return list of paths to clean up after C run.
 
         Override in subclasses to add model-specific output files.
@@ -301,11 +317,11 @@ class CBackendMixin:
         """
         return [getattr(self, 'sfout', None)]
 
-    def _remove_stderr(self: "BinDynSys") -> None:
+    def _remove_stderr(self: "DynSys") -> None:
         """Remove the stderr log file."""
         self._remove_file_safe(self.stderr_path)
 
-    def remove_run_c_files(self: "BinDynSys", remove_stderr: bool = True) -> None:
+    def remove_run_c_files(self: "DynSys", remove_stderr: bool = True) -> None:
         """Remove exported and generated files from C run.
 
         Parameters
@@ -321,7 +337,7 @@ class CBackendMixin:
     # ------------------------------------------------------------------
     # Utility methods
     # ------------------------------------------------------------------
-    def _get_datdir_arg(self: "BinDynSys") -> str:
+    def _get_datdir_arg(self: "DynSys") -> str:
         """Get data directory path suitable for C program arguments.
 
         Attempts to make the path relative to cwd for cleaner output.

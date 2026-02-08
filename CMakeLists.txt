@@ -66,6 +66,25 @@ set(SRC_PT    ${RBIM_SIMC}/LRGSG_pt.c)
 set(SRC_VM    ${VM_DIR}/LRGSG_vm.c)
 set(SRC_CP    ${CP_DIR}/LRGSG_cp.c)
 
+# Continuous / vector dynamics shared sources
+set(KUR_DIR     ${STATSYS}/kuramotoM)
+set(RD_DIR      ${STATSYS}/reactionD)
+set(CODE_DIR    ${STATSYS}/coupledODE)
+set(POTTS_DIR   ${STATSYS}/pottsM)
+set(XY_DIR      ${STATSYS}/xyM)
+set(HBERG_DIR   ${STATSYS}/heisenbergM)
+set(MSPEC_DIR   ${STATSYS}/multispecM)
+
+set(SRC_CONTDYNSYS  ${STATSYS}/LRGSG_contdynsys.c)
+set(SRC_VECDYNSYS   ${STATSYS}/LRGSG_vecdynsys.c)
+set(SRC_KURAMOTO    ${KUR_DIR}/LRGSG_kuramoto.c)
+set(SRC_RD          ${RD_DIR}/LRGSG_rd.c)
+set(SRC_CODE        ${CODE_DIR}/LRGSG_code.c)
+set(SRC_POTTS       ${POTTS_DIR}/LRGSG_potts.c)
+set(SRC_XY          ${XY_DIR}/LRGSG_xy.c)
+set(SRC_HBERG       ${HBERG_DIR}/LRGSG_heisenberg.c)
+set(SRC_MSPEC       ${MSPEC_DIR}/LRGSG_multispec.c)
+
 # Install destination for compiled binaries inside the Python package
 set(BIN_INSTALL_DIR lrgsglib/Ccore/bin)
 
@@ -200,6 +219,155 @@ add_contact_simulator(ContactSimulator1d)
 add_contact_simulator(ContactSimulator1e)
 add_contact_simulator(ContactSimulator1f)
 add_contact_simulator(ContactSimulator1g)
+
+# ===========================================================================
+# Kuramoto Model simulators
+# ===========================================================================
+function(add_kuramoto_simulator NAME)
+    add_executable(${NAME}
+        ${KUR_DIR}/${NAME}.c
+        ${COMMON_SOURCES}
+        ${SRC_CONTDYNSYS}
+        ${SRC_KURAMOTO}
+    )
+    target_include_directories(${NAME} PRIVATE ${COMMON_INCLUDES} ${KUR_DIR})
+    target_compile_options(${NAME} PRIVATE -O3 -g -Wall -Wextra)
+    target_link_libraries(${NAME} PRIVATE m)
+    if(OpenMP_FOUND)
+        target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
+    endif()
+    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+endfunction()
+
+add_kuramoto_simulator(KuramotoSimulator0)
+
+# ===========================================================================
+# Reaction-Diffusion simulators
+# ===========================================================================
+function(add_rd_simulator NAME)
+    add_executable(${NAME}
+        ${RD_DIR}/${NAME}.c
+        ${COMMON_SOURCES}
+        ${SRC_CONTDYNSYS}
+        ${SRC_RD}
+    )
+    target_include_directories(${NAME} PRIVATE ${COMMON_INCLUDES} ${RD_DIR})
+    target_compile_options(${NAME} PRIVATE -O3 -g -Wall -Wextra)
+    target_link_libraries(${NAME} PRIVATE m)
+    if(OpenMP_FOUND)
+        target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
+    endif()
+    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+endfunction()
+
+add_rd_simulator(ReactionDiffusionSimulator0)
+
+# ===========================================================================
+# Coupled ODE simulators
+# ===========================================================================
+function(add_code_simulator NAME)
+    add_executable(${NAME}
+        ${CODE_DIR}/${NAME}.c
+        ${COMMON_SOURCES}
+        ${SRC_CONTDYNSYS}
+        ${SRC_CODE}
+    )
+    target_include_directories(${NAME} PRIVATE ${COMMON_INCLUDES} ${CODE_DIR})
+    target_compile_options(${NAME} PRIVATE -O3 -g -Wall -Wextra)
+    target_link_libraries(${NAME} PRIVATE m)
+    if(OpenMP_FOUND)
+        target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
+    endif()
+    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+endfunction()
+
+add_code_simulator(CoupledODESimulator0)
+
+# ===========================================================================
+# Potts Model simulators
+# ===========================================================================
+function(add_potts_simulator NAME)
+    add_executable(${NAME}
+        ${POTTS_DIR}/${NAME}.c
+        ${COMMON_SOURCES}
+        ${SRC_VECDYNSYS}
+        ${SRC_POTTS}
+    )
+    target_include_directories(${NAME} PRIVATE ${COMMON_INCLUDES} ${POTTS_DIR})
+    target_compile_options(${NAME} PRIVATE -O3 -g -Wall -Wextra)
+    target_link_libraries(${NAME} PRIVATE m)
+    if(OpenMP_FOUND)
+        target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
+    endif()
+    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+endfunction()
+
+add_potts_simulator(PottsSimulator0)
+
+# ===========================================================================
+# XY Model simulators
+# ===========================================================================
+function(add_xy_simulator NAME)
+    add_executable(${NAME}
+        ${XY_DIR}/${NAME}.c
+        ${COMMON_SOURCES}
+        ${SRC_CONTDYNSYS}
+        ${SRC_VECDYNSYS}
+        ${SRC_XY}
+    )
+    target_include_directories(${NAME} PRIVATE ${COMMON_INCLUDES} ${XY_DIR})
+    target_compile_options(${NAME} PRIVATE -O3 -g -Wall -Wextra)
+    target_link_libraries(${NAME} PRIVATE m)
+    if(OpenMP_FOUND)
+        target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
+    endif()
+    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+endfunction()
+
+add_xy_simulator(XYSimulator0)
+
+# ===========================================================================
+# Heisenberg Model simulators
+# ===========================================================================
+function(add_heisenberg_simulator NAME)
+    add_executable(${NAME}
+        ${HBERG_DIR}/${NAME}.c
+        ${COMMON_SOURCES}
+        ${SRC_CONTDYNSYS}
+        ${SRC_VECDYNSYS}
+        ${SRC_HBERG}
+    )
+    target_include_directories(${NAME} PRIVATE ${COMMON_INCLUDES} ${HBERG_DIR})
+    target_compile_options(${NAME} PRIVATE -O3 -g -Wall -Wextra)
+    target_link_libraries(${NAME} PRIVATE m)
+    if(OpenMP_FOUND)
+        target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
+    endif()
+    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+endfunction()
+
+add_heisenberg_simulator(HeisenbergSimulator0)
+
+# ===========================================================================
+# MultiSpecies simulators
+# ===========================================================================
+function(add_multispec_simulator NAME)
+    add_executable(${NAME}
+        ${MSPEC_DIR}/${NAME}.c
+        ${COMMON_SOURCES}
+        ${SRC_VECDYNSYS}
+        ${SRC_MSPEC}
+    )
+    target_include_directories(${NAME} PRIVATE ${COMMON_INCLUDES} ${MSPEC_DIR})
+    target_compile_options(${NAME} PRIVATE -O3 -g -Wall -Wextra)
+    target_link_libraries(${NAME} PRIVATE m)
+    if(OpenMP_FOUND)
+        target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
+    endif()
+    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+endfunction()
+
+add_multispec_simulator(MultiSpeciesSimulator0)
 
 # ===========================================================================
 # pybind11 Python extensions
