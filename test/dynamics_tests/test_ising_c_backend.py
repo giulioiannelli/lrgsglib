@@ -1,7 +1,7 @@
 """Integration tests for Ising C backend.
 
 These tests require the C binaries to be compiled. They are skipped if
-the binaries are not found in the LRGSG_CCORE_BIN directory.
+the binaries are not found in the IsingDynamics per-model bin directory.
 
 Tests cover:
 - C1b (Metropolis) variant execution
@@ -26,34 +26,25 @@ np = pytest.importorskip("numpy")
 nx = pytest.importorskip("networkx")
 
 
-def _find_ccore_bin() -> Path | None:
-    """Find the Ccore/bin directory with compiled binaries.
+def _find_ising_bin_dir() -> Path | None:
+    """Find the IsingDynamics compiled binary directory.
 
-    Returns None if not found or binaries don't exist.
+    Uses the model class's ``_c_bin_dir`` attribute (per-model layout).
+    Returns None if not found or sentinel binary doesn't exist.
     """
-    # Check environment variable first
-    env_path = os.environ.get("LRGSG_CCORE_BIN")
-    if env_path:
-        path = Path(env_path)
-        if path.exists() and (path / "IsingSimulator1b").exists():
-            return path
-
-    # Check relative to this test file (test/dynamics_tests/)
-    test_dir = Path(__file__).resolve().parent
-    candidates = [
-        test_dir.parents[1] / "src" / "lrgsglib" / "Ccore" / "bin",  # from test/subdir/
-        test_dir.parent / "src" / "lrgsglib" / "Ccore" / "bin",      # from test/
-    ]
-
-    for candidate in candidates:
-        if candidate.exists() and (candidate / "IsingSimulator1b").exists():
-            return candidate
+    try:
+        from lrgsglib.statsys.IsingDynamics import IsingDynamics
+        bin_dir = IsingDynamics._c_bin_dir
+        if bin_dir is not None and bin_dir.is_dir() and (bin_dir / "IsingSimulator1b").exists():
+            return bin_dir
+    except ImportError:
+        pass
 
     return None
 
 
-# Find C core binaries
-CCORE_BIN = _find_ccore_bin()
+# Find Ising C binaries (per-model layout)
+CCORE_BIN = _find_ising_bin_dir()
 SKIP_REASON = "C binaries not found. Run 'make c-make' to build them."
 
 
@@ -71,15 +62,11 @@ class TestIsingCBackend(unittest.TestCase):
         cls.data_dir.mkdir(parents=True, exist_ok=True)
         cls.log_dir.mkdir(parents=True, exist_ok=True)
 
-        # Use actual C core binaries
-        os.environ["LRGSG_CCORE_BIN"] = str(CCORE_BIN)
-
-        # Set up environment module with real paths
+        # Set up environment module
         env_module = types.ModuleType("lrgsglib.config.lrgsg_env")
         env_module.LRGSG_LLIB = ""
         env_module.LRGSG_DATA = str(cls.data_dir)
         env_module.LRGSG_LOG = str(cls.log_dir)
-        env_module.LRGSG_CCORE_BIN = str(CCORE_BIN)
         sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
         from lrgsglib.graphs.nx import Lattice2DNX as Lattice2D
@@ -321,13 +308,10 @@ class TestIsingCBackendSA(unittest.TestCase):
         cls.data_dir.mkdir(parents=True, exist_ok=True)
         cls.log_dir.mkdir(parents=True, exist_ok=True)
 
-        os.environ["LRGSG_CCORE_BIN"] = str(CCORE_BIN)
-
         env_module = types.ModuleType("lrgsglib.config.lrgsg_env")
         env_module.LRGSG_LLIB = ""
         env_module.LRGSG_DATA = str(cls.data_dir)
         env_module.LRGSG_LOG = str(cls.log_dir)
-        env_module.LRGSG_CCORE_BIN = str(CCORE_BIN)
         sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
         from lrgsglib.graphs.nx import Lattice2DNX as Lattice2D

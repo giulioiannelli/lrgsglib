@@ -15,17 +15,13 @@ def test_collect_frames_and_make_animation(tmp_path):
 
     data_dir = tmp_path / "data"
     log_dir = tmp_path / "log"
-    ccore_dir = tmp_path / "Ccore" / "bin"
     data_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
-    ccore_dir.mkdir(parents=True, exist_ok=True)
-    os.environ["LRGSG_CCORE_BIN"] = str(ccore_dir)
 
     env_module = types.ModuleType("lrgsglib.config.lrgsg_env")
     env_module.LRGSG_LLIB = ""
     env_module.LRGSG_DATA = str(data_dir)
     env_module.LRGSG_LOG = log_dir
-    env_module.LRGSG_CCORE_BIN = str(ccore_dir)
     sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
     from lrgsglib.animations import collect_contact_process_frames

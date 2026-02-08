@@ -34,16 +34,11 @@ class TestContactProcessLimitingCases(unittest.TestCase):
         cls.log_dir = base_dir / "log"
         cls.data_dir.mkdir(parents=True, exist_ok=True)
         cls.log_dir.mkdir(parents=True, exist_ok=True)
-        cls.ccore_dir = base_dir / "Ccore" / "bin"
-        cls.ccore_dir.mkdir(parents=True, exist_ok=True)
-        os.environ["LRGSG_CCORE_BIN"] = str(cls.ccore_dir)
-
         # Mock environment module
         env_module = types.ModuleType("lrgsglib.config.lrgsg_env")
         env_module.LRGSG_LLIB = ""
         env_module.LRGSG_DATA = cls.data_dir  # Path object
         env_module.LRGSG_LOG = cls.log_dir  # Path object
-        env_module.LRGSG_CCORE_BIN = cls.ccore_dir  # Path object
         sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
         from lrgsglib import Lattice2D, ContactProcess
@@ -576,15 +571,10 @@ class TestContactProcessEdgeCases(unittest.TestCase):
         cls.log_dir = base_dir / "log"
         cls.data_dir.mkdir(parents=True, exist_ok=True)
         cls.log_dir.mkdir(parents=True, exist_ok=True)
-        cls.ccore_dir = base_dir / "Ccore" / "bin"
-        cls.ccore_dir.mkdir(parents=True, exist_ok=True)
-        os.environ["LRGSG_CCORE_BIN"] = str(cls.ccore_dir)
-
         env_module = types.ModuleType("lrgsglib.config.lrgsg_env")
         env_module.LRGSG_LLIB = ""
         env_module.LRGSG_DATA = cls.data_dir  # Path object
         env_module.LRGSG_LOG = cls.log_dir  # Path object
-        env_module.LRGSG_CCORE_BIN = cls.ccore_dir  # Path object
         sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
         from lrgsglib import Lattice2D, ContactProcess

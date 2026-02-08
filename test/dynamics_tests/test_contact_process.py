@@ -21,10 +21,6 @@ class TestContactProcess(unittest.TestCase):
         cls.log_dir = base_dir / "log"
         cls.data_dir.mkdir(parents=True, exist_ok=True)
         cls.log_dir.mkdir(parents=True, exist_ok=True)
-        cls.ccore_dir = base_dir / "Ccore" / "bin"
-        cls.ccore_dir.mkdir(parents=True, exist_ok=True)
-        os.environ["LRGSG_CCORE_BIN"] = str(cls.ccore_dir)
-
         # sys.path needed for kernels/parsers imports (not installed packages)
         cls.src_path = Path(__file__).resolve().parents[2] / "src"
         sys.path.insert(0, str(cls.src_path))
@@ -33,7 +29,6 @@ class TestContactProcess(unittest.TestCase):
         env_module.LRGSG_LLIB = ""
         env_module.LRGSG_DATA = str(cls.data_dir)
         env_module.LRGSG_LOG = str(cls.log_dir)
-        env_module.LRGSG_CCORE_BIN = str(cls.ccore_dir)
         sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
         from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
