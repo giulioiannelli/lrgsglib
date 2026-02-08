@@ -23,12 +23,12 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
-from .DynSys import DynSys
+from ..DynSys import DynSys
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ..graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs.nx import SignedGraphNX as SignedGraph
 
 
 class VecDynSys(DynSys):

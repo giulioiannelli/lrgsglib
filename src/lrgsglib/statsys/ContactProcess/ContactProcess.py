@@ -36,12 +36,12 @@ import numpy as np
 import tqdm
 from numba import njit
 
-from ._c_backend import CBackendMixin
-from .BinDynSys import BinDynSys
-from ..utils.tools.chronometer import time_function_accumulate
+from .._c_backend import CBackendMixin
+from ..BinDynSys import BinDynSys
+from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
-    from ..graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs.nx import SignedGraphNX as SignedGraph
 
 
 # ========================================================================
@@ -240,7 +240,7 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
 
     def _build_out_id(self) -> str:
         """Build identifier used by C backends for output files."""
-        from ..utils.basic.strings import join_non_empty
+        from ...utils.basic.strings import join_non_empty
         return join_non_empty("_", self._dynamics_out_label(), self.out_suffix, self.run_id)
 
     def _build_c_arglist_base(self) -> list[str]:

@@ -1,4 +1,9 @@
-"""Statistical physics systems for dynamics on signed graphs."""
+"""Statistical physics systems for dynamics on signed graphs.
+
+This module contains all dynamics models organized in a folder-per-class
+pattern.  Each model lives in its own subdirectory with optional ``ccore/``
+subfolder for C backend source and binaries.
+"""
 
 # Base classes
 from .DynSys import DynSys

@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .BinDynSys import BinDynSys
+from ..BinDynSys import BinDynSys
 
 if TYPE_CHECKING:
-    from ..graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs.nx import SignedGraphNX as SignedGraph
 
 
 class SignedRW(BinDynSys):

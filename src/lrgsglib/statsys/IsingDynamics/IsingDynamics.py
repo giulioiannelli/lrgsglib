@@ -8,17 +8,17 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import tqdm
 
-from ._c_backend import CBackendMixin
-from .BinDynSys import BinDynSys
-from ..config.const import BIN, SG_REPR
-from ..config.funcs import build_pT_fname
-from ..graphs.nx.funcs import get_kth_order_neighbours
-from ..utils.lrg.ising import compute_ising_pairwise_energy
-from ..utils.statsys import boltzmann_factor
-from ..utils.tools.chronometer import time_function_accumulate
+from .._c_backend import CBackendMixin
+from ..BinDynSys import BinDynSys
+from ...config.const import BIN, SG_REPR
+from ...config.funcs import build_pT_fname
+from ...graphs.nx.funcs import get_kth_order_neighbours
+from ...utils.lrg.ising import compute_ising_pairwise_energy
+from ...utils.statsys import boltzmann_factor
+from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
-    from ..graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs.nx import SignedGraphNX as SignedGraph
 
 # Type aliases for cooling/ladder schedules
 CoolingSchedule = Literal["linear", "exponential", "logarithmic", "custom"]

@@ -20,12 +20,12 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
-from ._c_backend import CBackendMixin
-from .ContDynSys import ContDynSys
-from ..utils.tools.chronometer import time_function_accumulate
+from .._c_backend import CBackendMixin
+from ..ContDynSys import ContDynSys
+from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
-    from ..graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs.nx import SignedGraphNX as SignedGraph
 
 
 class KuramotoModel(CBackendMixin, ContDynSys):

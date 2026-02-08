@@ -9,9 +9,9 @@ from typing import Any
 import numpy as np
 import tqdm
 
-from ._c_backend import CBackendMixin
-from .BinDynSys import BinDynSys
-from ..utils.tools.chronometer import time_function_accumulate
+from .._c_backend import CBackendMixin
+from ..BinDynSys import BinDynSys
+from ...utils.tools.chronometer import time_function_accumulate
 
 
 class VoterModel(CBackendMixin, BinDynSys):

@@ -25,12 +25,12 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
-from ..config.const import *
-from ..config.funcs import peq_fstr
-from ..utils.basic.strings import generate_random_id, join_non_empty
+from ...config.const import *
+from ...config.funcs import peq_fstr
+from ...utils.basic.strings import generate_random_id, join_non_empty
 
 if TYPE_CHECKING:
-    from ..graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs.nx import SignedGraphNX as SignedGraph
 
 ZERO_FIELD = lambda N: np.zeros(N, dtype=np.float64)
 
