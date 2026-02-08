@@ -52,6 +52,7 @@ class VoterModel(CBackendMixin, BinDynSys):
     dyn_UVclass = "voter_model"
 
     # CBackendMixin configuration
+    _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "VoterSimulator{}"
     _allowed_c_keys = ("C0", "C1")
 

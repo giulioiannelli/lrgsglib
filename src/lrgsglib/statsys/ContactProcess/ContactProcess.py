@@ -106,6 +106,7 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
     s_t: list[np.ndarray] = []
 
     # CBackendMixin configuration
+    _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "ContactSimulator{}"
     _allowed_c_keys: tuple[str, ...] = ()
 

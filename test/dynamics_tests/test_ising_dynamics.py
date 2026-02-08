@@ -365,6 +365,11 @@ class TestIsingDynamics(unittest.TestCase):
         ising = self.IsingDynamics(sg, T=2.0, steps=1, runlang="C1b", seed=0)
         ising.init_ising_dynamics()
 
+        # Point to a non-existent bin directory to simulate missing binary
+        from pathlib import Path
+        ising._c_bin_dir = Path("/tmp/nonexistent_ccore_bin")
+        ising.build_cprogram_command()
+
         with self.assertRaises(FileNotFoundError):
             ising.run(tqdm_on=False, clean_export=False)
 

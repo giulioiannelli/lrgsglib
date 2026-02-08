@@ -30,17 +30,27 @@ if(HAS_SSE2)
 endif()
 
 # ===========================================================================
-# Path variables
+# Path variables  (folder-per-class layout under statsys/)
 # ===========================================================================
-set(CCORE      ${CMAKE_SOURCE_DIR}/src/lrgsglib/Ccore)
-set(STATSYS    ${CCORE}/statsys)
-set(SFMT_DIR   ${CCORE}/SFMT)
-set(RBIM_SIMC  ${STATSYS}/RBIsingM/simulatorC)
-set(RBIM_BASE  ${STATSYS}/RBIsingM/base)
-set(RBIM_STORE ${STATSYS}/RBIsingM/storer)
-set(SRW_LATT   ${STATSYS}/signedRw/Lattices)
-set(VM_DIR     ${STATSYS}/voterM)
-set(CP_DIR     ${STATSYS}/contactP)
+set(LIB_STATSYS  ${CMAKE_SOURCE_DIR}/src/lrgsglib/statsys)
+set(CCORE        ${LIB_STATSYS}/_ccore)
+set(SFMT_DIR     ${CCORE}/SFMT)
+
+# Per-model C source directories
+set(ISING_CCORE  ${LIB_STATSYS}/IsingDynamics/ccore)
+set(RBIM_BASE    ${ISING_CCORE}/base)
+set(RBIM_STORE   ${ISING_CCORE}/storer)
+set(CP_DIR       ${LIB_STATSYS}/ContactProcess/ccore)
+set(VM_DIR       ${LIB_STATSYS}/VoterModel/ccore)
+set(SRW_CCORE    ${LIB_STATSYS}/SignedRW/ccore)
+set(SRW_LATT     ${SRW_CCORE}/Lattices)
+set(KUR_DIR      ${LIB_STATSYS}/KuramotoModel/ccore)
+set(RD_DIR       ${LIB_STATSYS}/ReactionDiffusionModel/ccore)
+set(CODE_DIR     ${LIB_STATSYS}/CoupledODEModel/ccore)
+set(POTTS_DIR    ${LIB_STATSYS}/PottsModel/ccore)
+set(XY_DIR       ${LIB_STATSYS}/XYModel/ccore)
+set(HBERG_DIR    ${LIB_STATSYS}/HeisenbergModel/ccore)
+set(MSPEC_DIR    ${LIB_STATSYS}/MultiSpeciesModel/ccore)
 
 # ===========================================================================
 # Common source files
@@ -49,34 +59,25 @@ set(COMMON_SOURCES
     ${CCORE}/LRGSG_utils.c
     ${CCORE}/sfmtrng.c
     ${SFMT_DIR}/SFMT.c
-    ${STATSYS}/LRGSG_bindynsys.c
+    ${CCORE}/LRGSG_bindynsys.c
 )
 
 set(COMMON_INCLUDES
     ${CCORE}
     ${SFMT_DIR}
-    ${STATSYS}
-    ${RBIM_SIMC}
+    ${ISING_CCORE}
 )
 
 # Model-specific shared sources
-set(SRC_RBIM  ${RBIM_SIMC}/LRGSG_rbim.c)
-set(SRC_SA    ${RBIM_SIMC}/LRGSG_sa.c)
-set(SRC_PT    ${RBIM_SIMC}/LRGSG_pt.c)
+set(SRC_RBIM  ${ISING_CCORE}/LRGSG_rbim.c)
+set(SRC_SA    ${ISING_CCORE}/LRGSG_sa.c)
+set(SRC_PT    ${ISING_CCORE}/LRGSG_pt.c)
 set(SRC_VM    ${VM_DIR}/LRGSG_vm.c)
 set(SRC_CP    ${CP_DIR}/LRGSG_cp.c)
 
 # Continuous / vector dynamics shared sources
-set(KUR_DIR     ${STATSYS}/kuramotoM)
-set(RD_DIR      ${STATSYS}/reactionD)
-set(CODE_DIR    ${STATSYS}/coupledODE)
-set(POTTS_DIR   ${STATSYS}/pottsM)
-set(XY_DIR      ${STATSYS}/xyM)
-set(HBERG_DIR   ${STATSYS}/heisenbergM)
-set(MSPEC_DIR   ${STATSYS}/multispecM)
-
-set(SRC_CONTDYNSYS  ${STATSYS}/LRGSG_contdynsys.c)
-set(SRC_VECDYNSYS   ${STATSYS}/LRGSG_vecdynsys.c)
+set(SRC_CONTDYNSYS  ${CCORE}/LRGSG_contdynsys.c)
+set(SRC_VECDYNSYS   ${CCORE}/LRGSG_vecdynsys.c)
 set(SRC_KURAMOTO    ${KUR_DIR}/LRGSG_kuramoto.c)
 set(SRC_RD          ${RD_DIR}/LRGSG_rd.c)
 set(SRC_CODE        ${CODE_DIR}/LRGSG_code.c)
@@ -85,8 +86,17 @@ set(SRC_XY          ${XY_DIR}/LRGSG_xy.c)
 set(SRC_HBERG       ${HBERG_DIR}/LRGSG_heisenberg.c)
 set(SRC_MSPEC       ${MSPEC_DIR}/LRGSG_multispec.c)
 
-# Install destination for compiled binaries inside the Python package
-set(BIN_INSTALL_DIR lrgsglib/Ccore/bin)
+# Per-model install destinations
+set(ISING_BIN_DIR  lrgsglib/statsys/IsingDynamics/ccore/bin)
+set(CP_BIN_DIR     lrgsglib/statsys/ContactProcess/ccore/bin)
+set(VM_BIN_DIR     lrgsglib/statsys/VoterModel/ccore/bin)
+set(KUR_BIN_DIR    lrgsglib/statsys/KuramotoModel/ccore/bin)
+set(RD_BIN_DIR     lrgsglib/statsys/ReactionDiffusionModel/ccore/bin)
+set(CODE_BIN_DIR   lrgsglib/statsys/CoupledODEModel/ccore/bin)
+set(POTTS_BIN_DIR  lrgsglib/statsys/PottsModel/ccore/bin)
+set(XY_BIN_DIR     lrgsglib/statsys/XYModel/ccore/bin)
+set(HBERG_BIN_DIR  lrgsglib/statsys/HeisenbergModel/ccore/bin)
+set(MSPEC_BIN_DIR  lrgsglib/statsys/MultiSpeciesModel/ccore/bin)
 
 # ===========================================================================
 # Helper functions
@@ -95,7 +105,7 @@ set(BIN_INSTALL_DIR lrgsglib/Ccore/bin)
 # --- Ising simulator (standard: uses LRGSG_rbim) ---
 function(add_ising_simulator NAME)
     add_executable(${NAME}
-        ${RBIM_SIMC}/${NAME}.c
+        ${ISING_CCORE}/${NAME}.c
         ${COMMON_SOURCES}
         ${SRC_RBIM}
     )
@@ -105,13 +115,13 @@ function(add_ising_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${ISING_BIN_DIR})
 endfunction()
 
 # --- Ising simulator with Simulated Annealing (extra: LRGSG_sa) ---
 function(add_ising_sa_simulator NAME)
     add_executable(${NAME}
-        ${RBIM_SIMC}/${NAME}.c
+        ${ISING_CCORE}/${NAME}.c
         ${COMMON_SOURCES}
         ${SRC_RBIM}
         ${SRC_SA}
@@ -122,13 +132,13 @@ function(add_ising_sa_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${ISING_BIN_DIR})
 endfunction()
 
 # --- Ising simulator with Parallel Tempering (extra: LRGSG_pt) ---
 function(add_ising_pt_simulator NAME)
     add_executable(${NAME}
-        ${RBIM_SIMC}/${NAME}.c
+        ${ISING_CCORE}/${NAME}.c
         ${COMMON_SOURCES}
         ${SRC_RBIM}
         ${SRC_PT}
@@ -139,7 +149,7 @@ function(add_ising_pt_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${ISING_BIN_DIR})
 endfunction()
 
 # --- Voter simulator ---
@@ -155,7 +165,7 @@ function(add_voter_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${VM_BIN_DIR})
 endfunction()
 
 # --- Contact Process simulator ---
@@ -171,7 +181,7 @@ function(add_contact_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${CP_BIN_DIR})
 endfunction()
 
 # ===========================================================================
@@ -236,7 +246,7 @@ function(add_kuramoto_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${KUR_BIN_DIR})
 endfunction()
 
 add_kuramoto_simulator(KuramotoSimulator0)
@@ -257,7 +267,7 @@ function(add_rd_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${RD_BIN_DIR})
 endfunction()
 
 add_rd_simulator(ReactionDiffusionSimulator0)
@@ -278,7 +288,7 @@ function(add_code_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${CODE_BIN_DIR})
 endfunction()
 
 add_code_simulator(CoupledODESimulator0)
@@ -299,7 +309,7 @@ function(add_potts_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${POTTS_BIN_DIR})
 endfunction()
 
 add_potts_simulator(PottsSimulator0)
@@ -321,7 +331,7 @@ function(add_xy_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${XY_BIN_DIR})
 endfunction()
 
 add_xy_simulator(XYSimulator0)
@@ -343,7 +353,7 @@ function(add_heisenberg_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${HBERG_BIN_DIR})
 endfunction()
 
 add_heisenberg_simulator(HeisenbergSimulator0)
@@ -364,7 +374,7 @@ function(add_multispec_simulator NAME)
     if(OpenMP_FOUND)
         target_link_libraries(${NAME} PRIVATE OpenMP::OpenMP_C)
     endif()
-    install(TARGETS ${NAME} DESTINATION ${BIN_INSTALL_DIR})
+    install(TARGETS ${NAME} DESTINATION ${MSPEC_BIN_DIR})
 endfunction()
 
 add_multispec_simulator(MultiSpeciesSimulator0)
@@ -375,7 +385,7 @@ add_multispec_simulator(MultiSpeciesSimulator0)
 
 # Signed random walk on CSR adjacency matrix (already pybind11)
 pybind11_add_module(_random_walk
-    ${STATSYS}/random_walk.cpp
+    ${SRW_CCORE}/random_walk.cpp
 )
 target_include_directories(_random_walk PRIVATE ${Python_NumPy_INCLUDE_DIRS})
 target_compile_options(_random_walk PRIVATE -O3)
@@ -386,7 +396,7 @@ pybind11_add_module(ising_model
     ${RBIM_BASE}/IsingModel.cpp
 )
 target_compile_options(ising_model PRIVATE -O3)
-install(TARGETS ising_model DESTINATION lrgsglib/Ccore/statsys/RBIsingM/base)
+install(TARGETS ising_model DESTINATION lrgsglib/statsys/IsingDynamics/ccore/base)
 
 # Ising model store - pybind11 binding
 pybind11_add_module(ising_model_store
@@ -395,14 +405,14 @@ pybind11_add_module(ising_model_store
 )
 target_include_directories(ising_model_store PRIVATE ${RBIM_STORE})
 target_compile_options(ising_model_store PRIVATE -O3)
-install(TARGETS ising_model_store DESTINATION lrgsglib/Ccore/statsys/RBIsingM/storer)
+install(TARGETS ising_model_store DESTINATION lrgsglib/statsys/IsingDynamics/ccore/storer)
 
 # Random walker on lattices - pybind11 binding
 pybind11_add_module(random_walker
     ${SRW_LATT}/random_walker.cpp
 )
 target_compile_options(random_walker PRIVATE -O3)
-install(TARGETS random_walker DESTINATION lrgsglib/Ccore/statsys/signedRw/Lattices)
+install(TARGETS random_walker DESTINATION lrgsglib/statsys/SignedRW/ccore/Lattices)
 
 # ===========================================================================
 # graph-tool C++ extensions (NOT built by CMake)

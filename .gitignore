@@ -1,8 +1,9 @@
 # paths
 data/
 src/lrgsglib.egg-info/
-src/lrgsglib/Ccore/bin/
-src/lrgsglib/Ccore/statsys/signedRw/Lattices/build/
+# Per-model compiled C binaries (folder-per-class layout)
+src/lrgsglib/statsys/*/ccore/bin/
+src/lrgsglib/statsys/SignedRW/ccore/Lattices/build/
 docs/build/
 docs/source/api/generated/
 # Explicitly ignore everything in data and data/plot, except the paper directory

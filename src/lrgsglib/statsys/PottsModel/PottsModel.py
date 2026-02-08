@@ -54,6 +54,7 @@ class PottsModel(CBackendMixin, VecDynSys):
 
     dyn_UVclass = "potts_model"
 
+    _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "PottsSimulator{}"
     _allowed_c_keys: tuple[str, ...] = ("C0",)
 

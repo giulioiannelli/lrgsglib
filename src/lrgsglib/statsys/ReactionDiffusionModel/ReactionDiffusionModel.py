@@ -62,6 +62,7 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
 
     dyn_UVclass = "reaction_diffusion"
 
+    _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "ReactionDiffusionSimulator{}"
     _allowed_c_keys: tuple[str, ...] = ("C0",)
 

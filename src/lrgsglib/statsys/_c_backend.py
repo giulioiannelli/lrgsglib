@@ -44,7 +44,12 @@ from ..utils.basic.strings import join_non_empty
 
 
 def _get_ccore_bin() -> Path:
-    """Get C core binary directory path at runtime.
+    """Get legacy C core binary directory path at runtime.
+
+    .. deprecated::
+        With the folder-per-class layout, each model class defines its own
+        ``_c_bin_dir`` class attribute.  This function is kept only for
+        backward compatibility with code that hasn't been updated yet.
 
     Reads from environment variable to allow test isolation.
     Falls back to configured constant if not set.
@@ -59,10 +64,10 @@ def _get_ccore_bin() -> Path:
 
 
 def _c_backend_available() -> bool:
-    """Check if compiled C backend directory exists.
+    """Check if compiled C backend directory exists (legacy).
 
-    Returns True if the Ccore/bin directory exists.  Individual binary
-    availability is checked later by ``run_cprogram()``.
+    .. deprecated::
+        Use the per-model ``_c_bin_dir`` attribute instead.
     """
     bin_dir = _get_ccore_bin()
     return bin_dir.is_dir()
@@ -92,6 +97,7 @@ class CBackendMixin:
     # Subclasses should override these
     _c_program_name_template: str = ""
     _allowed_c_keys: tuple[str, ...] = ()
+    _c_bin_dir: Path | None = None  # per-model compiled binary directory
 
     # These are set during operation
     CbaseName: str = ""
@@ -102,6 +108,16 @@ class CBackendMixin:
     # ------------------------------------------------------------------
     # C backend availability check
     # ------------------------------------------------------------------
+    def _get_bin_dir(self: "DynSys") -> Path:
+        """Return the binary directory for this model.
+
+        Uses the per-model ``_c_bin_dir`` if set, otherwise falls back
+        to the legacy global ``_get_ccore_bin()`` for backward compat.
+        """
+        if self._c_bin_dir is not None:
+            return self._c_bin_dir
+        return _get_ccore_bin()
+
     def _check_c_backend_or_fallback(self: "DynSys") -> None:
         """Check if C backend is available; fall back to Python if not.
 
@@ -116,9 +132,9 @@ class CBackendMixin:
         """
         if not self.runlang or not self.runlang.upper().startswith("C"):
             return
-        if _c_backend_available():
+        bin_dir = self._get_bin_dir()
+        if bin_dir.is_dir():
             return
-        bin_dir = _get_ccore_bin()
         warnings.warn(
             f"C backend requested (runlang='{self.runlang}') but compiled "
             f"binaries not found at {bin_dir}. Falling back to Python "
@@ -184,7 +200,7 @@ class CBackendMixin:
         suffix = self._c_program_suffix()
         self.CbaseName = self._c_program_name_template.format(suffix)
         arglist = self._build_c_arglist()
-        self.cprogram = [Path(_get_ccore_bin()) / self.CbaseName] + arglist
+        self.cprogram = [self._get_bin_dir() / self.CbaseName] + arglist
 
     def _build_c_arglist(self: "DynSys") -> list[str]:
         """Build argument list for C program.

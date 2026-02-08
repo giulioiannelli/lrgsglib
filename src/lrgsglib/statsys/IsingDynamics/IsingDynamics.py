@@ -66,6 +66,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     dyn_UVclass = "ising_dynamics"
 
     # CBackendMixin configuration
+    _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "IsingSimulator{}"
     _allowed_c_keys: tuple[str, ...] = (
         # New Metropolis variants

@@ -56,6 +56,7 @@ class MultiSpeciesModel(CBackendMixin, VecDynSys):
 
     dyn_UVclass = "multi_species"
 
+    _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "MultiSpeciesSimulator{}"
     _allowed_c_keys: tuple[str, ...] = ("C0",)
 

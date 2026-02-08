@@ -70,6 +70,7 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
 
     dyn_UVclass = "coupled_ode"
 
+    _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "CoupledODESimulator{}"
     _allowed_c_keys: tuple[str, ...] = ("C0",)
 

@@ -50,36 +50,36 @@ LRGSG_TOOLS_PY: Path = _LIB_ROOT / "tools" / "py"
 # ---------------------------------------------------------------------------
 # Package subpackage paths
 # ---------------------------------------------------------------------------
-LRGSG_LIB_CCORE: Path = _PKG_ROOT / "Ccore"
 LRGSG_LIB_GT_PATCHES: Path = _PKG_ROOT / "gt_patches"
 LRGSG_LIB_NX_PATCHES: Path = _PKG_ROOT / "nx_patches"
 LRGSG_LIB_STOCPROC: Path = _PKG_ROOT / "stocproc"
-
-# ---------------------------------------------------------------------------
-# Ccore paths
-# ---------------------------------------------------------------------------
-LRGSG_CCORE_BIN: Path = _path("LRGSG_CCORE_BIN", _PKG_ROOT / "Ccore" / "bin")
-LRGSG_CCORE_SFMT: Path = _PKG_ROOT / "Ccore" / "SFMT"
-LRGSG_CCORE_STATSYS: Path = _PKG_ROOT / "Ccore" / "statsys"
 LRGSG_GT_PATCHES_CPP: Path = _PKG_ROOT / "gt_patches" / "cpp"
 
 # ---------------------------------------------------------------------------
-# Dynamics subsystem paths
+# Statsys shared C infrastructure
 # ---------------------------------------------------------------------------
-LRGSG_STATSYS_RBIM: Path = _PKG_ROOT / "Ccore" / "statsys" / "RBIsingM"
-LRGSG_STATSYS_SRW: Path = _PKG_ROOT / "Ccore" / "statsys" / "signedRw"
-LRGSG_STATSYS_VM: Path = _PKG_ROOT / "Ccore" / "statsys" / "voterM"
-LRGSG_STATSYS_CP: Path = _PKG_ROOT / "Ccore" / "statsys" / "contactP"
-LRGSG_RBIM_BASE: Path = _PKG_ROOT / "Ccore" / "statsys" / "RBIsingM" / "base"
-LRGSG_RBIM_SIMC: Path = (
-    _PKG_ROOT / "Ccore" / "statsys" / "RBIsingM" / "simulatorC"
+LRGSG_STATSYS_CCORE: Path = _PKG_ROOT / "statsys" / "_ccore"
+LRGSG_CCORE_SFMT: Path = LRGSG_STATSYS_CCORE / "SFMT"
+
+# Legacy aliases (deprecated — use per-model _c_bin_dir instead)
+LRGSG_LIB_CCORE: Path = LRGSG_STATSYS_CCORE
+LRGSG_CCORE_BIN: Path = _path(
+    "LRGSG_CCORE_BIN", LRGSG_STATSYS_CCORE
 )
-LRGSG_RBIM_STORE: Path = (
-    _PKG_ROOT / "Ccore" / "statsys" / "RBIsingM" / "storer"
-)
-LRGSG_SRW_LATT: Path = (
-    _PKG_ROOT / "Ccore" / "statsys" / "signedRw" / "Lattices"
-)
+LRGSG_CCORE_STATSYS: Path = LRGSG_STATSYS_CCORE
+
+# ---------------------------------------------------------------------------
+# Per-model C source/binary directories
+# ---------------------------------------------------------------------------
+_STATSYS: Path = _PKG_ROOT / "statsys"
+LRGSG_STATSYS_RBIM: Path = _STATSYS / "IsingDynamics" / "ccore"
+LRGSG_STATSYS_SRW: Path = _STATSYS / "SignedRW" / "ccore"
+LRGSG_STATSYS_VM: Path = _STATSYS / "VoterModel" / "ccore"
+LRGSG_STATSYS_CP: Path = _STATSYS / "ContactProcess" / "ccore"
+LRGSG_RBIM_BASE: Path = LRGSG_STATSYS_RBIM / "base"
+LRGSG_RBIM_SIMC: Path = LRGSG_STATSYS_RBIM
+LRGSG_RBIM_STORE: Path = LRGSG_STATSYS_RBIM / "storer"
+LRGSG_SRW_LATT: Path = LRGSG_STATSYS_SRW / "Lattices"
 
 # ---------------------------------------------------------------------------
 # User-facing / project-level paths (overridable via environment)
