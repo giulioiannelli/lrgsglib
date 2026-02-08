@@ -1,5 +1,9 @@
 # LRGSGlib
 
+[![arXiv](https://img.shields.io/badge/arXiv-2504.00144-b31b1b.svg)](https://arxiv.org/abs/2504.00144)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+
 LRGSGlib is a set of Python modules and C/C++ extensions implementing the theoretical tools of the **Laplacian Renormalisation Group for Signed Graphs**. It provides utilities for building signed networks, running renormalisation flows and simulating statistical physics models such as the Ising, contact process and voter dynamics. Additional helpers for plotting, logging and networking patches are also included.
 
 The C sources for the performance critical parts live in `src/lrgsglib/Ccore` and can be built along with the Python modules.
@@ -113,6 +117,29 @@ The documentation includes:
 cd lrgsglib
 pytest test/
 ```
+
+## Citation
+
+If you use LRGSGlib in your research, please cite:
+
+> G. Iannelli, P. Villegas, T. Gili, A. Gabrielli, *Topological Symmetry Breaking in Antagonistic Dynamics*, arXiv:2504.00144 (2025). [https://arxiv.org/abs/2504.00144](https://arxiv.org/abs/2504.00144)
+
+<details>
+<summary>BibTeX</summary>
+
+```bibtex
+@article{iannelli2025topological,
+  title     = {Topological Symmetry Breaking in Antagonistic Dynamics},
+  author    = {Iannelli, Giulio and Villegas, Pablo and Gili, Tommaso and Gabrielli, Andrea},
+  year      = {2025},
+  eprint    = {2504.00144},
+  archivePrefix = {arXiv},
+  primaryClass  = {cond-mat.dis-nn},
+  url       = {https://arxiv.org/abs/2504.00144}
+}
+```
+
+</details>
 
 ## More Information
 
