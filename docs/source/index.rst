@@ -28,8 +28,8 @@ Project Layout
   dynamics classes, utilities, plotting helpers, and bindings).
 - ``src/`` contains standalone or compound programs used to compute or
   reproduce specific experiments and data products.
-- ``src/lrgsglib/Ccore`` hosts performance-critical C/C++ extensions used
-  by selected dynamics.
+- ``src/lrgsglib/statsys/<Model>/ccore/`` hosts performance-critical C/C++
+  extensions co-located with their Python dynamics classes.
 
 .. note::
    This documentation is for version |release|. For the latest development version,

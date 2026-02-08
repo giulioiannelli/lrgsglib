@@ -4,4 +4,4 @@
 while moving on a sparse lattice. The module is built with pybind11.
 
 Compile the extension using `make c-make`. The resulting shared object
-is stored in `src/lrgsglib/Ccore/bin/`.
+is stored in this directory.

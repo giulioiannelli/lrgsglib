@@ -8,7 +8,7 @@ import numpy as np
 ext_modules = [
     Pybind11Extension(
         "lrgsglib._random_walk",
-        ["src/lrgsglib/Ccore/statsys/random_walk.cpp"],
+        ["src/lrgsglib/statsys/SignedRW/ccore/random_walk.cpp"],
         include_dirs=[np.get_include()],
         cxx_std=17,
         extra_compile_args=["-O3"],

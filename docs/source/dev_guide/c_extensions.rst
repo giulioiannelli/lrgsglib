@@ -8,43 +8,43 @@ Overview
 --------
 
 Performance-critical simulations are implemented in C for ~100x speedup over
-pure Python. The C code lives in ``src/lrgsglib/Ccore/`` and compiles to
-standalone binaries called via subprocess from Python.
+pure Python. C code is co-located with Python classes in a folder-per-class
+layout under ``src/lrgsglib/statsys/``. Each model has its own ``ccore/``
+subdirectory, and shared infrastructure lives in ``statsys/_ccore/``.
 
 Directory Structure
 -------------------
 
 .. code-block:: text
 
-   Ccore/
-   ├── bin/                        ← Compiled binaries (output directory)
+   statsys/
+   ├── _ccore/                      ← Shared C infrastructure
+   │   ├── SFMT/                    ← SIMD-oriented Fast Mersenne Twister
+   │   │   ├── SFMT.c/.h            ← Core RNG implementation
+   │   │   └── params/              ← Period parameters (19937, etc.)
+   │   ├── LRGSG_utils.c/.h         ← Common utility functions
+   │   ├── LRGSG_customs.h          ← Custom type definitions
+   │   ├── LRGSG_bindynsys.c/.h     ← Binary dynamics utilities
+   │   ├── LRGSG_contdynsys.c/.h    ← Continuous dynamics utilities
+   │   ├── LRGSG_vecdynsys.c/.h     ← Vector dynamics utilities
+   │   └── sfmtrng.c/.h             ← SFMT RNG wrapper
    │
-   ├── LRGSG_utils.c/.h            ← Common utility functions
-   ├── LRGSG_customs.h             ← Custom type definitions
-   ├── LRGSG_bindynsys.c/.h        ← Binary dynamics system utilities
-   ├── sfmtrng.c/.h                ← SFMT RNG wrapper
+   ├── IsingDynamics/               ← Ising model
+   │   ├── IsingDynamics.py
+   │   └── ccore/
+   │       ├── bin/                  ← Compiled binaries (IsingSimulator*)
+   │       ├── LRGSG_rbim.c/.h
+   │       ├── base/                 ← Core Ising functions (pybind11)
+   │       └── storer/               ← Data storage (pybind11)
    │
-   ├── SFMT/                       ← SIMD-oriented Fast Mersenne Twister
-   │   ├── SFMT.c/.h               ← Core RNG implementation
-   │   ├── params/                 ← Period parameters (19937, etc.)
-   │   └── jump/                   ← Jump-ahead functionality
-   │
-   └── statsys/                    ← Statistical physics simulators
-       ├── RBIsingM/               ← Random-bond Ising model
-       │   ├── base/               ← Core Ising functions
-       │   ├── simulatorC/         ← Simulator implementations
-       │   └── storer/             ← Data storage utilities
-       │
-       ├── voterM/                 ← Voter model simulators
-       │   ├── VoterSimulator0.c
-       │   └── VoterSimulator1.c
-       │
-       ├── contactP/               ← Contact process simulators
-       │   ├── ContactSimulator*.c
-       │   └── LRGSG_cp.c/.h
-       │
-       └── signedRw/               ← Signed random walks
-           └── Lattices/
+   ├── ContactProcess/ccore/        ← Contact process simulators
+   ├── VoterModel/ccore/            ← Voter model simulators
+   ├── KuramotoModel/ccore/         ← Kuramoto oscillators
+   ├── PottsModel/ccore/            ← Potts model
+   ├── XYModel/ccore/               ← XY (planar rotator) model
+   ├── HeisenbergModel/ccore/       ← Heisenberg model
+   ├── MultiSpeciesModel/ccore/     ← Multi-species model
+   └── SignedRW/ccore/              ← Signed random walks
 
 Simulator Variants
 ------------------
@@ -284,7 +284,7 @@ The Makefile handles compilation:
    make c-make
 
    # Build specific simulator
-   make Ccore/bin/IsingSimulator1b
+   make src/lrgsglib/statsys/IsingDynamics/ccore/bin/IsingSimulator1b
 
    # Clean and rebuild
    make clean && make c-make
@@ -307,9 +307,9 @@ To add a new simulator:
 
    .. code-block:: c
 
-      // Ccore/statsys/mymodel/MySimulator.c
-      #include "../../LRGSG_utils.h"
-      #include "../../sfmtrng.h"
+      // statsys/MyModel/ccore/MySimulator.c
+      #include "LRGSG_utils.h"    /* resolved via -I flags */
+      #include "sfmtrng.h"
       #include "LRGSG_mymodel.h"
 
       int main(int argc, char* argv[]) {
@@ -403,7 +403,7 @@ Debugging C Code
 
 .. code-block:: bash
 
-   valgrind --leak-check=full ./Ccore/bin/IsingSimulator1b ...
+   valgrind --leak-check=full ./src/lrgsglib/statsys/IsingDynamics/ccore/bin/IsingSimulator1b ...
 
 **Add debug prints:**
 

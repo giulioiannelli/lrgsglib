@@ -115,9 +115,9 @@ When adding features:
 C/C++ Changes
 ~~~~~~~~~~~~~
 
-1. Follow existing patterns in ``Ccore/``
+1. Follow existing patterns in ``statsys/<Model>/ccore/``
 2. Add Makefile rules for new binaries
-3. Create Python wrappers in ``statsys/``
+3. Create Python class in ``statsys/<Model>/``
 4. Benchmark before and after
 
 Pull Request Process
@@ -260,7 +260,7 @@ Key directories to understand:
    │   ├── nx_patches/        ← Graph classes (start here for new graphs)
    │   ├── statsys/           ← Dynamics (start here for new simulations)
    │   ├── utils/             ← Utility functions
-   │   └── Ccore/             ← C code (performance-critical)
+   │   │   └── <Model>/ccore/  ← C code (per-model, performance-critical)
    │
    ├── src/                   ← Standalone programs
    │   ├── kernels/           ← Reusable computation blocks
@@ -286,10 +286,10 @@ Adding a New Graph Type
 Adding a New Simulation
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-1. Create ``statsys/NewDynamics.py``
-2. Inherit from ``BinDynSys``
+1. Create ``statsys/NewDynamics/NewDynamics.py``
+2. Inherit from ``BinDynSys`` (or ``ContDynSys``, ``VecDynSys``)
 3. Implement Python version
-4. Add C version in ``Ccore/statsys/``
+4. Add C code in ``statsys/NewDynamics/ccore/``
 5. Add Makefile rules
 6. Add tests and benchmarks
 

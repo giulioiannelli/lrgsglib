@@ -6,7 +6,7 @@
 
 LRGSGlib is a set of Python modules and C/C++ extensions implementing the theoretical tools of the **Laplacian Renormalisation Group for Signed Graphs**. It provides utilities for building signed networks, running renormalisation flows and simulating statistical physics models such as the Ising, contact process and voter dynamics. Additional helpers for plotting, logging and networking patches are also included.
 
-The C sources for the performance critical parts live in `src/lrgsglib/Ccore` and can be built along with the Python modules.
+The C sources for performance-critical simulations are co-located with their Python classes in a folder-per-class layout under `src/lrgsglib/statsys/<Model>/ccore/`, with shared infrastructure in `src/lrgsglib/statsys/_ccore/`. They are built alongside the Python modules.
 
 ## Installation
 
@@ -167,6 +167,6 @@ If you use LRGSGlib in your research, please cite:
 
 ## More Information
 
-- **C programs and models**: See `src/lrgsglib/Ccore/README.md`
+- **C programs and models**: Co-located with Python classes in `src/lrgsglib/statsys/<Model>/ccore/`
 - **Agent workspace**: See `.agents/00-START-HERE.md` for development context
 - **Examples**: See `docs/source/user_guide/examples.rst` for complete workflows

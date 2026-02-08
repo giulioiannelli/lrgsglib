@@ -16,7 +16,7 @@ You are an expert Python research engineer. The goal is to produce small, well-t
   - `Makefile` and `build/` — how C/C++ parts are compiled and configured.
 
 - Architecture & hotspots
-  - Languages: Python (primary) with performance-critical C/C++ in `src/lrgsglib/Ccore/`.
+  - Languages: Python (primary) with performance-critical C/C++ co-located in `src/lrgsglib/statsys/<Model>/ccore/`.
   - Key Python packages live under `src/lrgsglib/` (utilities, plotting, nx patches, spectral tools).
   - Notebooks live under `ipynb/` and large data under `data/` — avoid committing large binary data.
 
@@ -28,14 +28,14 @@ You are an expert Python research engineer. The goal is to produce small, well-t
   - Keep diffs minimal and focused; breaking API changes require a migration note.
 
 - C/C++ and performance-critical code
-  - The `Ccore` folder contains performance kernels. Do NOT rewrite or remove these files without
+  - Per-model `ccore/` folders contain performance kernels. Do NOT rewrite or remove these files without
     strong tests, benchmarks, and explicit human review.
   - Use the `Makefile` rules and `build/` include files to understand compile flags and paths.
 
 - Integration examples (where to look for patterns)
   - Spectral utilities: `src/lrgsglib/utils/lrg/spectral.py` (examples: computing Laplacian spectra)
   - Plot helpers: `src/lrgsglib/plotlib/` (small utilities for figures used in notebooks)
-  - C kernels: `src/lrgsglib/Ccore/statsys/` (simulators: Ising, Voter, Contact)
+  - C kernels: `src/lrgsglib/statsys/<Model>/ccore/` (simulators: Ising, Voter, Contact)
 
 - Hard constraints / do nots
   - Do not push/merge to protected branches; always open PRs for human review.
@@ -47,4 +47,4 @@ You are an expert Python research engineer. The goal is to produce small, well-t
   - How to reproduce/validate locally (commands used and expected quick checks).
   - If you touch C/C++ code, include a micro-benchmark or unit test showing parity/perf.
 
-If any section is unclear or you want more examples from specific modules, tell me which area (e.g. `Ccore` build, spectral utils, or plotting conventions) and I will expand this file with targeted examples.
+If any section is unclear or you want more examples from specific modules, tell me which area (e.g. C build, spectral utils, or plotting conventions) and I will expand this file with targeted examples.

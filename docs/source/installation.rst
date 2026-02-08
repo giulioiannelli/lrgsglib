@@ -68,7 +68,7 @@ For using lrgsglib as an independent library:
 
    The build process:
 
-   - Compiles C/C++ simulators in ``src/lrgsglib/Ccore/``
+   - Compiles C/C++ simulators in ``src/lrgsglib/statsys/<Model>/ccore/``
    - Builds pybind11 Python extensions
    - Generates a ``.env`` file with configured paths
    - Sets up data, log, and binary directories

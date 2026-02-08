@@ -48,7 +48,9 @@ low-level utilities up through graph operations to high-level programs.
    │   ├── plotlib/               ← Visualization utilities
    │   ├── config/                ← Configuration and constants
    │   │   └── progargs/          ← Command-line argument definitions
-   │   ├── Ccore/                 ← C/C++ performance layer
+   │   │   ├── _ccore/            ← Shared C infrastructure (SFMT, utils)
+   │   │   └── <Model>/ccore/    ← Per-model C code + compiled binaries
+   │   │
    │   └── bindings/              ← pybind11 Python-C++ bindings
    │
    ├── src/                       ← Standalone programs
@@ -230,21 +232,16 @@ The library implements intelligent fallback:
 Python/C Integration
 --------------------
 
-Performance-critical code lives in ``Ccore/``:
+Performance-critical code is co-located with Python classes (folder-per-class):
 
 .. code-block:: text
 
-   Ccore/
-   ├── bin/                    ← Compiled binaries
-   ├── SFMT/                   ← SIMD Mersenne Twister RNG
-   ├── statsys/                ← Simulator source code
-   │   ├── RBIsingM/           ← Random-bond Ising model
-   │   │   ├── base/           ← Core Ising functions
-   │   │   ├── simulatorC/     ← IsingSimulator0, 1a, 1b, 3b, 4b
-   │   │   └── storer/         ← Data storage utilities
-   │   ├── voterM/             ← Voter model simulators
-   │   └── contactP/           ← Contact process simulators
-   └── LRGSG_utils.c           ← Common C utilities
+   statsys/
+   ├── _ccore/                 ← Shared C infrastructure (SFMT, utils)
+   ├── IsingDynamics/ccore/    ← Ising C code + bin/
+   ├── ContactProcess/ccore/   ← Contact process C code + bin/
+   ├── VoterModel/ccore/       ← Voter model C code + bin/
+   └── ...other models.../ccore/
 
 **Simulator variants:**
 

@@ -32,7 +32,7 @@ Follow the repository’s conventions; prefer **pure functions**, minimal hidden
 ## 3) What agents MUST NOT do
 
 - Push directly to protected branches or merge without human review.
-- Remove or rewrite performance-critical code (especially C/C++ in `src/lrgsglib/Ccore/`) without strong tests and benchmarks.
+- Remove or rewrite performance-critical code (especially C/C++ in `src/lrgsglib/statsys/<Model>/ccore/`) without strong tests and benchmarks.
 - Add secrets or external network calls.
 - Make unverified scientific claims.
 - Change build, license, or CI defaults without an explicit rationale.
@@ -45,8 +45,8 @@ Follow the repository’s conventions; prefer **pure functions**, minimal hidden
 - **Architectural primitives:**  
   - **Structures:** Topological containers such as `Lattice2D`, `ErdosRenyi`, etc., modeled as `SignedGraph` objects responsible for graph construction and topological property computation.  
   - **Dynamics:** Binary spin-system processes (e.g., `IsingDynamics`, `ContactProcess`, other `BinDynSys`) that mount on `SignedGraph` instances and drive simulations. Keep dynamics decoupled from the graph backend.
-- **Performance & reproducibility:** Aim for long, optimized simulations with reproducible, cross-platform behavior. Provide backend options (`numpy`/`scipy` default; prefer optional `numba`/`cupy` accelerators; use `src/lrgsglib/Ccore/` kernels for hot paths). Preserve deterministic seeds and package/install cleanly (pip/conda-friendly).
-- **Languages:** Python (primary), C/C++ extensions in `src/lrgsglib/Ccore/` for hot paths.
+- **Performance & reproducibility:** Aim for long, optimized simulations with reproducible, cross-platform behavior. Provide backend options (`numpy`/`scipy` default; prefer optional `numba`/`cupy` accelerators; use `src/lrgsglib/statsys/<Model>/ccore/` kernels for hot paths). Preserve deterministic seeds and package/install cleanly (pip/conda-friendly).
+- **Languages:** Python (primary), C/C++ extensions in `src/lrgsglib/statsys/<Model>/ccore/` for hot paths.
 - **Typical stack:** `numpy`, `scipy`, `matplotlib`, and currently `networkx` (target: abstract away and support faster/multiple graph backends). Keep dependencies minimal and swappable.
 - **Python target:** 3.11+.
 - **Common modules (illustrative, not exhaustive):**
@@ -54,7 +54,7 @@ Follow the repository’s conventions; prefer **pure functions**, minimal hidden
   - `src/lrgsglib/plotlib/` (plot helpers)
   - `src/lrgsglib/utils/basic/` (general utilities)
   - `src/lrgsglib/nx_patches/` (NetworkX compatibility helpers)
-  - `src/lrgsglib/Ccore/` (C/C++ kernels and build scripts)
+  - `src/lrgsglib/statsys/<Model>/ccore/` (C/C++ kernels and build scripts)
 
 **Style**:
 - PEP 8, PEP 484, small functions, clear names.
@@ -63,7 +63,7 @@ Follow the repository’s conventions; prefer **pure functions**, minimal hidden
 - Keep docstrings short but precise; add one tiny runnable example when helpful.
 
 **Build notes** (developer convenience):
-- C/C++ bits live under `src/lrgsglib/Ccore`. They are built alongside Python modules.  
+- C/C++ bits are co-located with Python classes under `src/lrgsglib/statsys/<Model>/ccore/` (shared infra in `_ccore/`). They are built alongside Python modules.  
 - Typical workflow seen in the repo:  
   ```bash
   # example (adjust to your setup)
