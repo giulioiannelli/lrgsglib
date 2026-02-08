@@ -39,8 +39,8 @@ void random_unit_vector_3d(double *v) {
     /* Marsaglia method for uniform points on S^2 */
     double x1, x2, s_sq;
     do {
-        x1 = 2.0 * genrand_real2() - 1.0;
-        x2 = 2.0 * genrand_real2() - 1.0;
+        x1 = 2.0 * RNG_dbl() - 1.0;
+        x2 = 2.0 * RNG_dbl() - 1.0;
         s_sq = x1 * x1 + x2 * x2;
     } while (s_sq >= 1.0);
     double factor = 2.0 * sqrt(1.0 - s_sq);
@@ -53,7 +53,7 @@ void random_rotation_3d(const double *v_in, double *v_out, double delta) {
     /* Small random rotation of v_in by angle up to delta */
     double perturb[3];
     for (int k = 0; k < 3; ++k)
-        perturb[k] = v_in[k] + delta * (2.0 * genrand_real2() - 1.0);
+        perturb[k] = v_in[k] + delta * (2.0 * RNG_dbl() - 1.0);
     normalize3(perturb);
     v_out[0] = perturb[0];
     v_out[1] = perturb[1];

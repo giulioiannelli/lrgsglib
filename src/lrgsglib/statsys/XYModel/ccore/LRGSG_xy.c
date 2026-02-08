@@ -6,11 +6,11 @@
 void xy_metropolis_sweep(size_t N, double *theta, double T, double delta,
                          size_t *neigh_len, NodeEdges *node_edges) {
     for (size_t step = 0; step < N; ++step) {
-        size_t nd = (size_t)(genrand_real2() * N);
+        size_t nd = (size_t)(RNG_dbl() * N);
         if (nd >= N) nd = N - 1;
 
         double current = theta[nd];
-        double proposal = fmod(current + delta * (2.0 * genrand_real2() - 1.0), 2.0 * M_PI);
+        double proposal = fmod(current + delta * (2.0 * RNG_dbl() - 1.0), 2.0 * M_PI);
         if (proposal < 0.0) proposal += 2.0 * M_PI;
 
         double dE = 0.0;
@@ -21,7 +21,7 @@ void xy_metropolis_sweep(size_t N, double *theta, double T, double delta,
             dE += w * (cos(current - theta[j]) - cos(proposal - theta[j]));
         }
 
-        if (dE <= 0.0 || (T > 0.0 && genrand_real2() < exp(-dE / T))) {
+        if (dE <= 0.0 || (T > 0.0 && RNG_dbl() < exp(-dE / T))) {
             theta[nd] = proposal;
         }
     }

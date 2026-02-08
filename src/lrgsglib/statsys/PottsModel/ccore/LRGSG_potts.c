@@ -7,12 +7,12 @@ void potts_metropolis_sweep(size_t N, int32_t *s, int q, double T,
                             size_t *neigh_len, NodeEdges *node_edges) {
     for (size_t i = 0; i < N; ++i) {
         /* Pick random node */
-        size_t nd = (size_t)(genrand_real2() * N);
+        size_t nd = (size_t)(RNG_dbl() * N);
         if (nd >= N) nd = N - 1;
 
         int32_t current = s[nd];
         /* Propose new state != current */
-        int32_t proposal = (int32_t)(genrand_real2() * (q - 1));
+        int32_t proposal = (int32_t)(RNG_dbl() * (q - 1));
         if (proposal >= current) proposal++;
 
         /* Energy change */
@@ -26,7 +26,7 @@ void potts_metropolis_sweep(size_t N, int32_t *s, int q, double T,
         }
 
         /* Accept/reject */
-        if (dE <= 0.0 || (T > 0.0 && genrand_real2() < exp(-dE / T))) {
+        if (dE <= 0.0 || (T > 0.0 && RNG_dbl() < exp(-dE / T))) {
             s[nd] = proposal;
         }
     }
