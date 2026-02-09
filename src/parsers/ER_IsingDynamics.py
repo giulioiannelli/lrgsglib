@@ -21,6 +21,8 @@ for k, v in ER_ISDYN_args.items():
 for k, v in optionalaction_args_dict.items():
     parser.add_argument(*k, **v)
 
+parser.set_defaults(runlang="py")
+
 
 def parse_arguments(parser: argparse.ArgumentParser) -> argparse.Namespace:
     """Parse command line arguments and return namespace."""

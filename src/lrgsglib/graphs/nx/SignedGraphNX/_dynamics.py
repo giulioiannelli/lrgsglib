@@ -68,7 +68,7 @@ def compute_rbim_energy_eigV_all(self: "SignedGraphNX", on_g: str = SG_REPR, **k
         self.energy_eigV_RBIM = {}
     for which in range(len(self.eigV)):
         if which not in self.energy_eigV_RBIM:
-            compute_rbim_energy_eigV(self, which, on_g)
+            compute_rbim_energy_eigV(self, which, on_g=on_g)
 
 
 def get_rbim_energy_eigV(self: "SignedGraphNX", which: int = 0):
@@ -87,4 +87,3 @@ def get_all_rbim_energy_eigV(self: "SignedGraphNX", as_dict: bool = False, on_g:
         return self.energy_eigV_RBIM
     else:
         return np.array(list(self.energy_eigV_RBIM.values()))
-

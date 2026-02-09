@@ -52,8 +52,12 @@ def run_simulation(
     >>> isingDictArgs = {'T': 1.0, 'ic': 'ground_state_0', 'runlang': 'C1', 'NoClust': 1}
     >>> run_simulation(Args(), erDictArgs, isingDictArgs, 0, True)  # doctest: +SKIP
     """
-    count = 0
-    while count < args.number_of_averages and count < MAX_ITER:
+    completed = 0
+    attempts = 0
+    max_attempts = min(MAX_ITER, max(args.number_of_averages * 100, args.number_of_averages))
+
+    while completed < args.number_of_averages and attempts < max_attempts:
+        attempts += 1
         # Create new ER graph instance
         er = ErdosRenyi(**erDictArgs)
         er.flip_sel_edges(er.nwDict[args.cell_type]['G'])
@@ -65,15 +69,27 @@ def run_simulation(
         # Try to form clusters - may fail for some ER realizations
         try:
             er.make_clustersYN(f'eigV{number}', -1)
-        except (ValueError, IndexError, KeyError) as exc:
+        except (ValueError, IndexError, KeyError):
             # Skip this realization if clustering fails
+            continue
+        if getattr(er, "numClustersBig", 0) < 1:
+            # Some ER realizations can produce no valid clusters.
             continue
 
         # Run Ising dynamics on the successfully clustered graph
-        isdy = IsingDynamics(er, **isingDictArgs)
-        isdy.init_ising_dynamics()
-        er.export_ising_clust()
-        # run() with clean_export=True (default) handles file cleanup internally
-        isdy.run(verbose=False, clean_export=remove_files)
+        try:
+            isdy = IsingDynamics(er, **isingDictArgs)
+            isdy.init_ising_dynamics()
+            er.export_ising_clust()
+            # run() with clean_export=True (default) handles file cleanup internally
+            isdy.run(verbose=False, clean_export=remove_files)
+        except (RuntimeError, IndexError, ValueError):
+            continue
 
-        count += 1
+        completed += 1
+
+    if completed < args.number_of_averages:
+        raise RuntimeError(
+            f"Could not complete {args.number_of_averages} realizations "
+            f"(completed {completed}) after {attempts} attempts."
+        )

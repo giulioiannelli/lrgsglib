@@ -75,7 +75,7 @@ class ErdosRenyiNX(SignedGraphNX):
         G = nx.erdos_renyi_graph(n, p)
         CC = nx.connected_components(G)
         GC = max(CC, key=len)
-        self.G = G.subgraph(GC).copy()
+        self.G = nx.convert_node_labels_to_integers(G.subgraph(GC).copy())
         self.syshape = self.G.number_of_nodes()
         self.syshapePth = f"N={n}_p={p:.3g}"
 

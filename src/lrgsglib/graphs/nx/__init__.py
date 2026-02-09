@@ -49,6 +49,7 @@ Temporal:
 from .SignedGraphNX import SignedGraphNX
 
 # Lattice
+from .lattice import LatticeNDNX
 from .Lattice2DNX import (
     Lattice2DNX,
     Lattice2D,
@@ -128,6 +129,7 @@ __all__ = [
     # Base
     "SignedGraphNX",
     # Lattice
+    "LatticeNDNX",
     "Lattice2DNX",
     "Lattice2D",
     "Lattice3DNX",

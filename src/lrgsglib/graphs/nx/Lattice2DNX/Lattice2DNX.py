@@ -1,5 +1,6 @@
 from typing import Any
 import random
+from pathlib import Path
 
 import numpy as np
 import networkx as nx
@@ -90,7 +91,7 @@ class Lattice2DNX(SignedGraphNX):
         #
         self.__init_stdFname__(stdFnameSFFX)
         #
-        self.sgpathn = pth_join(sgpathn, L2D_PATH_DICT[self.geo]) if sgpathn else L2D_PATH_DICT[self.geo]
+        self.sgpathn = str(Path(sgpathn) / L2D_PATH_DICT[self.geo]) if sgpathn else L2D_PATH_DICT[self.geo]
         self.with_positions = with_positions
         self.bend_positions = bend_positions
         #

@@ -82,7 +82,17 @@ def run_contact_process(args: Any, signed_graph: SignedGraph):
     cp = cp_cls(signed_graph, **contact_kwargs)
     cp.init_contact_dynamics()
     # Disable cleanup during run; explicit cleanup happens after processing
-    cp.run(verbose=args.verbose, clean_export=False)
+    try:
+        cp.run(verbose=args.verbose, clean_export=False)
+    except RuntimeError:
+        runlang = str(contact_kwargs.get("runlang", "")).upper()
+        if not runlang.startswith("C"):
+            raise
+        # Fallback to Python backend if compiled C backend is unavailable.
+        contact_kwargs["runlang"] = "py"
+        cp = cp_cls(signed_graph, **contact_kwargs)
+        cp.init_contact_dynamics()
+        cp.run(verbose=args.verbose, clean_export=False)
     return cp
 
 
