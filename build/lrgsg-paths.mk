@@ -60,7 +60,9 @@ LRGSG_PATHS := \
 	GRAPHS_GT_FC:FullyConnectedGT:GRAPHS_GT \
 	GRAPHS_GT_FC_CPP:cpp:GRAPHS_GT_FC \
 	GRAPHS_GT_HK:HolmeKimGT:GRAPHS_GT \
-	GRAPHS_GT_HK_CPP:cpp:GRAPHS_GT_HK
+	GRAPHS_GT_HK_CPP:cpp:GRAPHS_GT_HK \
+	GRAPHS_GT_MC:MultiplicativeCascadeGT:GRAPHS_GT \
+	GRAPHS_GT_MC_CPP:cpp:GRAPHS_GT_MC
 # make paths
 define mk_path
   $(eval LRGSG_$(word 1,$(subst :, ,$(1))) := \
@@ -85,7 +87,8 @@ LRGSG_OBJ_DIRS := $(LRGSG_GT_PATCHES_CPP) \
            $(LRGSG_GRAPHS_GT_EBA_CPP) \
            $(LRGSG_GRAPHS_GT_DBA_CPP) \
            $(LRGSG_GRAPHS_GT_FC_CPP) \
-           $(LRGSG_GRAPHS_GT_HK_CPP)
+           $(LRGSG_GRAPHS_GT_HK_CPP) \
+           $(LRGSG_GRAPHS_GT_MC_CPP)
 # Legacy aliases for backward compatibility
 LRGSG_LIB_CCORE    := $(LRGSG_STATSYS_CCORE)
 LRGSG_CCORE_BIN    := $(LRGSG_STATSYS_ISING_BIN)

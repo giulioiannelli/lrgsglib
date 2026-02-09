@@ -7,7 +7,7 @@ cascade graphs directly without falling back to NetworkX.
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -21,7 +21,7 @@ except ImportError:
     GT_AVAILABLE = False
     Graph = object
 
-from ....gt_patches.signed_graph_gt import SignedGraphGT
+from ..MultispectralGraphGT import MultispectralGraphGT
 from ....config.const import (
     MSG_P1,
     MSG_P2,
@@ -41,7 +41,7 @@ from ...nx.MultispectralGraphNX.generators_msg import (
 __all__ = ["MultiplicativeCascadeGraphGT", "MultiplicativeCascadeGraph"]
 
 
-class MultiplicativeCascadeGraphGT(SignedGraphGT):
+class MultiplicativeCascadeGraphGT(MultispectralGraphGT):
     """Multiplicative cascade graph with hierarchical structure - graph-tool backend.
 
     This is a native graph-tool implementation that constructs the graph directly
@@ -77,7 +77,7 @@ class MultiplicativeCascadeGraphGT(SignedGraphGT):
 
     Example
     -------
-    >>> from lrgsglib.graphs.gt.multispectral import MultiplicativeCascadeGraphGT
+    >>> from lrgsglib.graphs.gt import MultiplicativeCascadeGraphGT
     >>> mc = MultiplicativeCascadeGraphGT(p1=0.8, p2=0.6, fraction=0.4, iterations=5, seed=42)
     >>> print(f"Nodes: {mc.N}, Edges: {mc.num_edges}")
     """
@@ -152,19 +152,18 @@ class MultiplicativeCascadeGraphGT(SignedGraphGT):
 
         Steps:
         1) Compute probability matrix via Kronecker products
-        2) Create 2D grid vertices
-        3) Select nodes using exponential clocks algorithm
-        4) Build subgraph of selected nodes with grid edges
+        2) Select nodes using exponential clocks or standard algorithm
+        3) Build edges via vectorized numpy grid operations
+        4) Attach grid positions as vertex property
         5) Extract giant component
         6) Add sign property
 
         Returns
         -------
         Graph
-            The generated graph-tool Graph with sign property.
+            The generated graph-tool Graph with sign and pos properties.
         """
         # Step 1: Compute probability matrix (uses numpy, same as NX)
-        # Use stored RNG for reproducibility
         old_state = np.random.get_state()
         np.random.seed(self._rng.integers(0, 2**31))
         self.probability_matrix = multiplicative_cascade_probability_matrix(
@@ -176,7 +175,7 @@ class MultiplicativeCascadeGraphGT(SignedGraphGT):
 
         size = int(self.probability_matrix.shape[0])
 
-        # Step 2-3: Select nodes using exp_clocks or standard algorithm
+        # Step 2: Select nodes
         if self.variant == "exp_clocks":
             selected_indices = self._select_nodes_exp_clocks(
                 self.probability_matrix,
@@ -191,53 +190,125 @@ class MultiplicativeCascadeGraphGT(SignedGraphGT):
         if len(selected_indices) == 0:
             raise ValueError("No nodes selected for the cascade graph.")
 
-        # Step 4: Build subgraph with only selected nodes
-        # Create mapping from 2D coords to vertex indices
-        coord_to_idx = {tuple(coord): i for i, coord in enumerate(selected_indices)}
+        # Step 3: Build edges (C++ backend if available, else vectorized numpy)
         n_selected = len(selected_indices)
-
-        # Create graph
         G = gt.Graph(directed=False)
         G.add_vertex(n_selected)
 
-        # Build edge list for grid edges between selected nodes
-        edge_list = []
-        for idx, (i, j) in enumerate(selected_indices):
-            # Check all 4 neighbors (up, down, left, right)
-            neighbors = [
-                ((i - 1) % size, j) if self.periodic else (i - 1, j),
-                ((i + 1) % size, j) if self.periodic else (i + 1, j),
-                (i, (j - 1) % size) if self.periodic else (i, j - 1),
-                (i, (j + 1) % size) if self.periodic else (i, j + 1),
-            ]
+        try:
+            from .cpp import build_cascade_edges
+            build_cascade_edges(
+                G,
+                selected_indices[:, 0].tolist(),
+                selected_indices[:, 1].tolist(),
+                n_selected,
+                size,
+                self.periodic,
+            )
+        except ImportError:
+            edge_array = self._build_edges_vectorized(selected_indices, size)
+            if len(edge_array) > 0:
+                G.add_edge_list(edge_array)
 
-            for ni, nj in neighbors:
-                # Skip out-of-bounds for non-periodic
-                if not self.periodic and (ni < 0 or ni >= size or nj < 0 or nj >= size):
-                    continue
-
-                neighbor_coord = (ni, nj)
-                if neighbor_coord in coord_to_idx:
-                    neighbor_idx = coord_to_idx[neighbor_coord]
-                    # Only add edge once (when idx < neighbor_idx)
-                    if idx < neighbor_idx:
-                        edge_list.append((idx, neighbor_idx))
-
-        if edge_list:
-            G.add_edge_list(edge_list)
+        # Step 4: Attach grid positions as vertex property
+        pos = G.new_vertex_property("vector<double>")
+        rows = selected_indices[:, 0].astype(np.float64)
+        cols = selected_indices[:, 1].astype(np.float64)
+        for v_idx in range(n_selected):
+            pos[v_idx] = [cols[v_idx], -rows[v_idx]]
+        G.vertex_properties["pos"] = pos
 
         # Step 5: Extract giant component
         if G.num_edges() > 0:
             G = self._extract_giant_component(G)
 
         if G.num_vertices() == 0:
-            raise ValueError("The multiplicative cascade graph is empty after giant component extraction.")
+            raise ValueError(
+                "The multiplicative cascade graph is empty after "
+                "giant component extraction."
+            )
 
         # Step 6: Add sign property
         sign_prop = G.new_edge_property("int", val=1)
         G.edge_properties["sign"] = sign_prop
 
         return G
+
+    def _build_edges_vectorized(
+        self,
+        selected_indices: NDArray[np.integer],
+        size: int,
+    ) -> NDArray[np.integer]:
+        """Build grid edges between selected nodes using vectorized numpy.
+
+        Uses boolean occupancy grids and ``np.roll`` / slicing to find
+        right-neighbor and down-neighbor edges in O(size^2) time instead
+        of O(n_selected) dict-lookup time.
+
+        Parameters
+        ----------
+        selected_indices : np.ndarray
+            Shape ``(n_selected, 2)`` with ``(row, col)`` of each node.
+        size : int
+            Grid side length.
+
+        Returns
+        -------
+        np.ndarray
+            Shape ``(n_edges, 2)`` edge list in vertex-index space.
+        """
+        n_selected = len(selected_indices)
+
+        # Build occupancy grid and index grid
+        # grid[i, j] = True if (i, j) is a selected node
+        grid = np.zeros((size, size), dtype=bool)
+        idx_grid = np.full((size, size), -1, dtype=np.int64)
+
+        rows = selected_indices[:, 0]
+        cols = selected_indices[:, 1]
+        grid[rows, cols] = True
+        idx_grid[rows, cols] = np.arange(n_selected)
+
+        edges = []
+
+        # Right-neighbor edges (horizontal: j -> j+1)
+        if self.periodic:
+            right_grid = np.roll(grid, -1, axis=1)
+            right_idx = np.roll(idx_grid, -1, axis=1)
+        else:
+            # Non-periodic: only columns 0..size-2 can have a right neighbor
+            right_grid = np.zeros_like(grid)
+            right_idx = np.full_like(idx_grid, -1)
+            right_grid[:, :-1] = grid[:, 1:]
+            right_idx[:, :-1] = idx_grid[:, 1:]
+
+        h_mask = grid & right_grid
+        if h_mask.any():
+            h_rows, h_cols = np.nonzero(h_mask)
+            src = idx_grid[h_rows, h_cols]
+            dst = right_idx[h_rows, h_cols]
+            edges.append(np.column_stack((src, dst)))
+
+        # Down-neighbor edges (vertical: i -> i+1)
+        if self.periodic:
+            down_grid = np.roll(grid, -1, axis=0)
+            down_idx = np.roll(idx_grid, -1, axis=0)
+        else:
+            down_grid = np.zeros_like(grid)
+            down_idx = np.full_like(idx_grid, -1)
+            down_grid[:-1, :] = grid[1:, :]
+            down_idx[:-1, :] = idx_grid[1:, :]
+
+        v_mask = grid & down_grid
+        if v_mask.any():
+            v_rows, v_cols = np.nonzero(v_mask)
+            src = idx_grid[v_rows, v_cols]
+            dst = down_idx[v_rows, v_cols]
+            edges.append(np.column_stack((src, dst)))
+
+        if edges:
+            return np.vstack(edges)
+        return np.empty((0, 2), dtype=np.int64)
 
     def _select_nodes_exp_clocks(
         self,
@@ -309,31 +380,30 @@ class MultiplicativeCascadeGraphGT(SignedGraphGT):
     def _extract_giant_component(self, G: "Graph") -> "Graph":
         """Extract the giant (largest) connected component.
 
+        Uses vectorized PropertyMap ``.a`` accessor instead of
+        per-vertex Python iteration.
+
         Parameters
         ----------
         G : Graph
-            Input graph
+            Input graph (may have 'pos' vertex property attached).
 
         Returns
         -------
         Graph
-            Graph containing only the giant component
+            Graph containing only the giant component. Internal
+            vertex properties (including 'pos') survive pruning.
         """
-        # Get component labels
         comp_labels, hist = label_components(G)
 
         if len(hist) == 0:
             return G
 
-        # Find the largest component
+        # Vectorized: set filter via numpy array
         giant_label = int(np.argmax(hist))
-
-        # Create vertex filter for giant component
         vfilt = G.new_vertex_property("bool")
-        for v in G.vertices():
-            vfilt[v] = (comp_labels[v] == giant_label)
+        vfilt.a = comp_labels.a == giant_label
 
-        # Set filter and prune to create new graph
         G.set_vertex_filter(vfilt)
         G_giant = Graph(G, prune=True)
 

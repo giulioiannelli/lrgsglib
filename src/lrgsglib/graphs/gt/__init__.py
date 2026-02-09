@@ -46,9 +46,9 @@ Bipartite:
     BipartiteFromDegreeSequenceGT : Backward-compat alias for BipartiteGraphGT
 
 Multispectral:
-    MultispectralGraphGT : Multispectral graph (fallback to NX)
-    MultiplicativeCascadeGraphGT : Multiplicative cascade graph (fallback to NX)
-    VicsekGraphGT : Vicsek fractal graph (fallback to NX)
+    MultispectralGraphGT : Multispectral graph base class (native GT)
+    MultiplicativeCascadeGraphGT : Multiplicative cascade graph (native GT)
+    VicsekGraphGT : Vicsek fractal graph (native GT)
     HierarchicalModularNetworkGT : Hierarchical modular network (fallback to NX)
 
 Dirac:
@@ -160,7 +160,7 @@ def __getattr__(name):
         from .BipartiteFromDegreeSequenceGT import BipartiteFromDegreeSequenceGT
         return BipartiteFromDegreeSequenceGT
 
-    # Multispectral (fallback to NX)
+    # Multispectral (native GT; HierarchicalModular fallback to NX)
     elif name == "MultispectralGraphGT":
         from .MultispectralGraphGT import MultispectralGraphGT
         return MultispectralGraphGT
@@ -235,7 +235,7 @@ __all__ = [
     # Bipartite (fallback to NX)
     "BipartiteGraphGT",
     "BipartiteFromDegreeSequenceGT",
-    # Multispectral (fallback to NX)
+    # Multispectral (native GT; HierarchicalModular fallback to NX)
     "MultispectralGraphGT",
     "MultiplicativeCascadeGraphGT",
     "VicsekGraphGT",

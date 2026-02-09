@@ -293,6 +293,85 @@ class TestMultiplicativeCascadeGraphGT:
         assert mc_periodic.N > 0
         assert mc_open.N > 0
 
+    def test_positions_stored(self):
+        """Test that grid positions are stored as vertex property."""
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
+
+        mc = MultiplicativeCascadeGraphGT(
+            p1=0.8, p2=0.6, p3=0.6, p4=0.4,
+            fraction=0.4,
+            iterations=5,
+            seed=42,
+        )
+        # pos property should exist
+        assert mc.pos is not None
+        # get_positions returns (N, 2) array
+        positions = mc.get_positions()
+        assert positions.shape == (mc.N, 2)
+        # x coords (col) and y coords (-row) should have finite values
+        assert np.all(np.isfinite(positions))
+
+    def test_draw_method(self):
+        """Test that draw() returns a matplotlib Axes."""
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
+
+        mc = MultiplicativeCascadeGraphGT(
+            p1=0.8, p2=0.6, p3=0.6, p4=0.4,
+            fraction=0.4,
+            iterations=4,
+            seed=42,
+        )
+        ax = mc.draw()
+        assert isinstance(ax, plt.Axes)
+        plt.close("all")
+
+    def test_edge_count_reproducibility(self):
+        """Test that same seed produces identical node and edge counts."""
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
+
+        kwargs = dict(
+            p1=0.8, p2=0.6, p3=0.6, p4=0.4,
+            fraction=0.5, iterations=5, seed=777,
+        )
+        mc1 = MultiplicativeCascadeGraphGT(**kwargs)
+        mc2 = MultiplicativeCascadeGraphGT(**kwargs)
+        assert mc1.N == mc2.N
+        assert mc1.num_edges == mc2.num_edges
+
+    def test_large_fraction_graph(self):
+        """Test high fraction (0.7) at iter=6 produces >10k nodes."""
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
+
+        mc = MultiplicativeCascadeGraphGT(
+            p1=0.8, p2=0.6, p3=0.6, p4=0.4,
+            fraction=0.7,
+            iterations=6,
+            seed=42,
+        )
+        assert mc.N > 10_000
+        assert mc.num_edges > mc.N  # should be well-connected
+
+    def test_multispectral_base_class(self):
+        """Verify inheritance from MultispectralGraphGT."""
+        from lrgsglib.graphs.gt.MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
+        from lrgsglib.graphs.gt.MultispectralGraphGT import MultispectralGraphGT
+
+        mc = MultiplicativeCascadeGraphGT(
+            p1=0.8, p2=0.6, fraction=0.4, iterations=4, seed=42,
+        )
+        assert isinstance(mc, MultispectralGraphGT)
+
+    def test_vicsek_inherits_multispectral(self):
+        """Verify VicsekGraphGT also inherits from MultispectralGraphGT."""
+        from lrgsglib.graphs.gt.VicsekGT import VicsekGraphGT
+        from lrgsglib.graphs.gt.MultispectralGraphGT import MultispectralGraphGT
+
+        v = VicsekGraphGT(N=50, k=2, m=3, seed=42)
+        assert isinstance(v, MultispectralGraphGT)
+
 
 class TestGTNativeConsistency:
     """Test consistency between GT native and NX implementations."""

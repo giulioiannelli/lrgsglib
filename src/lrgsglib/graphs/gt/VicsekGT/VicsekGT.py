@@ -20,7 +20,7 @@ except ImportError:
     GT_AVAILABLE = False
     Graph = object
 
-from ....gt_patches.signed_graph_gt import SignedGraphGT
+from ..MultispectralGraphGT import MultispectralGraphGT
 from ....config.const import VCK_STDFN, VCK_SGPATH
 from ...nx.MultispectralGraphNX.generators_msg import (
     initial_measure,
@@ -31,7 +31,7 @@ from ...nx.MultispectralGraphNX.generators_msg import (
 __all__ = ["VicsekGraphGT", "VicsekGraph"]
 
 
-class VicsekGraphGT(SignedGraphGT):
+class VicsekGraphGT(MultispectralGraphGT):
     """Vicsek (Palla-Lovasz-Vicsek) graph via Kronecker product - graph-tool backend.
 
     This is a native graph-tool implementation that constructs the graph directly
