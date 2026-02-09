@@ -52,6 +52,9 @@ _RUNLANG_ALIASES: dict[str, str] = {
     "cu":       "cu_met",
     "cuda":     "cu_met",
     "gpu":      "cu_met",
+    # Cluster algorithm aliases
+    "wolff":    "py_wolff",
+    "sw":       "py_sw",
 }
 
 # Reverse map: new name → legacy C key (for subprocess backend)
@@ -549,6 +552,126 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             save_magn_array()
 
     # =========================================================================
+    # Cluster Algorithm Methods (Python fallback)
+    # =========================================================================
+
+    def wolff_sampling(self, tqdm_on: bool = True) -> None:
+        """Pure Python Wolff single-cluster algorithm."""
+        self.ene = []
+        self.magn = []
+        self.cluster_sizes = []
+
+        iterator = tqdm.tqdm(range(self.steps), desc="Wolff") if tqdm_on \
+            else range(self.steps)
+
+        for _ in iterator:
+            self.magn.append(np.sum(self.s))
+            self.ene.append(self.calc_full_energy())
+            cluster_size = self._wolff_sweep()
+            self.cluster_sizes.append(cluster_size)
+
+    def _wolff_sweep(self) -> int:
+        """Execute Wolff steps until ~N spins have been flipped."""
+        total_flipped = 0
+        while total_flipped < self.N:
+            total_flipped += self._wolff_step()
+        return total_flipped
+
+    def _wolff_step(self) -> int:
+        """Single Wolff cluster step: grow from random seed, flip."""
+        seed = np.random.randint(0, self.N)
+        seed_spin = self.s[seed]
+        inv_T = 1.0 / self.T if self.T > 0 else 1e12
+
+        in_cluster = np.zeros(self.N, dtype=np.bool_)
+        in_cluster[seed] = True
+        queue = [seed]
+        head = 0
+
+        while head < len(queue):
+            node = queue[head]
+            head += 1
+            for nb, w in self.sg.get_neighbors_with_weights(node):
+                if in_cluster[nb]:
+                    continue
+                # Bond activation: only when aligned relative to coupling
+                if self.s[node] * self.s[nb] * (1 if w > 0 else -1) <= 0:
+                    continue
+                p_add = 1.0 - np.exp(-2.0 * abs(w) * inv_T)
+                if np.random.random() < p_add:
+                    in_cluster[nb] = True
+                    queue.append(nb)
+
+        # Flip entire cluster
+        cluster_nodes = np.array(queue, dtype=np.intp)
+        self.s[cluster_nodes] *= -1
+        return len(queue)
+
+    def swendsen_wang_sampling(self, tqdm_on: bool = True) -> None:
+        """Pure Python Swendsen-Wang multi-cluster algorithm."""
+        self.ene = []
+        self.magn = []
+        self.cluster_sizes = []
+
+        iterator = tqdm.tqdm(range(self.steps), desc="SW") if tqdm_on \
+            else range(self.steps)
+
+        for _ in iterator:
+            self.magn.append(np.sum(self.s))
+            self.ene.append(self.calc_full_energy())
+            n_clusters = self._sw_step()
+            self.cluster_sizes.append(n_clusters)
+
+    def _sw_step(self) -> int:
+        """Single Swendsen-Wang step with union-find."""
+        inv_T = 1.0 / self.T if self.T > 0 else 1e12
+        N = self.N
+
+        # Union-find (array-based)
+        parent = np.arange(N)
+        rank = np.zeros(N, dtype=np.int32)
+
+        def find(x: int) -> int:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]  # path halving
+                x = parent[x]
+            return x
+
+        def union(x: int, y: int) -> None:
+            rx, ry = find(x), find(y)
+            if rx == ry:
+                return
+            if rank[rx] < rank[ry]:
+                parent[rx] = ry
+            elif rank[rx] > rank[ry]:
+                parent[ry] = rx
+            else:
+                parent[ry] = rx
+                rank[rx] += 1
+
+        # Phase 1: Bond activation
+        for u, v, w in self.sg.get_edges_with_weights():
+            # Only activate when aligned relative to coupling
+            if self.s[u] * self.s[v] * (1 if w > 0 else -1) <= 0:
+                continue
+            p_bond = 1.0 - np.exp(-2.0 * abs(w) * inv_T)
+            if np.random.random() < p_bond:
+                union(u, v)
+
+        # Phase 2: Assign random flip bits per cluster root
+        flip_bit = np.random.randint(0, 2, size=N, dtype=np.int8)
+
+        # Phase 3: Flip clusters
+        roots = set()
+        for i in range(N):
+            root = find(i)
+            roots.add(root)
+            if flip_bit[root]:
+                self.s[i] = np.int8(-self.s[i])
+
+        return len(roots)
+
+    # =========================================================================
     # Simulated Annealing Methods
     # =========================================================================
 
@@ -905,6 +1028,82 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 )
 
     # =========================================================================
+    # Pybind11 cluster backends
+    # =========================================================================
+
+    def _run_pybind_wolff(self) -> None:
+        """Run Wolff cluster algorithm via pybind11 native kernels."""
+        mod = self._load_native_module()
+        ni, nw, nptr = self._build_graph_csr()
+        s_out, ene, magn, clusters = mod.wolff_sampling(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            self.field.astype(np.float64),
+            float(self.T),
+            int(self.steps),
+            int(self.seed),
+        )
+        self.s = s_out
+        self.ene = ene.tolist()
+        self.magn = magn.tolist()
+        self.cluster_sizes = clusters.tolist()
+
+    def _run_pybind_sw(self) -> None:
+        """Run Swendsen-Wang via pybind11 native kernels."""
+        mod = self._load_native_module()
+        ni, nw, nptr = self._build_graph_csr()
+        s_out, ene, magn, clusters = mod.sw_sampling(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            self.field.astype(np.float64),
+            float(self.T),
+            int(self.steps),
+            int(self.seed),
+        )
+        self.s = s_out
+        self.ene = ene.tolist()
+        self.magn = magn.tolist()
+        self.cluster_sizes = clusters.tolist()
+
+    # =========================================================================
+    # CuPy cluster backends
+    # =========================================================================
+
+    def _run_cupy_wolff(self) -> None:
+        """Run Wolff cluster algorithm via CuPy GPU kernels."""
+        from ._cupy_ising import cupy_wolff
+
+        ni, nw, nptr = self._build_graph_csr()
+        final_spins, ene_trace, magn_trace, clusters = cupy_wolff(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            float(self.T),
+            int(self.steps),
+            int(self.seed),
+        )
+        self.s = final_spins
+        self.ene = ene_trace
+        self.magn = magn_trace
+        self.cluster_sizes = clusters
+
+    def _run_cupy_sw(self) -> None:
+        """Run Swendsen-Wang via CuPy GPU kernels."""
+        from ._cupy_ising import cupy_sw
+
+        ni, nw, nptr = self._build_graph_csr()
+        final_spins, ene_trace, magn_trace, clusters = cupy_sw(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            float(self.T),
+            int(self.steps),
+            int(self.seed),
+        )
+        self.s = final_spins
+        self.ene = ene_trace
+        self.magn = magn_trace
+        self.cluster_sizes = clusters
+
+    # =========================================================================
     # Run Method
     # =========================================================================
 
@@ -957,7 +1156,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # ---- Pybind11 backend ----
         if rl.startswith("pb_"):
-            if use_pt or rl.endswith("_pt") or "pt" in rl:
+            if "wolff" in rl:
+                self._run_pybind_wolff()
+            elif "sw" in rl:
+                self._run_pybind_sw()
+            elif use_pt or rl.endswith("_pt") or "pt" in rl:
                 self._run_pybind_pt()
             elif use_sa or rl.endswith("_sa") or "sa" in rl:
                 self._run_pybind_sa()
@@ -966,7 +1169,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # ---- CuPy (GPU) backend ----
         elif rl.startswith("cu_"):
-            if use_pt or rl.endswith("_pt") or "pt" in rl:
+            if "wolff" in rl:
+                self._run_cupy_wolff()
+            elif "sw" in rl:
+                self._run_cupy_sw()
+            elif use_pt or rl.endswith("_pt") or "pt" in rl:
                 self._run_cupy_pt()
             elif use_sa or rl.endswith("_sa") or "sa" in rl:
                 self._run_cupy_sa()
@@ -983,7 +1190,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # ---- Python backend ----
         else:
-            if use_pt:
+            if "wolff" in rl:
+                self.wolff_sampling(tqdm_on)
+            elif "sw" in rl:
+                self.swendsen_wang_sampling(tqdm_on)
+            elif use_pt:
                 self.parallel_tempering_sampling(tqdm_on)
             elif use_sa:
                 self.simulated_annealing_sampling(tqdm_on)

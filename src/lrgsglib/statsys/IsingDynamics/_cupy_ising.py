@@ -398,3 +398,251 @@ def cupy_pt(
 
     final_spins = cp.asnumpy(replicas_gpu[0])
     return final_spins, energy_2d, magn_2d, exchanges
+
+
+# -----------------------------------------------------------------------
+# CUDA kernels for Swendsen-Wang
+# -----------------------------------------------------------------------
+_BOND_ACTIVATE_KERNEL_SRC = r"""
+extern "C" __global__
+void bond_activate(
+    const signed char* spins,
+    const long long* indices,
+    const double* weights,
+    const long long* ptr,
+    int* parent,
+    const double* randoms,
+    int N,
+    double inv_T
+) {
+    int node = blockDim.x * blockIdx.x + threadIdx.x;
+    if (node >= N) return;
+    long long start = ptr[node];
+    long long end = ptr[node + 1];
+    for (long long j = start; j < end; ++j) {
+        int nb = (int)indices[j];
+        if (nb <= node) continue;  // each edge once
+        double w = weights[j];
+        // Only activate when aligned relative to coupling
+        double alignment = (double)spins[node] * (double)spins[nb] * w;
+        if (alignment <= 0.0) continue;
+        double p_bond = 1.0 - exp(-2.0 * fabs(w) * inv_T);
+        if (randoms[j] < p_bond) {
+            // Union: hook smaller root under larger
+            int rx = node, ry = nb;
+            while (parent[rx] != rx) rx = parent[rx];
+            while (parent[ry] != ry) ry = parent[ry];
+            if (rx != ry) {
+                int hi = (rx > ry) ? rx : ry;
+                int lo = (rx > ry) ? ry : rx;
+                atomicCAS(&parent[hi], hi, lo);
+            }
+        }
+    }
+}
+"""
+
+_UF_COMPRESS_KERNEL_SRC = r"""
+extern "C" __global__
+void uf_compress(int* parent, int N) {
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    if (idx >= N) return;
+    // Pointer jumping until convergence
+    int p = parent[idx];
+    while (parent[p] != p) {
+        p = parent[p];
+    }
+    parent[idx] = p;
+}
+"""
+
+_CLUSTER_FLIP_KERNEL_SRC = r"""
+extern "C" __global__
+void cluster_flip(
+    signed char* spins,
+    const int* parent,
+    const signed char* flip_bits,
+    int N
+) {
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    if (idx >= N) return;
+    int root = parent[idx];
+    if (flip_bits[root]) {
+        spins[idx] = -spins[idx];
+    }
+}
+"""
+
+
+def _compile_sw_kernels():
+    """Compile Swendsen-Wang CUDA kernels (cached by CuPy)."""
+    bond_kernel = RawKernel(_BOND_ACTIVATE_KERNEL_SRC, "bond_activate")
+    compress_kernel = RawKernel(_UF_COMPRESS_KERNEL_SRC, "uf_compress")
+    flip_kernel = RawKernel(_CLUSTER_FLIP_KERNEL_SRC, "cluster_flip")
+    return bond_kernel, compress_kernel, flip_kernel
+
+
+# -----------------------------------------------------------------------
+# Wolff cluster algorithm (hybrid CPU-BFS + GPU energy)
+# -----------------------------------------------------------------------
+
+def cupy_wolff(
+    spins: np.ndarray,
+    neigh_indices: np.ndarray,
+    neigh_weights: np.ndarray,
+    neigh_ptr: np.ndarray,
+    T: float,
+    n_sweeps: int,
+    seed: int,
+) -> tuple[np.ndarray, list[float], list[float], list[int]]:
+    """GPU-accelerated Wolff cluster algorithm.
+
+    Cluster growth is BFS on CPU (inherently sequential).
+    Energy/magnetization computed on GPU.
+    """
+    if not CUPY_AVAILABLE:
+        raise RuntimeError("CuPy not available.")
+
+    N = len(spins)
+    inv_T = 1.0 / T if T > 0 else 1e12
+    rng = np.random.RandomState(seed)
+
+    # GPU arrays for energy computation
+    _, ene_kernel = _compile_kernels()
+    spins_gpu = cp.asarray(spins, dtype=cp.int8)
+    idx_gpu = cp.asarray(neigh_indices, dtype=cp.int64)
+    wgt_gpu = cp.asarray(neigh_weights, dtype=cp.float64)
+    ptr_gpu = cp.asarray(neigh_ptr, dtype=cp.int64)
+
+    # CPU arrays for BFS
+    cpu_spins = spins.copy().astype(np.int8)
+    cpu_indices = neigh_indices.astype(np.int64)
+    cpu_weights = neigh_weights.astype(np.float64)
+    cpu_ptr = neigh_ptr.astype(np.int64)
+
+    energy_trace: list[float] = []
+    magn_trace: list[float] = []
+    cluster_trace: list[int] = []
+
+    for _ in range(n_sweeps):
+        # Record observables on GPU
+        spins_gpu = cp.asarray(cpu_spins, dtype=cp.int8)
+        energy_trace.append(
+            gpu_compute_energy(spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel)
+        )
+        magn_trace.append(gpu_compute_magnetization(spins_gpu, N))
+
+        # Wolff sweep on CPU: flip ~N spins
+        total_flipped = 0
+        while total_flipped < N:
+            seed_node = rng.randint(0, N)
+            in_cluster = np.zeros(N, dtype=np.bool_)
+            in_cluster[seed_node] = True
+            queue = [seed_node]
+            head = 0
+
+            while head < len(queue):
+                node = queue[head]
+                head += 1
+                start = int(cpu_ptr[node])
+                end = int(cpu_ptr[node + 1])
+                for j in range(start, end):
+                    nb = int(cpu_indices[j])
+                    if in_cluster[nb]:
+                        continue
+                    w = cpu_weights[j]
+                    if cpu_spins[node] * cpu_spins[nb] * (1 if w > 0 else -1) <= 0:
+                        continue
+                    p_add = 1.0 - np.exp(-2.0 * abs(w) * inv_T)
+                    if rng.random() < p_add:
+                        in_cluster[nb] = True
+                        queue.append(nb)
+
+            cluster_nodes = np.array(queue, dtype=np.intp)
+            cpu_spins[cluster_nodes] *= -1
+            total_flipped += len(queue)
+
+        cluster_trace.append(total_flipped)
+
+    final_spins = cpu_spins
+    return final_spins, energy_trace, magn_trace, cluster_trace
+
+
+# -----------------------------------------------------------------------
+# Swendsen-Wang cluster algorithm (GPU)
+# -----------------------------------------------------------------------
+
+def cupy_sw(
+    spins: np.ndarray,
+    neigh_indices: np.ndarray,
+    neigh_weights: np.ndarray,
+    neigh_ptr: np.ndarray,
+    T: float,
+    n_sweeps: int,
+    seed: int,
+) -> tuple[np.ndarray, list[float], list[float], list[int]]:
+    """GPU Swendsen-Wang cluster algorithm.
+
+    All three phases (bond activation, connected components, cluster flip)
+    run on GPU using CUDA kernels.
+    """
+    if not CUPY_AVAILABLE:
+        raise RuntimeError("CuPy not available.")
+
+    N = len(spins)
+    total_edges = len(neigh_indices)
+    inv_T = 1.0 / T if T > 0 else 1e12
+    block = 256
+
+    _, ene_kernel = _compile_kernels()
+    bond_kernel, compress_kernel, flip_kernel = _compile_sw_kernels()
+
+    spins_gpu = cp.asarray(spins, dtype=cp.int8)
+    idx_gpu = cp.asarray(neigh_indices, dtype=cp.int64)
+    wgt_gpu = cp.asarray(neigh_weights, dtype=cp.float64)
+    ptr_gpu = cp.asarray(neigh_ptr, dtype=cp.int64)
+
+    rng = cp.random.RandomState(seed)
+
+    energy_trace: list[float] = []
+    magn_trace: list[float] = []
+    cluster_trace: list[int] = []
+
+    for _ in range(n_sweeps):
+        # Record observables
+        energy_trace.append(
+            gpu_compute_energy(spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel)
+        )
+        magn_trace.append(gpu_compute_magnetization(spins_gpu, N))
+
+        # Phase 1: Initialize parent array (each node is its own root)
+        parent_gpu = cp.arange(N, dtype=cp.int32)
+
+        # Random numbers for bond activation (one per edge entry)
+        randoms_gpu = rng.rand(total_edges).astype(cp.float64)
+
+        # Bond activation + union
+        grid_n = (N + block - 1) // block
+        bond_kernel(
+            (grid_n,), (block,),
+            (spins_gpu, idx_gpu, wgt_gpu, ptr_gpu,
+             parent_gpu, randoms_gpu, np.int32(N), np.float64(inv_T)),
+        )
+
+        # Phase 2: Compress union-find (multiple passes for convergence)
+        for _ in range(int(np.ceil(np.log2(N))) + 1):
+            compress_kernel((grid_n,), (block,), (parent_gpu, np.int32(N)))
+
+        # Phase 3: Flip clusters
+        flip_bits_gpu = (rng.rand(N) < 0.5).astype(cp.int8)
+        flip_kernel(
+            (grid_n,), (block,),
+            (spins_gpu, parent_gpu, flip_bits_gpu, np.int32(N)),
+        )
+
+        # Count clusters (on CPU for simplicity)
+        n_clusters = int(cp.unique(parent_gpu).shape[0])
+        cluster_trace.append(n_clusters)
+
+    final_spins = cp.asnumpy(spins_gpu)
+    return final_spins, energy_trace, magn_trace, cluster_trace

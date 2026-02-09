@@ -27,6 +27,7 @@ extern "C" {
 #include "LRGSG_rbim.h"
 #include "LRGSG_sa.h"
 #include "LRGSG_pt.h"
+#include "LRGSG_cluster.h"
 #include "LRGSG_utils.h"
 #include "sfmtrng.h"
 }
@@ -327,6 +328,126 @@ static py::tuple pt_sampling(
 /* ==================================================================
  * Single energy calculation (utility)
  * ================================================================== */
+/* ==================================================================
+ * Wolff cluster sampling
+ * ==================================================================
+ *
+ * Runs `n_sweeps` Wolff sweeps at temperature `T`, recording energy,
+ * magnetization, and cluster sizes.
+ */
+static py::tuple wolff_sampling(
+    py::array_t<int8_t, py::array::c_style> spins_in,
+    const py::array_t<int64_t>& neigh_indices,
+    const py::array_t<double>&  neigh_weights,
+    const py::array_t<int64_t>& neigh_ptr,
+    const py::array_t<double>&  field,
+    double T,
+    size_t n_sweeps,
+    uint64_t seed_val
+) {
+    auto s_buf = spins_in.request();
+    size_t N = static_cast<size_t>(s_buf.size);
+
+    std::vector<int8_t> spins(N);
+    std::memcpy(spins.data(), s_buf.ptr, N * sizeof(int8_t));
+
+    GraphCSR graph(N, neigh_indices, neigh_weights, neigh_ptr);
+
+    std::vector<double> ene_out(n_sweeps);
+    std::vector<double> magn_out(n_sweeps);
+    std::vector<int64_t> cluster_out(n_sweeps);
+
+    {
+        py::gil_scoped_release release;
+
+        seed_rng(seed_val);
+
+        spin_tp s = spins.data();
+        size_tp nlen_ptr = graph.nlen.data();
+        NodesEdges ne = graph.node_edges.data();
+
+        for (size_t step = 0; step < n_sweeps; ++step) {
+            ene_out[step]  = calc_totEnergy(N, s, nlen_ptr, ne);
+            magn_out[step] = calc_magn(N, s);
+            cluster_out[step] = static_cast<int64_t>(
+                wolff_sweep(N, T, s, nlen_ptr, ne));
+        }
+    }
+
+    py::array_t<int8_t> out_spins(N);
+    std::memcpy(out_spins.mutable_data(), spins.data(), N * sizeof(int8_t));
+
+    py::array_t<double> out_ene(n_sweeps);
+    std::memcpy(out_ene.mutable_data(), ene_out.data(), n_sweeps * sizeof(double));
+
+    py::array_t<double> out_magn(n_sweeps);
+    std::memcpy(out_magn.mutable_data(), magn_out.data(), n_sweeps * sizeof(double));
+
+    py::array_t<int64_t> out_clusters(n_sweeps);
+    std::memcpy(out_clusters.mutable_data(), cluster_out.data(), n_sweeps * sizeof(int64_t));
+
+    return py::make_tuple(out_spins, out_ene, out_magn, out_clusters);
+}
+
+
+/* ==================================================================
+ * Swendsen-Wang cluster sampling
+ * ================================================================== */
+static py::tuple sw_sampling(
+    py::array_t<int8_t, py::array::c_style> spins_in,
+    const py::array_t<int64_t>& neigh_indices,
+    const py::array_t<double>&  neigh_weights,
+    const py::array_t<int64_t>& neigh_ptr,
+    const py::array_t<double>&  field,
+    double T,
+    size_t n_sweeps,
+    uint64_t seed_val
+) {
+    auto s_buf = spins_in.request();
+    size_t N = static_cast<size_t>(s_buf.size);
+
+    std::vector<int8_t> spins(N);
+    std::memcpy(spins.data(), s_buf.ptr, N * sizeof(int8_t));
+
+    GraphCSR graph(N, neigh_indices, neigh_weights, neigh_ptr);
+
+    std::vector<double> ene_out(n_sweeps);
+    std::vector<double> magn_out(n_sweeps);
+    std::vector<int64_t> cluster_out(n_sweeps);
+
+    {
+        py::gil_scoped_release release;
+
+        seed_rng(seed_val);
+
+        spin_tp s = spins.data();
+        size_tp nlen_ptr = graph.nlen.data();
+        NodesEdges ne = graph.node_edges.data();
+
+        for (size_t step = 0; step < n_sweeps; ++step) {
+            ene_out[step]  = calc_totEnergy(N, s, nlen_ptr, ne);
+            magn_out[step] = calc_magn(N, s);
+            cluster_out[step] = static_cast<int64_t>(
+                sw_step(N, T, s, nlen_ptr, ne));
+        }
+    }
+
+    py::array_t<int8_t> out_spins(N);
+    std::memcpy(out_spins.mutable_data(), spins.data(), N * sizeof(int8_t));
+
+    py::array_t<double> out_ene(n_sweeps);
+    std::memcpy(out_ene.mutable_data(), ene_out.data(), n_sweeps * sizeof(double));
+
+    py::array_t<double> out_magn(n_sweeps);
+    std::memcpy(out_magn.mutable_data(), magn_out.data(), n_sweeps * sizeof(double));
+
+    py::array_t<int64_t> out_clusters(n_sweeps);
+    std::memcpy(out_clusters.mutable_data(), cluster_out.data(), n_sweeps * sizeof(int64_t));
+
+    return py::make_tuple(out_spins, out_ene, out_magn, out_clusters);
+}
+
+
 static double calc_energy(
     py::array_t<int8_t, py::array::c_style> spins_in,
     const py::array_t<int64_t>& neigh_indices,
@@ -423,6 +544,32 @@ tuple[ndarray, ndarray, ndarray, ndarray]
         py::arg("T_ladder"), py::arg("steps_per_exchange"),
         py::arg("n_exchanges"), py::arg("seed"),
         py::arg("update_mode") = "asynchronous");
+
+    m.def("wolff_sampling", &wolff_sampling,
+        R"pbdoc(
+Run Wolff cluster algorithm at fixed temperature.
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray, ndarray]
+    (final_spins, energy_trace, magnetization_trace, cluster_sizes)
+        )pbdoc",
+        py::arg("spins"), py::arg("neigh_indices"), py::arg("neigh_weights"),
+        py::arg("neigh_ptr"), py::arg("field"), py::arg("T"),
+        py::arg("n_sweeps"), py::arg("seed"));
+
+    m.def("sw_sampling", &sw_sampling,
+        R"pbdoc(
+Run Swendsen-Wang cluster algorithm at fixed temperature.
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray, ndarray]
+    (final_spins, energy_trace, magnetization_trace, n_clusters_per_step)
+        )pbdoc",
+        py::arg("spins"), py::arg("neigh_indices"), py::arg("neigh_weights"),
+        py::arg("neigh_ptr"), py::arg("field"), py::arg("T"),
+        py::arg("n_sweeps"), py::arg("seed"));
 
     m.def("calc_energy", &calc_energy,
         R"pbdoc(
