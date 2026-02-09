@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 from scipy.sparse import csr_matrix, diags
+from scipy.sparse.csgraph import connected_components as sp_connected_components
 from scipy.sparse.linalg import eigsh
 
 try:
@@ -655,9 +656,12 @@ class SignedGraphGT:
         self,
         k: int = 1,
         which: Literal["SM", "LM"] = "SM",
+        **kwargs: Any,
     ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
         """
         Compute k smallest or largest eigenvalues/eigenvectors.
+
+        Results are stored on ``self.eigv`` and ``self.eigV`` (column-major).
 
         Parameters
         ----------
@@ -665,6 +669,8 @@ class SignedGraphGT:
             Number of eigenvalues to compute.
         which : str, default 'SM'
             'SM' for smallest magnitude, 'LM' for largest magnitude.
+        **kwargs
+            Ignored (accepted for NX API compatibility, e.g. ``typf``).
 
         Returns
         -------
@@ -678,7 +684,9 @@ class SignedGraphGT:
 
         # Sort by eigenvalue
         idx = np.argsort(eigenvalues) if which == "SM" else np.argsort(-eigenvalues)
-        return eigenvalues[idx], eigenvectors[:, idx]
+        self.eigv = eigenvalues[idx]
+        self.eigV = eigenvectors[:, idx]
+        return self.eigv, self.eigV
 
     def get_eigV(
         self,
@@ -874,6 +882,300 @@ class SignedGraphGT:
         n_frustrated //= 3
 
         return n_frustrated / n_triangles if n_triangles > 0 else 0.0
+
+    # ------------------------------------------------------------------
+    # Eigenvector accessors (NX-compatible API)
+    # ------------------------------------------------------------------
+
+    def _get_eigvec(self, which: int = 0) -> NDArray[np.floating]:
+        """Return eigenvector ``which`` from column-major eigV."""
+        if self.eigV is None:
+            raise ValueError(
+                "Eigenvectors not computed. "
+                "Call compute_k_eigvV() or compute_laplacian_spectrum_weigV() first."
+            )
+        if self.eigV.ndim == 1:
+            if which != 0:
+                raise IndexError(f"Only 1 eigenvector available, got which={which}")
+            return self.eigV
+        if self.eigV.shape[1] <= which:
+            raise IndexError(
+                f"Only {self.eigV.shape[1]} eigenvectors computed, "
+                f"but index {which} requested."
+            )
+        return self.eigV[:, which]
+
+    def get_eigV_check(
+        self,
+        which: int = 0,
+        binarize: bool = False,
+        **kwargs: Any,
+    ) -> NDArray:
+        """Get eigenvector ``which``, computing if not yet available.
+
+        Parameters
+        ----------
+        which : int
+            Eigenvector index (0 = Fiedler vector).
+        binarize : bool
+            If True, return sign(eigvec) in {-1, +1}.
+        **kwargs
+            Forwarded to ``compute_k_eigvV`` if recomputation is needed.
+        """
+        need_compute = (
+            self.eigV is None
+            or (self.eigV.ndim == 2 and self.eigV.shape[1] <= which)
+        )
+        if need_compute:
+            self.compute_k_eigvV(k=which + 1)
+
+        vec = self._get_eigvec(which)
+        if binarize:
+            return np.sign(vec).astype(np.int8)
+        return vec
+
+    def get_sgspect_basis(
+        self,
+        max_factor: int = 2,
+        start: int = 0,
+        step: int = 1,
+        normalized: bool = False,
+    ) -> NDArray:
+        """Return spectral basis matrix from eigenvectors.
+
+        Parameters
+        ----------
+        max_factor : int
+            Fraction of N to use as upper limit: ``N // max_factor``.
+        start : int
+            First eigenvector index.
+        step : int
+            Step between eigenvector indices.
+        normalized : bool
+            If True, L2-normalize each basis row.
+
+        Returns
+        -------
+        ndarray, shape (k, N)
+            Row-major basis matrix.
+        """
+        stop = int(self.N // max_factor)
+        indices = range(start, stop, step)
+        if not indices:
+            return np.empty((0, self.N))
+        # Ensure enough eigenvectors are computed
+        max_idx = max(indices)
+        if self.eigV is None or (self.eigV.ndim == 2 and self.eigV.shape[1] <= max_idx):
+            self.compute_k_eigvV(k=max_idx + 1)
+
+        basis = np.array([self._get_eigvec(i) for i in indices])
+        if normalized:
+            norms = np.linalg.norm(basis, axis=1, keepdims=True)
+            norms = np.where(norms == 0, 1.0, norms)
+            basis = basis / norms
+        return basis
+
+    # ------------------------------------------------------------------
+    # Eigenvector clustering (scipy-based, no NX dependency)
+    # ------------------------------------------------------------------
+
+    def _find_components_in_subgraph(
+        self, node_mask: NDArray[np.bool_]
+    ) -> list[set[int]]:
+        """Find connected components among nodes where *node_mask* is True.
+
+        Uses the full signed adjacency matrix and scipy sparse connected
+        components — no NX graph objects involved.
+
+        Parameters
+        ----------
+        node_mask : ndarray of bool, shape (N,)
+            True for nodes to include in the subgraph.
+
+        Returns
+        -------
+        list[set[int]]
+            Connected components, sorted by size descending.
+        """
+        indices = np.where(node_mask)[0]
+        if len(indices) == 0:
+            return []
+
+        # Build adjacency sub-matrix for selected nodes
+        adj_full = self.get_signed_adjacency()  # dense (N, N)
+        # We only care about connectivity (ignore signs)
+        sub_adj = np.abs(adj_full[np.ix_(indices, indices)])
+        sub_sparse = csr_matrix(sub_adj)
+
+        n_comp, labels = sp_connected_components(sub_sparse, directed=False)
+
+        clusters: list[set[int]] = [set() for _ in range(n_comp)]
+        for local_idx, label in enumerate(labels):
+            clusters[label].add(int(indices[local_idx]))
+
+        # Sort by size descending, drop empties
+        clusters = sorted(
+            (c for c in clusters if c), key=len, reverse=True
+        )
+        return clusters
+
+    def make_clustersYN(
+        self,
+        which: int = 0,
+        binarize: bool = True,
+        val: int = 1,
+    ) -> None:
+        """Partition nodes by eigenvector sign and find connected components.
+
+        Parameters
+        ----------
+        which : int
+            Eigenvector index to partition on.
+        binarize : bool
+            If True, use sign of eigenvector.
+        val : int
+            Value considered "Y" partition (default +1).
+
+        Sets
+        ----
+        self.clustersY : list[set[int]]
+            Components where eigenvec matches *val*, sorted by size.
+        self.clustersN : list[set[int]]
+            Components where eigenvec does NOT match *val*.
+        """
+        eigvec = self.get_eigV_check(which, binarize=binarize)
+
+        mask_y = eigvec == val
+        mask_n = ~mask_y
+
+        self.clustersY = self._find_components_in_subgraph(mask_y)
+        self.clustersN = self._find_components_in_subgraph(mask_n)
+        self.numClustersY = len(self.clustersY)
+        self.numClustersN = len(self.clustersN)
+
+        if self.clustersY:
+            self.biggestClSet = self.clustersY
+            self.numClustersBig = len(self.clustersY)
+            self.gc = self.clustersY[0]
+        else:
+            self.biggestClSet = []
+            self.numClustersBig = 0
+            self.gc = None
+
+    make_eigVclustersYN = make_clustersYN  # alias for NX API compat
+
+    def get_eigV_cluster_sizes(
+        self,
+        which: int = 0,
+        binarize: bool = True,
+        val: int = 1,
+    ) -> list[int]:
+        """Return cluster sizes from eigenvector partitioning.
+
+        Parameters
+        ----------
+        which : int
+            Eigenvector index.
+        binarize : bool
+            Use sign of eigenvector.
+        val : int
+            Value for the "Y" partition.
+
+        Returns
+        -------
+        list[int]
+            Sorted cluster sizes (descending).
+        """
+        # Recompute clusters each time (stateless, avoids cache staleness)
+        self.make_clustersYN(which=which, binarize=binarize, val=val)
+        return sorted((len(c) for c in self.clustersY), reverse=True)
+
+    def get_cluster_distribution(
+        self,
+        which: int = 0,
+        binarize: bool = True,
+        val: int = 1,
+        **kwargs: Any,
+    ) -> dict[int, int]:
+        """Return cluster size distribution as ``{size: count}``.
+
+        Parameters
+        ----------
+        which : int
+            Eigenvector index.
+        binarize : bool
+            Use sign of eigenvector.
+        val : int
+            Value for "Y" partition.
+
+        Returns
+        -------
+        dict[int, int]
+            Mapping from cluster size to frequency.
+        """
+        cl_sizes = self.get_eigV_cluster_sizes(which, binarize, val)
+        return {size: cl_sizes.count(size) for size in set(cl_sizes)}
+
+    def compute_pinf(
+        self,
+        which: int = 0,
+        val: int = 1,
+        **kwargs: Any,
+    ) -> None:
+        """Compute infinite-cluster probability (Pinf).
+
+        Parameters
+        ----------
+        which : int
+            Eigenvector index.
+        val : int
+            Partition value.
+
+        Sets
+        ----
+        self.Pinf : float
+            Largest cluster size / N.
+        self.Pinf_var : float
+            Pinf variance estimate.
+        """
+        cl_sizes = np.array(self.get_eigV_cluster_sizes(which, True, val))
+        if len(cl_sizes) == 0:
+            self.Pinf = 0.0
+            self.Pinf_var = 0.0
+        else:
+            self.Pinf = float(cl_sizes[0]) / self.N
+            denominator = np.sum(cl_sizes) - cl_sizes[0]
+            if denominator > 0:
+                self.Pinf_var = float(
+                    np.sum(cl_sizes @ cl_sizes - cl_sizes[0] ** 2)
+                    / denominator
+                )
+            else:
+                self.Pinf_var = 0.0
+
+        if not hasattr(self, "Pinf_dict"):
+            self.Pinf_dict: dict[int, tuple[float, float]] = {}
+        self.Pinf_dict[which] = (self.Pinf, self.Pinf_var)
+
+    def handle_no_clust(self, NoClust: int) -> int | None:
+        """Check cluster availability (NX API compat).
+
+        Parameters
+        ----------
+        NoClust : int
+            Number of clusters requested.
+
+        Returns
+        -------
+        int or None
+            Validated cluster count, or None if no clusters exist.
+        """
+        num_big = getattr(self, "numClustersBig", 0)
+        if num_big == 0:
+            return None
+        if NoClust > num_big:
+            return num_big
+        return NoClust
 
     def __repr__(self) -> str:
         neg = self.count_negative_edges()

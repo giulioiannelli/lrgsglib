@@ -19,6 +19,8 @@ from .TransClusters import (
 )
 from .generic import resolve_float_type
 
+from parsers.shared import get_graph_engine, resolve_graph_class
+
 __all__ = ["run_transcluster"]
 
 
@@ -49,6 +51,25 @@ def file_path_maker(
     )
 
 
+def _make_lattice(args, engine: str, init_nw_dict: bool = True, **extra_kwargs):
+    """Create a lattice with the appropriate engine."""
+    if engine == "gt":
+        LatticeClass = resolve_graph_class("Lattice2D", "gt")
+        lattice = LatticeClass(side1=args.L, pflip=args.p, geo=args.geometry)
+        lattice.flip_random_fract_edges()
+        return lattice
+
+    # NX path
+    lattice = Lattice2D(
+        args.L,
+        pflip=args.p,
+        geo=args.geometry,
+        init_nw_dict=init_nw_dict,
+        **extra_kwargs,
+    )
+    return lattice
+
+
 def run_pcluster_mode(
     args,
     geometry_func: Callable[[Lattice2D], Iterable],
@@ -58,6 +79,7 @@ def run_pcluster_mode(
     typf,
 ) -> None:
     """Execute the ``pCluster`` averaging routine."""
+    engine = get_graph_engine(args)
 
     base_pattern = file_path_maker(
         base_path,
@@ -88,13 +110,9 @@ def run_pcluster_mode(
 
     averages_completed = n_avg_done
     while averages_completed < args.number_of_averages:
-        lattice = Lattice2D(
-            args.L,
-            pflip=args.p,
-            geo=args.geometry,
-            init_nw_dict=True,
-        )
-        lattice.flip_sel_edges(geometry_func(lattice))
+        lattice = _make_lattice(args, engine)
+        if engine == "nx":
+            lattice.flip_sel_edges(geometry_func(lattice))
         lattice.compute_k_eigvV(typf=typf)
         merged_dict += lattice.get_cluster_distribution()
 
@@ -135,6 +153,7 @@ def run_ordparam_mode(
     typf,
 ) -> None:
     """Execute the ``ordParam`` averaging routine."""
+    engine = get_graph_engine(args)
 
     pinf: list[float] = []
     pinf_sq: list[float] = []
@@ -166,15 +185,18 @@ def run_ordparam_mode(
         return filename
 
     for avg_idx in range(args.number_of_averages):
-        lattice = Lattice2D(
-            args.L,
-            pflip=args.p,
-            geo=args.geometry,
-            with_positions=True,
-            init_nw_dict=True,
-            sgpathn=args.workdir,
-        )
-        lattice.flip_sel_edges(geometry_func(lattice))
+        if engine == "gt":
+            lattice = _make_lattice(args, engine)
+        else:
+            lattice = Lattice2D(
+                args.L,
+                pflip=args.p,
+                geo=args.geometry,
+                with_positions=True,
+                init_nw_dict=True,
+                sgpathn=args.workdir,
+            )
+            lattice.flip_sel_edges(geometry_func(lattice))
         lattice.compute_k_eigvV(typf=typf)
 
         neglinks += lattice.Ne_n

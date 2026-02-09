@@ -109,6 +109,7 @@ def run_reconstruction(
     loglogger: Any,
     spinovp: List[NDArray],
     prepare_lattice_func: Callable[[Any], Any],
+    save_dir: Optional[Path] = None,
 ) -> Union[List[NDArray], Path]:
     """
     Run a reconstruction simulation with customizable body functions.
@@ -123,13 +124,14 @@ def run_reconstruction(
         List to store spin overlap arrays from simulations.
     prepare_lattice_func : Callable[[Any], Any]
         Function to prepare the lattice.
-    max_factor : int, optional
-        Maximum factor for the basis computation, by default 2.
+    save_dir : Path, optional
+        Fallback output directory (used when lattice lacks ``path_lrgsg``,
+        e.g. GT engine).
 
     Returns
     -------
-    Path
-        Path to the lattice output directory (lattice.path_lrgsg).
+    tuple[list, Path]
+        Updated spinovp list and output directory path.
     """
     pflip = args.p
     assert pflip >= 0. and pflip <= 1., "pflip must be in [0, 1]"
@@ -137,7 +139,7 @@ def run_reconstruction(
         lattice = prepare_lattice_func(args, save=False)
     else:
         lattice = prepare_lattice_func(args)
-    
+
     basis = lattice.get_sgspect_basis(args.max_factor, args.start_idx_basis, args.basis_step)
     loglogger.debug("Basis computed.")
 
@@ -154,11 +156,12 @@ def run_reconstruction(
                 basis_len = len(spinovp_tmp)
                 spinovp = [np.zeros(basis_len), np.zeros(basis_len), 0]
             spinovp = update_mean_m2(*spinovp, spinovp_tmp)
-        case 'full': 
+        case 'full':
             spinovp.append(spinovp_tmp)
     loglogger.debug("Reconstruction completed.")
 
-    return spinovp, lattice.path_lrgsg
+    out_dir = getattr(lattice, "path_lrgsg", save_dir)
+    return spinovp, out_dir
 #
 def save_spin_overlap_results(
     spinovp: List[NDArray],
@@ -263,9 +266,16 @@ def compute_recon_prog_lattice_incr(
     loglogger = setup_logger(loglogger)
     loglogger.info(f"Checking existing results for {args.number_of_averages} \
                    averages.")
-    # Check existing file and determine needed averages
-    test_lattice = prepare_lattice_func(args, compute = None)
-    save_dir = test_lattice.path_lrgsg  # Prepare lattice without eigV
+    # Check existing file and determine needed averages.
+    # For GT engine, prepare_lattice_func may return a graph without
+    # path_lrgsg; fall back to a default data directory.
+    test_lattice = prepare_lattice_func(args, compute=None)
+    save_dir = getattr(test_lattice, "path_lrgsg", None)
+    if save_dir is None:
+        # GT lattice — construct output dir from env + lattice info
+        from lrgsglib.config.lrgsg_env import LRGSG_DATA
+        save_dir = Path(LRGSG_DATA) / "lrgsg" / f"N={test_lattice.N}"
+        save_dir.mkdir(parents=True, exist_ok=True)
     needed_averages = check_existing_file_and_needed_averages(save_dir, args, loglogger)
 
     spinovp = []
@@ -296,7 +306,9 @@ def compute_recon_prog_lattice_incr(
     loglogger.info(f"Running {needed_averages} additional simulations.")
     lattice_path = None  # will hold the last lattice path
     for i in range(needed_averages):
-        spinovp, lattice_path = run_reconstruction(args, loglogger, spinovp, prepare_lattice_func)
+        spinovp, lattice_path = run_reconstruction(
+            args, loglogger, spinovp, prepare_lattice_func, save_dir=save_dir
+        )
         # Save results incrementally to a single file, replacing the previous one
         given_averages += 1
         if given_averages % args.save_frequency == 0:
