@@ -67,29 +67,43 @@ def _run_simulation_nx(
     number: int,
     remove_files: bool,
 ) -> None:
-    """NX path: original eigenvector/cluster-based initialization with retry logic."""
+    """NX path: eigenvector/cluster init for ground_state, direct for others."""
+    ic_gs = args.init_cond.startswith('ground_state') or args.init_cond.startswith('gs')
+
+    if not ic_gs:
+        # Direct path: no eigenvector/cluster pipeline needed
+        for _ in range(args.number_of_averages):
+            er = ErdosRenyi(**erDictArgs)
+            er.flip_sel_edges(er.nwDict[args.cell_type]['G'])
+            isdy = run_ising_dynamics(args, er)
+            if remove_files:
+                clean_up_files(isdy, er)
+        return
+
+    # Ground-state path: eigenvector/cluster-based initialization with retry
     count = 0
     while count < args.number_of_averages and count < MAX_ITER:
-        # Create new ER graph instance
         er = ErdosRenyi(**erDictArgs)
         er.flip_sel_edges(er.nwDict[args.cell_type]['G'])
 
-        # Compute eigenvector and load on graph
         er.compute_k_eigvV(k=number + 1)
         er.load_eigV_on_graph(which=number, binarize=True)
 
-        # Try to form clusters - may fail for some ER realizations
         try:
             er.make_clustersYN(f'eigV{number}', -1)
-        except (ValueError, IndexError, KeyError) as exc:
-            # Skip this realization if clustering fails
+        except (ValueError, IndexError, KeyError):
             continue
 
-        # Run Ising dynamics on the successfully clustered graph
+        NoClust = er.handle_no_clust(NoClust=args.NoClust)
+        if NoClust is None:
+            continue
+
         isdy = IsingDynamics(er, **isingDictArgs)
         isdy.init_ising_dynamics()
-        er.export_ising_clust()
-        # run() with clean_export=True (default) handles file cleanup internally
+        try:
+            er.export_ising_clust()
+        except (IndexError, ValueError):
+            continue
         isdy.run(verbose=False, clean_export=remove_files)
 
         count += 1

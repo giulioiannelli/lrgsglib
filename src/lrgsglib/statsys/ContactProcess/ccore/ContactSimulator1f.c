@@ -21,8 +21,9 @@ int main(int argc, char *argv[]) {
     size_t steps = strtozu(argv[4]);
     const char *datdir = argv[5];
     const char *syshape = argv[6];
-    const char *run_id = argv[7];
-    const char *out_id = argv[8];
+    char run_id[STRL256], out_id[STRL256];
+    build_str_id(argv[7], run_id, sizeof run_id);
+    build_str_id(argv[8], out_id, sizeof out_id);
     const char *activation_name = argv[9];
     size_t num_log_samples = strtozu(argv[10]);
     if (num_log_samples == 0) {

@@ -107,6 +107,9 @@ class SignedGraphGT:
         # Track edges marked for flipping
         self._flip_edges = set()
 
+        # Lazy neighbor cache for dynamics performance
+        self._neighbor_cache: dict[int, list[tuple[int, float]]] | None = None
+
     @property
     def N(self) -> int:
         """Number of nodes."""
@@ -555,7 +558,11 @@ class SignedGraphGT:
             for e in self.G.edges()
         }
 
-    def get_laplacian_spectrum(self, k: Optional[int] = None) -> np.ndarray:
+    def get_laplacian_spectrum(
+        self,
+        k: Optional[int] = None,
+        backend: Literal["numpy", "scipy", "cupy"] = "numpy",
+    ) -> np.ndarray:
         """
         Compute Laplacian eigenvalues.
 
@@ -563,6 +570,8 @@ class SignedGraphGT:
         ----------
         k : int, optional
             Number of eigenvalues to compute. If None, compute all.
+        backend : str, default 'numpy'
+            Computation backend ('numpy', 'scipy', 'cupy').
 
         Returns
         -------
@@ -571,13 +580,20 @@ class SignedGraphGT:
         """
         L = self.get_signed_laplacian()
 
-        if k is None or k >= self.N:
-            # Full spectrum
-            eigenvalues = np.linalg.eigvalsh(L)
-        else:
-            # Partial spectrum using scipy sparse
+        if k is not None and k < self.N:
             L_sparse = csr_matrix(L)
             eigenvalues, _ = eigsh(L_sparse, k=k, which="SM")
+        elif backend == "cupy":
+            try:
+                import cupy as cp
+                eigenvalues = cp.asnumpy(cp.linalg.eigvalsh(cp.asarray(L)))
+            except ImportError:
+                eigenvalues = np.linalg.eigvalsh(L)
+        elif backend == "scipy":
+            from scipy.linalg import eigvalsh
+            eigenvalues = eigvalsh(L)
+        else:
+            eigenvalues = np.linalg.eigvalsh(L)
 
         return np.sort(eigenvalues)
 
@@ -744,8 +760,28 @@ class SignedGraphGT:
     # Dynamics-critical methods (engine-agnostic interface)
     # ------------------------------------------------------------------
 
+    def _build_neighbor_cache(self) -> None:
+        """Pre-compute neighbor lists for all nodes (one-time GT traversal)."""
+        sign_prop = self.G.edge_properties["sign"]
+        cache: dict[int, list[tuple[int, float]]] = {}
+        for node in range(self.N):
+            v = self.G.vertex(node)
+            neighbors: list[tuple[int, float]] = []
+            for e in v.out_edges():
+                nn = int(e.target()) if int(e.source()) == node else int(e.source())
+                neighbors.append((nn, float(sign_prop[e])))
+            cache[node] = neighbors
+        self._neighbor_cache = cache
+
+    def invalidate_neighbor_cache(self) -> None:
+        """Invalidate cached neighbors (call after edge sign changes)."""
+        self._neighbor_cache = None
+
     def get_neighbors_with_weights(self, node: int) -> list[tuple[int, float]]:
         """Return neighbors of *node* with signed edge weights.
+
+        Uses a lazily-initialized cache to avoid repeated GT C++ traversals
+        during dynamics simulations.
 
         Parameters
         ----------
@@ -757,13 +793,9 @@ class SignedGraphGT:
         list[tuple[int, float]]
             List of ``(neighbor_index, sign_weight)`` pairs.
         """
-        v = self.G.vertex(node)
-        sign_prop = self.G.edge_properties["sign"]
-        result: list[tuple[int, float]] = []
-        for e in v.out_edges():
-            neighbor = int(e.target()) if int(e.source()) == node else int(e.source())
-            result.append((neighbor, float(sign_prop[e])))
-        return result
+        if self._neighbor_cache is None:
+            self._build_neighbor_cache()
+        return self._neighbor_cache[node]
 
     def get_edges_with_weights(self) -> list[tuple[int, int, float]]:
         """Return all edges with their signed weights.
@@ -796,11 +828,12 @@ class SignedGraphGT:
         return [int(n) for n in v.out_neighbors()]
 
     def invalidate_cache(self) -> None:
-        """Clear cached matrices and spectral data."""
+        """Clear cached matrices, spectral data, and neighbor cache."""
         self._slp = None
         self._adj = None
         self._eigv = None
         self._eigV = None
+        self._neighbor_cache = None
 
     def get_frustration_index(self) -> float:
         """

@@ -23,9 +23,24 @@ def _run_simulation_gt(args):
 
 
 def _run_simulation_nx(args):
-    """NX path: original eigenvector/cluster-based initialization."""
+    """NX path: eigenvector/cluster-based init for ground_state, direct for others."""
     ic_gs = args.init_cond.startswith('ground_state') or args.init_cond.startswith('gs')
-    number = int(args.init_cond.split('_')[-1]) if ic_gs else 0
+
+    if not ic_gs:
+        # Direct path: no eigenvector/cluster pipeline needed
+        for _ in range(args.number_of_averages):
+            lattice = Lattice2D(**initialize_l2d_dict_args(args))
+            if lattice.init_nw_dict:
+                lattice.flip_sel_edges(lattice.nwDict[args.cell_type]['G'])
+            else:
+                lattice.flip_random_fract_edges()
+            isdy = run_ising_dynamics(args, lattice)
+            if args.remove_files:
+                clean_up_files(isdy, lattice)
+        return
+
+    # Ground-state path: eigenvector/cluster-based initialization
+    number = int(args.init_cond.split('_')[-1])
     val = ConditionalPartitioning(args.val)
     for _ in range(args.number_of_averages):
         lattice = Lattice2D(**initialize_l2d_dict_args(args))

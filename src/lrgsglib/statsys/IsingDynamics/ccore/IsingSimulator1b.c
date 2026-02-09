@@ -37,7 +37,8 @@ int main(int argc, char *argv[])
 
     FILE *f_sini, *f_ene, *f_m;
     char buf[STRL512];
-    char *ptr, *datdir, *out_id, *run_id, *syshape, *update_mode;
+    char *ptr, *datdir, *_run_id, *_out_id, *syshape, *update_mode;
+    char run_id[STRL256], out_id[STRL256];
     double T, p;
     double *m, *ene, *h;
     spin_tp s;
@@ -61,9 +62,11 @@ int main(int argc, char *argv[])
     eqSTEP = strtod(argv[6], &ptr);
     datdir = argv[7];
     syshape = argv[8];
-    run_id = argv[9];
-    out_id = argv[10];
+    _run_id = argv[9];
+    _out_id = argv[10];
     update_mode = argv[11];
+    build_str_id(_run_id, run_id, sizeof run_id);
+    build_str_id(_out_id, out_id, sizeof out_id);
 
     /* init metropolis algorithm with zero external field */
     h = __chCalloc(N, sizeof(*h));

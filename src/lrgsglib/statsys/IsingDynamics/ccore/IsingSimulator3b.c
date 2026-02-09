@@ -43,7 +43,8 @@ int main(int argc, char *argv[])
     /* variable declarations */
     FILE *f_sini, *f_ene, *f_m, *f_T;
     char buf[STRL512];
-    char *ptr, *datdir, *out_id, *run_id, *syshape, *update_mode, *cooling_sched_str;
+    char *ptr, *datdir, *_out_id, *_run_id, *syshape, *update_mode, *cooling_sched_str;
+    char run_id[STRL256], out_id[STRL256];
     double p, T_init, T_final, cooling_rate;
     double *m, *ene, *h, *T_out;
     spin_tp s;
@@ -68,9 +69,11 @@ int main(int argc, char *argv[])
     n_temps = strtozu(argv[8]);
     datdir = argv[9];
     syshape = argv[10];
-    run_id = argv[11];
-    out_id = argv[12];
+    _run_id = argv[11];
+    _out_id = argv[12];
     update_mode = argv[13];
+    build_str_id(_run_id, run_id, sizeof run_id);
+    build_str_id(_out_id, out_id, sizeof out_id);
 
     /* parse cooling schedule */
     cooling_schedule = sa_parse_schedule(cooling_sched_str);

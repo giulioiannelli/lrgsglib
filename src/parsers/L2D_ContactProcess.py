@@ -30,8 +30,8 @@ def _validate_contact_args(args: argparse.Namespace) -> argparse.Namespace:
     if dynamics == "EI":
         if args.gamma is None:
             parser.error("Excitation/inhibition dynamics require --gamma.")
-        if not runlang.startswith("C1"):
-            parser.error("Excitation/inhibition dynamics currently support only C1* runlangs (e.g., --runlang C1c).")
+        if not (runlang.startswith("C1") or runlang == "PY"):
+            parser.error("Excitation/inhibition dynamics support C1* runlangs (e.g., --runlang C1c) and py.")
     elif dynamics == "SIR":
         if args.mu is None:
             parser.error("SIR dynamics require --mu.")
