@@ -59,8 +59,12 @@ def prepare_lattice(args: Any, **kwargs) -> Any:
 
     if engine == "gt":
         Cls = resolve_graph_class("Lattice2D", "gt")
+        # Normalize geometry name: NX uses 'squared', GT uses 'sqr'
+        geo = args.geometry
+        _GEO_ALIASES = {"squared": "sqr", "triangular": "tri", "hexagonal": "hex"}
+        geo = _GEO_ALIASES.get(geo, geo)
         l2d_kwargs = dict(
-            side1=args.L, geo=args.geometry, pflip=args.p, seed=42,
+            side1=args.L, geo=geo, pflip=args.p, seed=42,
         )
         lattice = Cls(**l2d_kwargs, **kwargs)
         lattice.flip_random_fract_edges()
@@ -77,9 +81,25 @@ def prepare_lattice(args: Any, **kwargs) -> Any:
 
 
 
-def eigV_for_lattice2D(side, mode='scipy', howmany=1, **kwargs) -> NDArray:
-    l = Lattice2D(side, **kwargs)
+_GEO_ALIASES = {"squared": "sqr", "triangular": "tri", "hexagonal": "hex"}
+
+
+def _make_lattice(side, engine='nx', **kwargs):
+    """Create a Lattice2D instance for the given engine."""
+    if engine == 'gt':
+        Cls = resolve_graph_class("Lattice2D", "gt")
+        # Normalize geometry name for GT
+        if 'geo' in kwargs:
+            kwargs['geo'] = _GEO_ALIASES.get(kwargs['geo'], kwargs['geo'])
+        l = Cls(side1=side, **kwargs)
+    else:
+        l = Lattice2D(side, **kwargs)
     l.flip_random_fract_edges()
+    return l
+
+
+def eigV_for_lattice2D(side, mode='scipy', howmany=1, engine='nx', **kwargs) -> NDArray:
+    l = _make_lattice(side, engine=engine, **kwargs)
     l.compute_k_eigvV(backend=mode, k=howmany)
     return l.eigV
 
@@ -91,12 +111,14 @@ def adjust_eigV_for_lattice2D(leigV: NDArray) -> NDArray:
 def eigV_for_lattice2D_ptch(**kwargs) -> NDArray:
     return adjust_eigV_for_lattice2D(eigV_for_lattice2D(**kwargs))
 
-def eigv_for_lattice2D(side, mode: str = "full", backend='scipy', keep_sparse=None, **kwargs) -> NDArray:
-    l = Lattice2D(side, **kwargs)
-    l.flip_random_fract_edges()
+def eigv_for_lattice2D(side, mode: str = "full", backend='scipy', keep_sparse=None, engine='nx', **kwargs) -> NDArray:
+    l = _make_lattice(side, engine=engine, **kwargs)
     match mode:
         case "full":
-            l.compute_laplacian_spectrum_weigV(backend=backend, keep_sparse=keep_sparse)
+            if engine == 'gt':
+                l.compute_laplacian_spectrum_weigV(backend=backend)
+            else:
+                l.compute_laplacian_spectrum_weigV(backend=backend, keep_sparse=keep_sparse)
         case _ if mode.startswith("some"):
             k = int(mode.split("_")[-1])
             l.compute_k_eigvV(k=k, backend=backend)

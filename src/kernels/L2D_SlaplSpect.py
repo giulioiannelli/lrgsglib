@@ -18,11 +18,15 @@ from .SlaplSpect import (
     build_eigval_fname_base,
     build_eigvec_fname_base,
 )
+from parsers.shared import get_graph_engine
 
 
 def get_lattice2d_path(args):
     """
     Get spectrum save path for Lattice2D.
+
+    Uses the NX class for path resolution regardless of engine,
+    since output directory structure is engine-independent.
 
     Parameters
     ----------
@@ -35,7 +39,7 @@ def get_lattice2d_path(args):
         Directory path for spectrum data storage.
     """
     return Lattice2D(
-        side1=args.L, pflip=args.p, geo=args.geo, path_data=args.workDir
+        side1=args.L, pflip=args.p, geo=args.geometry, path_data=args.workdir
     ).path_spect
 
 
@@ -87,15 +91,18 @@ def perform_spectral_calculations(args):
         # Raw eigenvalue storage mode
         fname_base = f"eigvals_{args.p:.3g}_{args.cell_type}"
 
+        engine = get_graph_engine(args)
         eigvlist = []
+        eig_mode = 'full' if args.howmany <= 0 else '_'.join(["some", str(args.howmany)])
         for idx in range(args.number_of_averages):
             eigv = eigv_for_lattice2D(
                 side=args.L,
                 pflip=args.p,
-                geo=args.geo,
-                mode='_'.join(["some", str(args.howmany)]),
+                geo=args.geometry,
+                mode=eig_mode,
                 backend=args.backend,
-                keep_sparse=getattr(args, 'keep_sparse', None)
+                keep_sparse=getattr(args, 'keep_sparse', None),
+                engine=engine,
             )
             eigvlist.append(eigv)
 
@@ -130,14 +137,16 @@ def eigvec_initial_data(args):
     np.ndarray
         Absolute values of eigenvector components.
     """
+    engine = get_graph_engine(args)
     if args.verbose:
         print("Computing initial eigenvector data...")
     result = np.abs(eigV_for_lattice2D_ptch(
         side=args.L,
         pflip=args.p,
-        geo=args.geo,
+        geo=args.geometry,
         mode=args.eigen_mode,
-        howmany=args.howmany
+        howmany=args.howmany,
+        engine=engine,
     ))
     if args.verbose:
         print(f"Computed initial eigenvector data of size {result.shape}")
@@ -158,12 +167,14 @@ def eigval_initial_data(args):
     np.ndarray
         Eigenvalues of signed Laplacian.
     """
+    engine = get_graph_engine(args)
     if args.verbose:
         print("Computing initial eigenvalue data...")
     result = eigv_for_lattice2D(
         side=args.L,
         pflip=args.p,
-        geo=args.geo
+        geo=args.geometry,
+        engine=engine,
     )
     if args.verbose:
         print(f"Computed initial eigenvalue data of size {result.shape}")
@@ -195,14 +206,16 @@ def eigvec_update_data(batch_size, bins, bin_centers, bin_counter, args):
     if args.verbose:
         print(f"Updating eigenvector data for batch size {batch_size}...")
 
+    engine = get_graph_engine(args)
     eig_values = [[] for _ in range(args.howmany)]
     for _ in range(batch_size):
         eigV = eigV_for_lattice2D_ptch(
             side=args.L,
             pflip=args.p,
-            geo=args.geo,
+            geo=args.geometry,
             mode=args.eigen_mode,
-            howmany=args.howmany
+            howmany=args.howmany,
+            engine=engine,
         )
         for i in range(args.howmany):
             eig_values[i].append(eigV[i])
@@ -248,8 +261,10 @@ def eigval_update_data(batch_size, bins, bin_centers, bin_counter, args):
     if args.verbose:
         print(f"Updating eigenvalue data for batch size {batch_size}...")
 
+    engine = get_graph_engine(args)
     eig_values = [
-        eigv_for_lattice2D(side=args.L, pflip=args.p, geo=args.geo)
+        eigv_for_lattice2D(side=args.L, pflip=args.p, geo=args.geometry,
+                           engine=engine)
         for _ in range(batch_size)
     ]
     eig_values = np.concatenate(eig_values)

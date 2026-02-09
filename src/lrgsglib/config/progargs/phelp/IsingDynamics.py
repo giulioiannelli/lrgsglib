@@ -1,5 +1,12 @@
 phelp_ic = "Initial condition for the Ising model"
-phelp_runlang = "Language for running the Ising model"
+phelp_runlang = (
+    "Backend for running the Ising model. "
+    "Options: py (Python Metropolis), pb_met (pybind11 Metropolis), "
+    "pb_sa (pybind11 SA), pb_pt (pybind11 PT), "
+    "cu_met/cu_sa/cu_pt (CuPy GPU), "
+    "wolff/sw (cluster algorithms), "
+    "C1/C1b/C3/C3b/C4/C4b (C subprocess, NX only)"
+)
 phelp_thrmsteps = "Number of thermalization steps"
 phelp_randstr = "Random string for the output files"
 # Simulated Annealing help text

@@ -1,8 +1,29 @@
 from lrgsglib import *
 from .L2D import *
 from .IsingDynamics import *
+from parsers.shared import get_graph_engine
+
 
 def run_simulation(args):
+    engine = get_graph_engine(args)
+
+    if engine == "gt":
+        _run_simulation_gt(args)
+    else:
+        _run_simulation_nx(args)
+
+
+def _run_simulation_gt(args):
+    """GT path: skip eigvec/cluster pipeline, use direct Ising dynamics."""
+    for _ in range(args.number_of_averages):
+        lattice = prepare_lattice(args)
+        isdy = run_ising_dynamics(args, lattice)
+        if args.remove_files:
+            clean_up_files(isdy, lattice)
+
+
+def _run_simulation_nx(args):
+    """NX path: original eigenvector/cluster-based initialization."""
     ic_gs = args.init_cond.startswith('ground_state') or args.init_cond.startswith('gs')
     number = int(args.init_cond.split('_')[-1]) if ic_gs else 0
     val = ConditionalPartitioning(args.val)

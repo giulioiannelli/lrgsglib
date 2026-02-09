@@ -3,8 +3,9 @@ from lrgsglib.config.progargs import *
 #
 optionalaction_args_dict = {
     **L2D_opt_args,
-    **L2D_SlaplSpect_optional_args_dict, 
-    **L2D_SlaplSpect_action_args_dict
+    **L2D_SlaplSpect_optional_args_dict,
+    **L2D_SlaplSpect_action_args_dict,
+    **action_args_dict,
 }
 #
 parser = argparse.ArgumentParser(

@@ -28,6 +28,7 @@ from .SlaplSpect import (
     save_with_na,
     cleanup_intermediate_files,
 )
+from parsers.shared import get_graph_engine, resolve_graph_class
 
 # ============================================================================
 # Helper functions for MultiplicativeCascadeGraph spectral analysis
@@ -103,10 +104,32 @@ def select_optimal_backend(N, E, requested_backend='cupy', verbose=False):
     return ('scipy', True, f'tooLarge_usePartialSpectrum')
 
 
+def _make_mc_graph(p1, p2, p3, p4, fraction, iterations,
+                   stochastic=False, periodic=False, variant='exp_clocks',
+                   pflip=0.0, out_suffix='', seed=None, engine='nx'):
+    """Create a MultiplicativeCascadeGraph instance for the given engine."""
+    if engine == 'gt':
+        Cls = resolve_graph_class("MultiplicativeCascade", "gt")
+    else:
+        from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as Cls
+    return Cls(
+        p1=p1, p2=p2, p3=p3, p4=p4,
+        fraction=fraction,
+        iterations=iterations,
+        stochastic=stochastic,
+        periodic=periodic,
+        variant=variant,
+        pflip=pflip,
+        out_suffix=out_suffix,
+        seed=seed,
+    )
+
+
 def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
                       stochastic=False, periodic=False, variant='exp_clocks',
                       mode='all', pflip=0.0, backend='scipy', seed=None,
-                      out_suffix='', keep_sparse=None, verbose=False):
+                      out_suffix='', keep_sparse=None, verbose=False,
+                      engine='nx'):
     """
     Compute eigenvalues of signed Laplacian for MultiplicativeCascadeGraph.
 
@@ -139,14 +162,14 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
         Sparse strategy: None (auto), True (force sparse), False (force dense)
     verbose : bool
         If True, print backend selection messages
+    engine : str
+        Graph engine: 'nx' (NetworkX) or 'gt' (graph-tool)
 
     Returns
     -------
     eigenvalues : np.ndarray
         Signed Laplacian eigenvalues
     """
-    from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
-
     # Memory tracking for debugging OOM issues
     if verbose:
         try:
@@ -169,9 +192,9 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
 
     # Generate graph
     if verbose:
-        print(f"[STEP 1/5] Creating MultiplicativeCascadeGraph (p1={p1}, p2={p2}, p3={p3}, p4={p4}, fraction={fraction}, it={iterations})...", flush=True)
+        print(f"[STEP 1/5] Creating MultiplicativeCascadeGraph (p1={p1}, p2={p2}, p3={p3}, p4={p4}, fraction={fraction}, it={iterations}, engine={engine})...", flush=True)
 
-    G = MultiplicativeCascadeGraph(
+    G = _make_mc_graph(
         p1=p1, p2=p2, p3=p3, p4=p4,
         fraction=fraction,
         iterations=iterations,
@@ -179,7 +202,9 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
         periodic=periodic,
         variant=variant,
         pflip=pflip,
-        out_suffix=out_suffix
+        out_suffix=out_suffix,
+        seed=seed,
+        engine=engine,
     )
 
     if verbose:
@@ -197,12 +222,10 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
 
     if backend == 'cupy' and keep_sparse is None:
         # Use intelligent backend selection
-        # Must access graph first to trigger generation and populate G.N
-        graph = G.gr['G']
-        N = graph.number_of_nodes()  # Get N directly from graph, not G.N
-        E = graph.number_of_edges()
+        N = G.N
+        E = G.Ne
         if verbose:
-            print(f"[DEBUG] Graph has N={N:,} nodes, E={E:,} edges, G.N={G.N}", flush=True)
+            print(f"[DEBUG] Graph has N={N:,} nodes, E={E:,} edges", flush=True)
         actual_backend, actual_keep_sparse, backend_suffix = select_optimal_backend(
             N, E, requested_backend=backend, verbose=verbose
         )
@@ -226,7 +249,11 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
             print(f"[INFO] Dense matrix size: {matrix_gb:.1f} GB", flush=True)
 
         try:
-            G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
+            if hasattr(G, 'compute_laplacian_spectrum'):
+                G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
+            else:
+                # GT graphs only have compute_laplacian_spectrum_weigV (no keep_sparse)
+                G.compute_laplacian_spectrum_weigV(backend=actual_backend)
             eigvals = G.eigv  # Full spectrum
 
             if verbose:
@@ -254,7 +281,10 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
                 actual_keep_sparse = False
                 backend_suffix = 'denseCPU_fallback'
                 G.out_suffix = f"{out_suffix}_{backend_suffix}" if out_suffix else backend_suffix
-                G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
+                if hasattr(G, 'compute_laplacian_spectrum'):
+                    G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
+                else:
+                    G.compute_laplacian_spectrum_weigV(backend=actual_backend)
                 eigvals = G.eigv
             else:
                 # Re-raise if not a recoverable GPU error
@@ -272,7 +302,8 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
 def eigV_for_mc_graph_ptch(p1, p2, p3, p4, fraction, iterations,
                             stochastic=False, periodic=False, variant='exp_clocks',
                             mode='smallest', howmany=5, pflip=0.0,
-                            backend='scipy', seed=None, out_suffix=''):
+                            backend='scipy', seed=None, out_suffix='',
+                            engine='nx'):
     """
     Compute eigenvectors of signed Laplacian for MultiplicativeCascadeGraph.
 
@@ -308,13 +339,11 @@ def eigV_for_mc_graph_ptch(p1, p2, p3, p4, fraction, iterations,
     eigenvectors : np.ndarray
         Shape (howmany, N) where N is number of nodes
     """
-    from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
-
     if seed is not None:
         np.random.seed(seed)
         random.seed(seed)
 
-    G = MultiplicativeCascadeGraph(
+    G = _make_mc_graph(
         p1=p1, p2=p2, p3=p3, p4=p4,
         fraction=fraction,
         iterations=iterations,
@@ -322,7 +351,9 @@ def eigV_for_mc_graph_ptch(p1, p2, p3, p4, fraction, iterations,
         periodic=periodic,
         variant=variant,
         pflip=pflip,
-        out_suffix=out_suffix
+        out_suffix=out_suffix,
+        seed=seed,
+        engine=engine,
     )
 
     # Compute eigenvectors with specified backend
@@ -404,6 +435,7 @@ def perform_spectral_calculations(args):
 
     # Determine mode and process accordingly
     out_suffix = getattr(args, 'out_suffix', '')
+    engine = get_graph_engine(args)
 
     if args.mode.endswith("dist"):
         if args.mode == "eigvec_dist":
@@ -498,7 +530,8 @@ def perform_spectral_calculations(args):
                 backend=args.backend,
                 out_suffix=out_suffix,
                 keep_sparse=getattr(args, 'keep_sparse', None),
-                verbose=(idx == start_idx and args.verbose)
+                verbose=(idx == start_idx and args.verbose),
+                engine=engine,
             )
             eigvlist.append(eigv)
 
@@ -617,9 +650,6 @@ def perform_spectral_calculations(args):
         last_saved_na = start_idx
 
         for idx in range(start_idx, args.number_of_averages):
-            # Generate graph
-            from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
-
             if entropy_seed is not None:
                 # Use deterministic seed sequence
                 realization_seed = entropy_seed + idx
@@ -630,7 +660,7 @@ def perform_spectral_calculations(args):
                 np.random.seed(realization_seed)
                 random.seed(realization_seed)
 
-            G = MultiplicativeCascadeGraph(
+            G = _make_mc_graph(
                 p1=args.p1, p2=args.p2, p3=args.p3, p4=args.p4,
                 fraction=args.fraction,
                 iterations=args.iterations,
@@ -638,11 +668,16 @@ def perform_spectral_calculations(args):
                 periodic=args.periodic,
                 variant=args.variant,
                 pflip=args.pflip,
-                out_suffix=out_suffix
+                out_suffix=out_suffix,
+                seed=realization_seed,
+                engine=engine,
             )
 
             # Compute Laplacian spectrum
-            G.compute_laplacian_spectrum(backend=spectral_backend)
+            if hasattr(G, 'compute_laplacian_spectrum'):
+                G.compute_laplacian_spectrum(backend=spectral_backend)
+            else:
+                G.compute_laplacian_spectrum_weigV(backend=spectral_backend)
 
             if G.eigv is None:
                 raise ValueError(f"Eigenvalue computation failed for realization {idx}", flush=True)
@@ -734,6 +769,7 @@ def eigvec_initial_data(args):
 
     out_suffix = getattr(args, 'out_suffix', '')
 
+    engine = get_graph_engine(args)
     result = eigV_for_mc_graph_ptch(
         p1=args.p1, p2=args.p2, p3=args.p3, p4=args.p4,
         fraction=args.fraction,
@@ -745,7 +781,8 @@ def eigvec_initial_data(args):
         howmany=args.howmany,
         pflip=args.pflip,
         backend=args.backend,
-        out_suffix=out_suffix
+        out_suffix=out_suffix,
+        engine=engine,
     )
 
     if args.verbose:
@@ -772,6 +809,7 @@ def eigval_initial_data(args):
 
     out_suffix = getattr(args, 'out_suffix', '')
 
+    engine = get_graph_engine(args)
     result = eigv_for_mc_graph(
         p1=args.p1, p2=args.p2, p3=args.p3, p4=args.p4,
         fraction=args.fraction,
@@ -782,7 +820,8 @@ def eigval_initial_data(args):
         mode='full',
         pflip=args.pflip,
         out_suffix=out_suffix,
-        verbose=args.verbose
+        verbose=args.verbose,
+        engine=engine,
     )
 
     if args.verbose:
@@ -818,6 +857,7 @@ def eigvec_update_data(batch_size, bins, bin_centers, bin_counter, args):
 
     out_suffix = getattr(args, 'out_suffix', '')
 
+    engine = get_graph_engine(args)
     for _ in range(batch_size):
         eigV = eigV_for_mc_graph_ptch(
             p1=args.p1, p2=args.p2, p3=args.p3, p4=args.p4,
@@ -830,7 +870,8 @@ def eigvec_update_data(batch_size, bins, bin_centers, bin_counter, args):
             howmany=args.howmany,
             pflip=args.pflip,
             backend=args.backend,
-            out_suffix=out_suffix
+            out_suffix=out_suffix,
+            engine=engine,
         )
         for i in range(args.howmany):
             eig_values[i].append(eigV[i])
@@ -878,6 +919,7 @@ def eigval_update_data(batch_size, bins, bin_centers, bin_counter, args):
 
     out_suffix = getattr(args, 'out_suffix', '')
 
+    engine = get_graph_engine(args)
     eig_values = [eigv_for_mc_graph(
         p1=args.p1, p2=args.p2, p3=args.p3, p4=args.p4,
         fraction=args.fraction,
@@ -888,7 +930,8 @@ def eigval_update_data(batch_size, bins, bin_centers, bin_counter, args):
         mode='full',
         pflip=args.pflip,
         out_suffix=out_suffix,
-        verbose=(i == 0 and args.verbose)
+        verbose=(i == 0 and args.verbose),
+        engine=engine,
     ) for i in range(batch_size)]
 
     eig_values = np.concatenate(eig_values)

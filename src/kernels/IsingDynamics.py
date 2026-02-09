@@ -86,5 +86,7 @@ def clean_up_files(isdy: IsingDynamics, sg: SignedGraph) -> None:
     sg: SignedGraph
         A SignedGraph instance.
     """
-    isdy.remove_run_c_files()
-    sg.remove_exported_files()
+    if hasattr(isdy, 'remove_run_c_files'):
+        isdy.remove_run_c_files()
+    if hasattr(sg, 'remove_exported_files'):
+        sg.remove_exported_files()

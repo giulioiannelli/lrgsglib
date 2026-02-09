@@ -74,7 +74,13 @@ MC_opt_args = {
         'help': phelp_workdir,  # Reuse from common
         'type': str,
         'default': DEFAULT_WORKDIR
-    }
+    },
+    tuple(['-ge', '--graph_engine']): {
+        'help': phelp_graph_engine,
+        'type': str,
+        'default': DEFAULT_GRAPH_ENGINE,
+        'choices': ['nx', 'gt'],
+    },
 }
 
 # Serializer-specific argument lists (for parameter sweeps)

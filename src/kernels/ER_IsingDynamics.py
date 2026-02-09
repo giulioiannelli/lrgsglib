@@ -1,8 +1,12 @@
 from typing import Any
 from lrgsglib import IsingDynamics
 from lrgsglib.graphs.nx import ErdosRenyi
-from .ER import initialize_er_dict_args
-from .IsingDynamics import initialize_ising_dict_args, get_out_suffix
+from .ER import initialize_er_dict_args, prepare_erdos_renyi
+from .IsingDynamics import (
+    initialize_ising_dict_args, get_out_suffix,
+    run_ising_dynamics, clean_up_files,
+)
+from parsers.shared import get_graph_engine
 
 __all__ = ["run_simulation"]
 
@@ -23,6 +27,9 @@ def run_simulation(
     retrying if cluster formation fails. The retry mechanism is specific to ER graphs
     where not all realizations may form valid clusters.
 
+    When ``--graph_engine gt`` is used, the eigenvector/cluster pipeline is
+    skipped and the graph is created via ``prepare_erdos_renyi(args)``.
+
     Parameters
     ----------
     args : Any
@@ -35,23 +42,32 @@ def run_simulation(
         Eigenvector index to use for cluster initialization.
     remove_files : bool
         Whether to remove temporary files after simulation.
-
-    Notes
-    -----
-    The function will retry up to MAX_ITER times if cluster formation fails
-    (make_clustersYN raises an exception). This is ER-specific behavior as
-    not all ER realizations may have sufficient structure for clustering.
-
-    Examples
-    --------
-    >>> class Args:
-    ...     number_of_averages = 10
-    ...     cell_type = 'rand'
-    ...     thrmsteps = 20
-    >>> erDictArgs = {'n': 100, 'p': 0.1, 'sgpathn': '', 'pflip': 0.2, 'init_nw_dict': True}
-    >>> isingDictArgs = {'T': 1.0, 'ic': 'ground_state_0', 'runlang': 'C1', 'NoClust': 1}
-    >>> run_simulation(Args(), erDictArgs, isingDictArgs, 0, True)  # doctest: +SKIP
     """
+    engine = get_graph_engine(args)
+
+    if engine == "gt":
+        _run_simulation_gt(args, remove_files)
+    else:
+        _run_simulation_nx(args, erDictArgs, isingDictArgs, number, remove_files)
+
+
+def _run_simulation_gt(args: Any, remove_files: bool) -> None:
+    """GT path: skip eigvec/cluster pipeline, use direct Ising dynamics."""
+    for _ in range(args.number_of_averages):
+        er = prepare_erdos_renyi(args)
+        isdy = run_ising_dynamics(args, er)
+        if remove_files:
+            clean_up_files(isdy, er)
+
+
+def _run_simulation_nx(
+    args: Any,
+    erDictArgs: dict[str, Any],
+    isingDictArgs: dict[str, Any],
+    number: int,
+    remove_files: bool,
+) -> None:
+    """NX path: original eigenvector/cluster-based initialization with retry logic."""
     count = 0
     while count < args.number_of_averages and count < MAX_ITER:
         # Create new ER graph instance

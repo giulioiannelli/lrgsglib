@@ -92,6 +92,8 @@ _GRAPH_CLASS_MAP = {
     ("BarabasiAlbert", "gt"):   "lrgsglib.graphs.gt.BarabasiAlbertGT.BarabasiAlbertGT",
     ("WattsStrogatz", "nx"):    "lrgsglib.graphs.nx.WattsStrogatzNX.WattsStrogatzNX",
     ("WattsStrogatz", "gt"):    "lrgsglib.graphs.gt.WattsStrogatzGT.WattsStrogatzGT",
+    ("MultiplicativeCascade", "nx"): "lrgsglib.graphs.nx.MultiplicativeCascadeNX.MultiplicativeCascadeNX.MultiplicativeCascadeGraphNX",
+    ("MultiplicativeCascade", "gt"): "lrgsglib.graphs.gt.MultiplicativeCascadeGT.MultiplicativeCascadeGT.MultiplicativeCascadeGraphGT",
 }
 
 
