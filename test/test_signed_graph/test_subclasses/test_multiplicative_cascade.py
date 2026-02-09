@@ -5,8 +5,8 @@ import pytest
 import networkx as nx
 import numpy as np
 
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
-from lrgsglib.nx_patches.SignedGraph import SignedGraph
+from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
+from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
 
 class TestMultiplicativeCascadeGraphCreation:

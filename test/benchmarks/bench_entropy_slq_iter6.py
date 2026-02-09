@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 from lrgsglib.utils.lrg.infocomm import (
     compute_entropy_observables_from_eigenvalues,
     compute_entropy_observables_slq

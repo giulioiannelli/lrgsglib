@@ -1,7 +1,7 @@
 """
 Lattice2DGT: graph-tool implementation of 2D lattice signed graphs.
 
-Mirrors the API of nx_patches.Lattice2D for easy switching between backends.
+Mirrors the API of Lattice2DNX for easy switching between backends.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ class Lattice2DGT(SignedGraphGT):
     """
     2D lattice graph using graph-tool backend.
 
-    Mirrors nx_patches.Lattice2D API for easy backend switching.
+    Mirrors Lattice2DNX API for easy backend switching.
 
     Parameters
     ----------

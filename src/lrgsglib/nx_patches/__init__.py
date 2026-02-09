@@ -24,7 +24,6 @@ The unified graphs module provides both NX and GT backends:
 """
 
 import warnings
-import sys
 
 # Emit deprecation warning on import
 warnings.warn(
@@ -156,57 +155,3 @@ __all__ = [
     "funcs",
     "datasets",
 ]
-
-# Store class references to override submodule shadowing
-# When Python imports a submodule like `lrgsglib.nx_patches.SignedGraph._backend`,
-# it caches `SignedGraph` as a submodule (folder), which shadows the class in __init__.py.
-# This mapping ensures the correct class is returned via custom __getattribute__.
-_CLASS_OVERRIDES = {
-    "SignedGraph": SignedGraph,
-    "Lattice2D": Lattice2D,
-    "Lattice3D": Lattice3D,
-    "ErdosRenyi": ErdosRenyi,
-    "FullyConnected": FullyConnected,
-    "HofieldNN": HofieldNN,
-    "SCSGeneralizedNN": SCSGeneralizedNN,
-    "DGMgraph": DGMgraph,
-    "MultispectralGraph": MultispectralGraph,
-    "MultiplicativeCascadeGraph": MultiplicativeCascadeGraph,
-    "VicsekGraph": VicsekGraph,
-    "HierarchicalModularNetwork": HierarchicalModularNetwork,
-    "DiracLatticeGraph": DiracLatticeGraph,
-    "DiracLattice": DiracLattice,
-    "DiracBrushGraph": DiracBrushGraph,
-    "DiracCombGraph": DiracCombGraph,
-}
-
-
-# Use a custom module class to intercept attribute access
-# This is needed because __getattr__ is only called when the attribute
-# is NOT found in __dict__, but Python adds submodules to __dict__
-import types
-
-
-class _NXPatchesModule(types.ModuleType):
-    """Custom module type that overrides submodule shadowing."""
-
-    _CLASS_OVERRIDES_ATTR = {}  # Will be set after instantiation
-
-    def __getattribute__(self, name: str):
-        # Use object.__getattribute__ to avoid recursion
-        try:
-            overrides = object.__getattribute__(self, "_CLASS_OVERRIDES_ATTR")
-        except AttributeError:
-            overrides = {}
-        if name in overrides:
-            return overrides[name]
-        return super().__getattribute__(name)
-
-
-# Replace this module with our custom module type
-_current_module = sys.modules[__name__]
-_new_module = _NXPatchesModule(__name__, __doc__)
-# Set overrides BEFORE updating dict to avoid issues
-_new_module._CLASS_OVERRIDES_ATTR = _CLASS_OVERRIDES
-_new_module.__dict__.update(_current_module.__dict__)
-sys.modules[__name__] = _new_module

@@ -7,8 +7,8 @@ import pytest
 import networkx as nx
 import warnings
 
-from lrgsglib.nx_patches.SignedGraph import SignedGraph
-from lrgsglib.nx_patches.SignedGraph._backend import Backend, BackendManager
+from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
+from lrgsglib.graphs.nx.SignedGraphNX._backend import Backend, BackendManager
 
 
 class TestSignedGraphInitWithBackend:

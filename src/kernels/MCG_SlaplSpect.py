@@ -145,7 +145,7 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
     eigenvalues : np.ndarray
         Signed Laplacian eigenvalues
     """
-    from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+    from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
     # Memory tracking for debugging OOM issues
     if verbose:
@@ -308,7 +308,7 @@ def eigV_for_mc_graph_ptch(p1, p2, p3, p4, fraction, iterations,
     eigenvectors : np.ndarray
         Shape (howmany, N) where N is number of nodes
     """
-    from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+    from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
     if seed is not None:
         np.random.seed(seed)
@@ -360,7 +360,7 @@ def get_mc_spectrum_path(args):
     path : Path
         Directory path for spectrum data storage
     """
-    from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+    from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
     # Get out_suffix from args if present
     out_suffix = getattr(args, 'out_suffix', '')
@@ -618,7 +618,7 @@ def perform_spectral_calculations(args):
 
         for idx in range(start_idx, args.number_of_averages):
             # Generate graph
-            from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+            from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
             if entropy_seed is not None:
                 # Use deterministic seed sequence

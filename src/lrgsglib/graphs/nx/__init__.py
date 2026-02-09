@@ -47,6 +47,7 @@ Temporal:
 
 # Base
 from .SignedGraphNX import SignedGraphNX
+SignedGraph = SignedGraphNX
 
 # Lattice
 from .Lattice2DNX import (
@@ -65,9 +66,11 @@ from .Lattice3DNX import (
 
 # Random
 from .RandomGraphNX import RandomGraphNX
+RandomGraph = RandomGraphNX
 from .ErdosRenyiNX import ErdosRenyiNX, ErdosRenyi
 from .BarabasiAlbertNX import BarabasiAlbertNX, BarabasiAlbert
 from .WattsStrogatzNX import WattsStrogatzNX, WattsStrogatz
+WattStrogatz = WattsStrogatzNX  # legacy typo alias
 from .StochasticBlockModelNX import StochasticBlockModelNX, StochasticBlockModel
 from .kRegularGraphNX import kRegularGraphNX, kRegularGraph
 from .ConfigurationModelNX import ConfigurationModelNX, ConfigurationModel
@@ -109,6 +112,7 @@ from .DiracLatticeNX import (
     DiracCombGraphNX,
     DiracCombGraph,
 )
+DiracLattice = DiracLatticeGraphNX
 
 # GraphOfGraphs
 from .GraphOfGraphsNX import (
@@ -123,10 +127,12 @@ from .TemporalSignedGraphNX import TemporalSignedGraphNX, TemporalSignedGraph
 # Utility submodules
 from . import funcs
 from . import datasets
+from .datasets import RealDatasetLoader, BUILTIN_DATASETS
 
 __all__ = [
     # Base
     "SignedGraphNX",
+    "SignedGraph",
     # Lattice
     "Lattice2DNX",
     "Lattice2D",
@@ -139,12 +145,14 @@ __all__ = [
     "load_or_compute_Lattice3D",
     # Random
     "RandomGraphNX",
+    "RandomGraph",
     "ErdosRenyiNX",
     "ErdosRenyi",
     "BarabasiAlbertNX",
     "BarabasiAlbert",
     "WattsStrogatzNX",
     "WattsStrogatz",
+    "WattStrogatz",
     "StochasticBlockModelNX",
     "StochasticBlockModel",
     "kRegularGraphNX",
@@ -199,6 +207,7 @@ __all__ = [
     "DiracBrushGraph",
     "DiracCombGraphNX",
     "DiracCombGraph",
+    "DiracLattice",
     # GraphOfGraphs
     "GraphOfGraphsNX",
     # Temporal
@@ -206,6 +215,9 @@ __all__ = [
     "TemporalGraph",
     "TemporalSignedGraphNX",
     "TemporalSignedGraph",
+    # Datasets
+    "RealDatasetLoader",
+    "BUILTIN_DATASETS",
     # Submodules
     "funcs",
     "datasets",

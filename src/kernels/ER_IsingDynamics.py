@@ -1,6 +1,6 @@
 from typing import Any
 from lrgsglib import IsingDynamics
-from lrgsglib.nx_patches import ErdosRenyi
+from lrgsglib.graphs.nx import ErdosRenyi
 from .ER import initialize_er_dict_args
 from .IsingDynamics import initialize_ising_dict_args, get_out_suffix
 

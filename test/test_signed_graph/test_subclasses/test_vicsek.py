@@ -5,8 +5,8 @@ import pytest
 import networkx as nx
 import numpy as np
 
-from lrgsglib.nx_patches.Vicsek import VicsekGraph
-from lrgsglib.nx_patches.SignedGraph import SignedGraph
+from lrgsglib.graphs.nx import VicsekGraphNX as VicsekGraph
+from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
 
 class TestVicsekGraphCreation:

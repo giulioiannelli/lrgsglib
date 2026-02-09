@@ -257,7 +257,7 @@ Key directories to understand:
 
    lrgsglib/
    ├── src/lrgsglib/          ← Main library code
-   │   ├── nx_patches/        ← Graph classes (start here for new graphs)
+   │   ├── graphs/nx/          ← Graph classes (start here for new graphs)
    │   ├── statsys/           ← Dynamics (start here for new simulations)
    │   ├── utils/             ← Utility functions
    │   │   └── <Model>/ccore/  ← C code (per-model, performance-critical)
@@ -276,8 +276,8 @@ Common Contribution Scenarios
 Adding a New Graph Type
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-1. Create ``nx_patches/NewGraph/NewGraph.py``
-2. Inherit from ``SignedGraph``
+1. Create ``graphs/nx/NewGraphNX/NewGraphNX.py``
+2. Inherit from ``SignedGraphNX``
 3. Add ``__init__.py`` with exports
 4. Create ``kernels/NewGraph.py``
 5. Add tests in ``test/test_new_graph.py``

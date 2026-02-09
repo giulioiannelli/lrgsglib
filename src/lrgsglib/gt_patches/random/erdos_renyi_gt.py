@@ -1,7 +1,7 @@
 """
 ErdosRenyiGT: graph-tool implementation of Erdos-Renyi random graphs.
 
-Mirrors the API of nx_patches.ErdosRenyi for easy switching between backends.
+Mirrors the API of ErdosRenyiNX for easy switching between backends.
 """
 from __future__ import annotations
 

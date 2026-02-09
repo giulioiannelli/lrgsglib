@@ -1,7 +1,7 @@
 """
 WattsStrogatzGT: graph-tool implementation of Watts-Strogatz small-world graphs.
 
-Mirrors the API of nx_patches.random.WattsStrogatz for easy switching between backends.
+Mirrors the API of WattsStrogatzNX for easy switching between backends.
 """
 from __future__ import annotations
 

@@ -152,7 +152,7 @@ def BarabasiAlbert(
     impl_module = impl_cls.__module__
 
     # Build kwargs for the specific implementation
-    if "nx_patches" in impl_module or "graphs.nx" in impl_module:
+    if "graphs.nx" in impl_module:
         # NetworkX implementation
         impl_kwargs = {
             "n": n,

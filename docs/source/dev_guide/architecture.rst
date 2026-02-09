@@ -24,14 +24,14 @@ low-level utilities up through graph operations to high-level programs.
 
    lrgsglib/
    ├── src/lrgsglib/              ← Core Python library
-   │   ├── nx_patches/            ← Graph types (NetworkX extensions)
-   │   │   ├── SignedGraph/       ← Base class for all signed graphs
-   │   │   ├── Lattice2D/         ← 2D lattice graphs
-   │   │   ├── Lattice3D/         ← 3D lattice graphs
-   │   │   ├── ErdosRenyi/        ← Random signed graphs
-   │   │   ├── MultiplicativeCascade/  ← Hierarchical scale-free graphs
-   │   │   ├── DiracLattice/      ← Dirac comb/brush lattices
-   │   │   ├── Vicsek/            ← Vicsek fractal graphs
+   │   ├── graphs/nx/             ← Graph types (NetworkX implementations)
+   │   │   ├── SignedGraphNX/     ← Base class for all signed graphs
+   │   │   ├── Lattice2DNX/       ← 2D lattice graphs
+   │   │   ├── Lattice3DNX/       ← 3D lattice graphs
+   │   │   ├── ErdosRenyiNX/      ← Random signed graphs
+   │   │   ├── MultiplicativeCascadeNX/  ← Hierarchical scale-free graphs
+   │   │   ├── DiracLatticeNX/    ← Dirac comb/brush lattices
+   │   │   ├── VicsekNX/          ← Vicsek fractal graphs
    │   │   └── funcs/             ← Utility functions for graphs
    │   │
    │   ├── statsys/               ← Statistical physics simulations
@@ -92,18 +92,18 @@ Large classes are split into multiple files using the **private method pattern**
 
 .. code-block:: text
 
-   nx_patches/SignedGraph/
-   ├── SignedGraph.py     ← Main class definition (~1200 lines)
-   ├── _spectral.py       ← Spectral computation methods (~1300 lines)
-   ├── _infotheory.py     ← Information theory methods (~200 lines)
-   ├── _dynamics.py       ← Dynamics simulation methods (~90 lines)
-   ├── _partitioning.py   ← Graph partitioning (~370 lines)
-   ├── _topology.py       ← Topological analysis (~200 lines)
-   ├── _backend.py        ← Backend management (~620 lines)
+   graphs/nx/SignedGraphNX/
+   ├── SignedGraphNX.py    ← Main class definition (~1200 lines)
+   ├── _spectral.py        ← Spectral computation methods (~1300 lines)
+   ├── _infotheory.py      ← Information theory methods (~200 lines)
+   ├── _dynamics.py        ← Dynamics simulation methods (~90 lines)
+   ├── _partitioning.py    ← Graph partitioning (~370 lines)
+   ├── _topology.py        ← Topological analysis (~200 lines)
+   ├── _backend.py         ← Backend management (~620 lines)
    ├── _representations.py ← Matrix representations (~95 lines)
-   ├── _loaders.py        ← I/O operations (~170 lines)
-   ├── _exports.py        ← Export formats (~220 lines)
-   └── _cleaners.py       ← Data cleaning (~50 lines)
+   ├── _loaders.py         ← I/O operations (~170 lines)
+   ├── _exports.py         ← Export formats (~220 lines)
+   └── _cleaners.py        ← Data cleaning (~50 lines)
 
 Methods in ``_*.py`` files are mixed into the main class at import time.
 This pattern keeps individual files manageable while maintaining a unified API.
@@ -436,7 +436,7 @@ Design Patterns Summary
      - Where Used
      - Purpose
    * - Private Method Files
-     - ``nx_patches/*/``
+     - ``graphs/nx/*/``
      - Split large classes into manageable files
    * - Kernels + Wrappers
      - ``src/``, ``src/kernels/``
@@ -466,9 +466,9 @@ Function Placement Guidelines
 - Information-theoretic calculations
 - Data structure helpers
 
-**When to place in ``nx_patches/``:**
+**When to place in ``graphs/nx/``:**
 
-- Graph class definitions
+- Graph class definitions (NX suffix convention)
 - Methods that belong to graph objects
 - Internal implementation files (``_*.py``)
 

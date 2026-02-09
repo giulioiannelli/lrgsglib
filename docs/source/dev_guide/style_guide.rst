@@ -336,8 +336,8 @@ For large classes, split methods into separate files:
 
 .. code-block:: text
 
-   nx_patches/SignedGraph/
-   ├── SignedGraph.py     ← Main class
+   graphs/nx/SignedGraphNX/
+   ├── SignedGraphNX.py   ← Main class
    ├── _spectral.py       ← Spectral methods
    ├── _dynamics.py       ← Dynamics methods
    └── _loaders.py        ← I/O methods

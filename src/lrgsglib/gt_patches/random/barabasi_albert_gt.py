@@ -1,7 +1,7 @@
 """
 BarabasiAlbertGT: graph-tool implementation of Barabasi-Albert preferential attachment graphs.
 
-Mirrors the API of nx_patches.BarabasiAlbert for easy switching between backends.
+Mirrors the API of BarabasiAlbertNX for easy switching between backends.
 """
 from __future__ import annotations
 

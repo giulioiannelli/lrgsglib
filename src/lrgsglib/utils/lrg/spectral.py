@@ -53,7 +53,7 @@ def get_graph_lspectrum(
     - When ``signed=False``, the Laplacian is computed using NetworkX's
       ``laplacian_matrix``, which ignores edge signs.
     - When ``signed=True``, uses ``signed_laplacian_matrix`` from
-      ``nx_patches.funcs.spectral``, which correctly handles negative edge weights.
+      ``graphs.nx.funcs.spectral``, which correctly handles negative edge weights.
     - For signed graphs (with negative edges), the signed Laplacian may have
       negative eigenvalues, unlike the standard Laplacian which is always PSD.
     - If ``"cupy"`` is selected, ensure that CuPy is installed and a compatible

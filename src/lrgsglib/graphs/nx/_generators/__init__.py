@@ -2,7 +2,7 @@
 Consolidated graph generators for all graph families.
 
 This module provides a unified interface to all graph generation functions
-used across the nx_patches module, organized by graph family.
+used across the graphs.nx module, organized by graph family.
 
 Generators are organized by family:
 - lattice: 2D, 3D, and ND lattice generators
@@ -12,7 +12,7 @@ Generators are organized by family:
 
 Example
 -------
->>> from lrgsglib.nx_patches._generators import lattice
+>>> from lrgsglib.graphs.nx._generators import lattice
 >>> G = lattice.squared_lattice_graph_FastPatch(10, 10, periodic=True)
 """
 

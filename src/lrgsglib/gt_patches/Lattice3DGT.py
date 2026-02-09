@@ -1,7 +1,7 @@
 """
 Lattice3DGT: graph-tool implementation of 3D lattice signed graphs.
 
-Mirrors the API of nx_patches.Lattice3D for easy switching between backends.
+Mirrors the API of Lattice3DNX for easy switching between backends.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ class Lattice3DGT(SignedGraphGT):
     """
     3D lattice graph using graph-tool backend.
 
-    Mirrors nx_patches.Lattice3D API for easy backend switching.
+    Mirrors Lattice3DNX API for easy backend switching.
 
     Parameters
     ----------

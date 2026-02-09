@@ -94,7 +94,7 @@ def compute_entropy_observables_expm_multiply(
 
     Examples
     --------
-    >>> from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+    >>> from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
     >>> G = MultiplicativeCascadeGraph(p1=0.8, p2=0.6, p3=0.6, p4=0.8,
     ...                                 fraction=0.4, iterations=5)
     >>> G.upd_graph_matrices()  # Ensure slp is computed

@@ -19,7 +19,7 @@ New Types (Phase 3)
 
 Example
 -------
->>> from lrgsglib.nx_patches._generators import random
+>>> from lrgsglib.graphs.nx._generators import random
 >>> G = random.erdos_renyi_graph(100, 0.1)
 >>> G.number_of_nodes()
 100

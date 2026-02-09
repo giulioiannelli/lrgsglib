@@ -1,7 +1,7 @@
 """
 StochasticBlockModelGT: graph-tool implementation of Stochastic Block Model graphs.
 
-Mirrors the API of nx_patches.random.StochasticBlockModel for easy switching between backends.
+Mirrors the API of StochasticBlockModelNX for easy switching between backends.
 """
 from __future__ import annotations
 

@@ -19,7 +19,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
 
 def test_full_spectrum_generation():

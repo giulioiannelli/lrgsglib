@@ -34,7 +34,7 @@ Basic Usage
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+   from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
    # Create cascade with seed probabilities
    mc = MultiplicativeCascadeGraph(
@@ -106,7 +106,7 @@ Multiplicative cascades exhibit characteristic spectral properties:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+   from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
    from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
    from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 
@@ -139,7 +139,7 @@ Basic Usage
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.Vicsek import VicsekGraph
+   from lrgsglib.graphs.nx import VicsekGraphNX as VicsekGraph
 
    # Create Vicsek graph
    vg = VicsekGraph(
@@ -176,7 +176,7 @@ You can provide a custom initial measure matrix:
 .. code-block:: python
 
    import numpy as np
-   from lrgsglib.nx_patches.Vicsek import VicsekGraph
+   from lrgsglib.graphs.nx import VicsekGraphNX as VicsekGraph
 
    # Define custom initial measure
    pij = np.array([
@@ -406,7 +406,7 @@ A Dirac comb has a 1D chain as the base graph with 1D chains as fibers:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.DiracLattice import DiracCombGraph
+   from lrgsglib.graphs.nx import DiracCombGraphNX as DiracCombGraph
 
    # Create Dirac comb
    comb = DiracCombGraph(
@@ -426,7 +426,7 @@ A Dirac brush has a 2D grid as the base graph with 1D chains as fibers:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.DiracLattice import DiracBrushGraph
+   from lrgsglib.graphs.nx import DiracBrushGraphNX as DiracBrushGraph
 
    # Create Dirac brush
    brush = DiracBrushGraph(
@@ -458,7 +458,7 @@ For a brush with 100 base nodes and 10 fiber nodes (1000 total):
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.DiracLattice import DiracBrushGraph
+   from lrgsglib.graphs.nx import DiracBrushGraphNX as DiracBrushGraph
    import numpy as np
 
    # Create brush
@@ -506,9 +506,9 @@ All hierarchical graph types share common patterns:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
-   from lrgsglib.nx_patches.Vicsek import VicsekGraph
-   from lrgsglib.nx_patches.DiracLattice import DiracCombGraph
+   from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
+   from lrgsglib.graphs.nx import VicsekGraphNX as VicsekGraph
+   from lrgsglib.graphs.nx import DiracCombGraphNX as DiracCombGraph
 
    # All inherit from MultispectralGraph and SignedGraph
    mc = MultiplicativeCascadeGraph(p1=0.8, p2=0.6, iterations=6, fraction=0.5)
@@ -528,7 +528,7 @@ Hierarchical graphs can have signed edges added:
 
 .. code-block:: python
 
-   from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+   from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
    # Create cascade with frustration
    mc = MultiplicativeCascadeGraph(

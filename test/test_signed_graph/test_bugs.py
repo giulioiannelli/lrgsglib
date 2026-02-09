@@ -15,14 +15,14 @@ class TestBug1NodesIn:
 
     def test_nodes_in_exists(self, small_graph):
         """Test that nodes_in() method exists on SignedGraph."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
         sg = SignedGraph(G=small_graph)
         assert hasattr(sg, 'nodes_in'), "nodes_in() method should exist"
 
     def test_nodes_in_returns_correct_nodes(self, small_graph):
         """Test that nodes_in() returns the correct list of nodes."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
         sg = SignedGraph(G=small_graph)
         nodes = sg.nodes_in()
@@ -33,7 +33,7 @@ class TestBug1NodesIn:
 
     def test_nodes_in_with_multiple_representations(self, small_graph):
         """Test nodes_in() with different graph representations."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
         from lrgsglib.config.const import SG_REPR
 
         sg = SignedGraph(G=small_graph)
@@ -47,7 +47,7 @@ class TestBug2UnflipAll:
 
     def test_unflip_all_basic(self, small_graph, random_seed):
         """Test that unflip_all() runs without error."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
         sg = SignedGraph(G=small_graph, pflip=0.5, seed=random_seed)
 
@@ -56,7 +56,7 @@ class TestBug2UnflipAll:
 
     def test_unflip_all_restores_positive(self, small_graph, random_seed):
         """Test that unflip_all() flips all negative edges back to positive."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
         sg = SignedGraph(G=small_graph, pflip=0.5, seed=random_seed)
 
@@ -72,7 +72,7 @@ class TestBug2UnflipAll:
 
     def test_unflip_all_updates_fleset(self, small_graph, random_seed):
         """Test that unflip_all() properly updates the fleset."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
         sg = SignedGraph(G=small_graph, pflip=0.3, seed=random_seed)
 
@@ -91,13 +91,13 @@ class TestBug3AttributeNaming:
 
     def test_specific_heat_attribute_exists(self, small_graph):
         """Test that specific_heat is set after entropy computation."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
         sg = SignedGraph(G=small_graph)
         sg.compute_laplacian_spectrum_weigV()
 
         # Import the function
-        from lrgsglib.nx_patches.SignedGraph._infotheory import compute_signed_laplacian_entropy
+        from lrgsglib.graphs.nx.SignedGraphNX._infotheory import compute_signed_laplacian_entropy
 
         compute_signed_laplacian_entropy(sg)
 
@@ -106,12 +106,12 @@ class TestBug3AttributeNaming:
 
     def test_entropy_derivative_deprecated_alias_works(self, small_graph):
         """Test that entropy_derivative still works as deprecated alias."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
         sg = SignedGraph(G=small_graph)
         sg.compute_laplacian_spectrum_weigV()
 
-        from lrgsglib.nx_patches.SignedGraph._infotheory import compute_signed_laplacian_entropy
+        from lrgsglib.graphs.nx.SignedGraphNX._infotheory import compute_signed_laplacian_entropy
         compute_signed_laplacian_entropy(sg)
 
         # Should have both attributes
@@ -124,7 +124,7 @@ class TestBug3AttributeNaming:
 
     def test_get_specific_heat_computes_if_missing(self, small_graph):
         """Test that get_specific_heat() computes entropy if not already computed."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
         sg = SignedGraph(G=small_graph)
         sg.compute_laplacian_spectrum_weigV()
@@ -138,7 +138,7 @@ class TestBug3AttributeNaming:
 
     def test_entropy_derivative_deprecation_warning(self, small_graph):
         """Test that using entropy_derivative getter shows deprecation warning."""
-        from lrgsglib.nx_patches.SignedGraph import SignedGraph
+        from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
         sg = SignedGraph(G=small_graph)
         sg.compute_laplacian_spectrum_weigV()

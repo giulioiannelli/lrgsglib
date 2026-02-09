@@ -5,12 +5,12 @@ import pytest
 import networkx as nx
 import numpy as np
 
-from lrgsglib.nx_patches.DiracLattice import (
-    DiracLatticeGraph,
-    DiracCombGraph,
-    DiracBrushGraph,
+from lrgsglib.graphs.nx import (
+    DiracLatticeGraphNX as DiracLatticeGraph,
+    DiracCombGraphNX as DiracCombGraph,
+    DiracBrushGraphNX as DiracBrushGraph,
 )
-from lrgsglib.nx_patches.SignedGraph import SignedGraph
+from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
 
 class TestDiracCombGraphCreation:

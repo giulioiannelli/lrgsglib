@@ -3,7 +3,7 @@
 
 import time
 import numpy as np
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
 
 def benchmark_variant(p1, p2, p3, p4, fraction, iterations, variant, n_runs=10):

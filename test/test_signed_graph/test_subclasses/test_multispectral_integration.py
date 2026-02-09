@@ -8,11 +8,11 @@ import pytest
 import networkx as nx
 import numpy as np
 
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
-from lrgsglib.nx_patches.Vicsek import VicsekGraph
-from lrgsglib.nx_patches.DiracLattice import DiracCombGraph, DiracBrushGraph
-from lrgsglib.nx_patches.MultispectralGraph import MultispectralGraph
-from lrgsglib.nx_patches.SignedGraph import SignedGraph
+from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
+from lrgsglib.graphs.nx import VicsekGraphNX as VicsekGraph
+from lrgsglib.graphs.nx import DiracCombGraphNX as DiracCombGraph, DiracBrushGraphNX as DiracBrushGraph
+from lrgsglib.graphs.nx import MultispectralGraphNX as MultispectralGraph
+from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
 
 
 @pytest.fixture(params=[
@@ -321,13 +321,13 @@ class TestBackwardCompatibilityImports:
 
     def test_import_from_multispectral_graph(self):
         """Test that all classes can be imported from MultispectralGraph."""
-        from lrgsglib.nx_patches.MultispectralGraph import (
-            MultispectralGraph,
-            MultiplicativeCascadeGraph,
-            VicsekGraph,
-            DiracCombGraph,
-            DiracBrushGraph,
-            DiracLatticeGraph,
+        from lrgsglib.graphs.nx import (
+            MultispectralGraphNX as MultispectralGraph,
+            MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph,
+            VicsekGraphNX as VicsekGraph,
+            DiracCombGraphNX as DiracCombGraph,
+            DiracBrushGraphNX as DiracBrushGraph,
+            DiracLatticeGraphNX as DiracLatticeGraph,
         )
 
         # Test that imports work
@@ -340,7 +340,7 @@ class TestBackwardCompatibilityImports:
 
     def test_import_generator_functions(self):
         """Test that generator functions are still available."""
-        from lrgsglib.nx_patches.MultispectralGraph import (
+        from lrgsglib.graphs.nx.MultispectralGraphNX import (
             multiplicative_cascade_probability_matrix,
             multiplicative_cascade_graph,
             dirac_comb_graph,

@@ -1,5 +1,5 @@
 from typing import Any
-from lrgsglib.nx_patches import ErdosRenyi
+from lrgsglib.graphs.nx import ErdosRenyi
 from parsers.shared import resolve_graph_class, get_graph_engine
 
 __all__ = [

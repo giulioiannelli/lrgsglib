@@ -2,7 +2,7 @@
 SignedGraphGT: graph-tool backend for signed graphs.
 
 This module provides a graph-tool implementation of SignedGraph that
-mirrors the nx_patches.SignedGraph API while leveraging graph-tool's
+mirrors the SignedGraphNX API while leveraging graph-tool's
 C++ performance.
 
 Example
@@ -43,7 +43,7 @@ class SignedGraphGT:
 
     This class provides a graph-tool based implementation of signed graphs,
     offering significant performance improvements for large graphs while
-    maintaining API compatibility with nx_patches.SignedGraph.
+    maintaining API compatibility with SignedGraphNX.
 
     Parameters
     ----------
@@ -65,7 +65,7 @@ class SignedGraphGT:
 
     Notes
     -----
-    Key differences from nx_patches.SignedGraph:
+    Key differences from SignedGraphNX:
     - Uses graph-tool property maps instead of NetworkX edge attributes
     - Spectral operations are faster via graph-tool's C++ backend
     - Memory-efficient for large graphs
@@ -470,7 +470,7 @@ class SignedGraphGT:
         Notes
         -----
         The signed Laplacian uses absolute degree values to ensure
-        proper spectral properties. This matches nx_patches.SignedGraph.
+        proper spectral properties. This matches SignedGraphNX.
         """
         # Get signed adjacency
         A_signed = self.get_signed_adjacency()

@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 import pytest
 
-from lrgsglib.nx_patches.SignedGraph._backend import (
+from lrgsglib.graphs.nx.SignedGraphNX._backend import (
     ArrayBackend,
     Backend,
     BackendManager,

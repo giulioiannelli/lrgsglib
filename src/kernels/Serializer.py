@@ -291,7 +291,7 @@ def estimate_mcg_laplacian_memory_mb(
     This function actually generates a sample graph, so it's accurate but may take
     a few seconds for large iterations (>10).
     """
-    from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+    from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
     # Generate a sample graph to get actual N
     mc = MultiplicativeCascadeGraph(

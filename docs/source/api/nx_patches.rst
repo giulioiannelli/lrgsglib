@@ -1,132 +1,30 @@
-nx_patches - NetworkX Extensions
-=================================
+nx_patches (Deprecated)
+=======================
 
-The ``nx_patches`` module provides NetworkX extensions for signed graphs, lattices, and specialized network topologies.
+.. deprecated:: 1.0
 
-.. currentmodule:: lrgsglib.nx_patches
+   The ``nx_patches`` module is deprecated. Use :mod:`lrgsglib.graphs.nx` instead.
 
-Overview
---------
+All graph types previously available through ``nx_patches`` have been moved to
+``lrgsglib.graphs.nx`` with the NX suffix naming convention.
 
-This module includes:
+Migration Guide
+---------------
 
-- **Lattice Graphs**: 2D and 3D lattice generation with various geometries
-- **Signed Graphs**: Graphs with positive and negative edge weights
-- **Random Graphs**: Erdős-Rényi and Watts-Strogatz variants
-- **Specialized Topologies**: Hopfield networks, fully connected graphs, multispectral graphs
-- **Utility Functions**: Spectral analysis, thresholding, neighbor operations
+.. code-block:: python
 
-Lattice Graphs
---------------
+   # Old (deprecated) - still works but emits DeprecationWarning
+   from lrgsglib.nx_patches import Lattice2D, ErdosRenyi, SignedGraph
 
-Lattice2D
-~~~~~~~~~
+   # New (recommended) - use NX suffix classes
+   from lrgsglib.graphs.nx import Lattice2DNX, ErdosRenyiNX, SignedGraphNX
 
-.. automodule:: lrgsglib.nx_patches.Lattice2D
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   # Backward-compatible short names also available:
+   from lrgsglib.graphs.nx import Lattice2D, ErdosRenyi, SignedGraph
 
-.. autosummary::
-   :toctree: generated/
-   :recursive:
+   # Or use the unified multi-engine factory:
+   from lrgsglib.graphs import Lattice2D
+   lat = Lattice2D(10, engine='nx')  # NetworkX backend
+   lat = Lattice2D(10, engine='gt')  # graph-tool backend
 
-   Lattice2D.Lattice2D
-
-Lattice3D
-~~~~~~~~~
-
-.. automodule:: lrgsglib.nx_patches.Lattice3D
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. autosummary::
-   :toctree: generated/
-   :recursive:
-
-   Lattice3D.Lattice3D
-
-Signed Graphs
--------------
-
-.. automodule:: lrgsglib.nx_patches.SignedGraph
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. autosummary::
-   :toctree: generated/
-   :recursive:
-
-   SignedGraph.SignedGraph
-
-Random Graph Generators
-------------------------
-
-ErdosRenyi
-~~~~~~~~~~
-
-.. automodule:: lrgsglib.nx_patches.ErdosRenyi
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-WattStrogatz
-~~~~~~~~~~~~
-
-.. automodule:: lrgsglib.nx_patches.WattStrogatz
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Specialized Topologies
-----------------------
-
-FullyConnected
-~~~~~~~~~~~~~~
-
-.. automodule:: lrgsglib.nx_patches.FullyConnected
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-HopfieldNN
-~~~~~~~~~~
-
-.. automodule:: lrgsglib.nx_patches.HofieldNN
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-MultispectralGraph
-~~~~~~~~~~~~~~~~~~
-
-.. automodule:: lrgsglib.nx_patches.MultispectralGraph
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-SCSGeneralizedNN
-~~~~~~~~~~~~~~~~
-
-.. automodule:: lrgsglib.nx_patches.SCSGeneralizedNN
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-DGMgraph
-~~~~~~~~
-
-.. automodule:: lrgsglib.nx_patches.DGMgraph
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Utility Functions
------------------
-
-.. automodule:: lrgsglib.nx_patches.funcs
-   :members:
-   :undoc-members:
-   :show-inheritance:
+See :doc:`graphs` for the full API reference of the new module.

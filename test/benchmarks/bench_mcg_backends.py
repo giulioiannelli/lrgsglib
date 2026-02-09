@@ -15,7 +15,7 @@ import numpy as np
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "lrgsglib" / "src"))
 
-from lrgsglib.nx_patches.MultiplicativeCascade import MultiplicativeCascadeGraph
+from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
 
 
 # Test configurations (user specified: iter 3-5, fraction 0.7)

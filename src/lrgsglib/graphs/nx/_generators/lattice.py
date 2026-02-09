@@ -2,7 +2,7 @@
 Consolidated lattice graph generators.
 
 This module provides a unified interface to all lattice generation functions
-used across the nx_patches module, supporting 2D, 3D, and ND lattices.
+used across the graphs.nx module, supporting 2D, 3D, and ND lattices.
 
 2D Generators
 -------------
@@ -20,7 +20,7 @@ used across the nx_patches module, supporting 2D, 3D, and ND lattices.
 
 Example
 -------
->>> from lrgsglib.nx_patches._generators import lattice
+>>> from lrgsglib.graphs.nx._generators import lattice
 >>> G = lattice.squared_lattice_graph(10, 10, periodic=True)
 >>> G.number_of_nodes()
 100

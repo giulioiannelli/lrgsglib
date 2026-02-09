@@ -2,7 +2,7 @@ from networkx import Graph
 
 from .config import *
 from .utils import *
-from .nx_patches import *
+from .graphs.nx import *
 from .statsys import *
 #
 # __all__ = [

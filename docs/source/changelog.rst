@@ -24,7 +24,7 @@ Initial release of lrgsglib.
 
 **Modules:**
 
-- ``nx_patches``: NetworkX extensions for signed graphs
+- ``graphs.nx``: NetworkX implementations of signed graph types
 - ``utils``: Utility functions for spectral analysis and more
 - ``statsys``: Statistical physics simulation systems
 - ``plotlib``: Plotting and visualization

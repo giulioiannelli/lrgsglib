@@ -7,7 +7,7 @@ without changing their code.
 
 Example:
 
-    >>> from lrgsglib.nx_patches.SignedGraph._backend import BackendManager, Backend  # doctest: +SKIP
+    >>> from lrgsglib.graphs.nx.SignedGraphNX._backend import BackendManager, Backend  # doctest: +SKIP
     >>> backend = BackendManager.get_backend(Backend.NUMPY)  # doctest: +SKIP
     >>> arr = backend.array([1, 2, 3])  # doctest: +SKIP
     >>> print(backend.sum(arr))  # doctest: +SKIP
