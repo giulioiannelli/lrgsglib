@@ -144,7 +144,7 @@ def register_implementation(
     >>>
     >>> # Lazy registration (preferred for avoiding circular imports)
     >>> def _get_lattice2d_gt():
-    ...     from lrgsglib.gt_patches.Lattice2DGT import Lattice2DGT
+    ...     from lrgsglib.graphs.gt.Lattice2DGT import Lattice2DGT
     ...     return Lattice2DGT
     >>> register_implementation('Lattice2D', GraphEngine.GRAPHTOOL, _get_lattice2d_gt)
     """

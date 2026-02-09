@@ -10,7 +10,7 @@ from typing import Callable, List, Optional, Tuple, Union
 import numpy as np
 import graph_tool.all as gt
 
-from ....gt_patches.signed_graph_gt import SignedGraphGT
+from ..SignedGraphGT import SignedGraphGT
 from .cpp import create_complete_graph
 
 
@@ -128,6 +128,26 @@ class FullyConnectedGT(SignedGraphGT):
             raise ValueError(f"Unsupported mode_positions: {self.mode_positions}")
 
         G.vertex_properties["pos"] = pos
+
+    def get_positions(self) -> np.ndarray:
+        """Return node positions as a numpy array.
+
+        Returns
+        -------
+        np.ndarray
+            Array of shape (N, 2) with node positions.
+
+        Raises
+        ------
+        RuntimeError
+            If graph was created without ``with_positions=True``.
+        """
+        if "pos" not in self.G.vertex_properties:
+            raise RuntimeError(
+                "No positions stored. Create with with_positions=True."
+            )
+        pos = self.G.vertex_properties["pos"]
+        return np.array([pos[v] for v in self.G.vertices()])
 
     def get_expected_num_nodes(self) -> int:
         """Return the expected number of nodes for this complete graph."""

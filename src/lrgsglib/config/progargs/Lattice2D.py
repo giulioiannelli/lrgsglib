@@ -47,4 +47,10 @@ L2D_opt_args = {
         'type': float,
         'default': DEFAULT_L2D_PREW,
     },
+    tuple(['-ge', '--graph_engine']): {
+        'help': phelp_graph_engine,
+        'type': str,
+        'default': DEFAULT_GRAPH_ENGINE,
+        'choices': ['nx', 'gt'],
+    },
 }

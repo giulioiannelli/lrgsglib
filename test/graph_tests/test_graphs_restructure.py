@@ -408,13 +408,13 @@ class TestGTFallbackClasses:
     """Test that GT fallback classes correctly alias NX classes."""
 
     def test_fallback_aliases_nx(self):
-        """Test that fallback GT classes are aliases to NX classes."""
+        """Test that NX-fallback GT classes alias their NX counterpart."""
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            from lrgsglib.graphs.gt.CompleteGraphGT import CompleteGraphGT
-            from lrgsglib.graphs.nx.complete import CompleteGraphNX
-            # Fallback should be the same class as NX
-            assert CompleteGraphGT is CompleteGraphNX
+            from lrgsglib.graphs.gt.SCSGeneralizedNNGT import SCSGeneralizedNNGT
+            from lrgsglib.graphs.nx.neural import SCSGeneralizedNNNX
+            # SCSGeneralizedNNGT has no native GT impl, falls back to NX
+            assert SCSGeneralizedNNGT is SCSGeneralizedNNNX
 
     def test_native_gt_not_alias(self):
         """Test that native GT classes are NOT aliases to NX classes."""

@@ -740,6 +740,61 @@ class SignedGraphGT:
         # Use first k non-trivial eigenvectors (skip index 0 if it's trivial)
         return self.eigV[:, :k]
 
+    # ------------------------------------------------------------------
+    # Dynamics-critical methods (engine-agnostic interface)
+    # ------------------------------------------------------------------
+
+    def get_neighbors_with_weights(self, node: int) -> list[tuple[int, float]]:
+        """Return neighbors of *node* with signed edge weights.
+
+        Parameters
+        ----------
+        node : int
+            Node index.
+
+        Returns
+        -------
+        list[tuple[int, float]]
+            List of ``(neighbor_index, sign_weight)`` pairs.
+        """
+        v = self.G.vertex(node)
+        sign_prop = self.G.edge_properties["sign"]
+        result: list[tuple[int, float]] = []
+        for e in v.out_edges():
+            neighbor = int(e.target()) if int(e.source()) == node else int(e.source())
+            result.append((neighbor, float(sign_prop[e])))
+        return result
+
+    def get_edges_with_weights(self) -> list[tuple[int, int, float]]:
+        """Return all edges with their signed weights.
+
+        Returns
+        -------
+        list[tuple[int, int, float]]
+            List of ``(u, v, weight)`` triples.
+        """
+        sign_prop = self.G.edge_properties["sign"]
+        return [
+            (int(e.source()), int(e.target()), float(sign_prop[e]))
+            for e in self.G.edges()
+        ]
+
+    def get_neighbor_indices(self, node: int) -> list[int]:
+        """Return neighbor indices without weights.
+
+        Parameters
+        ----------
+        node : int
+            Node index.
+
+        Returns
+        -------
+        list[int]
+            Neighbor node indices.
+        """
+        v = self.G.vertex(node)
+        return [int(n) for n in v.out_neighbors()]
+
     def invalidate_cache(self) -> None:
         """Clear cached matrices and spectral data."""
         self._slp = None

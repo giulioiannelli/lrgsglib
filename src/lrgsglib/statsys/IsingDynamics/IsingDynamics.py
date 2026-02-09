@@ -12,25 +12,115 @@ from .._c_backend import CBackendMixin
 from ..BinDynSys import BinDynSys
 from ...config.const import BIN, SG_REPR
 from ...config.funcs import build_pT_fname
-from ...graphs.nx.funcs import get_kth_order_neighbours
 from ...utils.lrg.ising import compute_ising_pairwise_energy
 from ...utils.statsys import boltzmann_factor
 from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
-    from ...graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs._base import SignedGraphProtocol as SignedGraph
 
 # Type aliases for cooling/ladder schedules
 CoolingSchedule = Literal["linear", "exponential", "logarithmic", "custom"]
 LadderType = Literal["geometric", "linear", "custom"]
 
+# ---------------------------------------------------------------------------
+# runlang naming convention
+# ---------------------------------------------------------------------------
+# Format: <backend>_<algorithm>[_<output>]
+#   backend:   py, c, pb (pybind), cu (cuda)
+#   algorithm: met (Metropolis), sa (simulated annealing), pt (parallel tempering)
+#   output:    em (energy+magnetization), snap (snapshots), clust (clusters)
+#
+# Legacy codes are mapped to the new scheme automatically.
+_RUNLANG_ALIASES: dict[str, str] = {
+    # Legacy → new (case-insensitive keys normalised in _resolve_runlang)
+    "C0":  "c_met_em",
+    "C1":  "c_met",
+    "C1B": "c_met_em",
+    "C2":  "c_met_snap",
+    "C3":  "c_sa",
+    "C3B": "c_sa_em",
+    "C4":  "c_pt",
+    "C4B": "c_pt_em",
+    "C5":  "c_met_clust",
+    # Convenience aliases
+    "py":       "py_met",
+    "python":   "py_met",
+    "Python":   "py_met",
+    "pb":       "pb_met",
+    "pybind":   "pb_met",
+    "cu":       "cu_met",
+    "cuda":     "cu_met",
+    "gpu":      "cu_met",
+}
+
+# Reverse map: new name → legacy C key (for subprocess backend)
+_NEW_TO_LEGACY_C: dict[str, str] = {
+    "c_met":      "C1",
+    "c_met_em":   "C1B",
+    "c_met_snap": "C2",
+    "c_sa":       "C3",
+    "c_sa_em":    "C3B",
+    "c_pt":       "C4",
+    "c_pt_em":    "C4B",
+    "c_met_clust":"C5",
+}
+
+
+def _resolve_runlang(raw: str) -> str:
+    """Normalise a runlang string to the canonical form.
+
+    Accepts both legacy codes (``'C1b'``) and new-style names
+    (``'pb_met'``).  Returns the canonical new-style name.
+    """
+    key = raw.strip()
+    # Already canonical?
+    if "_" in key:
+        return key
+    # Try legacy lookup (case-insensitive)
+    upper = key.upper()
+    if upper in _RUNLANG_ALIASES:
+        return _RUNLANG_ALIASES[upper]
+    # Exact match (e.g. "py", "pb_met")
+    if key in _RUNLANG_ALIASES:
+        return _RUNLANG_ALIASES[key]
+    # Pass through (unknown — let downstream validation catch it)
+    return key
+
 
 class IsingDynamics(CBackendMixin, BinDynSys):
     """Ising model dynamics with Metropolis, Simulated Annealing, and Parallel Tempering.
 
-    Naming convention for C backends:
-        - Number = Algorithm: 1=Metropolis, 3=SA, 4=PT
-        - Letter = Output: a=final, b=E/M, c=snapshots, d=clusters, e=eigvec, f=exchange
+    Naming convention for ``runlang``
+    ---------------------------------
+    Format: ``<backend>_<algorithm>[_<output>]``
+
+    ========= ======== ========================================
+    backend   meaning  description
+    ========= ======== ========================================
+    ``py``    Python   Pure-Python Metropolis / SA / PT
+    ``c``     C sub    C subprocess (file I/O, NX graphs only)
+    ``pb``    pybind11 C kernels called in-process via numpy
+    ``cu``    CUDA     GPU checkerboard Metropolis (lattices)
+    ========= ======== ========================================
+
+    ========= ============================================
+    algorithm meaning
+    ========= ============================================
+    ``met``   Glauber–Metropolis at fixed *T*
+    ``sa``    Simulated Annealing
+    ``pt``    Parallel Tempering (Replica Exchange)
+    ========= ============================================
+
+    ======== ===========================================
+    output   meaning (C subprocess only)
+    ======== ===========================================
+    ``em``   energy + magnetization time series
+    ``snap`` spin snapshots
+    ``clust``cluster export
+    ======== ===========================================
+
+    Legacy codes (``"C1b"``, ``"C3b"``, …) are mapped automatically.
 
     Parameters
     ----------
@@ -51,16 +141,13 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
     Examples
     --------
-    >>> ising = IsingDynamics(lattice, T=2.0, steps=1000, runlang='C1b')
+    >>> # Pybind11 Metropolis (fastest, engine-agnostic):
+    >>> ising = IsingDynamics(lattice, T=2.0, steps=1000, runlang='pb_met')
     >>> ising.init_ising_dynamics()
     >>> ising.run(verbose=False)
 
-    Notes
-    -----
-    C backend variants:
-        - ``runlang="C1b"``: Metropolis with E/M output
-        - ``runlang="C3b"``: Simulated Annealing with E/M output
-        - ``runlang="C4b"``: Parallel Tempering with E/M output
+    >>> # Legacy C subprocess (NX graphs only):
+    >>> ising = IsingDynamics(lattice, T=2.0, steps=1000, runlang='C1b')
     """
 
     dyn_UVclass = "ising_dynamics"
@@ -176,9 +263,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     def neigh_ene(self, neigh: list) -> float:
         return np.sum(neigh) / len(neigh)
     #
-    def neigh_wghtmagn(self, node: int,on_g: str = SG_REPR) -> list:
-        nd = dict(self.sg.gr[on_g][node])
-        return [w["weight"] * self.s[nn] for nn, w in nd.items()]
+    def neigh_wghtmagn(self, node: int) -> list:
+        neighbors = self.sg.get_neighbors_with_weights(node)
+        return [w * self.s[nn] for nn, w in neighbors]
     #
     def metropolis(self, node):
         neigh = self.neigh_wghtmagn(node)
@@ -620,8 +707,202 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         """
         if spins is None:
             spins = self.s
-        edges = list(self.sg.gr[self.sg.on_g].edges(data='weight', default=1.0))
+        edges = self.sg.get_edges_with_weights()
         return compute_ising_pairwise_energy(spins, edges)
+
+    # =========================================================================
+    # Graph CSR builder (for pybind11 backend)
+    # =========================================================================
+
+    def _build_graph_csr(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Build CSR-like arrays from the graph for the pybind11 backend.
+
+        Returns
+        -------
+        neigh_indices : ndarray[int64]
+            Concatenated neighbor indices.
+        neigh_weights : ndarray[float64]
+            Concatenated edge weights (signs).
+        neigh_ptr : ndarray[int64]
+            Row pointers (N+1,).
+        """
+        indices_list: list[int] = []
+        weights_list: list[float] = []
+        ptr = [0]
+        for node in range(self.N):
+            nw = self.sg.get_neighbors_with_weights(node)
+            for nn, w in nw:
+                indices_list.append(nn)
+                weights_list.append(w)
+            ptr.append(len(indices_list))
+        return (
+            np.array(indices_list, dtype=np.int64),
+            np.array(weights_list, dtype=np.float64),
+            np.array(ptr, dtype=np.int64),
+        )
+
+    # =========================================================================
+    # Pybind11 backend
+    # =========================================================================
+
+    @staticmethod
+    def _load_native_module():
+        """Import the compiled _ising_native pybind11 module."""
+        try:
+            from ..IsingDynamics.ccore import _ising_native  # type: ignore[import-untyped]
+            return _ising_native
+        except ImportError as exc:
+            raise RuntimeError(
+                "Pybind11 Ising backend not available. Build the C extensions "
+                "with `pip install -e .` or `make all` first."
+            ) from exc
+
+    def _run_pybind_met(self) -> None:
+        """Run Metropolis via pybind11 native kernels."""
+        mod = self._load_native_module()
+        ni, nw, nptr = self._build_graph_csr()
+        s_out, ene, magn = mod.metropolis_sampling(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            self.field.astype(np.float64),
+            float(self.T),
+            int(self.steps),
+            int(self.seed),
+            self.upd_mode,
+        )
+        self.s = s_out
+        self.ene = ene.tolist()
+        self.magn = magn.tolist()
+
+    def _run_pybind_sa(self) -> None:
+        """Run Simulated Annealing via pybind11 native kernels."""
+        mod = self._load_native_module()
+        ni, nw, nptr = self._build_graph_csr()
+        s_out, ene, magn, T_sched = mod.sa_sampling(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            self.field.astype(np.float64),
+            float(self.T_init),
+            float(self.T_final),
+            self.cooling_schedule,
+            float(self.cooling_rate),
+            int(self.steps_per_T),
+            int(self.n_temperatures),
+            int(self.seed),
+            self.upd_mode,
+        )
+        self.s = s_out
+        self.sa_energy = np.asarray(ene)
+        self.sa_magn = np.asarray(magn)
+        self.sa_temps = np.asarray(T_sched)
+        # Also set ene/magn for consistent API
+        self.ene = ene.tolist()
+        self.magn = magn.tolist()
+
+    def _run_pybind_pt(self) -> None:
+        """Run Parallel Tempering via pybind11 native kernels."""
+        mod = self._load_native_module()
+        ni, nw, nptr = self._build_graph_csr()
+        T_ladder = self._generate_T_ladder()
+        s_out, ene_2d, magn_2d, exchanges = mod.pt_sampling(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            self.field.astype(np.float64),
+            T_ladder.astype(np.float64),
+            int(self.steps_per_exchange),
+            int(self.n_exchanges),
+            int(self.seed),
+            self.upd_mode,
+        )
+        self.s = s_out
+        self.T_ladder = T_ladder
+        self.pt_energy = np.asarray(ene_2d)
+        self.pt_magn = np.asarray(magn_2d)
+        self.ene = np.asarray(ene_2d)
+        self.magn = np.asarray(magn_2d)
+        # Rebuild exchange list for API compatibility
+        exch = np.asarray(exchanges)
+        self.pt_exchanges = []
+        n_rep = len(T_ladder)
+        for ex_round in range(exch.shape[0]):
+            start = ex_round % 2
+            for i in range(start, n_rep - 1, 2):
+                self.pt_exchanges.append(
+                    (ex_round, i, i + 1, bool(exch[ex_round, i]))
+                )
+
+    # =========================================================================
+    # CuPy (GPU) backend
+    # =========================================================================
+
+    def _run_cupy_met(self) -> None:
+        """Run Metropolis via CuPy GPU kernels."""
+        from ._cupy_ising import cupy_metropolis
+
+        ni, nw, nptr = self._build_graph_csr()
+        final_spins, ene_trace, magn_trace = cupy_metropolis(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            float(self.T),
+            int(self.steps),
+            int(self.seed),
+        )
+        self.s = final_spins
+        self.ene = ene_trace
+        self.magn = magn_trace
+
+    def _run_cupy_sa(self) -> None:
+        """Run Simulated Annealing via CuPy GPU kernels."""
+        from ._cupy_ising import cupy_sa
+
+        ni, nw, nptr = self._build_graph_csr()
+        final_spins, ene_trace, magn_trace, temps = cupy_sa(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            float(self.T_init),
+            float(self.T_final),
+            self.cooling_schedule,
+            float(self.cooling_rate),
+            int(self.steps_per_T),
+            int(self.n_temperatures),
+            int(self.seed),
+        )
+        self.s = final_spins
+        self.sa_energy = np.array(ene_trace)
+        self.sa_magn = np.array(magn_trace)
+        self.sa_temps = np.array(temps)
+        self.ene = ene_trace
+        self.magn = magn_trace
+
+    def _run_cupy_pt(self) -> None:
+        """Run Parallel Tempering via CuPy GPU kernels."""
+        from ._cupy_ising import cupy_pt
+
+        ni, nw, nptr = self._build_graph_csr()
+        T_ladder = self._generate_T_ladder()
+        final_spins, ene_2d, magn_2d, exchanges = cupy_pt(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            T_ladder.astype(np.float64),
+            int(self.steps_per_exchange),
+            int(self.n_exchanges),
+            int(self.seed),
+        )
+        self.s = final_spins
+        self.T_ladder = T_ladder
+        self.pt_energy = ene_2d
+        self.pt_magn = magn_2d
+        self.ene = ene_2d
+        self.magn = magn_2d
+        # Rebuild exchange list for API compatibility
+        n_rep = len(T_ladder)
+        self.pt_exchanges = []
+        for ex_round in range(exchanges.shape[0]):
+            start = ex_round % 2
+            for i in range(start, n_rep - 1, 2):
+                self.pt_exchanges.append(
+                    (ex_round, i, i + 1, bool(exchanges[ex_round, i]))
+                )
 
     # =========================================================================
     # Run Method
@@ -667,34 +948,57 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.check_attribute()
         self.initialize_run_parameters(T_ising, steps=steps, simref=simref, eqSTEP=eqSTEP)
 
+        # Resolve naming convention
+        rl = _resolve_runlang(self.runlang)
+
         # Determine mode
         use_sa = sa_mode or self.sa_enabled
         use_pt = pt_mode or self.pt_enabled
 
-        if self.runlang.startswith("C"):
+        # ---- Pybind11 backend ----
+        if rl.startswith("pb_"):
+            if use_pt or rl.endswith("_pt") or "pt" in rl:
+                self._run_pybind_pt()
+            elif use_sa or rl.endswith("_sa") or "sa" in rl:
+                self._run_pybind_sa()
+            else:
+                self._run_pybind_met()
+
+        # ---- CuPy (GPU) backend ----
+        elif rl.startswith("cu_"):
+            if use_pt or rl.endswith("_pt") or "pt" in rl:
+                self._run_cupy_pt()
+            elif use_sa or rl.endswith("_sa") or "sa" in rl:
+                self._run_cupy_sa()
+            else:
+                self._run_cupy_met()
+
+        # ---- C subprocess backend ----
+        elif rl.startswith("c_") or self.runlang.upper().startswith("C"):
             self.build_cprogram_command()
             self.run_cprogram(verbose)
             if clean_export:
                 self.remove_run_c_files()
                 self.sg.remove_exported_files()
+
+        # ---- Python backend ----
         else:
-            # Python backends
             if use_pt:
                 self.parallel_tempering_sampling(tqdm_on)
             elif use_sa:
                 self.simulated_annealing_sampling(tqdm_on)
             else:
                 self.metropolis_sampling(tqdm_on)
-        
 
     #
     def find_ising_clusters(self, import_cl: bool = False):
-        #can be easily reworked
         if import_cl:
+            path_ising = getattr(self.sg, 'path_ising', self.dynpath)
+            std_fname = getattr(self.sg, 'std_fname', 'sg')
             for i in range(self.NoClust):
                 self.Ising_clusters.append(
                     np.fromfile(
-                        f"{self.sg.path_ising}cl{i}_{self.sg.std_fname}.bin",
+                        f"{path_ising}cl{i}_{std_fname}.bin",
                         dtype=int,
                     )
                 )
@@ -707,11 +1011,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         #
         self.Ising_clusters = []
         for j in range(self.NoClust):
-            lnodes = list(self.sg.H.nodes())
+            lnodes = list(range(self.sg.N))
             lnodes_tmp = lnodes[:]
 
             def recursive_search(seed, magn_i, clustertmp):
-                neighs = get_kth_order_neighbours(self.sg.H, seed, 1)
+                neighs = np.array(self.sg.get_neighbor_indices(seed))
                 neighs = np.array(
                     [e for e in neighs if e not in set(clustertmp)]
                 )
@@ -742,7 +1046,8 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             self.Ising_clusters.append(allclusters[0])
         self.numIsing_cl = len(self.Ising_clusters)
         if self.runlang.startswith("C"):
-            self.sg.export_ising_clust()
+            if hasattr(self.sg, 'export_ising_clust'):
+                self.sg.export_ising_clust()
 
     #
     def mapping_nodes_to_clusters(self):
@@ -759,14 +1064,19 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.node_inherclust_flat = node_inherclust_flat
         sorted_list = sorted(node_inherclust_flat, key=lambda x: x[0])
         self.sorted_list = sorted_list
+
+        # Lattice-specific mapping (requires side1/side2)
+        from ...graphs._base import is_lattice_graph
+        if not is_lattice_graph(self.sg):
+            raise TypeError(
+                "mapping_nodes_to_clusters requires a lattice graph "
+                "with side1 and side2 attributes."
+            )
         result_array = np.empty((self.sg.side1, self.sg.side2), dtype=object)
         self.result_array = result_array
 
-        # Fill the result_array with tuples from sorted_list
         for i, sublist in enumerate(sorted_list):
-            row, col = divmod(
-                i, self.sg.side1
-            )  # Calculate the row and column index
+            row, col = divmod(i, self.sg.side1)
             result_array[row, col] = sublist[1]
         self.mapping = result_array
 

@@ -12,7 +12,7 @@ import numpy as np
 import graph_tool.all as gt
 import graph_tool.generation as gen
 
-from ....gt_patches.signed_graph_gt import SignedGraphGT
+from ..SignedGraphGT import SignedGraphGT
 
 
 class ConfigurationModelGT(SignedGraphGT):

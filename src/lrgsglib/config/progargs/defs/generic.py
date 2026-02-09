@@ -21,5 +21,6 @@ DEFAULT_PARTITION = None
 DEFAULT_VAL = "=1"
 DEFAULT_VERBOSE = False
 DEFAULT_WORKDIR = ''
+DEFAULT_GRAPH_ENGINE = 'nx'
 ## default values depending on default arguments
 DEFAULT_DATA_SAVE_FREQ = DEFAULT_NAVG // 10

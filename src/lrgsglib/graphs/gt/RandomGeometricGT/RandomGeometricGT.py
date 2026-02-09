@@ -12,7 +12,7 @@ import numpy as np
 import graph_tool.all as gt
 import graph_tool.generation as gen
 
-from ....gt_patches.signed_graph_gt import SignedGraphGT
+from ..SignedGraphGT import SignedGraphGT
 
 
 class RandomGeometricGT(SignedGraphGT):
@@ -68,6 +68,7 @@ class RandomGeometricGT(SignedGraphGT):
         dim: int = 2,
         pflip: float = 0.0,
         seed: Optional[int] = None,
+        extract_giant_component: bool = False,
     ):
         if n <= 0:
             raise ValueError(f"n must be positive, got {n}")
@@ -81,6 +82,7 @@ class RandomGeometricGT(SignedGraphGT):
         self.n = n
         self.radius = radius
         self.dim = dim
+        self.extract_giant_component = extract_giant_component
 
         # Set seed
         if seed is not None:
@@ -90,12 +92,39 @@ class RandomGeometricGT(SignedGraphGT):
         # Generate graph using graph-tool's native geometric_graph
         G, self._pos = self._generate_graph()
 
+        # Extract giant component if requested
+        if extract_giant_component:
+            G, self._pos = self._extract_gc(G, self._pos)
+
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed)
 
         # Apply sign flips if requested
         if pflip > 0:
             self.flip_random_fract_edges()
+
+    @staticmethod
+    def _extract_gc(
+        G: gt.Graph, pos: gt.VertexPropertyMap
+    ) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
+        """Extract the largest connected component, preserving positions."""
+        import graph_tool.topology as topo
+
+        comp, hist = topo.label_components(G)
+        giant_label = int(np.argmax(hist))
+        vfilt = G.new_vertex_property("bool")
+        vfilt.a = comp.a == giant_label
+        G_gc = gt.Graph(gt.GraphView(G, vfilt=vfilt), prune=True)
+        # Rebuild position map for pruned graph
+        pos_gc = G_gc.new_vertex_property("vector<double>")
+        old_idx = 0
+        for v_new in G_gc.vertices():
+            # find the corresponding old vertex
+            while not vfilt.a[old_idx]:
+                old_idx += 1
+            pos_gc[v_new] = pos[G.vertex(old_idx)]
+            old_idx += 1
+        return G_gc, pos_gc
 
     def _generate_graph(self) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
         """Generate random geometric graph using graph-tool."""

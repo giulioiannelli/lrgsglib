@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from lrgsglib import Lattice3D, load_or_compute_Lattice3D
+from parsers.shared import resolve_graph_class, get_graph_engine
 
 __all__ = [
     "initialize_l3d_dict_args",
@@ -59,9 +60,29 @@ def make_transcluster_lattice(
     return Lattice3D(**kwargs)
 
 
-def prepare_lattice(args: Any, **kwargs: Any) -> Lattice3D:
-    """Return a cached or freshly generated :class:`Lattice3D` instance."""
+def prepare_lattice(args: Any, **kwargs: Any) -> Any:
+    """Return a cached or freshly generated Lattice3D instance (NX or GT).
 
+    Supports ``--graph_engine`` argument: when ``args.graph_engine == 'gt'``,
+    creates a ``Lattice3DGT`` instance instead of the default NX class.
+    """
+    engine = get_graph_engine(args)
+
+    if engine == "gt":
+        Cls = resolve_graph_class("Lattice3D", "gt")
+        dim = _normalize_dimension(getattr(args, "L"))
+        l3d_kwargs = dict(
+            dim=dim,
+            geo=getattr(args, "geometry", None),
+            pflip=getattr(args, "p", None),
+            seed=42,
+        )
+        l3d_kwargs = {k: v for k, v in l3d_kwargs.items() if v is not None}
+        lattice = Cls(**l3d_kwargs, **kwargs)
+        lattice.flip_random_fract_edges()
+        return lattice
+
+    # Default NX path (preserves load_or_compute and cell_type logic)
     base_kwargs = initialize_l3d_dict_args(args)
     cell_type = getattr(args, "cell_type", None)
     if cell_type is not None:

@@ -122,16 +122,34 @@ class CBackendMixin:
         """Check if C backend is available; fall back to Python if not.
 
         When ``runlang`` requests a C backend but compiled binaries are
-        missing, this method switches to the Python backend and emits a
-        ``RuntimeWarning``.  This makes ``pip install lrgsglib`` (without
-        a compiler) work seamlessly — dynamics run in Python mode with a
-        one-time warning.
+        missing or the graph does not support file I/O (e.g. graph-tool
+        graphs lack ``DynamicsGraphProtocol``), this method switches to
+        the Python backend and emits a ``RuntimeWarning``.
 
         Call this early in ``init_*_dynamics()`` before any C-specific
         setup (export files, stderr logging, etc.).
         """
-        if not self.runlang or not self.runlang.upper().startswith("C"):
+        if not self.runlang:
             return
+        upper = self.runlang.upper()
+        # Only check C subprocess backend, not CuPy (cu_*) or pybind (pb_*)
+        if not (upper.startswith("C") and not upper.startswith("CU")):
+            return
+
+        # Check if the graph supports file I/O required by C backend
+        from ..graphs._base import DynamicsGraphProtocol
+
+        if not isinstance(self.sg, DynamicsGraphProtocol):
+            warnings.warn(
+                f"C backend requested (runlang='{self.runlang}') but the "
+                f"graph ({type(self.sg).__name__}) does not support file "
+                f"I/O required by C backends. Falling back to Python.",
+                RuntimeWarning,
+                stacklevel=3,
+            )
+            self.runlang = "Python"
+            return
+
         bin_dir = self._get_bin_dir()
         if bin_dir.is_dir():
             return

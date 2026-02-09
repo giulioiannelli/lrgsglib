@@ -198,6 +198,15 @@ def __getattr__(name):
         from .TemporalSignedGraphGT import TemporalSignedGraphGT
         return TemporalSignedGraphGT
 
+    # Converters / utilities
+    elif name in ("nx_to_gt", "gt_to_nx", "GTNXConverter",
+                   "get_adjacency_matrix_gt", "get_laplacian_matrix_gt"):
+        from . import _converters
+        return getattr(_converters, name)
+    elif name == "create_triangular_lattice":
+        from .Lattice2DGT.cpp import create_triangular_lattice
+        return create_triangular_lattice
+
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -249,4 +258,11 @@ __all__ = [
     # Temporal (fallback to NX)
     "TemporalGraphGT",
     "TemporalSignedGraphGT",
+    # Converters / utilities
+    "nx_to_gt",
+    "gt_to_nx",
+    "GTNXConverter",
+    "get_adjacency_matrix_gt",
+    "get_laplacian_matrix_gt",
+    "create_triangular_lattice",
 ]

@@ -237,7 +237,9 @@ class TestContactProcess(unittest.TestCase):
         model = self.ContactProcessSIR(sg, mu=0.2, runlang="C0", steps=1, seed=0)
         model._set_time_controls(steps=5)
 
-        fake_binary = self.ccore_dir / "ContactSimulator0"
+        ccore_dir = Path(self._tmp_dir.name) / "ccore_bin"
+        ccore_dir.mkdir(exist_ok=True)
+        fake_binary = ccore_dir / "ContactSimulator0"
         fake_binary.write_text("#!/bin/sh\n")
 
         stdout_state = np.ones(model.N, dtype=np.int8)

@@ -1,29 +1,33 @@
 """
-graph-tool C++ extensions for lrgsglib.
+gt_patches.cpp — DEPRECATED.
 
-This subpackage provides high-performance C++ extensions for graph-tool operations.
-Extensions are built via `make cpp-make` from the lrgsglib root directory.
-
-Available functions:
-- create_triangular_lattice(width, height) - Create a triangular lattice graph
-
-The C++ extensions require graph-tool to be installed and provide significant
-speedups (typically 10-50x) over pure Python implementations.
+C++ extensions have moved to per-class ``cpp/`` subdirectories under
+``lrgsglib.graphs.gt``.  E.g. triangular lattice is now at
+``lrgsglib.graphs.gt.Lattice2DGT.cpp``.
 """
-from __future__ import annotations
+import warnings as _warnings
 
-# Import available extensions
-try:
-    from .lattice_generators import create_triangular_lattice
-except ImportError as e:
-    # Extension not built - provide helpful error
-    def create_triangular_lattice(*args, **kwargs):
-        raise ImportError(
-            "triangular_lattice C++ extension not available. "
-            "Build with 'make cpp-make' from the lrgsglib root directory."
-        ) from e
+_WARNED = False
 
 
-__all__ = [
-    "create_triangular_lattice",
-]
+def __getattr__(name):
+    global _WARNED
+    if name == "create_triangular_lattice":
+        if not _WARNED:
+            _warnings.warn(
+                "Importing 'create_triangular_lattice' from "
+                "'lrgsglib.gt_patches.cpp' is deprecated. "
+                "Use 'lrgsglib.graphs.gt.Lattice2DGT.cpp' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            _WARNED = True
+        from lrgsglib.graphs.gt.Lattice2DGT.cpp import (
+            create_triangular_lattice,
+        )
+        return create_triangular_lattice
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__all__: list[str] = []

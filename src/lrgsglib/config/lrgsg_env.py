@@ -50,10 +50,11 @@ LRGSG_TOOLS_PY: Path = _LIB_ROOT / "tools" / "py"
 # ---------------------------------------------------------------------------
 # Package subpackage paths
 # ---------------------------------------------------------------------------
-LRGSG_LIB_GT_PATCHES: Path = _PKG_ROOT / "gt_patches"
+LRGSG_LIB_GT_PATCHES: Path = _PKG_ROOT / "gt_patches"  # deprecated
 LRGSG_LIB_NX_PATCHES: Path = _PKG_ROOT / "nx_patches"
 LRGSG_LIB_STOCPROC: Path = _PKG_ROOT / "stocproc"
-LRGSG_GT_PATCHES_CPP: Path = _PKG_ROOT / "gt_patches" / "cpp"
+LRGSG_GT_PATCHES_CPP: Path = _PKG_ROOT / "gt_patches" / "cpp"  # deprecated
+LRGSG_GRAPHS_GT_L2D_CPP: Path = _PKG_ROOT / "graphs" / "gt" / "Lattice2DGT" / "cpp"
 
 # ---------------------------------------------------------------------------
 # Statsys shared C infrastructure

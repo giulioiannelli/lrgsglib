@@ -1,5 +1,5 @@
 """
-Tests for gt_patches C++ extensions.
+Tests for graph-tool C++ extensions and GT graph utilities.
 
 These tests verify that the C++ extensions for graph-tool operations
 work correctly and provide performance benefits over pure Python.
@@ -16,19 +16,19 @@ class TestTriangularLatticeExtension:
 
     def test_import(self):
         """Test that the extension can be imported."""
-        from lrgsglib.gt_patches import create_triangular_lattice
+        from lrgsglib.graphs.gt.Lattice2DGT.cpp import create_triangular_lattice
         assert callable(create_triangular_lattice)
 
     def test_basic_creation(self):
         """Test basic lattice creation."""
-        from lrgsglib.gt_patches import create_triangular_lattice
+        from lrgsglib.graphs.gt.Lattice2DGT.cpp import create_triangular_lattice
 
         g = create_triangular_lattice(5, 5)
         assert g.num_vertices() == 25  # 5x5 grid
 
     def test_edge_structure(self):
         """Test that the triangular lattice has correct edge count."""
-        from lrgsglib.gt_patches import create_triangular_lattice
+        from lrgsglib.graphs.gt.Lattice2DGT.cpp import create_triangular_lattice
 
         # For a triangular lattice, the number of edges depends on geometry
         g = create_triangular_lattice(10, 10)
@@ -41,14 +41,14 @@ class TestTriangularLatticeExtension:
 
     def test_undirected(self):
         """Test that the graph is undirected."""
-        from lrgsglib.gt_patches import create_triangular_lattice
+        from lrgsglib.graphs.gt.Lattice2DGT.cpp import create_triangular_lattice
 
         g = create_triangular_lattice(5, 5)
         assert not g.is_directed()
 
     def test_various_sizes(self):
         """Test different lattice sizes."""
-        from lrgsglib.gt_patches import create_triangular_lattice
+        from lrgsglib.graphs.gt.Lattice2DGT.cpp import create_triangular_lattice
 
         for size in [(3, 3), (10, 10), (20, 15), (50, 50)]:
             g = create_triangular_lattice(*size)
@@ -57,7 +57,7 @@ class TestTriangularLatticeExtension:
 
     def test_performance(self):
         """Test that C++ extension is reasonably fast."""
-        from lrgsglib.gt_patches import create_triangular_lattice
+        from lrgsglib.graphs.gt.Lattice2DGT.cpp import create_triangular_lattice
 
         # Creating a 100x100 lattice should take < 100ms
         start = time.time()
@@ -69,7 +69,7 @@ class TestTriangularLatticeExtension:
 
     def test_large_lattice(self):
         """Test large lattice creation."""
-        from lrgsglib.gt_patches import create_triangular_lattice
+        from lrgsglib.graphs.gt.Lattice2DGT.cpp import create_triangular_lattice
 
         g = create_triangular_lattice(200, 200)
         assert g.num_vertices() == 40000
@@ -81,7 +81,7 @@ class TestGTNXConversion:
     def test_nx_to_gt_basic(self):
         """Test basic NX to GT conversion."""
         import networkx as nx
-        from lrgsglib.gt_patches import nx_to_gt
+        from lrgsglib.graphs.gt import nx_to_gt
 
         G_nx = nx.complete_graph(10)
         for u, v in G_nx.edges():
@@ -94,7 +94,7 @@ class TestGTNXConversion:
     def test_gt_to_nx_basic(self):
         """Test basic GT to NX conversion."""
         import graph_tool.generation as gen
-        from lrgsglib.gt_patches import gt_to_nx
+        from lrgsglib.graphs.gt import gt_to_nx
 
         G_gt = gen.complete_graph(10)
         G_nx = gt_to_nx(G_gt)
@@ -105,7 +105,7 @@ class TestGTNXConversion:
     def test_roundtrip(self):
         """Test NX -> GT -> NX roundtrip."""
         import networkx as nx
-        from lrgsglib.gt_patches import nx_to_gt, gt_to_nx
+        from lrgsglib.graphs.gt import nx_to_gt, gt_to_nx
 
         G_nx = nx.grid_2d_graph(5, 5)
         for u, v in G_nx.edges():
@@ -123,21 +123,21 @@ class TestSignedGraphGT:
 
     def test_creation(self):
         """Test basic SignedGraphGT creation."""
-        from lrgsglib.gt_patches import SignedGraphGT
+        from lrgsglib.graphs.gt.SignedGraphGT import SignedGraphGT
 
         sg = SignedGraphGT()
         assert sg.N == 0
 
     def test_from_lattice(self):
         """Test creating SignedGraphGT from lattice."""
-        from lrgsglib.gt_patches import SignedGraphGT
+        from lrgsglib.graphs.gt.SignedGraphGT import SignedGraphGT
 
         sg = SignedGraphGT.from_lattice((10, 10))
         assert sg.N == 100
 
     def test_flip_edges(self):
         """Test edge sign flipping."""
-        from lrgsglib.gt_patches import SignedGraphGT
+        from lrgsglib.graphs.gt.SignedGraphGT import SignedGraphGT
 
         sg = SignedGraphGT.from_lattice((10, 10))
 

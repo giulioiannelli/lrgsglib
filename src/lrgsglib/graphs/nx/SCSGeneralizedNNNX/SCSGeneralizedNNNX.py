@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import networkx as nx
 import numpy as np
 from ..FullyConnectedNX import FullyConnectedNX
 from .generators_scs import generate_scs_generalized_graph
@@ -77,6 +78,14 @@ class SCSGeneralizedNNNX(FullyConnectedNX):
             diagonal=self.diagonal,
             rng=self._rng,
         )
+
+    def is_symmetric(self) -> bool:
+        """Whether the weight matrix is symmetric (gamma=1, undirected)."""
+        return not self.G.is_directed()
+
+    def get_weight_matrix(self) -> np.ndarray:
+        """Return the weight matrix as a numpy array of shape (N, N)."""
+        return nx.to_numpy_array(self.G, weight="weight")
 
     def __repr__(self) -> str:
         return (

@@ -17,6 +17,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import networkx as nx
 
 
@@ -160,6 +162,92 @@ class SignedGraphProtocol(Protocol):
         nx.Graph
             NetworkX graph with 'weight' edge attribute for signs.
         """
+        ...
+
+    # === Dynamics-Critical Methods ===
+
+    def get_neighbors_with_weights(self, node: int) -> list[tuple[int, float]]:
+        """Return neighbors of *node* with signed edge weights.
+
+        Parameters
+        ----------
+        node : int
+            Node index.
+
+        Returns
+        -------
+        list[tuple[int, float]]
+            List of ``(neighbor_index, sign_weight)`` pairs.
+        """
+        ...
+
+    def get_edges_with_weights(self) -> list[tuple[int, int, float]]:
+        """Return all edges with their signed weights.
+
+        Returns
+        -------
+        list[tuple[int, int, float]]
+            List of ``(u, v, weight)`` triples.
+        """
+        ...
+
+    def get_neighbor_indices(self, node: int) -> list[int]:
+        """Return neighbor indices without weights.
+
+        Parameters
+        ----------
+        node : int
+            Node index.
+
+        Returns
+        -------
+        list[int]
+            Neighbor node indices.
+        """
+        ...
+
+
+@runtime_checkable
+class DynamicsGraphProtocol(SignedGraphProtocol, Protocol):
+    """Protocol for graphs used with dynamics simulations.
+
+    Extends :class:`SignedGraphProtocol` with file I/O and path methods
+    required by the C backend pipeline.
+    """
+
+    @property
+    def syshapePth(self) -> str:
+        """Parameter string for directory/file naming."""
+        ...
+
+    @property
+    def path_sgdata(self) -> "Path":
+        """Root data directory for this graph instance."""
+        ...
+
+    def get_p_fname(self, prefix: str, out_suffix: str = "") -> str:
+        """Build a parametric filename.
+
+        Parameters
+        ----------
+        prefix : str
+            Filename prefix (e.g. ``'s'``, ``'h'``, ``'edgl'``).
+        out_suffix : str
+            Additional suffix.
+
+        Returns
+        -------
+        str
+            Constructed filename.
+        """
+        ...
+
+    def _export_edgel_bin(self, exName: str = "") -> None:
+        """Write edge list to binary file for C backend."""
+        ...
+
+    def remove_exported_files(self) -> None:
+        """Remove all exported binary files."""
         ...
 
 

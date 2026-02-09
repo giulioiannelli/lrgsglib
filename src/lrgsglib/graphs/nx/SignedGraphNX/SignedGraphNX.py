@@ -1215,4 +1215,68 @@ class SignedGraphNX:
     # #
     # #
     # #
-    
+
+    # ------------------------------------------------------------------
+    # Dynamics-critical methods (engine-agnostic interface)
+    # ------------------------------------------------------------------
+
+    def get_neighbors_with_weights(
+        self, node: int, on_g: str = SG_REPR,
+    ) -> list[tuple[int, float]]:
+        """Return neighbors of *node* with signed edge weights.
+
+        Parameters
+        ----------
+        node : int
+            Node index.
+        on_g : str
+            Graph representation to use.
+
+        Returns
+        -------
+        list[tuple[int, float]]
+            List of ``(neighbor_index, sign_weight)`` pairs.
+        """
+        nd = self.gr[on_g][node]
+        return [(nn, w.get("weight", 1.0)) for nn, w in nd.items()]
+
+    def get_edges_with_weights(
+        self, on_g: str | None = None,
+    ) -> list[tuple[int, int, float]]:
+        """Return all edges with their signed weights.
+
+        Parameters
+        ----------
+        on_g : str or None
+            Graph representation. If None, uses ``self.on_g``.
+
+        Returns
+        -------
+        list[tuple[int, int, float]]
+            List of ``(u, v, weight)`` triples.
+        """
+        on_g = on_g or self.on_g
+        return [
+            (u, v, d.get("weight", 1.0))
+            for u, v, d in self.gr[on_g].edges(data=True)
+        ]
+
+    def get_neighbor_indices(
+        self, node: int, on_g: str = SG_REPR,
+    ) -> list[int]:
+        """Return neighbor indices without weights.
+
+        Parameters
+        ----------
+        node : int
+            Node index.
+        on_g : str
+            Graph representation.
+
+        Returns
+        -------
+        list[int]
+            Neighbor node indices.
+        """
+        return list(self.gr[on_g][node].keys())
+

@@ -139,18 +139,17 @@ class VoterModel(CBackendMixin, BinDynSys):
     # Python dynamics
     # ------------------------------------------------------------------
     def ds1step(self, nd: int) -> None:
-        neigh = self.sg.gr[self.sg.on_g][nd]
-        if not neigh:
+        neighbors = self.sg.get_neighbors_with_weights(nd)
+        if not neighbors:
             return
-        neighbours = list(neigh)
-        choice = neighbours[np.random.randint(len(neighbours))]
-        weight = neigh[choice].get("weight", 1.0)
+        choice_idx = np.random.randint(len(neighbors))
+        neighbor, weight = neighbors[choice_idx]
         edge_sign = -1 if weight < 0 else 1
-        self.s[nd] = np.int8(edge_sign * self.s[choice])
+        self.s[nd] = np.int8(edge_sign * self.s[neighbor])
 
     def voter_sampling(self, tqdm_on: bool) -> None:
         dsNstep = self.dsNstep()
-        nodes = list(self.sg.gr[self.sg.on_g].nodes())
+        nodes = list(range(self.N))
         iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
         for _ in iterator:
             if self.save_magnetization:

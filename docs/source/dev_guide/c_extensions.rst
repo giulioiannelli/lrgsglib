@@ -343,8 +343,99 @@ To add a new simulator:
               result = subprocess.run(self.cprogram, ...)
               self.s = np.frombuffer(result.stdout, dtype=np.int8)
 
-pybind11 Bindings
------------------
+Pybind11 Native Ising Backend
+-----------------------------
+
+The ``_ising_native`` pybind11 module wraps the existing C kernels
+(``LRGSG_rbim``, ``LRGSG_sa``, ``LRGSG_pt``) with numpy arrays,
+eliminating the file I/O overhead of the subprocess backend.
+
+Architecture
+~~~~~~~~~~~~
+
+.. code-block:: text
+
+   IsingDynamics._run_pybind_met()
+     └─ _build_graph_csr()          ← Build CSR arrays from any graph
+         └─ sg.get_neighbors_with_weights()  ← Protocol method
+     └─ _ising_native.metropolis_sampling()  ← C kernel via pybind11
+         └─ LRGSG_rbim functions     ← Same C code as subprocess
+
+**Key advantages over C subprocess:**
+
+- No file I/O (graph data passed as numpy arrays)
+- Works with any graph satisfying ``SignedGraphProtocol`` (NX or GT)
+- GIL released during heavy C loops for parallelism
+- Same C kernels, same numerical results
+
+Graph Representation
+~~~~~~~~~~~~~~~~~~~~
+
+The pybind11 backend uses a CSR (Compressed Sparse Row) representation
+built at runtime from the graph's protocol methods:
+
+.. code-block:: python
+
+   # Built by IsingDynamics._build_graph_csr()
+   neigh_indices : ndarray[int64]   # Concatenated neighbor indices
+   neigh_weights : ndarray[float64] # Edge weights (signs)
+   neigh_ptr     : ndarray[int64]   # Row pointers (N+1,)
+
+Building
+~~~~~~~~
+
+.. code-block:: bash
+
+   # Built as part of the full build
+   make all
+
+   # Or build just the native module
+   cd src/lrgsglib/statsys/IsingDynamics/ccore/native
+   make
+
+   # Or via setup.py
+   pip install -e .
+
+Usage (``runlang``): ``pb_met``, ``pb_sa``, ``pb_pt``
+
+CuPy GPU Backend
+----------------
+
+The CuPy GPU backend uses CUDA RawKernels for Ising dynamics on GPU.
+Located at ``statsys/IsingDynamics/_cupy_ising.py``.
+
+Architecture
+~~~~~~~~~~~~
+
+.. code-block:: text
+
+   IsingDynamics._run_cupy_met()
+     └─ _build_graph_csr()             ← Same CSR builder as pybind11
+     └─ _cupy_ising.cupy_metropolis()
+         └─ _greedy_coloring()         ← CPU: partition nodes by color
+         └─ _compile_kernels()         ← CuPy caches compiled kernels
+         └─ gpu_metropolis_sweep()     ← GPU: update all colors
+             └─ metropolis_update      ← CUDA RawKernel
+
+**Graph-coloring approach:** Nodes are partitioned into independent sets
+(colors) so all same-color nodes can be updated simultaneously without
+race conditions. For bipartite graphs, this gives 2 colors (checkerboard).
+
+CUDA Kernels
+~~~~~~~~~~~~
+
+Two RawKernels are compiled by CuPy:
+
+1. ``metropolis_update`` - Parallel Metropolis update for one color class
+2. ``compute_energy_per_node`` - Per-node energy contribution (edge-sum)
+
+Usage (``runlang``): ``cu_met``, ``cu_sa``, ``cu_pt``
+(aliases: ``cu``, ``cuda``, ``gpu``)
+
+Requirements: CuPy with CUDA toolkit.
+
+pybind11 Bindings (General)
+---------------------------
 
 Some C++ code uses pybind11 for direct Python bindings (in ``bindings/``):
 

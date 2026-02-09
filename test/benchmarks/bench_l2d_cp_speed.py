@@ -188,8 +188,10 @@ def main():
         plt.suptitle(f'Contact Process: Python vs C1c\n(L={args.L}, pflip={args.pflip}, γ={args.gamma}, {args.steps} steps, ic=rand)',
                      fontsize=14, fontweight='bold')
         plt.tight_layout()
-        plt.savefig('/tmp/contact_process_comparison.png', dpi=150, bbox_inches='tight')
-        plt.show()
+        _fig_dir = Path(__file__).parent / ".tmp"
+        _fig_dir.mkdir(exist_ok=True)
+        plt.savefig(_fig_dir / 'contact_process_comparison.png', dpi=150, bbox_inches='tight')
+        plt.close()
         print('\nPlot saved to /tmp/contact_process_comparison.png')
 
         print('\nState change analysis:')
@@ -207,7 +209,7 @@ def main():
             ax_py.legend()
             ax_py.set_title('Density vs time (Python backend)')
             plt.tight_layout()
-            plt.show()
+            plt.close()
         elif args.nsamplelog > 0:
             print("Python density logging requested but no data captured.")
 
@@ -222,7 +224,7 @@ def main():
             ax_c.legend()
             ax_c.set_title('Density vs time (C1c backend)')
             plt.tight_layout()
-            plt.show()
+            plt.close()
 
 
 if __name__ == "__main__":

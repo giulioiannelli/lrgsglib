@@ -407,6 +407,21 @@ target_include_directories(ising_model_store PRIVATE ${RBIM_STORE})
 target_compile_options(ising_model_store PRIVATE -O3)
 install(TARGETS ising_model_store DESTINATION lrgsglib/statsys/IsingDynamics/ccore/storer)
 
+# Ising native kernels - pybind11 binding (Metropolis, SA, PT via numpy)
+pybind11_add_module(_ising_native
+    ${ISING_CCORE}/ising_native.cpp
+    ${SRC_RBIM}
+    ${SRC_SA}
+    ${SRC_PT}
+    ${COMMON_SOURCES}
+)
+target_include_directories(_ising_native PRIVATE
+    ${COMMON_INCLUDES}
+    ${Python_NumPy_INCLUDE_DIRS}
+)
+target_compile_options(_ising_native PRIVATE -O3)
+install(TARGETS _ising_native DESTINATION lrgsglib/statsys/IsingDynamics/ccore)
+
 # Random walker on lattices - pybind11 binding
 pybind11_add_module(random_walker
     ${SRW_LATT}/random_walker.cpp

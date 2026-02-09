@@ -2,11 +2,12 @@ from lrgsglib import Lattice2D
 
 from .ContactProcessDynamics import run_contact_process, get_out_suffix, clean_up_files
 from . import ContactProcessDynamics as cp_dyn
-from .L2D import initialize_l2d_dict_args
+from .L2D import initialize_l2d_dict_args, prepare_lattice as _prepare_lattice_l2d
 from pathlib import Path
 from dataclasses import dataclass
 import numpy as np
 from lrgsglib.config.funcs import peq_fstr
+from parsers.shared import get_graph_engine
 
 
 @dataclass
@@ -82,6 +83,11 @@ def _post_process_default(cp, args) -> None:
 
 
 def _prepare_lattice(args):
+    engine = get_graph_engine(args)
+    if engine == "gt":
+        return _prepare_lattice_l2d(args)
+
+    # Default NX path
     lattice = Lattice2D(**initialize_l2d_dict_args(args))
     if lattice.init_nw_dict:
         lattice.flip_sel_edges(lattice.nwDict[args.cell_type]["G"])

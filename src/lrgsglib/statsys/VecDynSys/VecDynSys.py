@@ -80,10 +80,7 @@ class VecDynSys(DynSys):
     def _get_adj_matrix(self) -> NDArray:
         """Return the (cached) signed adjacency matrix as dense float64."""
         if self._adj is None:
-            import networkx as nx
-
-            G = self.sg.gr[self.sg.on_g]
-            self._adj = nx.to_numpy_array(G, weight="weight", dtype=np.float64)
+            self._adj = self.sg.get_signed_adjacency().astype(np.float64)
         return self._adj
 
     # ------------------------------------------------------------------

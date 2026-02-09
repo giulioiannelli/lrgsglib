@@ -15,7 +15,7 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 SERIALIZER_SCRIPT = ROOT_DIR / "src" / "MCG_SlaplSpect_Serializer.py"
 
 

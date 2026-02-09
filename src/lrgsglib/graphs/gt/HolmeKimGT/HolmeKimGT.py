@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 import graph_tool.all as gt
 
-from ....gt_patches.signed_graph_gt import SignedGraphGT
+from ..SignedGraphGT import SignedGraphGT
 from .cpp import create_holme_kim
 
 

@@ -36,7 +36,7 @@ except ImportError:
     GT_AVAILABLE = False
     Graph = object
 
-from ....gt_patches.signed_graph_gt import SignedGraphGT
+from ..SignedGraphGT import SignedGraphGT
 
 
 __all__ = ["BipartiteGraphGT"]

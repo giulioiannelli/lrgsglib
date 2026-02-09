@@ -19,7 +19,7 @@ try:
 except ImportError:
     GT_AVAILABLE = False
 
-from ....gt_patches.signed_graph_gt import SignedGraphGT
+from ..SignedGraphGT import SignedGraphGT
 
 
 __all__ = ["MultispectralGraphGT"]

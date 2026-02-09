@@ -12,7 +12,7 @@ import numpy as np
 import graph_tool.all as gt
 import graph_tool.generation as gen
 
-from ....gt_patches.signed_graph_gt import SignedGraphGT
+from ..SignedGraphGT import SignedGraphGT
 
 
 class kRegularGraphGT(SignedGraphGT):
@@ -110,6 +110,16 @@ class kRegularGraphGT(SignedGraphGT):
         G.edge_properties["sign"] = sign
 
         return G
+
+    def verify_regularity(self) -> bool:
+        """Check that all nodes have degree exactly k.
+
+        Returns
+        -------
+        bool
+            True if all vertices have out-degree k.
+        """
+        return all(v.out_degree() == self.k for v in self.G.vertices())
 
     def get_expected_degree(self) -> int:
         """Return the expected (and actual) degree of all nodes."""

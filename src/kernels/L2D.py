@@ -1,6 +1,7 @@
 from typing import Any
 from numpy.typing import NDArray
 from lrgsglib import Lattice2D, load_or_compute_Lattice2D, flip_to_positive_majority
+from parsers.shared import resolve_graph_class, get_graph_engine
 
 __all__ = [
     "initialize_l2d_dict_args",
@@ -31,15 +32,18 @@ def initialize_l2d_dict_args(args: Any) -> dict:
     """
     match args.cell_type:
         case 'rand':
-            return dict(side1=args.L, geo=args.geometry, sgpathn=args.workdir, 
+            return dict(side1=args.L, geo=args.geometry, sgpathn=args.workdir,
                     pflip=args.p)
         case _:
-            return dict(side1=args.L, geo=args.geometry, sgpathn=args.workdir, 
+            return dict(side1=args.L, geo=args.geometry, sgpathn=args.workdir,
                     pflip=args.p, init_nw_dict=True)
-        
+
 def prepare_lattice(args: Any, **kwargs) -> Any:
     """
     Initialize and modify a Lattice2D object based on args.
+
+    Supports ``--graph_engine`` argument: when ``args.graph_engine == 'gt'``,
+    creates a ``Lattice2DGT`` instance instead of the default NX class.
 
     Parameters
     ----------
@@ -49,10 +53,22 @@ def prepare_lattice(args: Any, **kwargs) -> Any:
     Returns
     -------
     Any
-        Configured Lattice2D instance.
+        Configured Lattice2D instance (NX or GT).
     """
+    engine = get_graph_engine(args)
+
+    if engine == "gt":
+        Cls = resolve_graph_class("Lattice2D", "gt")
+        l2d_kwargs = dict(
+            side1=args.L, geo=args.geometry, pflip=args.p, seed=42,
+        )
+        lattice = Cls(**l2d_kwargs, **kwargs)
+        lattice.flip_random_fract_edges()
+        return lattice
+
+    # Default NX path (preserves load_or_compute and cell_type logic)
     lattice = load_or_compute_Lattice2D(
-        **initialize_l2d_dict_args(args), 
+        **initialize_l2d_dict_args(args),
         cell_type=args.cell_type,
         **kwargs
     )

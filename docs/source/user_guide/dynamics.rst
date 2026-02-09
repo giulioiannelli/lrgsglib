@@ -80,31 +80,82 @@ Basic Usage
    print(f"Final energy: {ising.ene[-1]:.4f}")
    print(f"Number of data points: {len(ising.magn)}")
 
-C Backend Selection
-~~~~~~~~~~~~~~~~~~~
+Backend Selection
+~~~~~~~~~~~~~~~~~
 
-The ``runlang`` parameter selects the simulation algorithm:
+The ``runlang`` parameter selects the execution backend and algorithm.
+The canonical format is ``<backend>_<algorithm>[_<output>]``:
 
-.. list-table:: Ising C Backend Options
+.. list-table:: Backend Identifiers
    :header-rows: 1
-   :widths: 15 20 65
+   :widths: 10 15 75
 
-   * - runlang
-     - Algorithm
+   * - Backend
+     - Prefix
      - Description
-   * - ``C1b``
-     - Metropolis
-     - Standard Glauber-Metropolis dynamics with E/M output
-   * - ``C3b``
-     - Simulated Annealing
-     - Cooling schedule from high to low temperature
-   * - ``C4b``
-     - Parallel Tempering
-     - Multiple replicas with temperature exchanges
+   * - Python
+     - ``py_``
+     - Pure-Python Metropolis / SA / PT. Always available, slowest.
+   * - C subprocess
+     - ``c_``
+     - Compiled C binaries via file I/O. ~100x faster. **NX graphs only.**
+   * - Pybind11
+     - ``pb_``
+     - C kernels called in-process via numpy arrays. No file I/O. Works with any graph.
+   * - CuPy (GPU)
+     - ``cu_``
+     - CUDA kernels on GPU via CuPy. Fastest for large systems. Works with any graph.
 
-**Naming convention:**
-- Number = Algorithm: 1=Metropolis, 3=SA, 4=PT
-- Letter = Output: a=final state, b=E/M time series, c=snapshots
+.. list-table:: Algorithm Identifiers
+   :header-rows: 1
+   :widths: 10 15 75
+
+   * - Algorithm
+     - Suffix
+     - Description
+   * - Metropolis
+     - ``_met``
+     - Glauber-Metropolis at fixed temperature
+   * - Simulated Annealing
+     - ``_sa``
+     - Temperature cooling schedule
+   * - Parallel Tempering
+     - ``_pt``
+     - Replica exchange at multiple temperatures
+
+**Examples:** ``pb_met`` (pybind11 Metropolis), ``cu_sa`` (GPU simulated annealing),
+``c_met_em`` (C subprocess Metropolis with E/M output).
+
+**Convenience aliases:** ``"py"`` = ``py_met``, ``"pb"`` = ``pb_met``,
+``"cu"`` / ``"cuda"`` / ``"gpu"`` = ``cu_met``.
+
+**Legacy codes** (``"C1b"``, ``"C3b"``, ``"C4b"``) are mapped automatically
+for backward compatibility.
+
+.. list-table:: Backend Compatibility Matrix
+   :header-rows: 1
+   :widths: 20 15 15 15 15
+
+   * - Graph Type
+     - ``py_*``
+     - ``c_*``
+     - ``pb_*``
+     - ``cu_*``
+   * - NX (``Lattice2D``, etc.)
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+   * - GT (``Lattice2DGT``, etc.)
+     - Yes
+     - No (auto-fallback)
+     - Yes
+     - Yes
+
+.. note::
+
+   When a C subprocess backend is requested for a graph-tool graph, the system
+   automatically falls back to the Python backend with a ``RuntimeWarning``.
 
 Simulated Annealing
 ~~~~~~~~~~~~~~~~~~~
@@ -155,10 +206,76 @@ Enhanced sampling with replica exchange:
    ising_pt.init_ising_dynamics()
    ising_pt.run(verbose=False)
 
+Pybind11 Backend (Recommended)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The pybind11 backend calls C kernels in-process via numpy arrays.
+No file I/O is needed, and it works with **any graph type** (NX or GT):
+
+.. code-block:: python
+
+   ising_pb = IsingDynamics(
+       sg=lattice,
+       T=2.0,
+       steps=1000,
+       runlang='pb_met',  # Pybind11 Metropolis
+       seed=42,
+   )
+   ising_pb.init_ising_dynamics()
+   ising_pb.run(verbose=False)
+
+Works with graph-tool graphs too:
+
+.. code-block:: python
+
+   from lrgsglib.graphs.gt.Lattice2DGT import Lattice2DGT
+
+   gt_lattice = Lattice2DGT(side1=32, geo='sqr', pflip=0.2, seed=42)
+   gt_lattice.flip_random_fract_edges()
+
+   ising_gt = IsingDynamics(sg=gt_lattice, T=2.0, steps=1000, runlang='pb_met')
+   ising_gt.init_ising_dynamics()
+   ising_gt.run(verbose=False)
+
+CuPy GPU Backend
+~~~~~~~~~~~~~~~~
+
+For large systems, the GPU backend provides the fastest execution.
+Requires CuPy and a CUDA-capable GPU:
+
+.. code-block:: python
+
+   ising_gpu = IsingDynamics(
+       sg=lattice,
+       T=2.0,
+       steps=5000,
+       runlang='cu_met',  # GPU Metropolis (aliases: 'cuda', 'gpu')
+       seed=42,
+   )
+   ising_gpu.init_ising_dynamics()
+   ising_gpu.run(verbose=False)
+
+The GPU backend uses a graph-coloring approach: nodes are partitioned into
+independent sets (colors) so all same-color nodes can be updated simultaneously.
+For bipartite graphs (e.g. square lattices), this is the classic checkerboard
+decomposition with 2 colors. Works on arbitrary graph topologies.
+
+GPU Simulated Annealing and Parallel Tempering are also available:
+
+.. code-block:: python
+
+   # GPU SA
+   ising_sa = IsingDynamics(sg=lattice, runlang='cu_sa', sa_enabled=True,
+       T_init=5.0, T_final=0.01, n_temperatures=100)
+
+   # GPU PT
+   ising_pt = IsingDynamics(sg=lattice, runlang='cu_pt', pt_enabled=True,
+       n_replicas=8, T_min=0.5, T_max=5.0, n_exchanges=500)
+
 Python Backend
 ~~~~~~~~~~~~~~
 
-For debugging or when C backends aren't available:
+For debugging or when compiled backends aren't available:
 
 .. code-block:: python
 
@@ -440,14 +557,20 @@ Best Practices
       ising.init_ising_dynamics()  # Required!
       ising.run()
 
-3. **Use C backends for production** (~100x faster):
+3. **Choose the right backend for your use case**:
 
    .. code-block:: python
 
-      # Fast
+      # GPU (fastest for large systems, any graph)
+      runlang='cu_met'
+
+      # Pybind11 (fast, any graph, no file I/O)
+      runlang='pb_met'
+
+      # C subprocess (fast, NX graphs only)
       runlang='C1b'
 
-      # Slow (for debugging)
+      # Python (slow, for debugging)
       runlang='py'
 
 4. **Set seeds for reproducibility**:

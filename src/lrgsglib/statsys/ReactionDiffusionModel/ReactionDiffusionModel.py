@@ -103,12 +103,9 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
     def _get_laplacian(self) -> NDArray:
         """Return the (cached) signed Laplacian matrix."""
         if self._laplacian is None:
-            import networkx as nx
-
-            G = self.sg.gr[self.sg.on_g]
-            A = nx.to_numpy_array(G, weight="weight", dtype=np.float64)
-            D = np.diag(np.abs(A).sum(axis=1))
-            self._laplacian = D - A
+            self._laplacian = self.sg.get_signed_laplacian().astype(
+                np.float64
+            )
         return self._laplacian
 
     # ------------------------------------------------------------------

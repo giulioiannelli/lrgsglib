@@ -1,5 +1,6 @@
 from typing import Any
 from lrgsglib.nx_patches import ErdosRenyi
+from parsers.shared import resolve_graph_class, get_graph_engine
 
 __all__ = [
     "initialize_er_dict_args",
@@ -44,9 +45,12 @@ def initialize_er_dict_args(args: Any) -> dict[str, Any]:
     )
 
 
-def prepare_erdos_renyi(args: Any, cell_type: str | None = None, **kwargs: Any) -> ErdosRenyi:
+def prepare_erdos_renyi(args: Any, cell_type: str | None = None, **kwargs: Any) -> Any:
     """
     Initialize an ErdosRenyi graph and flip edges according to cell_type strategy.
+
+    Supports ``--graph_engine`` argument: when ``args.graph_engine == 'gt'``,
+    creates an ``ErdosRenyiGT`` instance instead of the default NX class.
 
     Parameters
     ----------
@@ -60,22 +64,19 @@ def prepare_erdos_renyi(args: Any, cell_type: str | None = None, **kwargs: Any) 
 
     Returns
     -------
-    ErdosRenyi
-        Configured ErdosRenyi instance with edges flipped according to cell_type.
-
-    Examples
-    --------
-    >>> class Args:
-    ...     N = 100
-    ...     p = 0.1
-    ...     pflip = 0.2
-    ...     workdir = ''
-    ...     cell_type = 'rand'
-    >>> args = Args()
-    >>> er = prepare_erdos_renyi(args)
-    >>> er.syshape > 0
-    True
+    Any
+        Configured ErdosRenyi instance (NX or GT) with edges flipped.
     """
+    engine = get_graph_engine(args)
+
+    if engine == "gt":
+        Cls = resolve_graph_class("ErdosRenyi", "gt")
+        er = Cls(n=args.N, p=args.p, pflip=getattr(args, 'pflip', 0.0),
+                 seed=42, **kwargs)
+        er.flip_random_fract_edges()
+        return er
+
+    # Default NX path
     if cell_type is None:
         cell_type = args.cell_type
 

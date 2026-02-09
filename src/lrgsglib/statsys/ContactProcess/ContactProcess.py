@@ -41,7 +41,7 @@ from ..BinDynSys import BinDynSys
 from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
-    from ...graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs._base import SignedGraphProtocol as SignedGraph
 
 
 # ========================================================================
@@ -143,19 +143,7 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
         self.s_t = []
 
     def _iter_neighbour_data(self, node: int) -> Iterable[tuple[int, float]]:
-        graph = self.sg.gr[self.sg.on_g]
-        if hasattr(graph, "is_directed") and graph.is_directed():
-            iterator = graph.predecessors(node)
-            for neighbour in iterator:
-                data = graph[neighbour][node]
-                weight = data.get("weight", 1.0)
-                yield neighbour, weight
-        else:
-            iterator = graph.neighbors(node)
-            for neighbour in iterator:
-                data = graph[node][neighbour]
-                weight = data.get("weight", 1.0)
-                yield neighbour, weight
+        return self.sg.get_neighbors_with_weights(node)
 
     def init_contact_dynamics(self, custom: Any = None, exName: str = "") -> None:
         """Initialise the state and export data if required."""

@@ -22,4 +22,5 @@ phelp_partition = "Slurm partition selection: 'AMD' for high-memory jobs (auto-s
 phelp_verbose = "Verbose mode"
 phelp_val = "Value for the clusters"
 phelp_workdir = "Working directory"
+phelp_graph_engine = "Graph engine: 'nx' (NetworkX) or 'gt' (graph-tool)"
 phelp_randstr_ising = "Add random string to output ID"

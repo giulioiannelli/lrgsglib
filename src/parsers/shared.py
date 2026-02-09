@@ -73,3 +73,68 @@ def parse_multiple_linspace(value):
     segments = value.split(';')  # Split multiple tuples
     arrays = [parse_linspace(seg) for seg in segments]  # Convert each to linspace
     return np.concatenate(arrays)  # Merge all into one array
+
+
+# ---------------------------------------------------------------------------
+# Graph engine resolution
+# ---------------------------------------------------------------------------
+_VALID_GRAPH_ENGINES = {"nx", "gt"}
+
+# Mapping: (graph_type, engine) -> import path
+_GRAPH_CLASS_MAP = {
+    ("Lattice2D", "nx"):        "lrgsglib.graphs.nx.Lattice2DNX.Lattice2DNX",
+    ("Lattice2D", "gt"):        "lrgsglib.graphs.gt.Lattice2DGT.Lattice2DGT",
+    ("Lattice3D", "nx"):        "lrgsglib.graphs.nx.Lattice3DNX.Lattice3DNX",
+    ("Lattice3D", "gt"):        "lrgsglib.graphs.gt.Lattice3DGT.Lattice3DGT",
+    ("ErdosRenyi", "nx"):       "lrgsglib.graphs.nx.ErdosRenyiNX.ErdosRenyiNX",
+    ("ErdosRenyi", "gt"):       "lrgsglib.graphs.gt.ErdosRenyiGT.ErdosRenyiGT",
+    ("BarabasiAlbert", "nx"):   "lrgsglib.graphs.nx.BarabasiAlbertNX.BarabasiAlbertNX",
+    ("BarabasiAlbert", "gt"):   "lrgsglib.graphs.gt.BarabasiAlbertGT.BarabasiAlbertGT",
+    ("WattsStrogatz", "nx"):    "lrgsglib.graphs.nx.WattsStrogatzNX.WattsStrogatzNX",
+    ("WattsStrogatz", "gt"):    "lrgsglib.graphs.gt.WattsStrogatzGT.WattsStrogatzGT",
+}
+
+
+def resolve_graph_class(graph_type: str, engine: str = "nx"):
+    """Resolve a graph class by type and engine.
+
+    Parameters
+    ----------
+    graph_type : str
+        Graph type name (e.g. ``"Lattice2D"``, ``"ErdosRenyi"``).
+    engine : str
+        Graph engine: ``"nx"`` (NetworkX) or ``"gt"`` (graph-tool).
+
+    Returns
+    -------
+    type
+        The resolved graph class.
+
+    Raises
+    ------
+    ValueError
+        If engine is invalid or the graph type has no GT implementation.
+    """
+    engine = engine.lower()
+    if engine not in _VALID_GRAPH_ENGINES:
+        raise ValueError(
+            f"Unknown graph engine '{engine}'. Valid: {_VALID_GRAPH_ENGINES}"
+        )
+
+    key = (graph_type, engine)
+    if key not in _GRAPH_CLASS_MAP:
+        available = [k for k, e in _GRAPH_CLASS_MAP if k == graph_type]
+        raise ValueError(
+            f"No {engine} implementation for '{graph_type}'. "
+            f"Available engines: {available}"
+        )
+
+    import importlib
+    module_path, class_name = _GRAPH_CLASS_MAP[key].rsplit(".", 1)
+    mod = importlib.import_module(module_path)
+    return getattr(mod, class_name)
+
+
+def get_graph_engine(args) -> str:
+    """Extract graph engine from parsed args, defaulting to 'nx'."""
+    return getattr(args, "graph_engine", "nx")

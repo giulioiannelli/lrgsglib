@@ -186,6 +186,68 @@ Example kernel organization:
        "check_existing_and_needed_averages",
    ]
 
+Engine-Agnostic Design
+----------------------
+
+All dynamics classes accept any graph satisfying ``SignedGraphProtocol``,
+not just NetworkX graphs. This is achieved through a protocol-based design.
+
+Graph Protocols
+~~~~~~~~~~~~~~~
+
+Defined in ``graphs/_base.py`` using ``typing.runtime_checkable``:
+
+.. code-block:: text
+
+   SignedGraphProtocol          ← Core interface for all dynamics
+   ├── get_neighbors_with_weights(node) → [(neighbor, weight), ...]
+   ├── get_edges_with_weights()         → [(u, v, weight), ...]
+   ├── get_neighbor_indices(node)       → [neighbor, ...]
+   ├── get_signed_adjacency()           → ndarray
+   ├── get_signed_laplacian()           → ndarray
+   └── N, pflip, seed, on_g            ← Required attributes
+
+   DynamicsGraphProtocol        ← Extends with file I/O (NX only)
+   ├── syshapePth, path_sgdata  ← Path attributes for C subprocess
+   ├── _export_edgel_bin()      ← Export graph for C programs
+   └── remove_exported_files()
+
+   SpectralGraphProtocol        ← Spectral computation methods
+   LatticeGraphProtocol         ← Lattice-specific (side1, side2, geo)
+
+**Key design rule:** Dynamics classes use ``SignedGraphProtocol`` methods
+(e.g. ``sg.get_neighbors_with_weights(node)``), never NX-specific calls
+like ``sg.gr['G'][node]``.
+
+The ``CBackendMixin._check_c_backend_or_fallback()`` method detects when
+a graph doesn't support ``DynamicsGraphProtocol`` and falls back to Python.
+
+Dynamics Class Hierarchy
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: text
+
+   DynSys (abstract base)
+   ├── BinDynSys                ← Binary state (int8 spins)
+   │   ├── IsingDynamics        ← Metropolis / SA / PT
+   │   ├── VoterModel           ← Opinion dynamics
+   │   └── ContactProcess       ← SIR / EI infection dynamics
+   │
+   ├── ContDynSys               ← Continuous state (float64)
+   │   ├── KuramotoModel        ← Coupled oscillators
+   │   ├── ReactionDiffusionModel ← Fisher-KPP, bistable, etc.
+   │   └── CoupledODEModel      ← Generic coupled ODEs
+   │
+   └── VecDynSys                ← Vector state (N x d)
+       ├── PottsModel           ← q-state discrete
+       ├── XYModel              ← Planar rotator
+       ├── HeisenbergModel      ← 3D unit vector
+       └── MultiSpeciesModel    ← k-component discrete
+
+``CBackendMixin`` is mixed in to provide C subprocess integration.
+The mixin reads ``_state_dtype`` and ``_state_shape`` from the host class,
+making it dtype-aware for continuous and vector states.
+
 Backend Strategy
 ----------------
 
@@ -228,6 +290,48 @@ The library implements intelligent fallback:
        return ('scipy', True, 'sparseCPU_N-2')
 
 **Fallback chain:** GPU (cupy) → Dense CPU (scipy) → Sparse CPU (scipy)
+
+Dynamics Backend Strategy
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For statistical physics simulations, four backends are available with
+different trade-offs:
+
+.. list-table:: Dynamics Backend Comparison
+   :header-rows: 1
+   :widths: 12 12 12 12 52
+
+   * - Backend
+     - ``runlang``
+     - Graph Support
+     - Speed
+     - Notes
+   * - Python
+     - ``py_*``
+     - Any
+     - 1x
+     - Always available, good for debugging
+   * - C subprocess
+     - ``c_*``
+     - NX only
+     - ~100x
+     - Requires compiled binaries, file I/O overhead
+   * - Pybind11
+     - ``pb_*``
+     - Any
+     - ~80-100x
+     - In-process C calls via numpy, no file I/O
+   * - CuPy (GPU)
+     - ``cu_*``
+     - Any
+     - ~200-500x
+     - Requires CUDA GPU and CuPy
+
+**Dispatch order in** ``IsingDynamics.run()``:
+``pb_*`` → ``cu_*`` → ``c_*`` → Python fallback.
+
+The ``cu_*`` dispatch must come before ``c_*`` because the legacy C detection
+(``runlang.upper().startswith("C")``) would otherwise match ``CU_*`` codes.
 
 Python/C Integration
 --------------------
