@@ -122,9 +122,15 @@ The canonical format is ``<backend>_<algorithm>[_<output>]``:
    * - Parallel Tempering
      - ``_pt``
      - Replica exchange at multiple temperatures
+   * - Wolff Cluster
+     - ``wolff``
+     - Single-cluster update (no prefix needed)
+   * - Swendsen-Wang
+     - ``sw``
+     - Multi-cluster update (no prefix needed)
 
 **Examples:** ``pb_met`` (pybind11 Metropolis), ``cu_sa`` (GPU simulated annealing),
-``c_met_em`` (C subprocess Metropolis with E/M output).
+``c_met_em`` (C subprocess Metropolis with E/M output), ``wolff`` (Wolff cluster).
 
 **Convenience aliases:** ``"py"`` = ``py_met``, ``"pb"`` = ``pb_met``,
 ``"cu"`` / ``"cuda"`` / ``"gpu"`` = ``cu_met``.
@@ -288,6 +294,131 @@ For debugging or when compiled backends aren't available:
 
    ising_py.init_ising_dynamics()
    ising_py.run(tqdm_on=True)  # Show progress bar
+
+Cluster Algorithms (Wolff & Swendsen-Wang)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Cluster algorithms avoid critical slowing down near phase transitions by
+flipping entire clusters of aligned spins rather than single sites:
+
+.. code-block:: python
+
+   # Wolff algorithm — single-cluster update
+   ising_wolff = IsingDynamics(
+       sg=lattice, T=2.27, steps=5000,
+       runlang='wolff',
+   )
+   ising_wolff.init_ising_dynamics()
+   ising_wolff.run(verbose=False)
+
+   # Swendsen-Wang — multi-cluster update (all clusters flipped per sweep)
+   ising_sw = IsingDynamics(
+       sg=lattice, T=2.27, steps=5000,
+       runlang='sw',
+   )
+   ising_sw.init_ising_dynamics()
+   ising_sw.run(verbose=False)
+
+Cluster algorithms are pure-Python implementations that work with any graph
+type (NX or GT). They are especially effective near the critical temperature
+where single-spin Metropolis suffers from critical slowing down.
+
+.. note::
+
+   Cluster algorithms treat edge signs as bond weights. On frustrated
+   (signed) graphs, they reduce to the standard Wolff/SW algorithm applied
+   to the signed coupling :math:`J_{ij} \cdot s_i \cdot s_j`.
+
+Graph Engine Selection
+~~~~~~~~~~~~~~~~~~~~~~
+
+The ``--graph_engine`` (``-ge``) CLI flag selects between NetworkX (``nx``)
+and graph-tool (``gt``) backends for standalone programs:
+
+.. code-block:: bash
+
+   # Default: NetworkX
+   python src/L2D_IsingDynamics.py 16 0.0 -T 2.0 -rl py -na 1
+
+   # graph-tool backend
+   python src/L2D_IsingDynamics.py 16 0.0 -T 2.0 -rl py -na 1 -ge gt
+
+When using the GT engine:
+
+- **C subprocess backends** (``c_*``) are **not available** — the system
+  automatically falls back to the Python backend with a warning.
+- **Pybind11** (``pb_*``) and **CuPy** (``cu_*``) backends work with GT graphs.
+- **Cluster algorithms** (``wolff``, ``sw``) work with GT graphs.
+- GT graphs use a **neighbor cache** for dynamics (lazily built on first
+  access), giving performance within ~1.3x of NX.
+
+Complete Runlang Reference
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 15 50
+
+   * - Code
+     - Backend
+     - Algorithm
+     - Notes
+   * - ``py`` / ``py_met``
+     - Python
+     - Metropolis
+     - Always available, slowest
+   * - ``py_sa``
+     - Python
+     - Simulated Annealing
+     - Always available
+   * - ``py_pt``
+     - Python
+     - Parallel Tempering
+     - Always available
+   * - ``c_met`` / ``C1b``
+     - C subprocess
+     - Metropolis
+     - NX only, ~100x faster
+   * - ``c_sa`` / ``C3b``
+     - C subprocess
+     - Simulated Annealing
+     - NX only
+   * - ``c_pt`` / ``C4b``
+     - C subprocess
+     - Parallel Tempering
+     - NX only
+   * - ``pb_met`` / ``pb``
+     - Pybind11
+     - Metropolis
+     - In-process C, any graph
+   * - ``pb_sa``
+     - Pybind11
+     - Simulated Annealing
+     - In-process C, any graph
+   * - ``pb_pt``
+     - Pybind11
+     - Parallel Tempering
+     - In-process C, any graph
+   * - ``cu_met`` / ``cu`` / ``gpu``
+     - CuPy (GPU)
+     - Metropolis
+     - Requires CUDA, any graph
+   * - ``cu_sa``
+     - CuPy (GPU)
+     - Simulated Annealing
+     - Requires CUDA, any graph
+   * - ``cu_pt``
+     - CuPy (GPU)
+     - Parallel Tempering
+     - Requires CUDA, any graph
+   * - ``wolff``
+     - Python
+     - Wolff cluster
+     - Any graph, near-Tc efficient
+   * - ``sw``
+     - Python
+     - Swendsen-Wang cluster
+     - Any graph, near-Tc efficient
 
 Contact Process
 ---------------

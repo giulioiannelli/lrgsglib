@@ -11,6 +11,7 @@ This guide provides comprehensive tutorials and examples for using lrgsglib. Eac
    advanced_graphs
    spectral
    dynamics
+   cli_programs
    plotting
    examples
 
@@ -33,6 +34,9 @@ The user guide is organized into the following sections:
 
 **Dynamics**
    Simulate statistical physics models including Ising dynamics, contact process, and voter models
+
+**CLI Programs**
+   Standalone programs for batch computation: spectral analysis, dynamics, transient clustering, and reconstruction
 
 **Plotting**
    Visualize signed graphs, lattices, and simulation results with specialized plotting functions
