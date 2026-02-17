@@ -7,7 +7,10 @@ from :mod:`kernels.IsingDynamics`.  Engine-agnostic: the graph engine
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from lrgsglib import *
 from .L3D import get_l3d_out_suffix, prepare_lattice
@@ -18,6 +21,65 @@ from .IsingDynamics import (
 )
 
 __all__ = ["run_simulation"]
+
+
+def _save_ising_results(isdy, lattice, args, quench_idx: int) -> Path:
+    """Save energy/magnetization trajectories to an NPZ file.
+
+    Parameters
+    ----------
+    isdy : IsingDynamics
+        Executed IsingDynamics instance with results.
+    lattice : SignedGraph
+        The lattice used for the simulation.
+    args : argparse.Namespace
+        Parsed CLI arguments.
+    quench_idx : int
+        Index of the current disorder realization.
+
+    Returns
+    -------
+    Path
+        Path to the saved NPZ file.
+    """
+    save_dir = Path(lattice.path_sgdata) / "ising_results"
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    rl = isdy.runlang
+    side = getattr(lattice, "side1", 0)
+    pflip = getattr(lattice, "pflip", 0.0)
+    fname = f"ising_{rl}_L{side}_p{pflip:.3g}_q{quench_idx:03d}.npz"
+
+    data: dict[str, Any] = {
+        "runlang": rl,
+        "side": side,
+        "pflip": pflip,
+        "N": isdy.N,
+    }
+    # Standard trajectories
+    if hasattr(isdy, "ene") and isdy.ene is not None:
+        data["ene"] = np.asarray(isdy.ene)
+    if hasattr(isdy, "magn") and isdy.magn is not None:
+        data["magn"] = np.asarray(isdy.magn)
+    # SA trajectories
+    if hasattr(isdy, "sa_energy") and isdy.sa_energy is not None:
+        data["sa_energy"] = np.asarray(isdy.sa_energy)
+        data["sa_magn"] = np.asarray(isdy.sa_magn)
+        data["sa_temps"] = np.asarray(isdy.sa_temps)
+    # Topo_met results
+    if hasattr(isdy, "topo_met_best_energy"):
+        data["topo_met_best_energy"] = isdy.topo_met_best_energy
+        if hasattr(isdy, "topo_met_best_spins"):
+            data["topo_met_best_spins"] = isdy.topo_met_best_spins
+        if hasattr(isdy, "topo_met_coeffs"):
+            data["topo_met_coeffs"] = isdy.topo_met_coeffs
+    # Topo_fca results
+    if hasattr(isdy, "topo_fca_field") and isdy.topo_fca_field is not None:
+        data["topo_fca_field"] = isdy.topo_fca_field
+
+    out_path = save_dir / fname
+    np.savez_compressed(out_path, **data)
+    return out_path
 
 
 def run_simulation(args: Any) -> None:
@@ -59,5 +121,9 @@ def run_simulation(args: Any) -> None:
 
         for _t in range(n_thermal):
             isdy = run_ising_dynamics(args, lattice, out_suffix=out_suffix)
+            if getattr(args, 'save_results', False):
+                _save_ising_results(
+                    isdy, lattice, args, _q * n_thermal + _t
+                )
             if args.remove_files:
                 clean_up_files(isdy, lattice)

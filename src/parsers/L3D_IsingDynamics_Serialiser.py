@@ -7,8 +7,14 @@ from parsers.shared import parse_arguments
 optionalaction_args_dict = {
     **L3D_ISDYN_srun_opt_args,     # side1_list, pflip_linsp, Temp_linsp, slanzarv
     **L3D_opt_args,                 # geometry, pdil, mu, sigma, edge_weight, graph_engine
-    **L3D_ISDYN_opt_args,           # SA/PT args, n_thermal, runlang, freq, etc.
+    **L3D_ISDYN_opt_args,           # SA/PT/topo args, n_thermal, runlang, freq, etc.
     **L3D_ISDYN_srun_action_args,   # exec, print, nomail, short
+    # Result persistence (forwarded to L3D_IsingDynamics.py)
+    tuple(['--save-results']): {
+        'help': phelp_save_results,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_SAVE_RESULTS,
+    },
 }
 #
 parser = argparse.ArgumentParser(

@@ -76,6 +76,47 @@ def _build_passthrough_flags(args) -> list[str]:
         flags.extend(["--steps-per-exchange", str(args.steps_per_exchange)])
         flags.extend(["--n-exchanges", str(args.n_exchanges)])
 
+    # Topological algorithm parameters
+    rl_lower = rl.lower()
+    if 'topo' in rl_lower:
+        topo_n = getattr(args, 'topo_n_modes', 40)
+        if topo_n != 40:
+            flags.extend(['--topo-n-modes', str(topo_n)])
+        sigma = getattr(args, 'topo_sigma_init', 0.15)
+        if sigma != 0.15:
+            flags.extend(['--topo-sigma-init', str(sigma)])
+        chunk = getattr(args, 'topo_chunk_size', 5000)
+        if chunk != 5000:
+            flags.extend(['--topo-chunk-size', str(chunk)])
+        if not getattr(args, 'topo_polish', True):
+            flags.append('--no-topo-polish')
+        psweeps = getattr(args, 'topo_polish_sweeps', 50)
+        if psweeps != 50:
+            flags.extend(['--topo-polish-sweeps', str(psweeps)])
+        tau = getattr(args, 'topo_tau', 1.0)
+        if tau != 1.0:
+            flags.extend(['--topo-tau', str(tau)])
+        fstr = getattr(args, 'topo_field_strength', 1.0)
+        if fstr != 1.0:
+            flags.extend(['--topo-field-strength', str(fstr)])
+        # topo_fca needs SA params — ensure --sa-mode is set
+        if 'topo_fca' in rl_lower and not getattr(args, 'sa_mode', False):
+            flags.append('--sa-mode')
+            flags.extend(['--T-init', str(getattr(args, 'T_init', 10.0))])
+            flags.extend(['--T-final', str(getattr(args, 'T_final', 0.01))])
+            flags.extend(['--cooling-schedule',
+                          getattr(args, 'cooling_schedule', 'exponential')])
+            flags.extend(['--cooling-rate',
+                          str(getattr(args, 'cooling_rate', 0.95))])
+            flags.extend(['--steps-per-T',
+                          str(getattr(args, 'steps_per_T', 100))])
+            flags.extend(['--n-temperatures',
+                          str(getattr(args, 'n_temperatures', 100))])
+
+    # Result persistence
+    if getattr(args, 'save_results', False):
+        flags.append('--save-results')
+
     # Other Ising options
     ic = getattr(args, "init_cond", "ground_state_0")
     if ic != "ground_state_0":

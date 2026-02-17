@@ -137,6 +137,44 @@ IsDyn_pt_args = {
         'default': DEFAULT_PT_N_EXCHANGES,
     },
 }
+# Topological algorithm arguments
+IsDyn_topo_args = {
+    tuple(['--topo-n-modes']): {
+        'help': phelp_topo_n_modes,
+        'type': int,
+        'default': DEFAULT_TOPO_N_MODES,
+    },
+    tuple(['--topo-sigma-init']): {
+        'help': phelp_topo_sigma_init,
+        'type': float,
+        'default': DEFAULT_TOPO_SIGMA_INIT,
+    },
+    tuple(['--topo-chunk-size']): {
+        'help': phelp_topo_chunk_size,
+        'type': int,
+        'default': DEFAULT_TOPO_CHUNK_SIZE,
+    },
+    tuple(['--topo-polish']): {
+        'help': phelp_topo_polish,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_TOPO_POLISH,
+    },
+    tuple(['--topo-polish-sweeps']): {
+        'help': phelp_topo_polish_sweeps,
+        'type': int,
+        'default': DEFAULT_TOPO_POLISH_SWEEPS,
+    },
+    tuple(['--topo-tau']): {
+        'help': phelp_topo_tau,
+        'type': float,
+        'default': DEFAULT_TOPO_TAU,
+    },
+    tuple(['--topo-field-strength']): {
+        'help': phelp_topo_field_strength,
+        'type': float,
+        'default': DEFAULT_TOPO_FIELD_STRENGTH,
+    },
+}
 IsDyn_srun_list_args = {
     tuple(['-s1', '--side1_list']): {
         'help': phelp_side1_list,
@@ -193,8 +231,15 @@ L2D_ISDYN_description = f"""
 L2D_ISDYN_srun_description = f"""Serialiser for {L2D_ISDYN_progname}.py"""
 ## arg parsers dict
 L2D_ISDYN_args = {**L2D_args, **IsDyn_args}
-L2D_ISDYN_action_args = {**action_args_dict}
-L2D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args}
+L2D_ISDYN_action_args = {
+    **action_args_dict,
+    tuple(['--save-results']): {
+        'help': phelp_save_results,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_SAVE_RESULTS,
+    },
+}
+L2D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args}
 L2D_ISDYN_srun_opt_args = {**IsDyn_srun_list_args, **IsDyn_srun_args}
 L2D_ISDYN_srun_action_args = {**srun_action_args}
 # Lattice3D args
@@ -208,8 +253,15 @@ L3D_ISDYN_description = f"""
 L3D_ISDYN_srun_description = f"""Serialiser for {L3D_ISDYN_progname}.py"""
 ## arg parsers dict
 L3D_ISDYN_args = {**L3D_args, **IsDyn_args}
-L3D_ISDYN_action_args = {**action_args_dict}
-L3D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args}
+L3D_ISDYN_action_args = {
+    **action_args_dict,
+    tuple(['--save-results']): {
+        'help': phelp_save_results,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_SAVE_RESULTS,
+    },
+}
+L3D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args}
 L3D_ISDYN_srun_opt_args = {**IsDyn_srun_list_args, **IsDyn_srun_args}
 L3D_ISDYN_srun_action_args = {**srun_action_args}
 # ErdosRenyi args
@@ -223,4 +275,4 @@ ER_ISDYN_description = f"""
 ## arg parsers dict
 ER_ISDYN_args = {**ER_args, **IsDyn_args}
 ER_ISDYN_action_args = {**action_args_dict}
-ER_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args}
+ER_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args}

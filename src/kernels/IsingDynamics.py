@@ -40,6 +40,30 @@ def initialize_ising_dict_args(args, out_suffix, NoClust):
             n_exchanges=args.n_exchanges,
         )
 
+    # Add topological algorithm parameters if topo runlang detected
+    rl = getattr(args, 'runlang', 'C1')
+    if 'topo' in rl.lower():
+        base_args.update(
+            topo_n_modes=getattr(args, 'topo_n_modes', 40),
+            topo_sigma_init=getattr(args, 'topo_sigma_init', 0.15),
+            topo_chunk_size=getattr(args, 'topo_chunk_size', 5000),
+            topo_polish=getattr(args, 'topo_polish', True),
+            topo_polish_sweeps=getattr(args, 'topo_polish_sweeps', 50),
+            topo_tau=getattr(args, 'topo_tau', 1.0),
+            topo_field_strength=getattr(args, 'topo_field_strength', 1.0),
+        )
+        # topo_fca delegates to SA, so ensure SA params are also set
+        if 'topo_fca' in rl.lower() and not base_args.get('sa_enabled', False):
+            base_args.update(
+                sa_enabled=True,
+                T_init=getattr(args, 'T_init', 10.0),
+                T_final=getattr(args, 'T_final', 0.01),
+                cooling_schedule=getattr(args, 'cooling_schedule', 'exponential'),
+                cooling_rate=getattr(args, 'cooling_rate', 0.95),
+                steps_per_T=getattr(args, 'steps_per_T', 100),
+                n_temperatures=getattr(args, 'n_temperatures', 100),
+            )
+
     return base_args
 
 def get_out_suffix(args):
@@ -74,8 +98,13 @@ def run_ising_dynamics(
     isdy = IsingDynamics(signed_graph, **isingDictArgs)
     isdy.init_ising_dynamics()
 
+    rl = getattr(args, 'runlang', 'C1')
     if getattr(args, 'pt_mode', False):
         isdy.run(pt_mode=True)
+    elif 'topo' in rl.lower():
+        # Topological algorithms dispatch through the standard run() method
+        # which detects topo_met/topo_fca from the runlang string
+        isdy.run()
     elif getattr(args, 'sa_mode', False):
         isdy.run(sa_mode=True)
     else:

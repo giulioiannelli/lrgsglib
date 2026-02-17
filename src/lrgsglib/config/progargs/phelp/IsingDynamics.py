@@ -25,5 +25,15 @@ phelp_pt_T_max = "Maximum temperature in ladder"
 phelp_pt_T_ladder_type = "Type of temperature ladder"
 phelp_pt_steps_per_exchange = "MC sweeps between exchange attempts"
 phelp_pt_n_exchanges = "Total number of exchange rounds"
+# Topological algorithm help text
+phelp_topo_n_modes = "Number of Laplacian eigenvectors for topological algorithms"
+phelp_topo_sigma_init = "Initial proposal width for topo_met"
+phelp_topo_chunk_size = "Steps between adaptive sigma adjustments"
+phelp_topo_polish = "Enable T=0 greedy polish after each chunk"
+phelp_topo_polish_sweeps = "Max sweeps per greedy polish"
+phelp_topo_tau = "Softmax temperature for TFCA field weights"
+phelp_topo_field_strength = "Overall field magnitude scale for TFCA"
 # Thermal averaging help text
 phelp_n_thermal = "Number of independent thermal runs per disorder realization"
+# Result persistence help text
+phelp_save_results = "Save energy/magnetization trajectories to NPZ files"
