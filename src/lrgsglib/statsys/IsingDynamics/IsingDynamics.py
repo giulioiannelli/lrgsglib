@@ -55,6 +55,9 @@ _RUNLANG_ALIASES: dict[str, str] = {
     # Cluster algorithm aliases
     "wolff":    "py_wolff",
     "sw":       "py_sw",
+    # Topological algorithm aliases
+    "topo_met": "py_topo_met",
+    "topo_fca": "py_topo_fca",
 }
 
 # Reverse map: new name → legacy C key (for subprocess backend)
@@ -206,6 +209,16 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         custom_T_ladder: np.ndarray | None = None,
         steps_per_exchange: int = 10,
         n_exchanges: int = 1000,
+        # Topological Metropolis parameters
+        topo_n_modes: int = 40,
+        topo_sigma_init: float = 0.15,
+        topo_proposal_mode: str = "weighted",
+        topo_chunk_size: int = 5000,
+        topo_polish: bool = True,
+        topo_polish_sweeps: int = 50,
+        # Topological Field Cooling Annealing parameters
+        topo_tau: float = 1.0,
+        topo_field_strength: float = 1.0,
         **kwargs
     ) -> None:
         dynpath = getattr(sg, 'path_ising', None)
@@ -242,6 +255,18 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.custom_T_ladder = custom_T_ladder
         self.steps_per_exchange = steps_per_exchange
         self.n_exchanges = n_exchanges
+
+        # Topological Metropolis parameters
+        self.topo_n_modes = topo_n_modes
+        self.topo_sigma_init = topo_sigma_init
+        self.topo_proposal_mode = topo_proposal_mode
+        self.topo_chunk_size = topo_chunk_size
+        self.topo_polish = topo_polish
+        self.topo_polish_sweeps = topo_polish_sweeps
+
+        # Topological Field Cooling Annealing parameters
+        self.topo_tau = topo_tau
+        self.topo_field_strength = topo_field_strength
 
     @property
     def eqSTEP(self) -> int:
@@ -1173,6 +1198,323 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.cluster_sizes = clusters
 
     # =========================================================================
+    # Topological / spectral subspace helpers
+    # =========================================================================
+
+    def _ensure_spectral_subspace(self, n_modes: int) -> None:
+        """Compute partial Laplacian spectrum if not already cached.
+
+        Calls ``self.sg.compute_k_eigvV(k=n_modes)`` which is a no-op
+        when eigenvectors are already available.
+        """
+        # If full spectrum already computed, nothing to do
+        if getattr(self.sg, "eigV", None) is not None:
+            return
+        self.sg.compute_k_eigvV(k=n_modes)
+
+    def _build_subspace_matrix(self, n_modes: int) -> np.ndarray:
+        """Return ``(n_modes, N)`` matrix of continuous eigenvectors.
+
+        Row ``k`` is the *k*-th eigenvector (not binarized).  Uses
+        ``self.sg.get_eigV(which=k)`` which handles NX/GT layout.
+        """
+        vecs = [
+            self.sg.get_eigV(which=k, binarize=False)
+            for k in range(n_modes)
+        ]
+        return np.vstack(vecs).astype(np.float64)   # (M, N)
+
+    def _compute_rbim_energies(self, n_modes: int) -> np.ndarray:
+        """Return ``(n_modes,)`` array of RBIM energies for binarized eigvecs."""
+        self.sg.compute_rbim_energy_eigV_all()
+        return np.array([
+            self.sg.energy_eigV_RBIM[k]
+            for k in range(n_modes)
+        ], dtype=np.float64)
+
+    def _best_eigenvector_seed(
+        self, n_modes: int,
+    ) -> tuple[np.ndarray, int]:
+        """Return binarized spins and mode index of lowest-RBIM-energy eigvec."""
+        rbim_E = self._compute_rbim_energies(n_modes)
+        best_k = int(np.argmin(rbim_E))
+        spins = self.sg.get_eigV(which=best_k, binarize=True).copy()
+        # Ensure {-1, +1}  (sign(0) → 0 must become +1)
+        spins[spins == 0] = 1
+        return spins.astype(np.int8), best_k
+
+    @staticmethod
+    def _compute_spectral_field(
+        subspace_vecs: np.ndarray,
+        rbim_energies: np.ndarray,
+        tau: float,
+        field_strength: float,
+    ) -> np.ndarray:
+        """Construct TFCA external field from softmax-weighted eigvecs.
+
+        Parameters
+        ----------
+        subspace_vecs : ndarray, shape ``(M, N)``
+            Row-major eigenvectors.
+        rbim_energies : ndarray, shape ``(M,)``
+            RBIM energy per binarized eigenvector.
+        tau : float
+            Softmax temperature (lower → sharper weighting).
+        field_strength : float
+            Overall field magnitude scale.
+
+        Returns
+        -------
+        ndarray, shape ``(N,)``
+            External field ``h_i``.
+        """
+        # softmax(-E / tau): lower energy → higher weight
+        logits = -rbim_energies / tau
+        logits -= logits.max()                       # numerical stability
+        weights = np.exp(logits)
+        weights /= weights.sum()
+        # h_i = field_strength * sum_k c_k * v_k[i]
+        return field_strength * (weights @ subspace_vecs)  # (M,)@(M,N)→(N,)
+
+    def _greedy_polish(
+        self,
+        spins: np.ndarray,
+        max_sweeps: int = 50,
+    ) -> np.ndarray:
+        """T=0 Metropolis sweeps until no spin flips.
+
+        Uses the graph edge structure to evaluate local energy changes.
+        Returns polished spin configuration (does not modify ``self.s``).
+        """
+        s = spins.astype(np.float64).copy()
+        edges = self.sg.get_edges_with_weights()
+        # Precompute adjacency as dict-of-lists for fast node lookup
+        adj: dict[int, list[tuple[int, float]]] = {
+            i: [] for i in range(self.N)
+        }
+        for u, v, w in edges:
+            adj[u].append((v, w))
+            adj[v].append((u, w))
+
+        for _ in range(max_sweeps):
+            any_flip = False
+            for node in range(self.N):
+                h_eff = sum(w * s[nn] for nn, w in adj[node])
+                dE = 2.0 * s[node] * h_eff
+                if dE < 0:           # flipping reduces energy
+                    s[node] = -s[node]
+                    any_flip = True
+            if not any_flip:
+                break
+        return s.astype(np.int8)
+
+    # =========================================================================
+    # Topological Metropolis  (py_topo_met)
+    # =========================================================================
+
+    def topological_metropolis_sampling(
+        self, tqdm_on: bool = True,
+    ) -> None:
+        """MC in spectral coefficient space with mode-weighted selection.
+
+        See :ref:`topological-algorithms` for algorithm details.
+        """
+        n_modes = min(self.topo_n_modes, self.N)
+        self._ensure_spectral_subspace(n_modes)
+        V = self._build_subspace_matrix(n_modes)       # (M, N)
+        rbim_E = self._compute_rbim_energies(n_modes)   # (M,)
+
+        # --- seed from best eigenvector ---
+        best_spins, best_idx = self._best_eigenvector_seed(n_modes)
+        coeffs = np.zeros(n_modes, dtype=np.float64)
+        coeffs[best_idx] = 1.0
+        field = V[best_idx].copy()                      # (N,) continuous
+        spins = best_spins.astype(np.float64).copy()
+
+        # --- edge arrays for fast energy ---
+        edges = self.sg.get_edges_with_weights()
+        E_current = float(compute_ising_pairwise_energy(spins, edges))
+
+        # --- adaptive sigma per mode ---
+        sigma = np.full(n_modes, self.topo_sigma_init, dtype=np.float64)
+        accept_cnt = np.zeros(n_modes, dtype=np.int64)
+        total_cnt = np.zeros(n_modes, dtype=np.int64)
+
+        # --- mode selection weights ---
+        mode_w = np.abs(rbim_E).copy()
+        if mode_w.sum() == 0:
+            mode_w[:] = 1.0
+        mode_w /= mode_w.sum()
+
+        self.ene: list[float] = []
+        self.magn: list[float] = []
+        best_E = E_current
+        best_s = spins.copy()
+
+        rng = np.random.default_rng(self.seed)
+        iterator = (
+            tqdm.tqdm(range(self.steps), desc="TopoMet")
+            if tqdm_on else range(self.steps)
+        )
+
+        for step in iterator:
+            # 1. select mode
+            m = int(rng.choice(n_modes, p=mode_w))
+
+            # 2. propose perturbation
+            delta = float(rng.normal(0.0, sigma[m]))
+            field_new = field + delta * V[m]
+
+            # 3. binarize (keep old spin where field=0)
+            s_new = np.sign(field_new)
+            zeros = s_new == 0
+            s_new[zeros] = spins[zeros]
+
+            # 4. energy
+            E_new = float(compute_ising_pairwise_energy(s_new, edges))
+            dE = E_new - E_current
+
+            # 5. Metropolis
+            if dE <= 0 or (
+                self.T > 0 and rng.random() < np.exp(-dE / self.T)
+            ):
+                coeffs[m] += delta
+                field = field_new
+                spins = s_new
+                E_current = E_new
+                accept_cnt[m] += 1
+
+            total_cnt[m] += 1
+
+            self.ene.append(E_current)
+            self.magn.append(float(np.sum(spins)))
+
+            if E_current < best_E:
+                best_E = E_current
+                best_s = spins.copy()
+
+            # 6. adaptive sigma every chunk
+            if (step + 1) % self.topo_chunk_size == 0:
+                for mm in range(n_modes):
+                    if total_cnt[mm] > 0:
+                        rate = accept_cnt[mm] / total_cnt[mm]
+                        if rate > 0.35:
+                            sigma[mm] *= 1.1
+                        elif rate < 0.25:
+                            sigma[mm] *= 0.9
+                accept_cnt[:] = 0
+                total_cnt[:] = 0
+
+                # optional greedy polish
+                if self.topo_polish:
+                    polished = self._greedy_polish(
+                        spins.astype(np.int8),
+                        max_sweeps=self.topo_polish_sweeps,
+                    )
+                    E_pol = float(
+                        compute_ising_pairwise_energy(polished, edges)
+                    )
+                    if E_pol < best_E:
+                        best_E = E_pol
+                        best_s = polished.astype(np.float64).copy()
+
+        self.s = spins.astype(np.int8)
+        self.topo_met_coeffs = coeffs
+        self.topo_met_best_spins = best_s.astype(np.int8)
+        self.topo_met_best_energy = best_E
+
+    # =========================================================================
+    # Topological Field Cooling Annealing  (py_topo_fca)
+    # =========================================================================
+
+    def topological_fca_sampling(self, tqdm_on: bool = True) -> None:
+        """SA with a static spectral external field.
+
+        Constructs ``h_i = field_strength * Σ_k c_k v_k[i]`` where
+        ``c_k = softmax(-E_k / tau)`` from RBIM energies, then runs
+        the standard simulated-annealing loop with this field.
+        """
+        n_modes = min(self.topo_n_modes, self.N)
+        self._ensure_spectral_subspace(n_modes)
+        V = self._build_subspace_matrix(n_modes)
+        rbim_E = self._compute_rbim_energies(n_modes)
+
+        spectral_field = self._compute_spectral_field(
+            V, rbim_E, self.topo_tau, self.topo_field_strength,
+        )
+        self.topo_fca_field = spectral_field.copy()
+
+        # Set external field and delegate to SA
+        self.field = spectral_field
+        self.simulated_annealing_sampling(tqdm_on)
+
+    # =========================================================================
+    # Pybind11 Topological FCA  (pb_topo_fca)
+    # =========================================================================
+
+    def _run_pybind_topo_fca(self) -> None:
+        """Compute spectral field, then delegate to pybind11 SA."""
+        n_modes = min(self.topo_n_modes, self.N)
+        self._ensure_spectral_subspace(n_modes)
+        V = self._build_subspace_matrix(n_modes)
+        rbim_E = self._compute_rbim_energies(n_modes)
+
+        spectral_field = self._compute_spectral_field(
+            V, rbim_E, self.topo_tau, self.topo_field_strength,
+        )
+        self.topo_fca_field = spectral_field.copy()
+        self.field = spectral_field
+        self._run_pybind_sa()
+
+    # =========================================================================
+    # Pybind11 Topological Metropolis  (pb_topo_met)
+    # =========================================================================
+
+    def _run_pybind_topo_met(self) -> None:
+        """Run Topological Metropolis via pybind11 native kernel."""
+        mod = self._load_native_module()
+        ni, nw, nptr = self._build_graph_csr()
+
+        n_modes = min(self.topo_n_modes, self.N)
+        self._ensure_spectral_subspace(n_modes)
+        V = self._build_subspace_matrix(n_modes)
+        rbim_E = self._compute_rbim_energies(n_modes)
+
+        best_spins, best_idx = self._best_eigenvector_seed(n_modes)
+        coeffs = np.zeros(n_modes, dtype=np.float64)
+        coeffs[best_idx] = 1.0
+        init_field = V[best_idx].copy()
+
+        mode_w = np.abs(rbim_E).copy()
+        if mode_w.sum() == 0:
+            mode_w[:] = 1.0
+        mode_w /= mode_w.sum()
+
+        s_out, ene, magn, best_s, best_E, final_coeffs = (
+            mod.topo_met_sampling(
+                best_spins.astype(np.int8),
+                ni, nw, nptr,
+                V.astype(np.float64),
+                coeffs.astype(np.float64),
+                init_field.astype(np.float64),
+                mode_w.astype(np.float64),
+                float(self.T),
+                int(self.steps),
+                float(self.topo_sigma_init),
+                int(self.topo_chunk_size),
+                bool(self.topo_polish),
+                int(self.topo_polish_sweeps),
+                int(self.seed),
+            )
+        )
+        self.s = s_out
+        self.ene = ene.tolist()
+        self.magn = magn.tolist()
+        self.topo_met_coeffs = final_coeffs
+        self.topo_met_best_spins = best_s
+        self.topo_met_best_energy = float(best_E)
+
+    # =========================================================================
     # Run Method
     # =========================================================================
 
@@ -1225,7 +1567,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # ---- Pybind11 backend ----
         if rl.startswith("pb_"):
-            if "wolff" in rl:
+            if "topo_met" in rl:
+                self._run_pybind_topo_met()
+            elif "topo_fca" in rl:
+                self._run_pybind_topo_fca()
+            elif "wolff" in rl:
                 self._run_pybind_wolff()
             elif "sw" in rl:
                 self._run_pybind_sw()
@@ -1238,7 +1584,12 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # ---- CuPy (GPU) backend ----
         elif rl.startswith("cu_"):
-            if "wolff" in rl:
+            if "topo_met" in rl:
+                # CuPy topological not yet implemented — fall back to Python
+                self.topological_metropolis_sampling(tqdm_on)
+            elif "topo_fca" in rl:
+                self.topological_fca_sampling(tqdm_on)
+            elif "wolff" in rl:
                 self._run_cupy_wolff()
             elif "sw" in rl:
                 self._run_cupy_sw()
@@ -1259,7 +1610,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # ---- Python backend ----
         else:
-            if "wolff" in rl:
+            if "topo_met" in rl:
+                self.topological_metropolis_sampling(tqdm_on)
+            elif "topo_fca" in rl:
+                self.topological_fca_sampling(tqdm_on)
+            elif "wolff" in rl:
                 self.wolff_sampling(tqdm_on)
             elif "sw" in rl:
                 self.swendsen_wang_sampling(tqdm_on)

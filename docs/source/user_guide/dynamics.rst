@@ -329,6 +329,92 @@ where single-spin Metropolis suffers from critical slowing down.
    (signed) graphs, they reduce to the standard Wolff/SW algorithm applied
    to the signed coupling :math:`J_{ij} \cdot s_i \cdot s_j`.
 
+.. _topological-algorithms:
+
+Topological Algorithms
+~~~~~~~~~~~~~~~~~~~~~~
+
+Topological algorithms exploit the **Laplacian spectral structure** of the graph
+to guide Ising ground-state search. They are especially effective on frustrated
+lattices where standard Metropolis gets trapped in metastable states.
+
+**Topological Metropolis** (``topo_met``):
+Monte Carlo in spectral coefficient space. Instead of flipping individual spins,
+the algorithm perturbs coefficients in a decomposition over Laplacian
+eigenvectors and binarizes the resulting continuous field:
+
+.. code-block:: python
+
+   # Topological Metropolis on a frustrated lattice
+   ising_topo = IsingDynamics(
+       sg=lattice,
+       T=0.5,
+       steps=10000,
+       runlang='py_topo_met',   # or 'pb_topo_met' for pybind11
+       topo_n_modes=40,         # Number of eigenvectors to use
+       topo_polish=True,        # T=0 greedy polish per chunk
+       topo_polish_sweeps=50,   # Max sweeps for polish
+       topo_chunk_size=5000,    # Adaptive sigma adjustment interval
+       topo_sigma_init=0.15,    # Initial proposal width
+       seed=42,
+   )
+   ising_topo.init_ising_dynamics()
+   ising_topo.run(verbose=False)
+
+   # Results
+   print(f"Best energy found: {ising_topo.topo_met_best_energy:.2f}")
+   print(f"Final coefficients: {ising_topo.topo_met_coeffs}")
+   best_config = ising_topo.topo_met_best_spins
+
+Key features:
+
+- **Mode-energy-weighted selection**: modes with lower RBIM energy are
+  perturbed more frequently (:math:`P(m) \propto |E_{\text{RBIM}}[m]|`)
+- **Adaptive sigma**: per-mode proposal widths are adjusted via Robbins-Monro
+  to target ~30% acceptance rate
+- **Greedy polish**: optional T=0 Metropolis sweeps after each chunk
+
+**Topological Field Cooling Annealing** (``topo_fca``):
+Standard simulated annealing with a static external field constructed from
+softmax-weighted eigenvectors:
+
+.. code-block:: python
+
+   # TFCA on a frustrated lattice
+   ising_tfca = IsingDynamics(
+       sg=lattice,
+       T=1.0,
+       steps=100,
+       runlang='py_topo_fca',   # or 'pb_topo_fca' for pybind11
+       sa_enabled=True,
+       T_init=5.0,
+       T_final=0.01,
+       n_temperatures=100,
+       topo_n_modes=40,
+       topo_tau=1.0,             # Softmax temperature
+       topo_field_strength=1.0,  # Field magnitude scale
+       seed=42,
+   )
+   ising_tfca.init_ising_dynamics()
+   ising_tfca.run(verbose=False)
+
+   # The spectral field is stored for analysis
+   spectral_field = ising_tfca.topo_fca_field
+
+The field is computed as:
+
+.. math::
+
+   h_i = \text{strength} \cdot \sum_k c_k \, v_k(i), \quad
+   c_k = \text{softmax}(-E_k / \tau)
+
+where :math:`E_k` is the RBIM energy of the *k*-th binarized eigenvector and
+:math:`v_k` is the continuous eigenvector. Lower tau concentrates weight on
+the best modes.
+
+Both algorithms are available with Python (``py_``) and pybind11 (``pb_``)
+backends. Aliases ``topo_met`` and ``topo_fca`` default to the Python backend.
+
 Graph Engine Selection
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -419,6 +505,22 @@ Complete Runlang Reference
      - Python
      - Swendsen-Wang cluster
      - Any graph, near-Tc efficient
+   * - ``topo_met`` / ``py_topo_met``
+     - Python
+     - Topological Metropolis
+     - Spectral coefficient space MC
+   * - ``pb_topo_met``
+     - Pybind11
+     - Topological Metropolis
+     - In-process C, any graph
+   * - ``topo_fca`` / ``py_topo_fca``
+     - Python
+     - Topological FCA
+     - SA with spectral field
+   * - ``pb_topo_fca``
+     - Pybind11
+     - Topological FCA
+     - In-process C, any graph
 
 Contact Process
 ---------------

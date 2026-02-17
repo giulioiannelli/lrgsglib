@@ -15,6 +15,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
@@ -448,6 +449,208 @@ static py::tuple sw_sampling(
 }
 
 
+/* ==================================================================
+ * Topological Metropolis: MC in spectral coefficient space
+ * ==================================================================
+ *
+ * Performs Metropolis updates by perturbing coefficients of a spectral
+ * decomposition.  field = V^T @ c  is maintained incrementally; spins
+ * are binarized from the field and energy is evaluated on the graph.
+ */
+
+static inline double rng_normal() {
+    /* Box-Muller: two uniform → one normal deviate. */
+    double u1 = RNG_dbl() + 1e-300;      /* avoid log(0) */
+    double u2 = RNG_dbl();
+    return std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * M_PI * u2);
+}
+
+static py::tuple topo_met_sampling(
+    py::array_t<int8_t, py::array::c_style> spins_in,
+    const py::array_t<int64_t>& neigh_indices,
+    const py::array_t<double>&  neigh_weights,
+    const py::array_t<int64_t>& neigh_ptr,
+    const py::array_t<double, py::array::c_style>& subspace_vecs_in,   /* (M, N) */
+    const py::array_t<double>& init_coefficients_in,                   /* (M,)   */
+    const py::array_t<double>& init_field_in,                          /* (N,)   */
+    const py::array_t<double>& mode_weights_in,                        /* (M,)   */
+    double T,
+    size_t n_steps,
+    double sigma_init,
+    size_t chunk_size,
+    bool   do_polish,
+    size_t polish_sweeps,
+    uint64_t seed_val
+) {
+    /* ---- Parse inputs ------------------------------------------------ */
+    auto s_buf = spins_in.request();
+    size_t N = static_cast<size_t>(s_buf.size);
+
+    auto sv_buf = subspace_vecs_in.request();
+    if (sv_buf.ndim != 2)
+        throw std::runtime_error("subspace_vecs must be 2-D (M, N)");
+    size_t M = static_cast<size_t>(sv_buf.shape[0]);
+    if (static_cast<size_t>(sv_buf.shape[1]) != N)
+        throw std::runtime_error("subspace_vecs cols must equal N");
+
+    auto coeff_buf  = init_coefficients_in.request();
+    auto field_buf  = init_field_in.request();
+    auto mw_buf     = mode_weights_in.request();
+
+    GraphCSR graph(N, neigh_indices, neigh_weights, neigh_ptr);
+
+    /* ---- Copy mutable state ------------------------------------------ */
+    std::vector<int8_t> spins(N);
+    std::memcpy(spins.data(), s_buf.ptr, N * sizeof(int8_t));
+
+    const double *V = static_cast<const double*>(sv_buf.ptr);   /* row-major (M,N) */
+    std::vector<double> coeffs(M);
+    std::memcpy(coeffs.data(), coeff_buf.ptr, M * sizeof(double));
+    std::vector<double> field(N);
+    std::memcpy(field.data(), field_buf.ptr, N * sizeof(double));
+    std::vector<double> mw(M);
+    std::memcpy(mw.data(), mw_buf.ptr, M * sizeof(double));
+
+    /* ---- Pre-compute mode CDF for weighted selection ---- */
+    std::vector<double> cdf(M);
+    cdf[0] = mw[0];
+    for (size_t k = 1; k < M; ++k) cdf[k] = cdf[k-1] + mw[k];
+
+    /* ---- Adaptive sigma per mode ---- */
+    std::vector<double> sigma(M, sigma_init);
+    std::vector<size_t> accept_cnt(M, 0);
+    std::vector<size_t> total_cnt(M, 0);
+
+    /* ---- Output arrays ---- */
+    std::vector<double> ene_out(n_steps);
+    std::vector<double> magn_out(n_steps);
+
+    /* ---- Best tracking ---- */
+    std::vector<int8_t> best_spins(spins);
+    double best_E = calc_totEnergy(N, spins.data(), graph.nlen.data(),
+                                   graph.node_edges.data());
+    double E_current = best_E;
+
+    /* ---- Temporary buffers ---- */
+    std::vector<double> field_new(N);
+    std::vector<int8_t> spins_new(N);
+
+    {
+        py::gil_scoped_release release;
+        seed_rng(seed_val);
+
+        for (size_t step = 0; step < n_steps; ++step) {
+            /* 1. Select mode via CDF */
+            double r = RNG_dbl();
+            size_t m = 0;
+            for (size_t k = 0; k < M; ++k) {
+                if (r < cdf[k]) { m = k; break; }
+            }
+
+            /* 2. Propose delta ~ N(0, sigma[m]) */
+            double delta = rng_normal() * sigma[m];
+
+            /* 3. Incremental field update + binarize */
+            const double *vm = V + m * N;    /* row m of subspace_vecs */
+            for (size_t i = 0; i < N; ++i) {
+                field_new[i] = field[i] + delta * vm[i];
+                double f = field_new[i];
+                if      (f > 0.0)  spins_new[i] =  1;
+                else if (f < 0.0)  spins_new[i] = -1;
+                else               spins_new[i] = spins[i];  /* keep old */
+            }
+
+            /* 4. Compute energy of proposed config */
+            double E_new = calc_totEnergy(N, spins_new.data(),
+                                          graph.nlen.data(),
+                                          graph.node_edges.data());
+            double dE = E_new - E_current;
+
+            /* 5. Metropolis accept/reject */
+            bool accept = (dE <= 0.0);
+            if (!accept && T > 0.0) {
+                accept = (RNG_dbl() < std::exp(-dE / T));
+            }
+
+            if (accept) {
+                coeffs[m] += delta;
+                std::swap(field, field_new);
+                std::swap(spins, spins_new);
+                E_current = E_new;
+                accept_cnt[m]++;
+            }
+
+            total_cnt[m]++;
+
+            ene_out[step]  = E_current;
+            magn_out[step] = calc_magn(N, spins.data());
+
+            if (E_current < best_E) {
+                best_E = E_current;
+                std::memcpy(best_spins.data(), spins.data(), N);
+            }
+
+            /* 6. Adaptive sigma every chunk_size steps */
+            if (chunk_size > 0 && (step + 1) % chunk_size == 0) {
+                for (size_t mm = 0; mm < M; ++mm) {
+                    if (total_cnt[mm] > 0) {
+                        double rate = (double)accept_cnt[mm] / total_cnt[mm];
+                        if (rate > 0.35) sigma[mm] *= 1.1;
+                        else if (rate < 0.25) sigma[mm] *= 0.9;
+                    }
+                }
+                std::fill(accept_cnt.begin(), accept_cnt.end(), 0);
+                std::fill(total_cnt.begin(), total_cnt.end(), 0);
+
+                /* Optional T=0 greedy polish */
+                if (do_polish) {
+                    /* Use a zero-field array for polish */
+                    std::vector<double> zero_h(N, 0.0);
+                    initialize_glauberMetropolis(0.0, zero_h.data());
+                    std::vector<int8_t> polish_s(spins);
+                    for (size_t ps = 0; ps < polish_sweeps; ++ps) {
+                        bool any_flip = false;
+                        for (size_t i = 0; i < N; ++i) {
+                            int8_t old_s = polish_s[i];
+                            glauberMetropolis_1step_T0(
+                                i, 0.0, polish_s.data(),
+                                graph.nlen[i],
+                                graph.node_edges[i]
+                            );
+                            if (polish_s[i] != old_s) any_flip = true;
+                        }
+                        if (!any_flip) break;
+                    }
+                    double E_pol = calc_totEnergy(
+                        N, polish_s.data(),
+                        graph.nlen.data(), graph.node_edges.data()
+                    );
+                    if (E_pol < best_E) {
+                        best_E = E_pol;
+                        best_spins = polish_s;
+                    }
+                }
+            }
+        }
+    }
+
+    /* ---- Convert to numpy ---- */
+    auto out_s = py::array_t<int8_t>(N);
+    std::memcpy(out_s.mutable_data(), spins.data(), N);
+    auto out_best_s = py::array_t<int8_t>(N);
+    std::memcpy(out_best_s.mutable_data(), best_spins.data(), N);
+    auto out_coeffs = py::array_t<double>(M);
+    std::memcpy(out_coeffs.mutable_data(), coeffs.data(), M * sizeof(double));
+
+    auto out_ene  = py::array_t<double>(n_steps);
+    auto out_magn = py::array_t<double>(n_steps);
+    std::memcpy(out_ene.mutable_data(), ene_out.data(), n_steps * sizeof(double));
+    std::memcpy(out_magn.mutable_data(), magn_out.data(), n_steps * sizeof(double));
+
+    return py::make_tuple(out_s, out_ene, out_magn, out_best_s, best_E, out_coeffs);
+}
+
+
 static double calc_energy(
     py::array_t<int8_t, py::array::c_style> spins_in,
     const py::array_t<int64_t>& neigh_indices,
@@ -570,6 +773,53 @@ tuple[ndarray, ndarray, ndarray, ndarray]
         py::arg("spins"), py::arg("neigh_indices"), py::arg("neigh_weights"),
         py::arg("neigh_ptr"), py::arg("field"), py::arg("T"),
         py::arg("n_sweeps"), py::arg("seed"));
+
+    m.def("topo_met_sampling", &topo_met_sampling,
+        R"pbdoc(
+Run Topological Metropolis: MC in spectral coefficient space.
+
+Parameters
+----------
+spins : ndarray[int8]
+    Initial spins (N,).
+neigh_indices, neigh_weights, neigh_ptr : CSR graph arrays.
+subspace_vecs : ndarray[float64]
+    Eigenvectors (M, N) row-major.
+init_coefficients : ndarray[float64]
+    Initial spectral coefficients (M,).
+init_field : ndarray[float64]
+    Initial continuous field (N,).
+mode_weights : ndarray[float64]
+    Mode selection probabilities (M,).
+T : float
+    Metropolis temperature.
+n_steps : int
+    Number of MC steps (coordinate-wise).
+sigma_init : float
+    Initial proposal std per mode.
+chunk_size : int
+    Adaptive sigma adjustment interval.
+do_polish : bool
+    Greedy T=0 polish after chunks.
+polish_sweeps : int
+    Max sweeps for polish.
+seed : int
+    RNG seed.
+
+Returns
+-------
+tuple
+    (final_spins, energy_trace, magn_trace,
+     best_spins, best_energy, final_coefficients)
+        )pbdoc",
+        py::arg("spins"), py::arg("neigh_indices"), py::arg("neigh_weights"),
+        py::arg("neigh_ptr"), py::arg("subspace_vecs"),
+        py::arg("init_coefficients"), py::arg("init_field"),
+        py::arg("mode_weights"),
+        py::arg("T"), py::arg("n_steps"),
+        py::arg("sigma_init"), py::arg("chunk_size"),
+        py::arg("do_polish"), py::arg("polish_sweeps"),
+        py::arg("seed"));
 
     m.def("calc_energy", &calc_energy,
         R"pbdoc(
