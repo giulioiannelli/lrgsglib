@@ -1,4 +1,4 @@
-"""Dynamics energy — re-exports from shared engine-agnostic location.
+"""Dynamics energy — re-exports from shared location.
 
 The canonical implementation lives in ``graphs._shared._dynamics``.
 """

@@ -30,7 +30,7 @@ from ...config.funcs import peq_fstr
 from ...utils.basic.strings import generate_random_id, join_non_empty
 
 if TYPE_CHECKING:
-    from ...graphs._base import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
 
 ZERO_FIELD = lambda N: np.zeros(N, dtype=np.float64)
 

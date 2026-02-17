@@ -12,7 +12,7 @@ from ..DynSys import DynSys
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ...graphs._base import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
 
 StateType = Literal["bipolar", "binary"]
 

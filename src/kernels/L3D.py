@@ -5,13 +5,36 @@ from __future__ import annotations
 from typing import Any
 
 from lrgsglib import Lattice3D, load_or_compute_Lattice3D
+from lrgsglib.utils.basic.strings import join_non_empty
 from parsers.shared import resolve_graph_class, get_graph_engine
 
 __all__ = [
+    "get_l3d_out_suffix",
     "initialize_l3d_dict_args",
     "make_transcluster_lattice",
     "prepare_lattice",
 ]
+
+
+def get_l3d_out_suffix(args: Any) -> str:
+    """Build output suffix from L3D-relevant structural parameters."""
+
+    init_cond = getattr(args, "init_cond", "")
+    geometry = getattr(args, "geometry", "")
+    pdil = getattr(args, "pdil", 0.0)
+    edge_weight = getattr(args, "edge_weight", "flip")
+    mu = getattr(args, "mu", 0.0)
+    sigma = getattr(args, "sigma", 0.0)
+    out_suffix = getattr(args, "out_suffix", "")
+
+    tokens = [init_cond, geometry]
+    if pdil:
+        tokens.append(f"pdil{pdil:.3g}")
+    if edge_weight != "flip":
+        tokens.append(f"mu{mu:.3g}_s{sigma:.3g}")
+    if out_suffix:
+        tokens.append(out_suffix)
+    return join_non_empty("_", *tokens)
 
 
 def _normalize_dimension(dim: Any) -> Any:
@@ -75,7 +98,7 @@ def prepare_lattice(args: Any, **kwargs: Any) -> Any:
             dim=dim,
             geo=getattr(args, "geometry", None),
             pflip=getattr(args, "p", None),
-            seed=42,
+            seed=getattr(args, "seed", None),
         )
         l3d_kwargs = {k: v for k, v in l3d_kwargs.items() if v is not None}
         lattice = Cls(**l3d_kwargs, **kwargs)

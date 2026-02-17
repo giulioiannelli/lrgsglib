@@ -28,22 +28,22 @@ L3D_opt_args = {
     tuple(['--pdil']): {
         'help': phelp_pdil,
         'type': float,
-        'default': DEFAULT_L3D_TRANSCLUSTER_PDIL,
+        'default': DEFAULT_L3D_PDIL,
     },
     tuple(['--mu']): {
         'help': phelp_mu,
         'type': float,
-        'default': DEFAULT_L3D_TRANSCLUSTER_MU,
+        'default': DEFAULT_L3D_MU,
     },
     tuple(['--sigma']): {
         'help': phelp_sigma,
         'type': float,
-        'default': DEFAULT_L3D_TRANSCLUSTER_SIGMA,
+        'default': DEFAULT_L3D_SIGMA,
     },
     tuple(['--edge_weight']): {
         'help': phelp_edge_weight,
         'type': str,
-        'default': DEFAULT_L3D_TRANSCLUSTER_EDGE_WEIGHT,
+        'default': DEFAULT_L3D_EDGE_WEIGHT,
     },
     **SG_opt_args,
     tuple(['-ge', '--graph_engine']): {

@@ -58,7 +58,7 @@ The module is organized as follows:
 
 graphs/
 ├── __init__.py              # This file (unified API)
-├── _base.py                 # Protocol definitions
+├── protocols.py             # Protocol definitions
 ├── _engine.py               # Engine selection
 ├── Lattice2D.py             # Facade
 ├── Lattice3D.py             # Facade
@@ -80,7 +80,7 @@ Direct access to engine-specific implementations:
 >>> from lrgsglib.graphs.gt.lattice import Lattice2DGT
 """
 
-from ._base import (
+from .protocols import (
     LatticeGraphProtocol,
     SignedGraphProtocol,
     SpectralGraphProtocol,

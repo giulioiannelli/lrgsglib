@@ -179,7 +179,11 @@ def compute_entropy_observables_from_eigenvalues(
 
     normalized_entropy = _normalize_entropy_profile(entropy_profile, entropy_norm)
 
-    entropy_derivative = np.gradient(normalized_entropy, np.log(time_grid))
+    # Specific heat is always computed from the complement form (1 - S/logN)
+    # so that C(τ) = d(1-S/logN)/d(logτ) stays positive at diffusion scales,
+    # regardless of which normalization the caller chose for the output entropy.
+    complement = _normalize_entropy_profile(entropy_profile, "complement")
+    entropy_derivative = np.gradient(complement, np.log(time_grid))
     scale = specific_heat_scale.lower()
     if scale == "logn":
         entropy_derivative = log_N * entropy_derivative

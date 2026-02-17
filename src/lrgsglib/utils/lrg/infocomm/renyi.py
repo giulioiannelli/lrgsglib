@@ -4,7 +4,7 @@ This module provides generalized entropy computation using Rényi and
 Tsallis entropy formulas with parameterized q values.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -14,6 +14,7 @@ from ._common import _normalize_entropy_profile
 
 __all__ = [
     "compute_renyi_observables_from_eigenvalues",
+    "renyi_scan",
 ]
 
 
@@ -151,12 +152,12 @@ def compute_renyi_observables_from_eigenvalues(
     )
 
     with np.errstate(invalid="ignore"):
-        heat_mode = entropy_norm
-        if legacy_normalization and entropy_norm.lower() == "standard":
-            heat_mode = "complement"
+        # Specific heat is always computed from the complement form
+        # (1 - S_q/logN) so that C_q(τ) stays positive at diffusion
+        # scales, regardless of the output normalization choice.
         heat_source = _normalize_entropy_profile(
             renyi_entropy_standard,
-            heat_mode,
+            "complement",
         )
         specific_heat = np.gradient(heat_source, log_tau)
         scale = specific_heat_scale.lower()
@@ -186,3 +187,37 @@ def compute_renyi_observables_from_eigenvalues(
         "legacy_normalization": legacy_normalization,
         "specific_heat_scale": specific_heat_scale,
     }
+
+
+def renyi_scan(
+    eigenvalues: NDArray,
+    q_values: Sequence[float],
+    num_nodes: Optional[int] = None,
+    **kwargs: Any,
+) -> List[Dict[str, Any]]:
+    """Compute Renyi entropy profiles for multiple q values.
+
+    Parameters
+    ----------
+    eigenvalues : NDArray
+        Spectrum of the Laplacian (or signed Laplacian) matrix.
+    q_values : Sequence[float]
+        Iterable of Renyi orders to evaluate.
+    num_nodes : int, optional
+        Number of nodes. Defaults to ``len(eigenvalues)``.
+    **kwargs
+        Forwarded to :func:`compute_renyi_observables_from_eigenvalues`.
+
+    Returns
+    -------
+    list of dict
+        One result dictionary per q value (same format as
+        :func:`compute_renyi_observables_from_eigenvalues`).
+    """
+    n = num_nodes if num_nodes is not None else len(eigenvalues)
+    return [
+        compute_renyi_observables_from_eigenvalues(
+            eigenvalues, num_nodes=n, q=q, **kwargs
+        )
+        for q in q_values
+    ]

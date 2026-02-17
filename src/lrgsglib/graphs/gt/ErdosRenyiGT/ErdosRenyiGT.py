@@ -91,8 +91,12 @@ class ErdosRenyiGT(SignedGraphGT):
         if extract_giant_component:
             G = self._extract_giant_component(G)
 
+        # Set syshapePth before super().__init__ so lazy path init uses it
+        self._syshapePth = f"N={G.num_vertices()}_p={p:.3g}"
+
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed,
+                         sgpathn="erdos_renyi_gt")
 
     def _generate_graph(self) -> gt.Graph:
         """Generate Erdos-Renyi random graph using graph-tool."""

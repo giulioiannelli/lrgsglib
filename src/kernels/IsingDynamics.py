@@ -45,7 +45,11 @@ def initialize_ising_dict_args(args, out_suffix, NoClust):
 def get_out_suffix(args):
     return join_non_empty('_', args.init_cond, args.cell_type, args.out_suffix)
 
-def run_ising_dynamics(args: Any, signed_graph: SignedGraph) -> Any:
+def run_ising_dynamics(
+    args: Any,
+    signed_graph: SignedGraph,
+    out_suffix: str | None = None,
+) -> Any:
     """
     Initialize and run the IsingDynamics simulation (equilibrium, SA, or PT mode).
 
@@ -55,13 +59,18 @@ def run_ising_dynamics(args: Any, signed_graph: SignedGraph) -> Any:
         Argument object containing Ising simulation parameters.
     signed_graph : SignedGraph
         Generic SignedGraph instance used for the dynamics.
+    out_suffix : str or None
+        Output suffix for file naming. If None, computed from args
+        via :func:`get_out_suffix` (backward compat for L2D callers).
 
     Returns
     -------
     Any
         Executed IsingDynamics instance.
     """
-    isingDictArgs = initialize_ising_dict_args(args, get_out_suffix(args), 1)
+    if out_suffix is None:
+        out_suffix = get_out_suffix(args)
+    isingDictArgs = initialize_ising_dict_args(args, out_suffix, 1)
     isdy = IsingDynamics(signed_graph, **isingDictArgs)
     isdy.init_ising_dynamics()
 

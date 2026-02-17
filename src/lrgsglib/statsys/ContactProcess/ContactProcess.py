@@ -41,7 +41,7 @@ from ..BinDynSys import BinDynSys
 from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
-    from ...graphs._base import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
 
 
 # ========================================================================

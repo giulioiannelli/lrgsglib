@@ -21,7 +21,7 @@ from .slq import compute_entropy_observables_slq
 from .expm import compute_entropy_observables_expm_multiply
 
 # Generalized entropies
-from .renyi import compute_renyi_observables_from_eigenvalues
+from .renyi import compute_renyi_observables_from_eigenvalues, renyi_scan
 
 # Distance functions
 from .distances import (
@@ -39,6 +39,7 @@ __all__ = [
     "compute_entropy_observables_expm_multiply",
     # Renyi
     "compute_renyi_observables_from_eigenvalues",
+    "renyi_scan",
     # Distances
     "extract_ultrametric_matrix",
     "lapl_dists",

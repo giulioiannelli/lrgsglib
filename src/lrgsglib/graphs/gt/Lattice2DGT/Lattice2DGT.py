@@ -92,8 +92,12 @@ class Lattice2DGT(SignedGraphGT):
         # Store position property
         self._pos = pos
 
+        # Set syshapePth before super().__init__ so lazy path init uses it
+        self._syshapePth = f"N={G.num_vertices()}"
+
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed,
+                         sgpathn=f"l2d_{geo}_gt")
 
     def _create_square_lattice(self) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
         """Create square lattice using GT's native function."""

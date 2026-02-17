@@ -25,3 +25,5 @@ phelp_pt_T_max = "Maximum temperature in ladder"
 phelp_pt_T_ladder_type = "Type of temperature ladder"
 phelp_pt_steps_per_exchange = "MC sweeps between exchange attempts"
 phelp_pt_n_exchanges = "Total number of exchange rounds"
+# Thermal averaging help text
+phelp_n_thermal = "Number of independent thermal runs per disorder realization"

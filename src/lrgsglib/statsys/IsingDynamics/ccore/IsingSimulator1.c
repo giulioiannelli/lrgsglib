@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
         mclus[i] = __chMalloc(sizeof(**mclus) * T_EQ_STEP);
     /* open spin initial condition  */
     sprintf(buf, SINI_FNAME, datdir, syshape, p, run_id);
-    printf("buf: %s\n", buf);
+    fprintf(stderr, "buf: %s\n", buf);
     __fopen(&f_sini, buf, "rb");
     __fread_check(fread(s, sizeof(*s), N, f_sini), N);
     /* open cluster indices files */

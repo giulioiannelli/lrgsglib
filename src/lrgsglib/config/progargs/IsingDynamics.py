@@ -53,6 +53,11 @@ IsDyn_opt_args = {
         'action': argparse.BooleanOptionalAction,
         'default': DEFAULT_randstr,
     },
+    tuple(['--n_thermal']): {
+        'help': phelp_n_thermal,
+        'type': int,
+        'default': DEFAULT_N_THERMAL,
+    },
 }
 # Simulated Annealing arguments
 IsDyn_sa_args = {

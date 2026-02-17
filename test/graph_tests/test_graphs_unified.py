@@ -22,7 +22,7 @@ from lrgsglib.graphs import (
     list_registered_types,
     is_engine_available,
 )
-from lrgsglib.graphs._base import (
+from lrgsglib.graphs.protocols import (
     SignedGraphProtocol,
     is_signed_graph,
 )

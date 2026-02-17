@@ -20,7 +20,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Callable, Optional, Type, TypeVar, Union
 
 if TYPE_CHECKING:
-    from ._base import SignedGraphProtocol
+    from .protocols import SignedGraphProtocol
 
 T = TypeVar("T")
 

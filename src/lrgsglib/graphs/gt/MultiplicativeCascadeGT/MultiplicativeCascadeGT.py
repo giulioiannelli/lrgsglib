@@ -141,7 +141,7 @@ class MultiplicativeCascadeGraphGT(MultispectralGraphGT):
         G = self._generate()
 
         # Initialize base class with generated graph
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, sgpathn=sgpathn)
 
         # Apply sign flips if requested
         if pflip > 0:

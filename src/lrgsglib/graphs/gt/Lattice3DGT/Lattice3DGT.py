@@ -93,8 +93,17 @@ class Lattice3DGT(SignedGraphGT):
         # Store position property
         self._pos = pos
 
+        # Set syshapePth before super().__init__ so lazy path init uses it
+        total_nodes = G.num_vertices()
+        if all(x == self.dim[0] for x in self.dim):
+            self._syshapePth = f"N={total_nodes}"
+        else:
+            dim_part = "_".join(f"L{i}={s}" for i, s in enumerate(self.dim))
+            self._syshapePth = f"{dim_part}_N={total_nodes}"
+
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed,
+                         sgpathn=f"l3d_{geo}_gt")
 
     def _create_simple_cubic(self) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
         """Create simple cubic lattice using GT's native function."""

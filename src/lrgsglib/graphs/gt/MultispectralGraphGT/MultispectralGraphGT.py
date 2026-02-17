@@ -37,8 +37,6 @@ class MultispectralGraphGT(SignedGraphGT):
         The computed probability matrix.
     sample_fraction : float
         Fraction of nodes sampled (1.0 for Vicsek).
-    syshapePth : str
-        Parameter string for file paths.
     stdFnameSFFX : str
         Standard filename suffix.
     sgpathn : str
@@ -48,7 +46,8 @@ class MultispectralGraphGT(SignedGraphGT):
     # Subclasses set these before calling super().__init__
     probability_matrix: Optional[NDArray[np.floating]] = None
     sample_fraction: float = 1.0
-    syshapePth: str = ""
+    # NOTE: syshapePth is NOT declared here — it is a property on
+    # SignedGraphGT.  A plain class attribute would shadow the descriptor.
     stdFnameSFFX: str = ""
     sgpathn: str = ""
 

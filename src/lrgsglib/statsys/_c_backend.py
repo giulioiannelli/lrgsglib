@@ -137,7 +137,7 @@ class CBackendMixin:
             return
 
         # Check if the graph supports file I/O required by C backend
-        from ..graphs._base import DynamicsGraphProtocol
+        from ..graphs.protocols import DynamicsGraphProtocol
 
         if not isinstance(self.sg, DynamicsGraphProtocol):
             warnings.warn(
