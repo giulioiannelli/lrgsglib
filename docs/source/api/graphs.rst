@@ -8,8 +8,7 @@ multiple backends (NetworkX, graph-tool, igraph).
 
 .. note::
 
-   This is the **recommended** module for new code. The ``nx_patches`` module
-   is deprecated but still functional for backward compatibility.
+   This is the canonical module for all graph code.
 
 Overview
 --------
@@ -356,24 +355,8 @@ graph-tool Module
    :undoc-members:
    :show-inheritance:
 
-Deprecation Notice
-------------------
-
-.. warning::
-
-   The ``nx_patches`` module is **deprecated and will be removed in v2.0**.
-
-   Update your imports:
-
-   .. code-block:: python
-
-      # OLD (will stop working)
-      from lrgsglib.nx_patches import Lattice2D
-
-      # NEW (use this)
-      from lrgsglib.graphs import Lattice2D
-
-All graph types previously in ``nx_patches`` are now available through:
+Module Structure
+----------------
 
 - ``lrgsglib.graphs`` - Unified API with engine selection
 - ``lrgsglib.graphs.nx`` - Direct NetworkX implementations

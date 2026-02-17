@@ -164,7 +164,7 @@ def WattsStrogatz(
         # Pass remaining kwargs
         impl_kwargs.update(kwargs)
 
-    elif "gt_patches" in impl_module or "graphs.gt" in impl_module:
+    elif "graphs.gt" in impl_module:
         # graph-tool implementation
         impl_kwargs = {
             "n": n,

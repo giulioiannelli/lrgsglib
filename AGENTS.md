@@ -53,7 +53,7 @@ Follow the repository’s conventions; prefer **pure functions**, minimal hidden
   - `src/lrgsglib/utils/lrg/spectral.py` (e.g., `get_graph_lspectrum`, `compute_laplacian_properties`)
   - `src/lrgsglib/plotlib/` (plot helpers)
   - `src/lrgsglib/utils/basic/` (general utilities)
-  - `src/lrgsglib/nx_patches/` (NetworkX compatibility helpers)
+  - `src/lrgsglib/graphs/` (unified graph interface: nx/ and gt/ backends)
   - `src/lrgsglib/statsys/<Model>/ccore/` (C/C++ kernels and build scripts)
 
 **Style**:

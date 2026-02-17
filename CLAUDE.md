@@ -165,8 +165,9 @@ results_file = TEST_TMP_DIR / "bench_mcg_slaplspect_results.pkl"
   - `progargs/` - Command-line argument definitions for graph types and dynamics (ContactProcess, IsingDynamics, Lattice2D/3D, SignedGraph, etc.)
   - `lrgsg_env.py` - Environment variables from build system
 
-- **`nx_patches/`** - NetworkX extensions for specialized graph types
-  - `SignedGraph/`, `Lattice2D/`, `Lattice3D/`, `ErdosRenyi/`, `WeightedGraph/`, etc.
+- **`graphs/`** - Unified graph interface (NX + GT backends)
+  - `nx/` - NetworkX implementations (SignedGraphNX, Lattice2DNX, ErdosRenyiNX, etc.)
+  - `gt/` - graph-tool implementations (SignedGraphGT, Lattice2DGT, etc.)
   - `funcs/` - Utility functions (spectral, thresholding, neighbors, lattice operations)
 
 - **`statsys/`** - Statistical physics simulations (folder-per-class layout)
@@ -176,8 +177,6 @@ results_file = TEST_TMP_DIR / "bench_mcg_slaplspect_results.pkl"
   - `_c_backend.py` - CBackendMixin for C subprocess integration
 
 - **`plotlib/`** - Plotting utilities specialized for signed graphs and lattices
-
-- **`gt_patches/`** - graph-tool compatibility layer and C++ extensions
 
 - **`utils/`** - Core utilities organized by domain
   - `lrg/` - Laplacian renormalization group tools (spectral analysis, coarse-graining)
@@ -232,7 +231,7 @@ Build generates a `.env` file with all paths (`LRGSG_DATA`, `LRGSG_IPYNB`, `LRGS
 3. Results analyzed in notebooks with plotlib utilities
 
 **Graph creation and analysis:**
-1. Create signed graphs using nx_patches (e.g., `Lattice2D.create_graph()`, `ErdosRenyi.signed_erdos_renyi()`)
+1. Create signed graphs using `graphs.nx` or `graphs.gt` (e.g., `Lattice2DNX`, `ErdosRenyiNX`)
 2. Extract properties (Laplacian spectra, balance ratios) via `utils/lrg/spectral.py`
 3. Run dynamics simulations via C programs or Python wrappers
 4. Visualize with plotlib

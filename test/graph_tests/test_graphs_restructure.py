@@ -180,26 +180,6 @@ class TestEngineSelection:
         assert lat.N == 25
 
 
-class TestBackwardCompatibility:
-    """Test backward compatibility with old import paths."""
-
-    def test_old_nx_patches_lattice2d_import(self):
-        """Test that old import path still works."""
-        from lrgsglib.nx_patches import Lattice2D
-        lat = Lattice2D(side1=5, geo='sqr', seed=42)
-        assert lat.N == 25
-
-    def test_old_nx_patches_erdos_renyi_import(self):
-        """Test that old import path still works."""
-        from lrgsglib.nx_patches import ErdosRenyi
-        er = ErdosRenyi(n=50, p=0.2, seed=42)
-        assert er.N > 0
-
-    def test_old_nx_patches_signed_graph_import(self):
-        """Test that old SignedGraph import still works."""
-        from lrgsglib.nx_patches import SignedGraph
-        assert SignedGraph is not None
-
 
 class TestFlipEdges:
     """Test edge flipping functionality works correctly."""
