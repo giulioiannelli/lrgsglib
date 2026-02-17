@@ -17,7 +17,7 @@ from ...utils.statsys import boltzmann_factor
 from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
-    from ...graphs._base import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
 
 # Type aliases for cooling/ladder schedules
 CoolingSchedule = Literal["linear", "exponential", "logarithmic", "custom"]
@@ -288,7 +288,8 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     def init_ising_dynamics(self, custom: Any = None, exName: str = ""):
         self._check_c_backend_or_fallback()
         self.init_s(custom)
-        if self.runlang.startswith("C"):
+        rl = _resolve_runlang(self.runlang)
+        if rl.startswith("c_") or self.runlang.startswith("C"):
             self.build_cprogram_command()
             self.setup_stderr_logging()
             self.export_s_init()
@@ -326,11 +327,22 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         """Convert runlang to internal key (e.g., 'c1b' -> 'C1B').
 
         Overrides mixin to default to C1B when no suffix is provided.
+        Supports both legacy codes (``C1B``) and canonical names (``c_met_em``).
         """
-        if not self.runlang or not self.runlang.upper().startswith("C"):
-            raise ValueError("C backend requires runlang starting with 'C'")
-        suffix = self.runlang[1:]
-        key = f"C{suffix.upper()}" if suffix else "C1B"  # Default to C1B
+        if not self.runlang:
+            raise ValueError("C backend requires a runlang value")
+        rl = self.runlang.strip()
+        # Canonical new-style name → legacy key via reverse map
+        if rl in _NEW_TO_LEGACY_C:
+            key = _NEW_TO_LEGACY_C[rl]
+        elif rl.upper().startswith("C") and "_" not in rl:
+            # Legacy code path (e.g. "C1", "C1b", "C3B")
+            suffix = rl[1:]
+            key = f"C{suffix.upper()}" if suffix else "C1B"
+        else:
+            raise ValueError(
+                f"runlang '{self.runlang}' cannot be mapped to a C program key"
+            )
         if self._allowed_c_keys and key not in self._allowed_c_keys:
             raise ValueError(
                 f"runlang '{self.runlang}' not supported for {self.__class__.__name__}. "
@@ -837,8 +849,58 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     # Graph CSR builder (for pybind11 backend)
     # =========================================================================
 
+    @staticmethod
+    def _build_graph_csr_from_arrays(
+        src: np.ndarray,
+        dst: np.ndarray,
+        wts: np.ndarray,
+        N: int,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Build CSR arrays from edge arrays (vectorized, no Python loops).
+
+        Parameters
+        ----------
+        src, dst : ndarray[int64]
+            Source and target vertex indices (directed edges, one per GT
+            edge — this method symmetrises them).
+        wts : ndarray[float64]
+            Edge weights corresponding to ``(src, dst)`` pairs.
+        N : int
+            Number of nodes.
+
+        Returns
+        -------
+        neigh_indices, neigh_weights, neigh_ptr
+            CSR representation of the undirected graph.
+        """
+        # Symmetrise: add both directions
+        all_src = np.concatenate([src, dst])
+        all_dst = np.concatenate([dst, src])
+        all_wts = np.concatenate([wts, wts])
+
+        # Sort by source node
+        order = np.argsort(all_src, kind="stable")
+        all_dst = all_dst[order]
+        all_wts = all_wts[order]
+        all_src = all_src[order]
+
+        # Build row pointers via searchsorted
+        nodes = np.arange(N + 1, dtype=np.int64)
+        ptr = np.searchsorted(all_src, nodes, side="left")
+
+        return (
+            all_dst.astype(np.int64),
+            all_wts.astype(np.float64),
+            ptr,
+        )
+
     def _build_graph_csr(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Build CSR-like arrays from the graph for the pybind11 backend.
+
+        If the graph provides ``get_edge_arrays()`` (GT graphs), uses a
+        vectorized numpy path that avoids per-node Python loops.
+        Otherwise falls back to the per-node loop via
+        ``get_neighbors_with_weights()``.
 
         Returns
         -------
@@ -849,6 +911,13 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         neigh_ptr : ndarray[int64]
             Row pointers (N+1,).
         """
+        if hasattr(self.sg, "get_edge_arrays"):
+            src, dst, wts = self.sg.get_edge_arrays()
+            return self._build_graph_csr_from_arrays(
+                src, dst, wts, self.N
+            )
+
+        # Fallback: per-node loop (fast for NX dict-of-dicts)
         indices_list: list[int] = []
         weights_list: list[float] = []
         ptr = [0]
@@ -1277,7 +1346,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.sorted_list = sorted_list
 
         # Lattice-specific mapping (requires side1/side2)
-        from ...graphs._base import is_lattice_graph
+        from ...graphs.protocols import is_lattice_graph
         if not is_lattice_graph(self.sg):
             raise TypeError(
                 "mapping_nodes_to_clusters requires a lattice graph "

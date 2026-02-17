@@ -16,6 +16,8 @@ Example
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
@@ -36,6 +38,11 @@ except ImportError:
 import networkx as nx
 
 from .._converters import nx_to_gt, gt_to_nx, get_laplacian_matrix_gt
+from ....config.const import (
+    BIN, PATHDATA,
+    PATHN_GRAPH_LIST, PATHN_DYNAMICS_LIST,
+)
+from ....config.funcs import build_p_fname
 
 
 class SignedGraphGT:
@@ -85,6 +92,8 @@ class SignedGraphGT:
         G: Optional["Graph"] = None,
         pflip: float = 0.0,
         seed: Optional[int] = None,
+        path_data: Optional[Path] = None,
+        sgpathn: str = "signed_graph_gt",
     ) -> None:
         if not GT_AVAILABLE:
             raise ImportError(
@@ -110,6 +119,27 @@ class SignedGraphGT:
 
         # Lazy neighbor cache for dynamics performance
         self._neighbor_cache: dict[int, list[tuple[int, float]]] | None = None
+
+        # ---- Path infrastructure for DynamicsGraphProtocol ----
+        self._path_data = path_data
+        self._sgpathn = sgpathn
+        # Paths are initialised lazily by _ensure_paths() on first access.
+        self._paths_initialised = False
+
+    def __getattr__(self, name: str) -> Any:
+        """Trigger lazy path initialisation for ``path_*`` attributes."""
+        if name.startswith("path_") and not name.startswith("_path_"):
+            # Avoid recursion: check the flag directly on __dict__
+            if not self.__dict__.get("_paths_initialised", True):
+                self._ensure_paths()
+                # After init, the attribute should exist now
+                try:
+                    return self.__dict__[name]
+                except KeyError:
+                    pass
+        raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{name}'"
+        )
 
     @property
     def N(self) -> int:
@@ -688,6 +718,130 @@ class SignedGraphGT:
         self.eigV = eigenvectors[:, idx]
         return self.eigv, self.eigV
 
+    # ------------------------------------------------------------------
+    # Adjacency spectrum methods
+    # ------------------------------------------------------------------
+
+    def compute_adjacency_spectrum_weigV(
+        self,
+        backend: Literal["numpy", "scipy", "cupy"] = "numpy",
+        **kwargs: Any,
+    ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
+        """Compute full eigendecomposition of the signed adjacency matrix.
+
+        Parameters
+        ----------
+        backend : str
+            ``'numpy'``, ``'scipy'``, or ``'cupy'``.
+        **kwargs
+            Ignored (NX compat: ``transpose``, ``flip_to_pos``, ``typf``).
+
+        Returns
+        -------
+        tuple[ndarray, ndarray]
+            ``(adj_eigv, adj_eigV)`` — eigenvalues sorted ascending,
+            eigenvectors column-major.
+        """
+        A = self.get_signed_adjacency()
+
+        if backend == "cupy":
+            try:
+                import cupy as cp
+                eigv, eigV = cp.linalg.eigh(cp.asarray(A))
+                eigv, eigV = cp.asnumpy(eigv), cp.asnumpy(eigV)
+            except ImportError:
+                eigv, eigV = np.linalg.eigh(A)
+        elif backend == "scipy":
+            from scipy.linalg import eigh
+            eigv, eigV = eigh(A)
+        else:
+            eigv, eigV = np.linalg.eigh(A)
+
+        idx = np.argsort(eigv)
+        self.adj_eigv = eigv[idx]
+        self.adj_eigV = eigV[:, idx]
+        return self.adj_eigv, self.adj_eigV
+
+    def compute_k_adj_eigvV(
+        self,
+        k: int = 1,
+        which: str = "LM",
+        **kwargs: Any,
+    ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
+        """Compute k eigenvalues/eigenvectors of the adjacency matrix.
+
+        Parameters
+        ----------
+        k : int
+            Number of eigenpairs.
+        which : str
+            ``'LM'`` largest magnitude, ``'SM'`` smallest magnitude.
+        **kwargs
+            Ignored (NX compat).
+
+        Returns
+        -------
+        tuple[ndarray, ndarray]
+            ``(adj_eigv, adj_eigV)`` with k values.
+        """
+        A = self.get_signed_adjacency()
+        A_sparse = csr_matrix(A)
+
+        eigv, eigV = eigsh(A_sparse, k=k, which=which)
+        idx = np.argsort(-eigv) if which == "LM" else np.argsort(eigv)
+        self.adj_eigv = eigv[idx]
+        self.adj_eigV = eigV[:, idx]
+        return self.adj_eigv, self.adj_eigV
+
+    # ------------------------------------------------------------------
+    # Eigenvector format helpers
+    # ------------------------------------------------------------------
+
+    def make_eigV_transposed(self) -> None:
+        """Transpose eigV to row-major (M x N) format."""
+        if self.eigV is not None:
+            self.eigV = self.eigV.T
+            self._eigV_is_transposed = True
+
+    def make_eigV_column_major(self) -> None:
+        """Transpose eigV to column-major (N x M) format."""
+        if self.eigV is not None:
+            self.eigV = self.eigV.T
+            self._eigV_is_transposed = False
+
+    def make_adj_eigV_transposed(self) -> None:
+        """Transpose adj_eigV to row-major."""
+        if hasattr(self, "adj_eigV") and self.adj_eigV is not None:
+            self.adj_eigV = self.adj_eigV.T
+            self._adj_eigV_is_transposed = True
+
+    def make_adj_eigV_column_major(self) -> None:
+        """Transpose adj_eigV to column-major."""
+        if hasattr(self, "adj_eigV") and self.adj_eigV is not None:
+            self.adj_eigV = self.adj_eigV.T
+            self._adj_eigV_is_transposed = False
+
+    def make_rescaled_signed_laplacian(self, MODE: str = "field") -> None:
+        """Compute rescaled signed Laplacian: L - lambda_0 * I.
+
+        Parameters
+        ----------
+        MODE : str
+            ``'field'`` subtracts smallest eigenvalue once.
+            ``'double'`` subtracts twice (re-computes residual).
+        """
+        if self.eigv is None:
+            self.compute_laplacian_spectrum()
+
+        L = self.get_signed_laplacian()
+        if MODE == "field":
+            self.resLp = L - self.eigv[0] * np.eye(self.N)
+        elif MODE == "double":
+            from scipy.linalg import eigvalsh
+            self.resLp = L - self.eigv[0] * np.eye(self.N)
+            new_eigv0 = eigvalsh(self.resLp, subset_by_index=[0, 0])
+            self.resLp = self.resLp - new_eigv0 * np.eye(self.N)
+
     def get_eigV(
         self,
         which: int = 0,
@@ -819,6 +973,27 @@ class SignedGraphGT:
             for e in self.G.edges()
         ]
 
+    def get_edge_arrays(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return (sources, targets, weights) as numpy arrays.
+
+        Uses GT's bulk C++ accessors (``G.get_edges()`` and
+        ``ep["sign"].a``) so that no per-edge Python loop is needed.
+
+        Returns
+        -------
+        sources : ndarray[int64]
+            Source vertex indices, shape ``(E,)``.
+        targets : ndarray[int64]
+            Target vertex indices, shape ``(E,)``.
+        weights : ndarray[float64]
+            Signed edge weights, shape ``(E,)``.
+        """
+        edges = self.G.get_edges()  # (E, 2) int64
+        weights = self.G.ep["sign"].a.astype(np.float64)  # (E,)
+        return edges[:, 0].copy(), edges[:, 1].copy(), weights
+
     def get_neighbor_indices(self, node: int) -> list[int]:
         """Return neighbor indices without weights.
 
@@ -933,6 +1108,112 @@ class SignedGraphGT:
         if binarize:
             return np.sign(vec).astype(np.int8)
         return vec
+
+    def get_eigV_bin_check(
+        self,
+        which: int = 0,
+        reshaped: bool = False,
+        **kwargs: Any,
+    ) -> NDArray[np.int8]:
+        """Get binarized eigenvector with automatic computation.
+
+        Convenience wrapper: ``get_eigV_check(which, binarize=True)``.
+        NX-compatible alias used by ``BinDynSys.init_s()`` for
+        ``init_cond='ground_state_*'``.
+
+        Parameters
+        ----------
+        which : int
+            Eigenvector index (0 = smallest eigenvalue).
+        reshaped : bool
+            Ignored (GT has no ``syshape``).  Accepted for NX API compat.
+        **kwargs
+            Forwarded to :meth:`get_eigV_check`.
+        """
+        return self.get_eigV_check(which, binarize=True, **kwargs)
+
+    def get_eigV_bin_check_list(
+        self,
+        custom_slice: slice = slice(None),
+        reshaped: bool = False,
+        asarray: bool = False,
+        **kwargs: Any,
+    ) -> Union[List[NDArray], NDArray]:
+        """Get multiple binarized eigenvectors.
+
+        Parameters
+        ----------
+        custom_slice : slice
+            ``slice.stop`` sets the number of eigenvectors.
+            ``slice(None)`` returns all N.
+        reshaped : bool
+            Ignored (GT has no ``syshape``).
+        asarray : bool
+            If True, return stacked (k, N) array.
+        **kwargs
+            Forwarded to :meth:`get_eigV_check`.
+
+        Returns
+        -------
+        list[ndarray] or ndarray
+            Binarized eigenvectors in {-1, +1}.
+        """
+        stop = custom_slice.stop if custom_slice.stop is not None else self.N
+        vecs = [self.get_eigV_check(i, binarize=True, **kwargs) for i in range(stop)]
+        if asarray:
+            return np.array(vecs)
+        return vecs
+
+    def load_eigV_on_graph(
+        self,
+        which: int = 0,
+        on_g: Optional[str] = None,
+        binarize: bool = False,
+    ) -> None:
+        """Ensure eigenvector is computed (GT does not store on node attrs).
+
+        NX stores eigenvectors as node attributes on the graph object;
+        GT keeps them in ``self.eigV`` and doesn't need that step.
+        This method just ensures the eigenvector has been computed.
+
+        Parameters
+        ----------
+        which : int
+            Eigenvector index.
+        on_g : str, optional
+            Ignored (GT single representation).
+        binarize : bool
+            If True, also binarize (for validation; result is discarded).
+        """
+        self.get_eigV_check(which, binarize=binarize)
+
+    def compute_laplacian_spectrum(
+        self,
+        typf: type = np.float64,
+        backend: Optional[str] = None,
+        keep_sparse: Optional[bool] = None,
+        verbose: bool = False,
+    ) -> None:
+        """Compute eigenvalues only (NX-compatible signature).
+
+        Wraps :meth:`get_laplacian_spectrum` and caches the result
+        in ``self.eigv``.  This method exists so that
+        ``_ensure_spectrum()`` in the shared info-theory mixin
+        can call ``self.compute_laplacian_spectrum(...)`` uniformly.
+
+        Parameters
+        ----------
+        typf : type
+            Ignored (GT always uses float64).
+        backend : str, optional
+            ``'numpy'``, ``'scipy'``, or ``'cupy'``.
+        keep_sparse : bool, optional
+            Ignored (GT always uses dense).
+        verbose : bool
+            Ignored.
+        """
+        be = backend or "numpy"
+        self.eigv = self.get_laplacian_spectrum(backend=be)
 
     def get_sgspect_basis(
         self,
@@ -1176,6 +1457,210 @@ class SignedGraphGT:
         if NoClust > num_big:
             return num_big
         return NoClust
+
+    # ------------------------------------------------------------------
+    # Mixin imports — engine-agnostic methods from graphs._shared
+    # ------------------------------------------------------------------
+
+    # Info theory (Shannon & Renyi entropy, specific heat)
+    from ._infotheory import compute_signed_laplacian_entropy
+    from ._infotheory import compute_renyi_entropy_profile
+    from ._infotheory import get_entropy, get_specific_heat
+    from ._infotheory import get_entropy_derivative  # DEPRECATED
+    from ._infotheory import get_renyi_results
+
+    # Dynamics energy (RBIM, spherical SK from eigenvectors)
+    from ._dynamics import compute_rbim_energy_eigV
+    from ._dynamics import compute_rbim_energy_eigV_all
+    from ._dynamics import get_rbim_energy_eigV
+    from ._dynamics import get_all_rbim_energy_eigV
+    from ._dynamics import compute_sksph_energy_eigV
+    from ._dynamics import compute_sksph_energy_eigV_all
+    from ._dynamics import get_sksph_energy_eigV
+    from ._dynamics import get_all_sksph_energy_eigV
+
+    # Order parameters (spectral gap)
+    from ._ordparams import compute_gap
+    from ._ordparams import compute_gap_between
+    from ._ordparams import get_gap
+
+    # Quantum propagator
+    from ._quantum import compute_quantum_propagator
+    from ._quantum import quantum_walk_probabilities
+    from ._quantum import quantum_observables_time_series
+
+    # Graph operations (NX _ongraph.py parity)
+    from ._ongraph import check_Ne_flips
+    from ._ongraph import set_edges_random_normal
+    from ._ongraph import load_vec_on_nodes
+    from ._ongraph import set_node_attributes
+    from ._ongraph import get_random_edges_from_set
+
+    # Partitioning (NX _partitioning.py parity)
+    from ._partitioning import get_subgraph_from_nodes
+    from ._partitioning import get_nodes_subgraph_by_kv
+    from ._partitioning import make_graphYN
+    from ._partitioning import make_connected_component_by_edge
+    from ._partitioning import get_ferroAntiferro_regions
+
+    # File I/O — exports
+    from ._exports import export_eigV_all
+    from ._exports import export_adj_bin
+    from ._exports import export_ising_clust
+
+    # File I/O — loaders
+    from ._loaders import load_eigV_all
+    from ._loaders import set_edgel_from_bin
+
+    # File I/O — cleaners
+    from ._cleaners import remove_ising_clust_files
+    from ._cleaners import remove_edgl_file
+    from ._cleaners import remove_eigV_file
+    from ._cleaners import remove_adj_file
+    from ._cleaners import remove_exported_files
+    from ._cleaners import clean_gclutil
+
+    # Topology helpers (NX _topology.py parity)
+    from ._topology import nodes_in
+    from ._topology import get_node_attributes
+    from ._topology import get_edge_data
+    from ._topology import get_edge_color
+    from ._topology import get_graph_neighbors
+    from ._topology import get_adjacency_matrix_for
+    from ._topology import get_degree_matrix_for
+    from ._topology import get_laplacian_matrix_for
+    from ._topology import get_signed_degree_matrix_for
+    from ._topology import get_signed_laplacian_matrix_for
+
+    # Representation stubs (NX multi-repr compat)
+    from ._representations import upd_graph_matrices
+    from ._representations import upd_edge_sets
+    from ._representations import upd_Degree
+    from ._representations import upd_GraphRepr_All
+    from ._representations import upd_NodeMap
+    from ._representations import upd_EdgeMap
+    from ._representations import upd_ReprMaps
+    from ._representations import zip_reprNodes
+    from ._representations import zip_reprEdges
+
+    @property
+    def gcl(self):
+        """Graph clustering utility (lazy-initialized NestedDict)."""
+        if not hasattr(self, "_gcl"):
+            from ....utils.tools import NestedDict
+            self._gcl = NestedDict()
+        return self._gcl
+
+    @property
+    def graph_clustering_utility(self):
+        """Alias for gcl (NX compatibility)."""
+        return self.gcl
+
+    # ==================================================================
+    # DynamicsGraphProtocol — path infrastructure & C backend I/O
+    # ==================================================================
+
+    def _ensure_paths(self) -> None:
+        """Lazily initialise directory paths for C backend file I/O.
+
+        Mirrors the NX path tree:
+        ``path_sgdata / {graph,lrgsg,phtra,spect,ising,...} / syshapePth``
+
+        Called on first access to any path property.  Subclasses that
+        set ``self.syshapePth`` in their own ``__init__`` (e.g.
+        ``Lattice3DGT``) will see that value used here.
+        """
+        if self._paths_initialised:
+            return
+        self._paths_initialised = True
+
+        self.path_data = self._path_data or PATHDATA
+        self._path_sgdata = self.path_data / Path(self._sgpathn)
+
+        # syshapePth may have been set by a subclass already
+        if not hasattr(self, "_syshapePth") or self._syshapePth is None:
+            self._syshapePth = f"N={self.N}"
+
+        for p in PATHN_GRAPH_LIST + PATHN_DYNAMICS_LIST:
+            pfname = Path(p, self._syshapePth)
+            setattr(self, f"path_{p}", self._path_sgdata / pfname)
+
+    @property
+    def syshapePth(self) -> str:
+        """Parameter string used in directory/file naming."""
+        if hasattr(self, "_syshapePth") and self._syshapePth is not None:
+            return self._syshapePth
+        return f"N={self.N}"
+
+    @syshapePth.setter
+    def syshapePth(self, value: str) -> None:
+        self._syshapePth = value
+
+    @property
+    def path_sgdata(self) -> Path:
+        """Root data directory for this graph instance."""
+        self._ensure_paths()
+        return self._path_sgdata
+
+    def get_p_fname(
+        self,
+        who: str,
+        out_suffix: str = "",
+        ext: str = BIN,
+    ) -> str | Path:
+        """Build a parametric filename.
+
+        Parameters
+        ----------
+        who : str
+            Filename prefix (e.g. ``'s'``, ``'h'``, ``'edgelist'``).
+        out_suffix : str
+            Additional suffix appended before the extension.
+        ext : str
+            File extension (default ``'.bin'``).
+
+        Returns
+        -------
+        Path
+            Constructed filename (relative, no directory).
+        """
+        return build_p_fname(who, self.pflip, out_suffix=out_suffix, ext=ext)
+
+    def _export_edgel_bin(self, exName: str = "") -> None:
+        """Write edge list to binary file for C backend.
+
+        Binary format per edge: ``(uint64 i, uint64 j, float64 w_ij)``
+        — 24 bytes, matching the NX implementation exactly.
+
+        Parameters
+        ----------
+        exName : str
+            Suffix appended to the filename (typically the run id).
+        """
+        self._ensure_paths()
+        fname = build_p_fname("edgelist", self.pflip, out_suffix=exName, ext=BIN)
+        self.path_exp_edgl = self.path_graph / fname
+        self.path_exp_edgl.parent.mkdir(parents=True, exist_ok=True)
+
+        sign_prop = self.G.edge_properties["sign"]
+        dtype = [("i", np.uint64), ("j", np.uint64), ("w_ij", np.float64)]
+        edge_array = np.array(
+            [(int(e.source()), int(e.target()), float(sign_prop[e]))
+             for e in self.G.edges()],
+            dtype=dtype,
+        )
+        with open(self.path_exp_edgl, "wb") as f:
+            edge_array.tofile(f)
+
+    def remove_exported_files(self) -> None:
+        """Remove all exported binary files created by C backend I/O."""
+        for attr in ("path_exp_edgl",):
+            path = getattr(self, attr, None)
+            if path is not None and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
 
     def __repr__(self) -> str:
         neg = self.count_negative_edges()
