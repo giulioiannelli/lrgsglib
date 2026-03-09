@@ -37,7 +37,8 @@ def main():
                 opts.append(f"--time {args.moretime}")
             opts.append("--jobname")
             opts.append(f"{join_non_empty('_', progn_shrt, args.slanzarv_id, *progargs)}")
-            execpath = LRGSG_SRC.relative_to(Path.cwd()) / f'{progn}.py'
+            src_dir = Path(__file__).resolve().parent
+            execpath = src_dir.relative_to(Path.cwd()) / f'{progn}.py'
             cmd = ['python', str(execpath)] + progargs + unknown
             slanz_cmd = ["slanzarv"] + opts + cmd
             #

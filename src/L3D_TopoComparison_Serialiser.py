@@ -147,7 +147,8 @@ def main():
     memoryfunc = build_memory_function(
         args.slanzarv_minMB, args.slanzarv_maxMB, side_list
     )
-    exec_path = LRGSG_SRC.relative_to(Path.cwd()) / f"{L3D_ISDYN_progname}.py"
+    src_dir = Path(__file__).resolve().parent
+    exec_path = src_dir.relative_to(Path.cwd()) / f"{L3D_ISDYN_progname}.py"
 
     total_printed = total_executed = 0
 

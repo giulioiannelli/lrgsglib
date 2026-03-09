@@ -33,7 +33,8 @@ def main():
     temp_list = list(args.Temp_linsp)
 
     memoryfunc = build_memory_function(args.slanzarv_minMB, args.slanzarv_maxMB, side_list)
-    exec_path = LRGSG_SRC.relative_to(Path.cwd()) / f"{progn}.py"
+    src_dir = Path(__file__).resolve().parent
+    exec_path = src_dir.relative_to(Path.cwd()) / f"{progn}.py"
 
     total_printed = total_executed = 0
 
