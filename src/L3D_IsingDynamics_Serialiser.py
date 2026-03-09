@@ -36,6 +36,9 @@ def _build_passthrough_flags(args) -> list[str]:
         flags.extend(["-g", geo])
 
     # Lattice parameters
+    cell = getattr(args, "cell_type", "rand")
+    if cell != "rand":
+        flags.extend(["-c", cell])
     pdil = getattr(args, "pdil", 0.0)
     if pdil:
         flags.extend(["--pdil", str(pdil)])
@@ -44,6 +47,9 @@ def _build_passthrough_flags(args) -> list[str]:
         flags.extend(["--edge_weight", ew])
         flags.extend(["--mu", str(getattr(args, "mu", 0.0))])
         flags.extend(["--sigma", str(getattr(args, "sigma", 0.0))])
+    wd = getattr(args, "workdir", "")
+    if wd:
+        flags.extend(["-wd", wd])
 
     # Ising dynamics
     rl = getattr(args, "runlang", "C1")
@@ -143,10 +149,20 @@ def _build_passthrough_flags(args) -> list[str]:
     if es != 20:
         flags.extend(["-es", str(es)])
 
-    # Output suffix
+    # Clustering
+    nc = getattr(args, "NoClust", 1)
+    if nc != 1:
+        flags.extend(["-nc", str(nc)])
+    vl = getattr(args, "val", "=1")
+    if vl != "=1":
+        flags.extend(["-vl", vl])
+
+    # Output options
     os_ = getattr(args, "out_suffix", "")
     if os_:
         flags.extend(["-os", os_])
+    if not getattr(args, "randstr", True):
+        flags.append("--no-randstr")
 
     return flags
 
