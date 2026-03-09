@@ -1,92 +1,58 @@
-"""Runtime path detection for lrgsglib.
-
-All paths are resolved relative to the package location at import time.
-Environment variables override defaults for DATA, IPYNB, LOG, and CCORE_BIN.
-
-This replaces the former Makefile-generated file with hardcoded absolute paths.
-"""
-
 from pathlib import Path
-import os
 
-# ---------------------------------------------------------------------------
-# Anchor points
-# ---------------------------------------------------------------------------
-# Package root: lrgsglib/src/lrgsglib/
-_PKG_ROOT = Path(__file__).resolve().parent.parent
-
-# Library root: lrgsglib/ (the submodule / repo root)
-_LIB_ROOT = _PKG_ROOT.parent.parent
-
-# Detect outer project root (if used as submodule in lrgsglib-ipynb)
-# Heuristic: look for ipynb/ directory in parent of library root
-_PROJECT_ROOT = (
-    _LIB_ROOT.parent
-    if (_LIB_ROOT.parent / "ipynb").exists()
-    else _LIB_ROOT
-)
-
-
-# ---------------------------------------------------------------------------
-# Helper
-# ---------------------------------------------------------------------------
-def _path(env_var: str, default: Path) -> Path:
-    """Return Path from environment variable, falling back to default."""
-    val = os.environ.get(env_var)
-    return Path(val) if val else default
-
-
-# ---------------------------------------------------------------------------
-# Library structure paths (relative to package/library root)
-# ---------------------------------------------------------------------------
-LRGSG_LIB: Path = _PKG_ROOT
-LRGSG_BUILD: Path = _LIB_ROOT / "build"
-LRGSG_SRC: Path = _LIB_ROOT / "src"
-LRGSG_TEST: Path = _LIB_ROOT / "test"
-LRGSG_TOOLS: Path = _LIB_ROOT / "tools"
-LRGSG_TOOLS_SCRPT: Path = _LIB_ROOT / "tools" / "bash"
-LRGSG_TOOLS_PY: Path = _LIB_ROOT / "tools" / "py"
-
-# ---------------------------------------------------------------------------
-# Package subpackage paths
-# ---------------------------------------------------------------------------
-LRGSG_LIB_STOCPROC: Path = _PKG_ROOT / "stocproc"
-LRGSG_GRAPHS_GT_L2D_CPP: Path = _PKG_ROOT / "graphs" / "gt" / "Lattice2DGT" / "cpp"
-
-# ---------------------------------------------------------------------------
-# Statsys shared C infrastructure
-# ---------------------------------------------------------------------------
-LRGSG_STATSYS_CCORE: Path = _PKG_ROOT / "statsys" / "_ccore"
-LRGSG_CCORE_SFMT: Path = LRGSG_STATSYS_CCORE / "SFMT"
-
-# Legacy aliases (deprecated — use per-model _c_bin_dir instead)
-LRGSG_LIB_CCORE: Path = LRGSG_STATSYS_CCORE
-LRGSG_CCORE_BIN: Path = _path(
-    "LRGSG_CCORE_BIN", LRGSG_STATSYS_CCORE
-)
-LRGSG_CCORE_STATSYS: Path = LRGSG_STATSYS_CCORE
-
-# ---------------------------------------------------------------------------
-# Per-model C source/binary directories
-# ---------------------------------------------------------------------------
-_STATSYS: Path = _PKG_ROOT / "statsys"
-LRGSG_STATSYS_RBIM: Path = _STATSYS / "IsingDynamics" / "ccore"
-LRGSG_STATSYS_SRW: Path = _STATSYS / "SignedRW" / "ccore"
-LRGSG_STATSYS_VM: Path = _STATSYS / "VoterModel" / "ccore"
-LRGSG_STATSYS_CP: Path = _STATSYS / "ContactProcess" / "ccore"
-LRGSG_RBIM_BASE: Path = LRGSG_STATSYS_RBIM / "base"
-LRGSG_RBIM_SIMC: Path = LRGSG_STATSYS_RBIM
-LRGSG_RBIM_STORE: Path = LRGSG_STATSYS_RBIM / "storer"
-LRGSG_SRW_LATT: Path = LRGSG_STATSYS_SRW / "Lattices"
-
-# ---------------------------------------------------------------------------
-# User-facing / project-level paths (overridable via environment)
-# ---------------------------------------------------------------------------
-LRGSG_DATA: Path = _path("LRGSG_DATA", _PROJECT_ROOT / "data")
-LRGSG_IPYNB: Path = _path("LRGSG_IPYNB", _PROJECT_ROOT / "ipynb")
-LRGSG_LOG: Path = _path("LRGSG_LOG", _PROJECT_ROOT / ".log")
-
-# ---------------------------------------------------------------------------
-# Outer project root
-# ---------------------------------------------------------------------------
-LRGSG_LLIB: Path = _PROJECT_ROOT
+LRGSG_BUILD: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/build')
+LRGSG_DATA: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/data')
+LRGSG_IPYNB: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/ipynb')
+LRGSG_LOG: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/.log')
+LRGSG_SRC: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src')
+LRGSG_TEST: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/test')
+LRGSG_TOOLS: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/tools')
+LRGSG_LIB: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib')
+LRGSG_TOOLS_SCRPT: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/tools/bash')
+LRGSG_TOOLS_PY: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/tools/py')
+LRGSG_LIB_STOCPROC: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/stocproc')
+LRGSG_LIB_STATSYS: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys')
+LRGSG_STATSYS_CCORE: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/_ccore')
+LRGSG_CCORE_SFMT: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/_ccore/SFMT')
+LRGSG_STATSYS_ISING: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/IsingDynamics/ccore')
+LRGSG_STATSYS_ISING_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/IsingDynamics/ccore/bin')
+LRGSG_STATSYS_CP: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/ContactProcess/ccore')
+LRGSG_STATSYS_CP_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/ContactProcess/ccore/bin')
+LRGSG_STATSYS_VM: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/VoterModel/ccore')
+LRGSG_STATSYS_VM_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/VoterModel/ccore/bin')
+LRGSG_STATSYS_SRW: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/SignedRW/ccore')
+LRGSG_STATSYS_KUR: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/KuramotoModel/ccore')
+LRGSG_STATSYS_KUR_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/KuramotoModel/ccore/bin')
+LRGSG_STATSYS_RD: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/ReactionDiffusionModel/ccore')
+LRGSG_STATSYS_RD_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/ReactionDiffusionModel/ccore/bin')
+LRGSG_STATSYS_CODE: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/CoupledODEModel/ccore')
+LRGSG_STATSYS_CODE_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/CoupledODEModel/ccore/bin')
+LRGSG_STATSYS_POTTS: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/PottsModel/ccore')
+LRGSG_STATSYS_POTTS_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/PottsModel/ccore/bin')
+LRGSG_STATSYS_XY: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/XYModel/ccore')
+LRGSG_STATSYS_XY_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/XYModel/ccore/bin')
+LRGSG_STATSYS_HBERG: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/HeisenbergModel/ccore')
+LRGSG_STATSYS_HBERG_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/HeisenbergModel/ccore/bin')
+LRGSG_STATSYS_MSPEC: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/MultiSpeciesModel/ccore')
+LRGSG_STATSYS_MSPEC_BIN: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/MultiSpeciesModel/ccore/bin')
+LRGSG_RBIM_BASE: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/IsingDynamics/ccore/base')
+LRGSG_RBIM_STORE: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/IsingDynamics/ccore/storer')
+LRGSG_RBIM_NATIVE: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/IsingDynamics/ccore/native')
+LRGSG_SRW_LATT: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/statsys/SignedRW/ccore/Lattices')
+LRGSG_LIB_GRAPHS: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs')
+LRGSG_GRAPHS_GT: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt')
+LRGSG_GRAPHS_GT_L2D: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/Lattice2DGT')
+LRGSG_GRAPHS_GT_L2D_CPP: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/Lattice2DGT/cpp')
+LRGSG_GRAPHS_GT_BA: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/BarabasiAlbertGT')
+LRGSG_GRAPHS_GT_BA_CPP: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/BarabasiAlbertGT/cpp')
+LRGSG_GRAPHS_GT_EBA: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/ExtendedBarabasiAlbertGT')
+LRGSG_GRAPHS_GT_EBA_CPP: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/ExtendedBarabasiAlbertGT/cpp')
+LRGSG_GRAPHS_GT_DBA: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/DualBarabasiAlbertGT')
+LRGSG_GRAPHS_GT_DBA_CPP: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/DualBarabasiAlbertGT/cpp')
+LRGSG_GRAPHS_GT_FC: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/FullyConnectedGT')
+LRGSG_GRAPHS_GT_FC_CPP: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/FullyConnectedGT/cpp')
+LRGSG_GRAPHS_GT_HK: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/HolmeKimGT')
+LRGSG_GRAPHS_GT_HK_CPP: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/HolmeKimGT/cpp')
+LRGSG_GRAPHS_GT_MC: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/MultiplicativeCascadeGT')
+LRGSG_GRAPHS_GT_MC_CPP: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb/lrgsglib/src/lrgsglib/graphs/gt/MultiplicativeCascadeGT/cpp')
+LRGSG_LLIB: Path = Path('/home/opisthofulax/Documents/research+/network_topology/lrgsglib-ipynb')

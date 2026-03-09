@@ -19,8 +19,6 @@ LRGSG_PATHS := \
 	TOOLS_SCRPT:bash:TOOLS \
 	TOOLS_PY:py:TOOLS \
 	LIB_STOCPROC:stocproc:LIB \
-	GRAPHS_GT_L2D:Lattice2DGT:GRAPHS_GT \
-	GRAPHS_GT_L2D_CPP:cpp:GRAPHS_GT_L2D \
 	LIB_STATSYS:statsys:LIB \
 	STATSYS_CCORE:_ccore:LIB_STATSYS \
 	CCORE_SFMT:SFMT:STATSYS_CCORE \
@@ -51,6 +49,8 @@ LRGSG_PATHS := \
 	SRW_LATT:Lattices:STATSYS_SRW \
 	LIB_GRAPHS:graphs:LIB \
 	GRAPHS_GT:gt:LIB_GRAPHS \
+	GRAPHS_GT_L2D:Lattice2DGT:GRAPHS_GT \
+	GRAPHS_GT_L2D_CPP:cpp:GRAPHS_GT_L2D \
 	GRAPHS_GT_BA:BarabasiAlbertGT:GRAPHS_GT \
 	GRAPHS_GT_BA_CPP:cpp:GRAPHS_GT_BA \
 	GRAPHS_GT_EBA:ExtendedBarabasiAlbertGT:GRAPHS_GT \
@@ -75,9 +75,9 @@ LIST := $(foreach P,$(LRGSG_PATHS),$(word 1,$(subst :, ,$(P))))
 # print paths
 .PHONY: echo-paths
 echo-paths: $(ALL_PATHS)
-	@echo "LRGSG_ROOT = $(LRGSG_ROOT)"
-	@$(foreach V,$(LIST),echo LRGSG_$(V) = $(LRGSG_$(V));)
-	@echo "LRGSG_LLIB = $(LRGSG_LLIB)"
+	@printf "  %-24s %s\n" "LRGSG_ROOT" "$(LRGSG_ROOT)"
+	@$(foreach V,$(LIST),printf "  %-24s %s\n" "LRGSG_$(V)" "$(LRGSG_$(V))";)
+	@printf "  %-24s %s\n" "LRGSG_LLIB" "$(LRGSG_LLIB)"
 #
 LRGSG_OBJ_DIRS := $(LRGSG_GRAPHS_GT_L2D_CPP) \
            $(LRGSG_SRW_LATT) \
@@ -102,6 +102,7 @@ UNCONFIG_SCRIPT_PATH		= $(LRGSG_TOOLS_SCRPT)/unconfig_env.sh
 # 
 #
 DIRS_TO_MAKE = $(LRGSG_DATA) \
+	$(LRGSG_BUILD)/obj \
 	$(LRGSG_STATSYS_ISING_BIN) \
 	$(LRGSG_STATSYS_CP_BIN) \
 	$(LRGSG_STATSYS_VM_BIN) \
