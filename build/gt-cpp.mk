@@ -21,7 +21,9 @@ GT_SITE_PACKAGES := $(CONDA_PREFIX)/lib/python$(PY3DOTVERSION)/site-packages/gra
 GT_CORE_LIB := $(GT_SITE_PACKAGES)/libgraph_tool_core.so
 
 # Compiler flags
-CXXFLAGS := -O3 -fopenmp -std=gnu++17 -Wall -fPIC -D_GLIBCXX_NO_TIMESPEC_GET $(GT_CFLAGS) -I$(CONDA_PREFIX)/include
+# Workaround: GCC 15 + old conda sysroot lacks timespec_get (see gcc15_compat.h)
+GCC15_COMPAT := $(dir $(lastword $(MAKEFILE_LIST)))gcc15_compat.h
+CXXFLAGS := -O3 -fopenmp -std=gnu++17 -Wall -fPIC -include $(GCC15_COMPAT) $(GT_CFLAGS) -I$(CONDA_PREFIX)/include
 
 # Link flags - link against boost_python and graph_tool_core
 LDFLAGS := -shared $(GT_LIBS) -L$(GT_SITE_PACKAGES) -lgraph_tool_core -Wl,-rpath,$(GT_SITE_PACKAGES)

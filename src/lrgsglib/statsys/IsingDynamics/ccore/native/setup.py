@@ -9,6 +9,9 @@ HERE = Path(__file__).resolve().parent
 CCORE_DIR = HERE.parent          # IsingDynamics/ccore
 SHARED_CCORE = CCORE_DIR.parent.parent / "_ccore"  # statsys/_ccore
 SFMT_DIR = SHARED_CCORE / "SFMT"
+# GCC 15 + old conda sysroot compat (see build/gcc15_compat.h)
+LRGSG_ROOT = CCORE_DIR.parents[4]  # ccore → IsingDynamics → statsys → lrgsglib(pkg) → src → ROOT
+GCC15_COMPAT = str(LRGSG_ROOT / "build" / "gcc15_compat.h")
 
 ext_modules = [
     Pybind11Extension(
@@ -34,7 +37,7 @@ ext_modules = [
             ("DSFMT_MEXP", "19937"),
             ("HAVE_SSE2", None),
         ],
-        extra_compile_args=["-O3", "-msse2", "-D_GLIBCXX_NO_TIMESPEC_GET"],
+        extra_compile_args=["-O3", "-msse2", "-include", GCC15_COMPAT],
     ),
 ]
 

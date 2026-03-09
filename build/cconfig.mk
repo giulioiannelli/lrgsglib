@@ -1,6 +1,8 @@
 GCC := $(CONDA_PREFIX)/bin/gcc
 CPP := $(CONDA_PREFIX)/bin/g++
-CXXFLAGS      = -O3 -Wall -shared -std=c++14 -fPIC -D_GLIBCXX_NO_TIMESPEC_GET
+# Workaround: GCC 15 + old conda sysroot lacks timespec_get (see gcc15_compat.h)
+GCC15_COMPAT := $(LRGSG_BUILD)/gcc15_compat.h
+CXXFLAGS      = -O3 -Wall -shared -std=c++14 -fPIC -include $(GCC15_COMPAT)
 GFLAGS        = -g
 OFLAGS        = -O3
 DSFMTFLAG     = -DSFMT_MEXP=19937

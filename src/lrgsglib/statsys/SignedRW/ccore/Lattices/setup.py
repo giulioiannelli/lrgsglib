@@ -20,6 +20,9 @@ def get_python_version():
 
 # Get the environment path
 env_path = os.path.dirname(sys.executable)
+# GCC 15 + old conda sysroot compat (see build/gcc15_compat.h)
+_here = os.path.dirname(os.path.abspath(__file__))
+_gcc15_compat = os.path.join(_here, '..', '..', '..', '..', '..', '..', 'build', 'gcc15_compat.h')
 
 ext_modules = [
     Extension(
@@ -37,7 +40,7 @@ ext_modules = [
             # Library dirs for the Conda environment
             os.path.join(env_path, 'lib'),
         ],
-        extra_compile_args=['-D_GLIBCXX_NO_TIMESPEC_GET'],
+        extra_compile_args=['-include', _gcc15_compat],
         libraries=[f'boost_python{get_python_version()}'],  # Dynamically set the Boost.Python library
         language='c++'
     ),
