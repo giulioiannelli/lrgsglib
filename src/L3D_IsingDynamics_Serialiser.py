@@ -143,6 +143,11 @@ def _build_passthrough_flags(args) -> list[str]:
     if es != 20:
         flags.extend(["-es", str(es)])
 
+    # Output suffix
+    os_ = getattr(args, "out_suffix", "")
+    if os_:
+        flags.extend(["-os", os_])
+
     return flags
 
 
