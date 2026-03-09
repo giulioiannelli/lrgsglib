@@ -39,8 +39,8 @@ ext_modules = [
             # Library dirs for the Conda environment
             os.path.join(env_path, 'lib'),
         ],
-        extra_compile_args=['-O3'],  # Enable O3 optimization
-        extra_link_args=['-O3'],     # Enable O3 optimization for linking
+        extra_compile_args=['-O3', '-D_GLIBCXX_NO_TIMESPEC_GET'],
+        extra_link_args=['-O3'],
         libraries=[f'boost_python{get_python_version()}'],  # Dynamically set the Boost.Python library
         language='c++'
     ),

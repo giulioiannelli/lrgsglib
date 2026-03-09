@@ -1,6 +1,6 @@
 GCC := $(CONDA_PREFIX)/bin/gcc
 CPP := $(CONDA_PREFIX)/bin/g++
-CXXFLAGS      = -O3 -Wall -shared -std=c++14 -fPIC
+CXXFLAGS      = -O3 -Wall -shared -std=c++14 -fPIC -D_GLIBCXX_NO_TIMESPEC_GET
 GFLAGS        = -g
 OFLAGS        = -O3
 DSFMTFLAG     = -DSFMT_MEXP=19937

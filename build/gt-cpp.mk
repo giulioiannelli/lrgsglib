@@ -21,7 +21,7 @@ GT_SITE_PACKAGES := $(CONDA_PREFIX)/lib/python$(PY3DOTVERSION)/site-packages/gra
 GT_CORE_LIB := $(GT_SITE_PACKAGES)/libgraph_tool_core.so
 
 # Compiler flags
-CXXFLAGS := -O3 -fopenmp -std=gnu++17 -Wall -fPIC $(GT_CFLAGS) -I$(CONDA_PREFIX)/include
+CXXFLAGS := -O3 -fopenmp -std=gnu++17 -Wall -fPIC -D_GLIBCXX_NO_TIMESPEC_GET $(GT_CFLAGS) -I$(CONDA_PREFIX)/include
 
 # Link flags - link against boost_python and graph_tool_core
 LDFLAGS := -shared $(GT_LIBS) -L$(GT_SITE_PACKAGES) -lgraph_tool_core -Wl,-rpath,$(GT_SITE_PACKAGES)

@@ -34,7 +34,7 @@ ext_modules = [
             ("DSFMT_MEXP", "19937"),
             ("HAVE_SSE2", None),
         ],
-        extra_compile_args=["-O3", "-msse2"],
+        extra_compile_args=["-O3", "-msse2", "-D_GLIBCXX_NO_TIMESPEC_GET"],
     ),
 ]
 
