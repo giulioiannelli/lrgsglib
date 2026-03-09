@@ -116,6 +116,18 @@ def _build_passthrough_flags(args) -> list[str]:
     # Result persistence
     if getattr(args, 'save_results', False):
         flags.append('--save-results')
+        sf = getattr(args, 'save_frequency', 0)
+        if sf > 0:
+            flags.extend(['-sf', str(sf)])
+        # Observable selection (only forward non-defaults)
+        if not getattr(args, 'save_ene', True):
+            flags.append('--no-save-ene')
+        if not getattr(args, 'save_magn', True):
+            flags.append('--no-save-magn')
+        if getattr(args, 'save_sout', False):
+            flags.append('--save-sout')
+        if getattr(args, 'save_all', False):
+            flags.append('--save-all')
 
     # Other Ising options
     ic = getattr(args, "init_cond", "ground_state_0")
@@ -127,6 +139,9 @@ def _build_passthrough_flags(args) -> list[str]:
     ts = getattr(args, "thrmsteps", 20)
     if ts != 20:
         flags.extend(["-ts", str(ts)])
+    es = getattr(args, "eqstep", 20)
+    if es != 20:
+        flags.extend(["-es", str(es)])
 
     return flags
 
@@ -152,10 +167,21 @@ def main():
 
     total_printed = total_executed = 0
 
-    def dispatch(L: int, p: float, T: float) -> None:
+    # In SA/PT mode, temperature is controlled by the schedule — no T sweep
+    use_sa = getattr(args, "sa_mode", False)
+    use_pt = getattr(args, "pt_mode", False)
+    if use_sa or use_pt:
+        temp_list = [None]
+
+    def dispatch(L: int, p: float, T: float | None) -> None:
         nonlocal total_printed, total_executed
 
-        prog_args = [str(L), f"{p:.3g}", f"{T:.3g}"]
+        prog_args = [str(L), "-p", f"{p:.3g}"]
+        jobname_tokens = [str(L), f"{p:.3g}"]
+        if T is not None:
+            prog_args.extend(["-T", f"{T:.3g}"])
+            jobname_tokens.append(f"{T:.3g}")
+
         cmd = ["python", str(exec_path), *prog_args, *passthrough]
 
         slanz_opts: list[str] = ["-m", str(memoryfunc(L))]
@@ -168,7 +194,7 @@ def main():
 
         jobname = build_jobname(
             program_short=progn_shrt,
-            tokens=prog_args,
+            tokens=jobname_tokens,
             job_id=getattr(args, "slanzarv_id", None) or None,
             prefix_job_id=False,
         )

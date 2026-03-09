@@ -540,48 +540,52 @@ static py::tuple topo_met_sampling(
         seed_rng(seed_val);
 
         for (size_t step = 0; step < n_steps; ++step) {
-            /* 1. Select mode via CDF */
-            double r = RNG_dbl();
-            size_t m = 0;
-            for (size_t k = 0; k < M; ++k) {
-                if (r < cdf[k]) { m = k; break; }
+            /* 1 MC step = N coefficient proposals */
+            for (size_t prop = 0; prop < N; ++prop) {
+                /* 1. Select mode via CDF */
+                double r = RNG_dbl();
+                size_t m = 0;
+                for (size_t k = 0; k < M; ++k) {
+                    if (r < cdf[k]) { m = k; break; }
+                }
+
+                /* 2. Propose delta ~ N(0, sigma[m]) */
+                double delta = rng_normal() * sigma[m];
+
+                /* 3. Incremental field update + binarize */
+                const double *vm = V + m * N;
+                for (size_t i = 0; i < N; ++i) {
+                    field_new[i] = field[i] + delta * vm[i];
+                    double f = field_new[i];
+                    if      (f > 0.0)  spins_new[i] =  1;
+                    else if (f < 0.0)  spins_new[i] = -1;
+                    else               spins_new[i] = spins[i];
+                }
+
+                /* 4. Compute energy of proposed config */
+                double E_new = calc_totEnergy(N, spins_new.data(),
+                                              graph.nlen.data(),
+                                              graph.node_edges.data());
+                double dE = E_new - E_current;
+
+                /* 5. Metropolis accept/reject */
+                bool accept = (dE <= 0.0);
+                if (!accept && T > 0.0) {
+                    accept = (RNG_dbl() < std::exp(-dE / T));
+                }
+
+                if (accept) {
+                    coeffs[m] += delta;
+                    std::swap(field, field_new);
+                    std::swap(spins, spins_new);
+                    E_current = E_new;
+                    accept_cnt[m]++;
+                }
+
+                total_cnt[m]++;
             }
 
-            /* 2. Propose delta ~ N(0, sigma[m]) */
-            double delta = rng_normal() * sigma[m];
-
-            /* 3. Incremental field update + binarize */
-            const double *vm = V + m * N;    /* row m of subspace_vecs */
-            for (size_t i = 0; i < N; ++i) {
-                field_new[i] = field[i] + delta * vm[i];
-                double f = field_new[i];
-                if      (f > 0.0)  spins_new[i] =  1;
-                else if (f < 0.0)  spins_new[i] = -1;
-                else               spins_new[i] = spins[i];  /* keep old */
-            }
-
-            /* 4. Compute energy of proposed config */
-            double E_new = calc_totEnergy(N, spins_new.data(),
-                                          graph.nlen.data(),
-                                          graph.node_edges.data());
-            double dE = E_new - E_current;
-
-            /* 5. Metropolis accept/reject */
-            bool accept = (dE <= 0.0);
-            if (!accept && T > 0.0) {
-                accept = (RNG_dbl() < std::exp(-dE / T));
-            }
-
-            if (accept) {
-                coeffs[m] += delta;
-                std::swap(field, field_new);
-                std::swap(spins, spins_new);
-                E_current = E_new;
-                accept_cnt[m]++;
-            }
-
-            total_cnt[m]++;
-
+            /* Record once per MC step (after N proposals) */
             ene_out[step]  = E_current;
             magn_out[step] = calc_magn(N, spins.data());
 

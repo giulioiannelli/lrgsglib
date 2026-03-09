@@ -1268,8 +1268,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ndarray, shape ``(N,)``
             External field ``h_i``.
         """
-        # softmax(-E / tau): lower energy → higher weight
-        logits = -rbim_energies / tau
+        # Normalize energies by |E_min| so gaps are O(0.01–0.1)
+        E_min_abs = np.abs(rbim_energies.min())
+        normed = rbim_energies / E_min_abs if E_min_abs > 0 else rbim_energies
+        # softmax(-E_norm / tau): lower energy → higher weight
+        logits = -normed / tau
         logits -= logits.max()                       # numerical stability
         weights = np.exp(logits)
         weights /= weights.sum()
@@ -1317,6 +1320,10 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     ) -> None:
         """MC in spectral coefficient space with mode-weighted selection.
 
+        One MC step = *N* coefficient proposals (analogous to one lattice
+        sweep), where *N* is the number of sites.  Energy and magnetization
+        are recorded once per step.
+
         See :ref:`topological-algorithms` for algorithm details.
         """
         n_modes = min(self.topo_n_modes, self.N)
@@ -1357,35 +1364,42 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             if tqdm_on else range(self.steps)
         )
 
+        n_proposals = self.N  # 1 MC step = N proposals
+
         for step in iterator:
-            # 1. select mode
-            m = int(rng.choice(n_modes, p=mode_w))
+            for _ in range(n_proposals):
+                # 1. select mode
+                m = int(rng.choice(n_modes, p=mode_w))
 
-            # 2. propose perturbation
-            delta = float(rng.normal(0.0, sigma[m]))
-            field_new = field + delta * V[m]
+                # 2. propose perturbation
+                delta = float(rng.normal(0.0, sigma[m]))
+                field_new = field + delta * V[m]
 
-            # 3. binarize (keep old spin where field=0)
-            s_new = np.sign(field_new)
-            zeros = s_new == 0
-            s_new[zeros] = spins[zeros]
+                # 3. binarize (keep old spin where field=0)
+                s_new = np.sign(field_new)
+                zeros = s_new == 0
+                s_new[zeros] = spins[zeros]
 
-            # 4. energy
-            E_new = float(compute_ising_pairwise_energy(s_new, edges))
-            dE = E_new - E_current
+                # 4. energy
+                E_new = float(
+                    compute_ising_pairwise_energy(s_new, edges)
+                )
+                dE = E_new - E_current
 
-            # 5. Metropolis
-            if dE <= 0 or (
-                self.T > 0 and rng.random() < np.exp(-dE / self.T)
-            ):
-                coeffs[m] += delta
-                field = field_new
-                spins = s_new
-                E_current = E_new
-                accept_cnt[m] += 1
+                # 5. Metropolis
+                if dE <= 0 or (
+                    self.T > 0
+                    and rng.random() < np.exp(-dE / self.T)
+                ):
+                    coeffs[m] += delta
+                    field = field_new
+                    spins = s_new
+                    E_current = E_new
+                    accept_cnt[m] += 1
 
-            total_cnt[m] += 1
+                total_cnt[m] += 1
 
+            # --- record once per MC step ---
             self.ene.append(E_current)
             self.magn.append(float(np.sum(spins)))
 
@@ -1393,7 +1407,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 best_E = E_current
                 best_s = spins.copy()
 
-            # 6. adaptive sigma every chunk
+            # adaptive sigma every chunk steps
             if (step + 1) % self.topo_chunk_size == 0:
                 for mm in range(n_modes):
                     if total_cnt[mm] > 0:
@@ -1428,11 +1442,16 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     # =========================================================================
 
     def topological_fca_sampling(self, tqdm_on: bool = True) -> None:
-        """SA with a static spectral external field.
+        """Field-constrained quench: spectral field + T~0 Metropolis.
 
         Constructs ``h_i = field_strength * Σ_k c_k v_k[i]`` where
-        ``c_k = softmax(-E_k / tau)`` from RBIM energies, then runs
-        the standard simulated-annealing loop with this field.
+        ``c_k = softmax(-E_k / tau)`` from RBIM energies, then performs
+        a sudden quench from a paramagnetic configuration: standard
+        Metropolis at near-zero temperature lets the system relax under
+        the topological field, reaching a structure-informed minimum.
+
+        The total number of MC sweeps equals
+        ``n_temperatures * steps_per_T`` (matching the SA step budget).
         """
         n_modes = min(self.topo_n_modes, self.N)
         self._ensure_spectral_subspace(n_modes)
@@ -1444,16 +1463,29 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         )
         self.topo_fca_field = spectral_field.copy()
 
-        # Set external field and delegate to SA
+        # Sudden quench: Metropolis at T~0 with spectral field
         self.field = spectral_field
-        self.simulated_annealing_sampling(tqdm_on)
+        saved_T, saved_steps = self.T, self.steps
+        self.T = 1e-3
+        self.steps = self.n_temperatures * self.steps_per_T
+        self.metropolis_sampling(tqdm_on)
+        self.T, self.steps = saved_T, saved_steps
 
     # =========================================================================
     # Pybind11 Topological FCA  (pb_topo_fca)
     # =========================================================================
 
     def _run_pybind_topo_fca(self) -> None:
-        """Compute spectral field, then delegate to pybind11 SA."""
+        """Field-constrained quench: spectral field + T~0 Metropolis.
+
+        Builds an eigenvector-weighted external field, then performs a
+        sudden quench from a paramagnetic configuration: standard
+        Metropolis at near-zero temperature lets the system relax under
+        the topological field, reaching a structure-informed minimum.
+
+        The total number of MC sweeps equals
+        ``n_temperatures * steps_per_T`` (matching the SA step budget).
+        """
         n_modes = min(self.topo_n_modes, self.N)
         self._ensure_spectral_subspace(n_modes)
         V = self._build_subspace_matrix(n_modes)
@@ -1464,7 +1496,13 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         )
         self.topo_fca_field = spectral_field.copy()
         self.field = spectral_field
-        self._run_pybind_sa()
+
+        # Sudden quench: Metropolis at T~0 with spectral field
+        saved_T, saved_steps = self.T, self.steps
+        self.T = 1e-3
+        self.steps = self.n_temperatures * self.steps_per_T
+        self._run_pybind_met()
+        self.T, self.steps = saved_T, saved_steps
 
     # =========================================================================
     # Pybind11 Topological Metropolis  (pb_topo_met)

@@ -84,7 +84,7 @@ def main() -> None:
         probability_str = _format_value_consistently(probability, p_precision)
         prog_args = [
             str(L),
-            probability_str,
+            "-p", probability_str,
         ]
 
         # Add mode-specific flags

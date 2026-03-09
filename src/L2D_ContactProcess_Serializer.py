@@ -77,7 +77,7 @@ def main() -> None:
 
         prog_args = [
             str(L),
-            _format_value_consistently(pflip, p_precision),
+            "-p", _format_value_consistently(pflip, p_precision),
             "--dynamics",
             dynamics,
             "--runlang",

@@ -3,6 +3,7 @@ from numpy import linspace
 DEFAULT_INIT_COND = 'ground_state_0'
 DEFAULT_RUNLANG = 'C1'
 DEFAULT_THRMSTEPS = 20
+DEFAULT_EQSTEP = 20
 DEFAULT_TEMP_LINSP = linspace(0.1, 2.2, 10).round(decimals=2)
 DEFAULT_randstr = True
 # Simulated Annealing defaults
@@ -31,3 +32,8 @@ DEFAULT_TOPO_FIELD_STRENGTH = 1.0
 DEFAULT_N_THERMAL = 1
 # Result persistence
 DEFAULT_SAVE_RESULTS = False
+DEFAULT_SAVE_FREQUENCY = 0
+DEFAULT_SAVE_ENE = True
+DEFAULT_SAVE_MAGN = True
+DEFAULT_SAVE_SOUT = False
+DEFAULT_SAVE_ALL = False

@@ -7,83 +7,46 @@ from :mod:`kernels.IsingDynamics`.  Engine-agnostic: the graph engine
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
-
-import numpy as np
 
 from lrgsglib import *
 from .L3D import get_l3d_out_suffix, prepare_lattice
 from .IsingDynamics import (
-    initialize_ising_dict_args,
     run_ising_dynamics,
     clean_up_files,
+    resolve_save_flags,
+    build_ising_stem,
+    load_ising_checkpoint,
+    save_ising_checkpoint,
+    find_completed_quenches,
+    extract_ene_data,
+    extract_magn_data,
+    extract_sout_data,
+    extract_coeffs_data,
+    new_accumulator,
+    rebuild_accumulator,
+    append_run,
+    finalize_accumulator,
+    should_checkpoint,
 )
 
 __all__ = ["run_simulation"]
 
-
-def _save_ising_results(isdy, lattice, args, quench_idx: int) -> Path:
-    """Save energy/magnetization trajectories to an NPZ file.
-
-    Parameters
-    ----------
-    isdy : IsingDynamics
-        Executed IsingDynamics instance with results.
-    lattice : SignedGraph
-        The lattice used for the simulation.
-    args : argparse.Namespace
-        Parsed CLI arguments.
-    quench_idx : int
-        Index of the current disorder realization.
-
-    Returns
-    -------
-    Path
-        Path to the saved NPZ file.
-    """
-    save_dir = Path(lattice.path_sgdata) / "ising_results"
-    save_dir.mkdir(parents=True, exist_ok=True)
-
-    rl = isdy.runlang
-    side = getattr(lattice, "side1", 0)
-    pflip = getattr(lattice, "pflip", 0.0)
-    fname = f"ising_{rl}_L{side}_p{pflip:.3g}_q{quench_idx:03d}.npz"
-
-    data: dict[str, Any] = {
-        "runlang": rl,
-        "side": side,
-        "pflip": pflip,
-        "N": isdy.N,
-    }
-    # Standard trajectories
-    if hasattr(isdy, "ene") and isdy.ene is not None:
-        data["ene"] = np.asarray(isdy.ene)
-    if hasattr(isdy, "magn") and isdy.magn is not None:
-        data["magn"] = np.asarray(isdy.magn)
-    # SA trajectories
-    if hasattr(isdy, "sa_energy") and isdy.sa_energy is not None:
-        data["sa_energy"] = np.asarray(isdy.sa_energy)
-        data["sa_magn"] = np.asarray(isdy.sa_magn)
-        data["sa_temps"] = np.asarray(isdy.sa_temps)
-    # Topo_met results
-    if hasattr(isdy, "topo_met_best_energy"):
-        data["topo_met_best_energy"] = isdy.topo_met_best_energy
-        if hasattr(isdy, "topo_met_best_spins"):
-            data["topo_met_best_spins"] = isdy.topo_met_best_spins
-        if hasattr(isdy, "topo_met_coeffs"):
-            data["topo_met_coeffs"] = isdy.topo_met_coeffs
-    # Topo_fca results
-    if hasattr(isdy, "topo_fca_field") and isdy.topo_fca_field is not None:
-        data["topo_fca_field"] = isdy.topo_fca_field
-
-    out_path = save_dir / fname
-    np.savez_compressed(out_path, **data)
-    return out_path
+# Map observable prefix → extractor function
+_EXTRACTORS = {
+    "ene": extract_ene_data,
+    "magn": extract_magn_data,
+    "sout": extract_sout_data,
+    "coeffs": extract_coeffs_data,
+}
 
 
 def run_simulation(args: Any) -> None:
     """Run L3D Ising dynamics with quenched + thermal averaging.
+
+    Supports progressive checkpointing (``--save_frequency``) and
+    resume from partial runs.  Each observable is saved to its own
+    NPZ file with an ``_nt=<count>`` progress token.
 
     Parameters
     ----------
@@ -93,13 +56,44 @@ def run_simulation(args: Any) -> None:
     """
     n_quench = getattr(args, "number_of_averages", 1)
     n_thermal = getattr(args, "n_thermal", 1)
+    save_freq = getattr(args, "save_frequency", 0)
     out_suffix = get_l3d_out_suffix(args)
+    save_flags = resolve_save_flags(args)
+    any_save = any(save_flags.values())
 
-    for _q in range(n_quench):
+    # ── Pre-scan for completed quenches ──────────────────────────
+    completed_q: set[int] = set()
+    if any_save and n_quench > 1:
+        probe = prepare_lattice(args)
+        # Stash topo_n_modes on lattice for stem builder
+        rl = getattr(args, "runlang", "C1")
+        if "topo" in rl.lower():
+            probe._topo_n_modes = getattr(args, "topo_n_modes", 0)
+        active_prefixes = [p for p, on in save_flags.items() if on]
+        first_pfx = active_prefixes[0]
+        stem0, save_dir0 = build_ising_stem(
+            first_pfx, rl, probe, 1, is_l3d=True,
+        )
+        # stem without the _q=001 suffix
+        stem_no_q = stem0.rsplit("_q=", 1)[0]
+        completed_q = find_completed_quenches(
+            save_dir0, stem_no_q, n_thermal,
+            prefixes=active_prefixes,
+        )
+        if completed_q:
+            print(
+                f"Resuming: skipping {len(completed_q)} completed "
+                f"quenches q={sorted(completed_q)}"
+            )
+
+    # ── Quench loop ──────────────────────────────────────────────
+    for _q in range(1, n_quench + 1):
+        if _q in completed_q:
+            continue
+
         lattice = prepare_lattice(args)
 
-        # Optional: eigenvector-based init for ground_state_k conditions
-        # Requires compute_k_eigvV / load_eigV_on_graph on the graph class.
+        # Eigenvector-based init for ground_state_k conditions
         ic = getattr(args, "init_cond", "rand")
         if ic.startswith("ground_state") or ic.startswith("gs"):
             k = int(ic.rsplit("_", 1)[-1])
@@ -112,18 +106,74 @@ def run_simulation(args: Any) -> None:
                 import warnings
 
                 warnings.warn(
-                    f"ground_state init requested but {type(lattice).__name__} "
-                    "does not support eigenvector loading. Using random init.",
+                    f"ground_state init requested but "
+                    f"{type(lattice).__name__} does not support "
+                    "eigenvector loading. Using random init.",
                     RuntimeWarning,
                     stacklevel=2,
                 )
                 args.init_cond = "rand"
 
-        for _t in range(n_thermal):
-            isdy = run_ising_dynamics(args, lattice, out_suffix=out_suffix)
-            if getattr(args, 'save_results', False):
-                _save_ising_results(
-                    isdy, lattice, args, _q * n_thermal + _t
-                )
+        # ── Set up per-observable accumulators ───────────────────
+        rl = getattr(args, "runlang", "C1")
+        if "topo" in rl.lower():
+            lattice._topo_n_modes = getattr(args, "topo_n_modes", 0)
+
+        obs_state: dict[str, dict[str, Any]] = {}
+        for prefix, enabled in save_flags.items():
+            if not enabled:
+                continue
+            stem, save_dir = build_ising_stem(
+                prefix, rl, lattice, _q, is_l3d=True,
+            )
+            prior, n_done, old_path = load_ising_checkpoint(
+                save_dir, stem,
+            )
+            acc = (
+                rebuild_accumulator(prior)
+                if prior is not None
+                else new_accumulator(lattice, args, _q, is_l3d=True)
+            )
+            obs_state[prefix] = {
+                "stem": stem,
+                "dir": save_dir,
+                "acc": acc,
+                "n_done": n_done,
+                "old_path": old_path,
+            }
+
+        # Resume point: minimum across all observables
+        n_done = (
+            min(s["n_done"] for s in obs_state.values())
+            if obs_state
+            else 0
+        )
+
+        # ── Thermal loop ────────────────────────────────────────
+        for _t in range(n_done, n_thermal):
+            isdy = run_ising_dynamics(
+                args, lattice, out_suffix=out_suffix,
+            )
+
+            # Extract and accumulate each observable
+            for prefix, state in obs_state.items():
+                single = _EXTRACTORS[prefix](isdy)
+                append_run(state["acc"], single)
+
+            current_nt = _t + 1
+            if should_checkpoint(current_nt, save_freq, n_thermal):
+                for prefix, state in obs_state.items():
+                    final = finalize_accumulator(
+                        state["acc"], current_nt,
+                    )
+                    new_path = save_ising_checkpoint(
+                        final,
+                        state["dir"],
+                        state["stem"],
+                        current_nt,
+                        old_path=state["old_path"],
+                    )
+                    state["old_path"] = new_path
+
             if args.remove_files:
                 clean_up_files(isdy, lattice)

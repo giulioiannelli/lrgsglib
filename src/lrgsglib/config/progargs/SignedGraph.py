@@ -3,14 +3,15 @@ from .common import *
 from .phelp.SignedGraph import *
 from .defs.SignedGraph import *
 
-SG_args = {
-    'p': {
-        'help': phelp_p,
-        'type': float
-    }
-}
+SG_args: dict = {}
 
 SG_opt_args = {
+    tuple(['-p', '--pflip']): {
+        'help': phelp_p,
+        'type': float,
+        'default': 0.0,
+        'dest': 'p',
+    },
     tuple(['-c', '--cell_type']): {
         'help': phelp_cell,
         'type': str,

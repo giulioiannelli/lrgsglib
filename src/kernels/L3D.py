@@ -88,6 +88,10 @@ def prepare_lattice(args: Any, **kwargs: Any) -> Any:
 
     Supports ``--graph_engine`` argument: when ``args.graph_engine == 'gt'``,
     creates a ``Lattice3DGT`` instance instead of the default NX class.
+
+    When ``init_cond`` is ``"rand"`` (or not a ground-state variant),
+    skips the expensive eigenvector/energy precomputation so that large
+    lattices (L>=20) can be created without full diagonalisation.
     """
     engine = get_graph_engine(args)
 
@@ -105,9 +109,23 @@ def prepare_lattice(args: Any, **kwargs: Any) -> Any:
         lattice.flip_random_fract_edges()
         return lattice
 
+    # Determine whether eigenspace computation is needed
+    ic = getattr(args, "init_cond", "rand")
+    needs_eigV = ic.startswith("ground_state") or ic.startswith("gs")
+
     # Default NX path (preserves load_or_compute and cell_type logic)
     base_kwargs = initialize_l3d_dict_args(args)
     cell_type = getattr(args, "cell_type", None)
     if cell_type is not None:
         base_kwargs["cell_type"] = cell_type
-    return load_or_compute_Lattice3D(**base_kwargs, **kwargs)
+
+    if needs_eigV:
+        return load_or_compute_Lattice3D(**base_kwargs, **kwargs)
+
+    # Fast path: construct lattice without eigenspace computation
+    base_kwargs.pop("cell_type", None)  # only used by load_or_compute
+    lattice = Lattice3D(**base_kwargs, **kwargs)
+    pflip = getattr(lattice, "pflip", 0.0)
+    if pflip and pflip > 0.0:
+        lattice.flip_random_fract_edges()
+    return lattice

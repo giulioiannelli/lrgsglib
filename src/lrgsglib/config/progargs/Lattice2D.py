@@ -8,15 +8,17 @@ from .defs.Lattice2D import *
 #
 L2D_args = {
     'L': {
-        'help': phelp_L, 
+        'help': phelp_L,
         'type': int
     },
-    'p': {
-        'help': phelp_p,
-        'type': float
-    }
 }
 L2D_opt_args = {
+    tuple(['-p', '--pflip']): {
+        'help': phelp_p,
+        'type': float,
+        'default': 0.0,
+        'dest': 'p',
+    },
     tuple(['-c', '--cell_type']): {
         'help': phelp_cell,
         'type': str,

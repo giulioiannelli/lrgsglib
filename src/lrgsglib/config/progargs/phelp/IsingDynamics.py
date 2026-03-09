@@ -8,6 +8,7 @@ phelp_runlang = (
     "C1/C1b/C3/C3b/C4/C4b (C subprocess, NX only)"
 )
 phelp_thrmsteps = "Number of thermalization steps"
+phelp_eqstep = "Number of equilibrium/optimization MC steps (1 step = N proposals)"
 phelp_randstr = "Random string for the output files"
 # Simulated Annealing help text
 phelp_sa_mode = "Enable simulated annealing mode"
@@ -36,4 +37,9 @@ phelp_topo_field_strength = "Overall field magnitude scale for TFCA"
 # Thermal averaging help text
 phelp_n_thermal = "Number of independent thermal runs per disorder realization"
 # Result persistence help text
-phelp_save_results = "Save energy/magnetization trajectories to NPZ files"
+phelp_save_results = "Master switch: enable saving results to NPZ files"
+phelp_save_frequency = "Checkpoint every N thermal runs (0 = save only at end)"
+phelp_save_ene = "Save energy trajectories"
+phelp_save_magn = "Save magnetization trajectories"
+phelp_save_sout = "Save spin snapshots at log-spaced time points"
+phelp_save_all = "Save all observables (ene + magn + sout + topo coeffs)"

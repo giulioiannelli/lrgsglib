@@ -6,13 +6,14 @@ from .Lattice2D import *
 from .Lattice3D import *
 from .ErdosRenyi import *
 # general arguments
-IsDyn_args = {
-    'T': {
-        'help': phelp_T,
-        'type': float
-    }
-}
+IsDyn_args: dict = {}
 IsDyn_opt_args = {
+    tuple(['-T', '--temperature']): {
+        'help': phelp_T,
+        'type': float,
+        'default': 1.0,
+        'dest': 'T',
+    },
     tuple(['-fq', '--freq']): {
         'help': phelp_freq,
         'type': int,
@@ -43,6 +44,11 @@ IsDyn_opt_args = {
         'type': int,
         'default': DEFAULT_THRMSTEPS
     },
+    tuple(['-es', '--eqstep']): {
+        'help': phelp_eqstep,
+        'type': int,
+        'default': DEFAULT_EQSTEP
+    },
     tuple(['-vl', '--val']): {
         'help': phelp_val,
         'type': str,
@@ -57,6 +63,31 @@ IsDyn_opt_args = {
         'help': phelp_n_thermal,
         'type': int,
         'default': DEFAULT_N_THERMAL,
+    },
+    tuple(['-sf', '--save_frequency']): {
+        'help': phelp_save_frequency,
+        'type': int,
+        'default': DEFAULT_SAVE_FREQUENCY,
+    },
+    tuple(['--save-ene']): {
+        'help': phelp_save_ene,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_SAVE_ENE,
+    },
+    tuple(['--save-magn']): {
+        'help': phelp_save_magn,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_SAVE_MAGN,
+    },
+    tuple(['--save-sout']): {
+        'help': phelp_save_sout,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_SAVE_SOUT,
+    },
+    tuple(['--save-all']): {
+        'help': phelp_save_all,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_SAVE_ALL,
     },
 }
 # Simulated Annealing arguments

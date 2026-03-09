@@ -1,78 +1,120 @@
+"""Kernel for Ising dynamics on 2D lattices.
+
+Supports three execution paths:
+- GT engine (skip eigvec/cluster pipeline)
+- NX direct (no ground-state init)
+- NX ground-state (eigenvector/cluster-based init)
+
+All paths share the same checkpoint/accumulation logic via
+:mod:`kernels.IsingDynamics`.
+"""
+
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
-
-import numpy as np
 
 from lrgsglib import *
 from .L2D import *
-from .IsingDynamics import *
+from .IsingDynamics import (
+    initialize_ising_dict_args,
+    get_out_suffix,
+    run_ising_dynamics,
+    clean_up_files,
+    resolve_save_flags,
+    build_ising_stem,
+    load_ising_checkpoint,
+    save_ising_checkpoint,
+    find_completed_quenches,
+    extract_ene_data,
+    extract_magn_data,
+    extract_sout_data,
+    extract_coeffs_data,
+    new_accumulator,
+    rebuild_accumulator,
+    append_run,
+    finalize_accumulator,
+    should_checkpoint,
+)
 from parsers.shared import get_graph_engine
 
+# Map observable prefix → extractor function
+_EXTRACTORS = {
+    "ene": extract_ene_data,
+    "magn": extract_magn_data,
+    "sout": extract_sout_data,
+    "coeffs": extract_coeffs_data,
+}
 
-def _save_ising_results(isdy, lattice, args, quench_idx: int) -> Path:
-    """Save energy/magnetization trajectories to an NPZ file (L2D).
 
-    Parameters
-    ----------
-    isdy : IsingDynamics
-        Executed IsingDynamics instance with results.
-    lattice : SignedGraph
-        The 2D lattice used for the simulation.
-    args : argparse.Namespace
-        Parsed CLI arguments.
-    quench_idx : int
-        Index of the current disorder realization.
+# ── Checkpoint helpers (shared by all L2D paths) ─────────────────────
 
-    Returns
-    -------
-    Path
-        Path to the saved NPZ file.
+def _setup_obs_state(
+    save_flags: dict[str, bool],
+    rl: str,
+    lattice: Any,
+    quench_idx: int,
+    args: Any,
+) -> dict[str, dict[str, Any]]:
+    """Build per-observable accumulator state for one quench.
+
+    Returns a dict keyed by prefix ("ene", "magn", ...) with entries:
+    ``stem``, ``dir``, ``acc``, ``n_done``, ``old_path``.
     """
-    save_dir = Path(lattice.path_sgdata) / "ising_results"
-    save_dir.mkdir(parents=True, exist_ok=True)
+    if "topo" in rl.lower():
+        lattice._topo_n_modes = getattr(args, "topo_n_modes", 0)
 
-    rl = isdy.runlang
-    side = getattr(lattice, "side1", 0)
-    pflip = getattr(lattice, "pflip", 0.0)
-    geo = getattr(lattice, "geo", "sqr")
-    fname = (
-        f"ising_{rl}_L{side}_{geo}_p{pflip:.3g}_q{quench_idx:03d}.npz"
-    )
+    obs_state: dict[str, dict[str, Any]] = {}
+    for prefix, enabled in save_flags.items():
+        if not enabled:
+            continue
+        stem, save_dir = build_ising_stem(
+            prefix, rl, lattice, quench_idx, is_l3d=False,
+        )
+        prior, n_done, old_path = load_ising_checkpoint(save_dir, stem)
+        acc = (
+            rebuild_accumulator(prior)
+            if prior is not None
+            else new_accumulator(lattice, args, quench_idx, is_l3d=False)
+        )
+        obs_state[prefix] = {
+            "stem": stem,
+            "dir": save_dir,
+            "acc": acc,
+            "n_done": n_done,
+            "old_path": old_path,
+        }
+    return obs_state
 
-    data: dict[str, Any] = {
-        "runlang": rl,
-        "side": side,
-        "pflip": pflip,
-        "geo": geo,
-        "N": isdy.N,
-    }
-    # Standard trajectories
-    if hasattr(isdy, "ene") and isdy.ene is not None:
-        data["ene"] = np.asarray(isdy.ene)
-    if hasattr(isdy, "magn") and isdy.magn is not None:
-        data["magn"] = np.asarray(isdy.magn)
-    # SA trajectories
-    if hasattr(isdy, "sa_energy") and isdy.sa_energy is not None:
-        data["sa_energy"] = np.asarray(isdy.sa_energy)
-        data["sa_magn"] = np.asarray(isdy.sa_magn)
-        data["sa_temps"] = np.asarray(isdy.sa_temps)
-    # Topo_met results
-    if hasattr(isdy, "topo_met_best_energy"):
-        data["topo_met_best_energy"] = isdy.topo_met_best_energy
-        if hasattr(isdy, "topo_met_best_spins"):
-            data["topo_met_best_spins"] = isdy.topo_met_best_spins
-        if hasattr(isdy, "topo_met_coeffs"):
-            data["topo_met_coeffs"] = isdy.topo_met_coeffs
-    # Topo_fca results
-    if hasattr(isdy, "topo_fca_field") and isdy.topo_fca_field is not None:
-        data["topo_fca_field"] = isdy.topo_fca_field
 
-    out_path = save_dir / fname
-    np.savez_compressed(out_path, **data)
-    return out_path
+def _do_checkpoint(
+    obs_state: dict[str, dict[str, Any]],
+    current_nt: int,
+    save_freq: int,
+    n_thermal: int,
+) -> None:
+    """Write checkpoints for all observables if it's time."""
+    if not should_checkpoint(current_nt, save_freq, n_thermal):
+        return
+    for state in obs_state.values():
+        final = finalize_accumulator(state["acc"], current_nt)
+        new_path = save_ising_checkpoint(
+            final, state["dir"], state["stem"],
+            current_nt, old_path=state["old_path"],
+        )
+        state["old_path"] = new_path
 
+
+def _accumulate_run(
+    obs_state: dict[str, dict[str, Any]],
+    isdy: Any,
+) -> None:
+    """Extract and append one run's data to all active accumulators."""
+    for prefix, state in obs_state.items():
+        single = _EXTRACTORS[prefix](isdy)
+        append_run(state["acc"], single)
+
+
+# ── Main entry point ─────────────────────────────────────────────────
 
 def run_simulation(args):
     engine = get_graph_engine(args)
@@ -85,73 +127,151 @@ def run_simulation(args):
 
 def _run_simulation_gt(args):
     """GT path: skip eigvec/cluster pipeline, use direct Ising dynamics."""
-    for _q in range(args.number_of_averages):
+    n_thermal = getattr(args, "n_thermal", 1)
+    save_freq = getattr(args, "save_frequency", 0)
+    save_flags = resolve_save_flags(args)
+    any_save = any(save_flags.values())
+
+    for _q in range(1, args.number_of_averages + 1):
         lattice = prepare_lattice(args)
-        isdy = run_ising_dynamics(args, lattice)
-        if getattr(args, 'save_results', False):
-            _save_ising_results(isdy, lattice, args, _q)
-        if args.remove_files:
-            clean_up_files(isdy, lattice)
+
+        obs_state: dict[str, dict[str, Any]] = {}
+        n_done = 0
+        if any_save:
+            rl = getattr(args, "runlang", "C1")
+            obs_state = _setup_obs_state(
+                save_flags, rl, lattice, _q, args,
+            )
+            n_done = (
+                min(s["n_done"] for s in obs_state.values())
+                if obs_state
+                else 0
+            )
+
+        for _t in range(n_done, n_thermal):
+            isdy = run_ising_dynamics(args, lattice)
+            if obs_state:
+                _accumulate_run(obs_state, isdy)
+                _do_checkpoint(obs_state, _t + 1, save_freq, n_thermal)
+            if args.remove_files:
+                clean_up_files(isdy, lattice)
 
 
 def _run_simulation_nx(args):
     """NX path: eigenvector/cluster-based init for ground_state, direct for others."""
-    ic_gs = args.init_cond.startswith('ground_state') or args.init_cond.startswith('gs')
+    n_thermal = getattr(args, "n_thermal", 1)
+    save_freq = getattr(args, "save_frequency", 0)
+    save_flags = resolve_save_flags(args)
+    any_save = any(save_flags.values())
+    ic_gs = (
+        args.init_cond.startswith("ground_state")
+        or args.init_cond.startswith("gs")
+    )
 
     if not ic_gs:
-        # Direct path: no eigenvector/cluster pipeline needed
-        for _q in range(args.number_of_averages):
-            lattice = Lattice2D(**initialize_l2d_dict_args(args))
-            if lattice.init_nw_dict:
-                lattice.flip_sel_edges(lattice.nwDict[args.cell_type]['G'])
-            else:
-                lattice.flip_random_fract_edges()
-            isdy = run_ising_dynamics(args, lattice)
-            if getattr(args, 'save_results', False):
-                _save_ising_results(isdy, lattice, args, _q)
-            if args.remove_files:
-                clean_up_files(isdy, lattice)
-        return
+        _run_nx_direct(args, n_thermal, save_freq, save_flags, any_save)
+    else:
+        _run_nx_ground_state(
+            args, n_thermal, save_freq, save_flags, any_save,
+        )
 
-    # Ground-state path: eigenvector/cluster-based initialization
-    number = int(args.init_cond.split('_')[-1])
-    val = ConditionalPartitioning(args.val)
-    for _q in range(args.number_of_averages):
+
+def _run_nx_direct(args, n_thermal, save_freq, save_flags, any_save):
+    """NX direct path: no eigenvector/cluster pipeline needed."""
+    for _q in range(1, args.number_of_averages + 1):
         lattice = Lattice2D(**initialize_l2d_dict_args(args))
         if lattice.init_nw_dict:
-            lattice.flip_sel_edges(lattice.nwDict[args.cell_type]['G'])
+            lattice.flip_sel_edges(lattice.nwDict[args.cell_type]["G"])
         else:
             lattice.flip_random_fract_edges()
-        lattice.compute_k_eigvV(number+1)
+
+        obs_state: dict[str, dict[str, Any]] = {}
+        n_done = 0
+        if any_save:
+            rl = getattr(args, "runlang", "C1")
+            obs_state = _setup_obs_state(
+                save_flags, rl, lattice, _q, args,
+            )
+            n_done = (
+                min(s["n_done"] for s in obs_state.values())
+                if obs_state
+                else 0
+            )
+
+        for _t in range(n_done, n_thermal):
+            isdy = run_ising_dynamics(args, lattice)
+            if obs_state:
+                _accumulate_run(obs_state, isdy)
+                _do_checkpoint(obs_state, _t + 1, save_freq, n_thermal)
+            if args.remove_files:
+                clean_up_files(isdy, lattice)
+
+
+def _run_nx_ground_state(
+    args, n_thermal, save_freq, save_flags, any_save,
+):
+    """NX ground-state path: eigenvector/cluster-based initialization."""
+    number = int(args.init_cond.split("_")[-1])
+    val = ConditionalPartitioning(args.val)
+
+    for _q in range(1, args.number_of_averages + 1):
+        lattice = Lattice2D(**initialize_l2d_dict_args(args))
+        if lattice.init_nw_dict:
+            lattice.flip_sel_edges(lattice.nwDict[args.cell_type]["G"])
+        else:
+            lattice.flip_random_fract_edges()
+        lattice.compute_k_eigvV(number + 1)
         lattice.load_eigV_on_graph(number, binarize=True)
-        lattice.make_clustersYN(f'eigV{number}', val=val)
-        #
+        lattice.make_clustersYN(f"eigV{number}", val=val)
+
         NoClust = lattice.handle_no_clust(NoClust=args.NoClust)
-        isingDictArgs = initialize_ising_dict_args(args, get_out_suffix(args), NoClust)
-        #
         if NoClust is None:
             continue
-        #
+
+        isingDictArgs = initialize_ising_dict_args(
+            args, get_out_suffix(args), NoClust,
+        )
         isdy = IsingDynamics(lattice, **isingDictArgs)
         isdy.init_ising_dynamics(exName=isdy.run_id)
         match args.runlang:
-            case 'C4'|'C1':
-                lattice.export_ising_clust(exName=isdy.run_id,
-                                        NoClust=NoClust)
-                if args.runlang == 'C4':
-                    lattice._export_eigV(number, exName=isdy.run_id, verbose=args.verbose)
-        # Run in appropriate mode (equilibrium, SA, PT, or topo)
-        rl = getattr(args, 'runlang', 'C1')
-        if getattr(args, 'pt_mode', False):
-            isdy.run(pt_mode=True, verbose=args.verbose)
-        elif 'topo' in rl.lower():
-            isdy.run(verbose=args.verbose)
-        elif getattr(args, 'sa_mode', False):
-            isdy.run(sa_mode=True, verbose=args.verbose)
-        else:
-            isdy.run(verbose=args.verbose)
-        if getattr(args, 'save_results', False):
-            _save_ising_results(isdy, lattice, args, _q)
-        if args.remove_files:
-            isdy.remove_run_c_files(remove_stderr=True)
-            lattice.remove_exported_files()
+            case "C4" | "C1":
+                lattice.export_ising_clust(
+                    exName=isdy.run_id, NoClust=NoClust,
+                )
+                if args.runlang == "C4":
+                    lattice._export_eigV(
+                        number, exName=isdy.run_id,
+                        verbose=args.verbose,
+                    )
+
+        obs_state: dict[str, dict[str, Any]] = {}
+        n_done = 0
+        if any_save:
+            rl = getattr(args, "runlang", "C1")
+            obs_state = _setup_obs_state(
+                save_flags, rl, lattice, _q, args,
+            )
+            n_done = (
+                min(s["n_done"] for s in obs_state.values())
+                if obs_state
+                else 0
+            )
+
+        for _t in range(n_done, n_thermal):
+            # Run in appropriate mode
+            rl = getattr(args, "runlang", "C1")
+            if getattr(args, "pt_mode", False):
+                isdy.run(pt_mode=True, verbose=args.verbose)
+            elif "topo" in rl.lower():
+                isdy.run(verbose=args.verbose)
+            elif getattr(args, "sa_mode", False):
+                isdy.run(sa_mode=True, verbose=args.verbose)
+            else:
+                isdy.run(verbose=args.verbose)
+
+            if obs_state:
+                _accumulate_run(obs_state, isdy)
+                _do_checkpoint(obs_state, _t + 1, save_freq, n_thermal)
+            if args.remove_files:
+                isdy.remove_run_c_files(remove_stderr=True)
+                lattice.remove_exported_files()

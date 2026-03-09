@@ -232,7 +232,7 @@ class TestPyTopoFCA:
         ising.run(verbose=False, tqdm_on=False)
         assert hasattr(ising, "topo_fca_field")
         assert ising.topo_fca_field.shape == (ising.N,)
-        assert len(ising.sa_energy) > 0
+        assert len(ising.ene) > 0
 
     def test_field_nonzero(self, frustrated_lattice):
         """The spectral field should be nonzero."""
@@ -246,22 +246,21 @@ class TestPyTopoFCA:
         ising.run(verbose=False, tqdm_on=False)
         assert np.linalg.norm(ising.topo_fca_field) > 0
 
-    def test_sa_attributes_populated(self, frustrated_lattice):
-        """TFCA should populate standard SA result attributes."""
-        n_temps = 50
+    def test_metropolis_attributes_populated(self, frustrated_lattice):
+        """TFCA quench should populate Metropolis result attributes."""
         ising = IsingDynamics(
             sg=frustrated_lattice, T=1.0, steps=200,
             runlang="py_topo_fca",
             sa_enabled=True, T_init=5.0, T_final=0.01,
-            n_temperatures=n_temps,
+            n_temperatures=50, steps_per_T=10,
             topo_n_modes=8, seed=42,
         )
         ising.init_ising_dynamics()
         ising.run(verbose=False, tqdm_on=False)
-        assert hasattr(ising, "sa_energy")
-        assert hasattr(ising, "sa_magn")
-        assert hasattr(ising, "sa_temps")
-        assert len(ising.sa_energy) == n_temps
+        # TFCA now runs Metropolis at T~0 (not SA), so ene/magn are populated
+        assert hasattr(ising, "ene")
+        assert hasattr(ising, "magn")
+        assert len(ising.ene) == 50 * 10  # n_temperatures * steps_per_T
 
 
 # ---------------------------------------------------------------------------
@@ -386,7 +385,9 @@ class TestIntegration:
         )
         ising.init_ising_dynamics()
         ising.run(verbose=False, tqdm_on=False)
-        assert len(ising.sa_energy) == 50
+        # TFCA now uses Metropolis quench, so ene is populated
+        assert hasattr(ising, "ene")
+        assert len(ising.ene) > 0
 
     def test_gt_graph_fallback(self):
         """topo_met on a GT graph should work (Python fallback)."""

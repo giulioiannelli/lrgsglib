@@ -66,7 +66,7 @@ if execBool or printBool:
         inSuffix = inSuffix or f"p={pflip:.3g}"
         # outStr = f"-os {out_suffix} " if out_suffix else " "
         argStr = " ".join(filter(None, [
-            f"{N} {p:.3g} {pflip:.3g} {T:.3g}",
+            f"{N} {p:.3g} {pflip:.3g} -T {T:.3g}",
             f"-c {cell} -n {navg} -ic {ic}",
             f"-rl {runlang} -is {inSuffix}",
             f"-os {out_suffix}" if out_suffix else "",

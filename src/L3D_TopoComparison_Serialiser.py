@@ -156,7 +156,7 @@ def main():
         nonlocal total_printed, total_executed
 
         # For SA/TFCA the temperature is set by SA schedule, use T=0.5 as dummy
-        prog_args = [str(L), f"{p:.3g}", "0.5"]
+        prog_args = [str(L), "-p", f"{p:.3g}", "-T", "0.5"]
         cmd = ["python", str(exec_path), *prog_args, *method_flags]
 
         slanz_opts: list[str] = ["-m", str(memoryfunc(L))]

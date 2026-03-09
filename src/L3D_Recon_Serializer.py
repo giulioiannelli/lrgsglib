@@ -16,7 +16,7 @@ from parsers.L3D_Recon_srun import parse_arguments, parser
 
 
 def _build_prog_args(L: int, pflip: float, temp: float) -> list[str]:
-    return [str(L), f"{pflip:.3g}", f"{temp:.3g}"]
+    return [str(L), "-p", f"{pflip:.3g}", "-T", f"{temp:.3g}"]
 
 
 def main():

@@ -25,7 +25,7 @@ def main():
 
         def operate(L, p, T):
             nonlocal count, count_exe
-            progargs = [str(L), f"{p:.3g}", f"{T:.3g}"]
+            progargs = [str(L), "-p", f"{p:.3g}", "-T", f"{T:.3g}"]
             opts = []
             opts.append("-m")
             opts.append(f"{memoryfunc(L)}")
