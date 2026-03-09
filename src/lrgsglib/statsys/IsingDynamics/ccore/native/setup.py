@@ -34,7 +34,7 @@ ext_modules = [
             str(CCORE_DIR),
         ],
         define_macros=[
-            ("DSFMT_MEXP", "19937"),
+            ("SFMT_MEXP", "19937"),
             ("HAVE_SSE2", None),
         ],
         extra_compile_args=["-O3", "-msse2", "-include", GCC15_COMPAT],

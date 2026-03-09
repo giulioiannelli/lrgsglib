@@ -20,8 +20,6 @@ size_t wolff_step(size_t N, double T, spin_tp s, size_tp nlen, NodesEdges ne) {
     size_t seed = (size_t)(RNG_dbl() * (double)N);
     if (seed >= N) seed = N - 1;
 
-    int8_t seed_spin = s[seed];
-
     /* BFS queue (worst case: entire lattice) */
     size_t *queue = (size_t *)malloc(N * sizeof(size_t));
     uint8_t *in_cluster = (uint8_t *)calloc(N, sizeof(uint8_t));
