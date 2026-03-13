@@ -208,6 +208,10 @@ def build_ising_stem(
 ) -> tuple[str, Path]:
     """Build filename stem and save directory for an observable file.
 
+    The graph's ``syshapePth`` attribute provides the size subdirectory
+    (e.g. ``N=27000``), keeping it out of the filename.  Geometry is
+    already encoded in the parent path (e.g. ``l3d_simple_cubic/``).
+
     Parameters
     ----------
     prefix : str
@@ -215,40 +219,32 @@ def build_ising_stem(
     rl : str
         Runlang string (e.g. ``"pb_sa"``).
     lattice : SignedGraph
-        Lattice instance (used for side, pflip, geo, path_sgdata).
+        Graph instance — must have ``syshapePth`` and ``path_sgdata``.
     quench_idx : int
         Quench realization index.
     is_l3d : bool
-        If True extract side from ``lattice.dim[0]`` (3D), else
-        ``lattice.side1`` (2D).
+        Kept for backward compatibility (metadata only); no longer
+        affects the stem or directory.
 
     Returns
     -------
     tuple[str, Path]
         ``(stem, save_dir)`` where stem is e.g.
-        ``"ene_pb_sa_L=8_sc_p=0.3_q=000"`` and save_dir is the target
-        directory.
+        ``"ene_pb_sa_p=0.3_q=001"`` and save_dir is e.g.
+        ``<path_sgdata>/ising_results/N=27000/``.
     """
-    if is_l3d:
-        dim = getattr(lattice, "dim", (0,))
-        side = dim[0] if isinstance(dim, tuple) else dim
-    else:
-        side = getattr(lattice, "side1", 0)
     pflip = getattr(lattice, "pflip", 0.0)
-    geo = getattr(lattice, "geo", "sqr" if not is_l3d else "sc")
+    shape_dir = getattr(lattice, "syshapePth", f"N={getattr(lattice, 'N', 0)}")
 
     is_topo = "topo" in rl.lower()
     n_modes = getattr(lattice, "_topo_n_modes", 0)
-    # topo_n_modes may be on the args, not lattice; caller should set
-    # lattice._topo_n_modes before calling if needed.  Alternatively
-    # accept it from the IsingDynamics instance.  We fall back to 0.
     mode_tag = f"_m={n_modes}" if is_topo and n_modes else ""
 
     stem = (
-        f"{prefix}_{rl}_L={side}_{geo}_p={pflip:.3g}"
+        f"{prefix}_{rl}_p={pflip:.3g}"
         f"{mode_tag}_q={quench_idx:03d}"
     )
-    save_dir = Path(lattice.path_sgdata) / "ising_results"
+    save_dir = Path(lattice.path_sgdata) / "ising_results" / shape_dir
     return stem, save_dir
 
 
@@ -412,27 +408,28 @@ def _build_metadata(
 ) -> dict[str, Any]:
     """Build the scalar metadata dict for an NPZ file."""
     rl = getattr(args, "runlang", "C1")
-    if is_l3d:
-        dim = getattr(lattice, "dim", (0,))
-        side = dim[0] if isinstance(dim, tuple) else dim
-    else:
-        side = getattr(lattice, "side1", 0)
     pflip = getattr(lattice, "pflip", 0.0)
-    geo = getattr(lattice, "geo", "sqr" if not is_l3d else "sc")
+    geo = getattr(lattice, "geo", "")
     G = lattice.gr["G"]
+    N = G.number_of_nodes()
     n_edges = G.number_of_edges()
 
     meta: dict[str, Any] = {
         "runlang": rl,
-        "side": side,
         "pflip": pflip,
         "geo": geo,
-        "N": G.number_of_nodes(),
+        "N": N,
         "n_edges": n_edges,
         "quench_idx": quench_idx,
+        "syshapePth": getattr(lattice, "syshapePth", f"N={N}"),
     }
+    # Backward-compat: store side for 2D, dim for 3D
     if is_l3d:
+        dim = getattr(lattice, "dim", (0,))
         meta["dim"] = dim
+        meta["side"] = dim[0] if isinstance(dim, tuple) else dim
+    else:
+        meta["side"] = getattr(lattice, "side1", 0)
 
     # Topo params
     if "topo" in rl.lower():
