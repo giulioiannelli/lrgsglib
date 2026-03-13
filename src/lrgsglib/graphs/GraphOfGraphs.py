@@ -57,67 +57,36 @@ register_implementation("GraphOfGraphs", GraphEngine.NETWORKX, _get_nx_impl)
 register_implementation("GraphOfGraphs", GraphEngine.GRAPHTOOL, _get_gt_impl)
 
 
-def GraphOfGraphs(
-    base_graph_type: str,
-    base_params: dict,
-    fiber_graph_type: str,
-    fiber_params: Union[dict, Callable[[int], dict]],
-    anchor_policy: Union[str, Callable[[int, int], int]] = "first",
-    pflip: float = 0.0,
-    seed: Optional[int] = None,
-    engine: Optional[Union[str, GraphEngine]] = None,
-    **kwargs: Any,
-) -> "SignedGraphProtocol":
-    """
-    Create a hierarchical graph-of-graphs structure.
+class GraphOfGraphs:
+    """Create a hierarchical graph-of-graphs structure.
 
-    This factory function creates a composite graph where each node in a base
-    graph has a fiber graph attached to it, using the specified engine backend.
+    Each node in a base graph has a fiber graph attached to it.
 
     Parameters
     ----------
     base_graph_type : str
-        Type name of the base graph. Supported types:
-        - 'Lattice2D', 'Lattice3D'
-        - 'ErdosRenyi', 'BarabasiAlbert', 'WattsStrogatz'
-        - 'StochasticBlockModel'
+        Type name of the base graph ('Lattice2D', 'ErdosRenyi', etc.).
     base_params : dict
         Parameters to pass to the base graph constructor.
     fiber_graph_type : str
-        Type name of the fiber graph. Same types as base_graph_type.
+        Type name of the fiber graph.
     fiber_params : dict or callable
         Parameters for fiber graph construction.
-        If callable, should be a function(base_idx) -> dict for heterogeneous
-        fibers where each base node gets a different fiber configuration.
+        If callable: function(base_idx) -> dict for heterogeneous fibers.
     anchor_policy : str or callable, default 'first'
-        How to select anchor nodes connecting fibers to base:
-        - 'first': Use fiber node 0 (default, matches Dirac lattices)
-        - 'center': Use middle node (n_fiber // 2)
-        - 'last': Use last node (n_fiber - 1)
-        - 'random': Random node per fiber (seeded)
-        - callable: Custom function(base_idx, n_fiber) -> anchor_idx
+        How to select anchor nodes ('first', 'center', 'last', 'random',
+        or callable(base_idx, n_fiber) -> anchor_idx).
     pflip : float, default 0.0
         Fraction of edges to mark for sign flipping (0.0 to 1.0).
-        Call `flip_random_fract_edges()` to apply the flips.
     seed : int, optional
         Random seed for reproducibility.
     engine : str or GraphEngine, optional
-        Graph engine to use:
-        - 'nx': NetworkX (default)
-        - 'gt': graph-tool (high performance)
-        If None, uses the global default engine.
+        Graph engine ('nx', 'gt'). If None, uses the global default.
     **kwargs
         Additional engine-specific parameters.
 
-    Returns
-    -------
-    SignedGraphProtocol
-        A graph-of-graphs instance supporting the signed graph protocol.
-
     Examples
     --------
-    Create a 2D lattice base with Erdos-Renyi fibers:
-
     >>> gog = GraphOfGraphs(
     ...     base_graph_type='Lattice2D',
     ...     base_params={'side1': 5, 'geo': 'sqr'},
@@ -125,65 +94,44 @@ def GraphOfGraphs(
     ...     fiber_params={'n': 10, 'p': 0.2},
     ...     engine='nx'
     ... )
-    >>> print(f"Nodes: {gog.N}, Base: {gog.N_base}, Fiber: {gog.N_fiber}")
-
-    Create with heterogeneous fibers (different size per base node):
-
-    >>> gog = GraphOfGraphs(
-    ...     base_graph_type='Lattice2D',
-    ...     base_params={'side1': 4},
-    ...     fiber_graph_type='ErdosRenyi',
-    ...     fiber_params_fn=lambda idx: {'n': 5 + idx % 3, 'p': 0.2},
-    ...     engine='nx'
-    ... )
-
-    Use center anchor policy:
-
-    >>> gog = GraphOfGraphs(
-    ...     base_graph_type='Lattice2D',
-    ...     base_params={'side1': 5},
-    ...     fiber_graph_type='Lattice2D',
-    ...     fiber_params={'side1': 3},
-    ...     anchor_policy='center',
-    ...     engine='gt'
-    ... )
-
-    Notes
-    -----
-    - The vertex layout follows Dirac convention:
-      [base nodes][fiber 0][fiber 1]...[fiber N_base-1]
-
-    - When anchor_policy='first' and all fibers are identical (homogeneous),
-      the structure supports efficient separated spectrum computation via
-      `compute_separated_spectrum()`.
-
-    - graph-tool backend offers faster graph construction for large structures.
 
     See Also
     --------
-    lrgsglib.graphs.nx.GraphOfGraphsNX : NetworkX implementation details
-    lrgsglib.graphs.gt.GraphOfGraphsGT : graph-tool implementation details
-    lrgsglib.graphs.nx.DiracLatticeNX : Original Dirac lattice pattern
+    lrgsglib.graphs.nx.GraphOfGraphsNX : NetworkX implementation
+    lrgsglib.graphs.gt.GraphOfGraphsGT : graph-tool implementation
     """
-    # Resolve engine
-    if engine is not None and isinstance(engine, str):
-        engine = GraphEngine(engine)
 
-    # Get implementation class
-    impl_cls = get_implementation("GraphOfGraphs", engine)
+    def __new__(
+        cls,
+        base_graph_type: str,
+        base_params: dict,
+        fiber_graph_type: str,
+        fiber_params: Union[dict, Callable[[int], dict]],
+        anchor_policy: Union[str, Callable[[int, int], int]] = "first",
+        pflip: float = 0.0,
+        seed: Optional[int] = None,
+        engine: Optional[Union[str, GraphEngine]] = None,
+        **kwargs: Any,
+    ):
+        # Resolve engine
+        if engine is not None and isinstance(engine, str):
+            engine = GraphEngine(engine)
 
-    # Build kwargs for the implementation
-    impl_kwargs = {
-        "base_graph_type": base_graph_type,
-        "base_params": base_params,
-        "fiber_graph_type": fiber_graph_type,
-        "fiber_params": fiber_params,
-        "anchor_policy": anchor_policy,
-        "pflip": pflip,
-        "seed": seed,
-    }
+        # Get implementation class
+        impl_cls = get_implementation("GraphOfGraphs", engine)
 
-    # Pass through additional kwargs
-    impl_kwargs.update(kwargs)
+        # Build kwargs for the implementation
+        impl_kwargs = {
+            "base_graph_type": base_graph_type,
+            "base_params": base_params,
+            "fiber_graph_type": fiber_graph_type,
+            "fiber_params": fiber_params,
+            "anchor_policy": anchor_policy,
+            "pflip": pflip,
+            "seed": seed,
+        }
 
-    return impl_cls(**impl_kwargs)
+        # Pass through additional kwargs
+        impl_kwargs.update(kwargs)
+
+        return impl_cls(**impl_kwargs)

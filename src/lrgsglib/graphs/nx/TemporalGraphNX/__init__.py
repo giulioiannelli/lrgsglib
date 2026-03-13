@@ -1,9 +1,9 @@
 """
-TemporalGraphNX: Time-varying network with snapshot-based representation.
+TemporalGraphNX: Time-varying signed network inheriting from SignedGraphNX.
 
 This module provides the TemporalGraphNX class for analyzing networks that
-evolve over time, with support for both discrete snapshots and continuous-time
-edge streams.
+evolve over time, with full signed graph functionality (spectral analysis,
+entropy, clustering) via inheritance from SignedGraphNX.
 """
 
 from .TemporalGraphNX import TemporalGraphNX

@@ -1,10 +1,12 @@
 Lattices
 ========
 
-``lrgsglib`` provides 2D and 3D lattice generators that build signed graphs
-with convenient coordinate representations and plotting-ready positions.
-The primary entry points are :py:class:`lrgsglib.graphs.Lattice2D.Lattice2D`
-and :py:class:`lrgsglib.graphs.Lattice3D.Lattice3D`.
+``lrgsglib`` provides 2D, 3D, and N-dimensional lattice generators that build
+signed graphs with coordinate representations and plotting-ready positions.
+
+- :py:class:`~lrgsglib.graphs.Lattice2D.Lattice2D` — 2D lattices with specialized geometries
+- :py:class:`~lrgsglib.graphs.Lattice3D.Lattice3D` — 3D lattices with specialized geometries
+- :py:class:`~lrgsglib.graphs.LatticeND.LatticeND` — Unified entry point (dispatches to 2D/3D or generic cubic)
 
 2D Lattices
 -----------
@@ -74,8 +76,31 @@ Set ``with_positions=True`` to store node positions for plotting:
 For ``Lattice3D``, positions are projected to 2D using the ``theta`` and
 ``phi`` angles.
 
+N-Dimensional Lattices
+----------------------
+
+For arbitrary dimensions or when you want a single entry point, use
+``LatticeND``. It automatically routes to the specialized class when a
+known geometry is requested:
+
+.. code-block:: python
+
+   from lrgsglib.graphs import LatticeND
+
+   # 2D → dispatches to Lattice2D
+   lat = LatticeND(shape=(64, 64), geo="tri")
+
+   # 3D → dispatches to Lattice3D
+   lat = LatticeND(shape=(10, 10, 10), geo="bcc")
+
+   # 4D+ → generic cubic lattice
+   lat = LatticeND(shape=(5, 5, 5, 5), periodic=True)
+
+For dimensions beyond 3D, only cubic lattice geometry is available.
+
 Next Steps
 ----------
 
+- :doc:`graph_architecture` for the complete graph type catalogue
 - :doc:`spectral` for Laplacian spectra and embeddings
 - :doc:`plotting` for lattice visualization helpers

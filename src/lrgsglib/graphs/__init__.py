@@ -19,30 +19,52 @@ Quick Start
 
 Available Graph Types
 --------------------
-Lattice2D : 2D lattice (square, triangular, hexagonal)
-    - Parameters: side1, side2, geo, pflip, periodic, seed, engine
+Base:
+    SignedGraph : Base signed graph wrapper
 
-Lattice3D : 3D lattice (simple cubic, BCC, FCC)
-    - Parameters: dim, geo, pflip, periodic, seed, engine
+Lattice:
+    Lattice2D, Lattice3D, LatticeND
 
-ErdosRenyi : Erdos-Renyi random graph
-    - Parameters: n, p, pflip, extract_giant_component, seed, engine
+Random:
+    ErdosRenyi, kRegularGraph, ConfigurationModel,
+    RandomGeometric, LFRBenchmark
 
-BarabasiAlbert : Barabasi-Albert scale-free graph
-    - Parameters: n, m, pflip, seed, engine
+Scale-Free:
+    BarabasiAlbert, ExtendedBarabasiAlbert, DualBarabasiAlbert, HolmeKim
 
-WattsStrogatz : Watts-Strogatz small-world graph
-    - Parameters: n, k, p, pflip, seed, engine
+Small-World:
+    WattsStrogatz
 
-StochasticBlockModel : Stochastic Block Model with communities
-    - Parameters: sizes, p_matrix, pflip, extract_giant_component, seed, engine
+Community:
+    StochasticBlockModel
+
+Complete:
+    FullyConnected
+
+Bipartite:
+    BipartiteGraph, BipartiteFromDegreeSequence
+
+Neural:
+    HofieldNN, SCSGeneralizedNN
+
+Multispectral:
+    MultiplicativeCascade, VicsekGraph, HierarchicalModular
+
+Fractal:
+    SierpinskiGraph, DGMgraph
+
+Graph-of-Graphs:
+    GraphOfGraphs, DiracCombGraph, DiracBrushGraph
+
+Temporal:
+    TemporalGraph
 
 Engine Configuration
 --------------------
 Engines can be configured via:
-1. Explicit parameter: `Lattice2D(..., engine='gt')`
-2. Global setting: `set_default_engine('gt')`
-3. Environment variable: `LRGSG_GRAPH_ENGINE=gt`
+1. Explicit parameter: ``Lattice2D(..., engine='gt')``
+2. Global setting: ``set_default_engine('gt')``
+3. Environment variable: ``LRGSG_GRAPH_ENGINE=gt``
 
 Priority: explicit parameter > environment variable > global setting
 
@@ -51,33 +73,6 @@ Supported Engines
 - 'nx' : NetworkX (default, always available)
 - 'gt' : graph-tool (high performance, requires installation)
 - 'ig' : igraph (future support)
-
-Module Structure
-----------------
-The module is organized as follows:
-
-graphs/
-├── __init__.py              # This file (unified API)
-├── protocols.py             # Protocol definitions
-├── _engine.py               # Engine selection
-├── Lattice2D.py             # Facade
-├── Lattice3D.py             # Facade
-├── ErdosRenyi.py            # Facade
-├── BarabasiAlbert.py        # Facade
-├── WattsStrogatz.py         # Facade
-├── StochasticBlockModel.py  # Facade
-├── nx/                      # NetworkX implementations
-│   ├── base/SignedGraphNX.py
-│   ├── lattice/{Lattice2DNX,Lattice3DNX}.py
-│   └── random/{ErdosRenyiNX,...}.py
-└── gt/                      # graph-tool implementations
-    ├── base/SignedGraphGT.py
-    ├── lattice/{Lattice2DGT,Lattice3DGT}.py
-    └── random/{ErdosRenyiGT,...}.py
-
-Direct access to engine-specific implementations:
->>> from lrgsglib.graphs.nx.lattice import Lattice2DNX
->>> from lrgsglib.graphs.gt.lattice import Lattice2DGT
 """
 
 from .protocols import (
@@ -99,14 +94,62 @@ from ._engine import (
     set_default_engine,
 )
 
-# Import graph type facades from root level
+# === Graph type facades ===
+
+# Base
+from .SignedGraph import SignedGraph
+
+# Lattice
 from .Lattice2D import Lattice2D
 from .Lattice3D import Lattice3D
+from .LatticeND import LatticeND
+
+# Random
 from .ErdosRenyi import ErdosRenyi
+from .kRegularGraph import kRegularGraph
+from .ConfigurationModel import ConfigurationModel
+from .RandomGeometric import RandomGeometric
+from .LFRBenchmark import LFRBenchmark
+
+# Scale-Free
 from .BarabasiAlbert import BarabasiAlbert
+from .ExtendedBarabasiAlbert import ExtendedBarabasiAlbert
+from .DualBarabasiAlbert import DualBarabasiAlbert
+from .HolmeKim import HolmeKim
+
+# Small-World
 from .WattsStrogatz import WattsStrogatz
+
+# Community
 from .StochasticBlockModel import StochasticBlockModel
+
+# Complete
+from .FullyConnected import FullyConnected
+
+# Bipartite
+from .BipartiteGraph import BipartiteGraph
+from .BipartiteFromDegreeSequence import BipartiteFromDegreeSequence
+
+# Neural
+from .HofieldNN import HofieldNN
+from .SCSGeneralizedNN import SCSGeneralizedNN
+
+# Multispectral (concrete classes)
+from .MultiplicativeCascade import MultiplicativeCascade
+from .VicsekGraph import VicsekGraph
+from .HierarchicalModular import HierarchicalModular
+
+# Fractal (concrete classes)
+from .SierpinskiGraph import SierpinskiGraph
+from .DGMgraph import DGMgraph
+
+# Graph-of-Graphs / Dirac
 from .GraphOfGraphs import GraphOfGraphs
+from .DiracCombGraph import DiracCombGraph
+from .DiracBrushGraph import DiracBrushGraph
+
+# Temporal
+from .TemporalGraph import TemporalGraph
 
 __all__ = [
     # Engine management
@@ -125,14 +168,46 @@ __all__ = [
     "LatticeGraphProtocol",
     "is_signed_graph",
     "is_lattice_graph",
-    # Graph types - Lattice
+    # Base
+    "SignedGraph",
+    # Lattice
     "Lattice2D",
     "Lattice3D",
-    # Graph types - Random
+    "LatticeND",
+    # Random
     "ErdosRenyi",
+    "kRegularGraph",
+    "ConfigurationModel",
+    "RandomGeometric",
+    "LFRBenchmark",
+    # Scale-Free
     "BarabasiAlbert",
+    "ExtendedBarabasiAlbert",
+    "DualBarabasiAlbert",
+    "HolmeKim",
+    # Small-World
     "WattsStrogatz",
+    # Community
     "StochasticBlockModel",
-    # Graph types - Hierarchical
+    # Complete
+    "FullyConnected",
+    # Bipartite
+    "BipartiteGraph",
+    "BipartiteFromDegreeSequence",
+    # Neural
+    "HofieldNN",
+    "SCSGeneralizedNN",
+    # Multispectral
+    "MultiplicativeCascade",
+    "VicsekGraph",
+    "HierarchicalModular",
+    # Fractal
+    "SierpinskiGraph",
+    "DGMgraph",
+    # Graph-of-Graphs / Dirac
     "GraphOfGraphs",
+    "DiracCombGraph",
+    "DiracBrushGraph",
+    # Temporal
+    "TemporalGraph",
 ]

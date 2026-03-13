@@ -1,19 +1,15 @@
 """
-Unified ErdosRenyi factory with multi-engine support.
+Unified SignedGraph factory with multi-engine support.
 
-This module provides a factory function for creating Erdos-Renyi random
-signed graphs using different backends (NetworkX, graph-tool, igraph).
+This module provides a factory function for creating signed graphs
+using different backends (NetworkX, graph-tool).
 
 Example
 -------
->>> from lrgsglib.graphs import ErdosRenyi
+>>> from lrgsglib.graphs import SignedGraph
 >>>
->>> # Create with specific engine
->>> er_nx = ErdosRenyi(n=200, p=0.05, engine='nx')
->>> er_gt = ErdosRenyi(n=200, p=0.05, engine='gt')
->>>
->>> # Both have the same interface
->>> print(er_nx.N, er_gt.N)
+>>> sg_nx = SignedGraph(engine='nx')
+>>> sg_gt = SignedGraph(engine='gt')
 """
 
 from __future__ import annotations
@@ -31,76 +27,78 @@ if TYPE_CHECKING:
 
 def _get_nx_impl():
     """Lazy import for NetworkX implementation."""
-    from .nx.random import ErdosRenyiNX
+    from .nx.SignedGraphNX import SignedGraphNX
 
-    return ErdosRenyiNX
+    return SignedGraphNX
 
 
 def _get_gt_impl():
     """Lazy import for graph-tool implementation."""
-    from .gt.ErdosRenyiGT import ErdosRenyiGT
+    from .gt.SignedGraphGT import SignedGraphGT
 
-    return ErdosRenyiGT
+    return SignedGraphGT
 
 
 # === Register implementations ===
 
-register_implementation("ErdosRenyi", GraphEngine.NETWORKX, _get_nx_impl)
-register_implementation("ErdosRenyi", GraphEngine.GRAPHTOOL, _get_gt_impl)
+register_implementation("SignedGraph", GraphEngine.NETWORKX, _get_nx_impl)
+register_implementation("SignedGraph", GraphEngine.GRAPHTOOL, _get_gt_impl)
 
 
 # Parameters specific to each engine (not passed to the other)
 _NX_SPECIFIC_PARAMS = {
     "stdFnameSFFX",
+    "std_fname",
     "sgpathn",
     "only_const_mode",
     "path_data",
     "path_plot",
     "init_nw_dict",
+    "init_weights_val",
+    "export_mode",
+    "make_dir_tree",
+    "imported",
+    "import_fname",
+    "import_mode",
+    "on_g",
+    "backend",
 }
 
 _GT_SPECIFIC_PARAMS: set[str] = set()
 
 
-class ErdosRenyi:
-    """Create an Erdos-Renyi random signed graph.
+class SignedGraph:
+    """
+    Create a signed graph.
+
+    This factory class creates a signed graph using the specified engine
+    backend, providing a consistent interface regardless of which engine
+    is used.
 
     Parameters
     ----------
-    n : int
-        Number of nodes in the initial graph.
-    p : float
-        Probability of edge creation (0.0 to 1.0).
+    G : optional
+        An existing graph object to wrap as a signed graph.
+        For NX: a networkx.Graph. For GT: a graph_tool.Graph.
     pflip : float, default 0.0
-        Fraction of edges to mark for sign flipping (0.0 to 1.0).
-    extract_giant_component : bool, default True
-        If True, keep only the largest connected component.
+        Fraction of edges to mark for sign flipping.
     seed : int, optional
         Random seed for reproducibility.
     engine : str or GraphEngine, optional
-        Graph engine ('nx', 'gt'). If None, uses the global default.
+        Graph engine to use ('nx' or 'gt').
     **kwargs
         Additional engine-specific parameters.
 
-    Examples
-    --------
-    >>> er = ErdosRenyi(n=200, p=0.05, pflip=0.2, engine='nx')
-    >>> er.flip_random_fract_edges()
-
-    >>> er = ErdosRenyi(n=1000, p=0.01, engine='gt')
-
-    See Also
-    --------
-    lrgsglib.graphs.nx.random.ErdosRenyiNX : NetworkX implementation
-    lrgsglib.graphs.gt.random.ErdosRenyiGT : graph-tool implementation
+    Returns
+    -------
+    SignedGraphProtocol
+        A signed graph instance.
     """
 
     def __new__(
         cls,
-        n: int,
-        p: float,
+        G=None,
         pflip: float = 0.0,
-        extract_giant_component: bool = True,
         seed: Optional[int] = None,
         engine: Optional[Union[str, GraphEngine]] = None,
         **kwargs: Any,
@@ -110,39 +108,34 @@ class ErdosRenyi:
             engine = GraphEngine(engine)
 
         # Get implementation class
-        impl_cls = get_implementation("ErdosRenyi", engine)
+        impl_cls = get_implementation("SignedGraph", engine)
 
-        # Determine which engine we got (may have fallen back)
+        # Determine which engine we got
         impl_module = impl_cls.__module__
 
         # Build kwargs for the specific implementation
         if "graphs.nx" in impl_module:
-            # NetworkX implementation
-            # NX ErdosRenyi always extracts GC (no option to disable)
-            impl_kwargs = {
-                "n": n,
-                "p": p,
+            impl_kwargs: dict[str, Any] = {
                 "pflip": pflip,
                 "seed": seed,
             }
+            if G is not None:
+                impl_kwargs["G"] = G
 
             # Pass through NX-specific kwargs
             for key in _NX_SPECIFIC_PARAMS:
                 if key in kwargs:
                     impl_kwargs[key] = kwargs.pop(key)
 
-            # Pass remaining kwargs
             impl_kwargs.update(kwargs)
 
         elif "graphs.gt" in impl_module:
-            # graph-tool implementation
             impl_kwargs = {
-                "n": n,
-                "p": p,
                 "pflip": pflip,
-                "extract_giant_component": extract_giant_component,
                 "seed": seed,
             }
+            if G is not None:
+                impl_kwargs["G"] = G
 
             # Filter out NX-specific params
             for key in _NX_SPECIFIC_PARAMS:
@@ -151,14 +144,12 @@ class ErdosRenyi:
             impl_kwargs.update(kwargs)
 
         else:
-            # Unknown implementation, pass all params
             impl_kwargs = {
-                "n": n,
-                "p": p,
                 "pflip": pflip,
-                "extract_giant_component": extract_giant_component,
                 "seed": seed,
                 **kwargs,
             }
+            if G is not None:
+                impl_kwargs["G"] = G
 
         return impl_cls(**impl_kwargs)

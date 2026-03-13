@@ -1,15 +1,20 @@
 """
-TemporalSignedGraphGT - Falls back to NX implementation (no native GT implementation).
+TemporalSignedGraphGT: Deprecated - use TemporalGraphGT directly.
+
+TemporalGraphNX now inherits from SignedGraphNX, so the separate
+TemporalSignedGraph class is no longer needed.
 """
 
 import warnings
-from ...nx.temporal import TemporalSignedGraphNX
+from ...nx.TemporalGraphNX import TemporalGraphNX
 
 warnings.warn(
-    "TemporalSignedGraphGT: No native graph-tool implementation. Using NetworkX backend.",
+    "TemporalSignedGraphGT is deprecated. Use TemporalGraphGT (or TemporalGraphNX) "
+    "directly — it now inherits from SignedGraphNX.",
+    DeprecationWarning,
     stacklevel=2,
 )
 
-TemporalSignedGraphGT = TemporalSignedGraphNX
+TemporalSignedGraphGT = TemporalGraphNX
 
 __all__ = ["TemporalSignedGraphGT"]

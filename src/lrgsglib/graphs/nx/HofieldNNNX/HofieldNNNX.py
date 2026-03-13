@@ -1,3 +1,5 @@
+import numpy as np
+
 from ....config.const import *
 from ..funcs import *
 from ..FullyConnectedNX import FullyConnectedNX

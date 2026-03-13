@@ -16,7 +16,7 @@ Base:
     SignedGraphNX : Base signed graph class
 
 Lattice:
-    LatticeNDNX : N-dimensional lattice (abstract base)
+    LatticeNDNX : N-dimensional cubic lattice
     Lattice2DNX : 2D lattice graph
     Lattice3DNX : 3D lattice graph
 
@@ -50,6 +50,7 @@ from .SignedGraphNX import SignedGraphNX
 SignedGraph = SignedGraphNX
 
 # Lattice
+from .LatticeNDNX import LatticeNDNX
 from .Lattice2DNX import (
     Lattice2DNX,
     Lattice2D,
@@ -134,6 +135,7 @@ __all__ = [
     "SignedGraphNX",
     "SignedGraph",
     # Lattice
+    "LatticeNDNX",
     "Lattice2DNX",
     "Lattice2D",
     "Lattice3DNX",

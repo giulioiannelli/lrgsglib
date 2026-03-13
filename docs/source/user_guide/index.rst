@@ -6,6 +6,7 @@ This guide provides comprehensive tutorials and examples for using lrgsglib. Eac
 .. toctree::
    :maxdepth: 2
 
+   graph_architecture
    graphs
    lattices
    advanced_graphs

@@ -1,5 +1,7 @@
 from typing import Any
 
+import networkx as nx
+
 from ....config.const import *
 from ..funcs import *
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX

@@ -1,15 +1,18 @@
 """
-TemporalSignedGraphNX: Temporal network with signed edges that can flip over time.
+TemporalSignedGraphNX: Deprecated - use TemporalGraphNX directly.
 
-This module provides the TemporalSignedGraphNX class which extends
-TemporalGraphNX with specific support for signed edge dynamics,
-including frustration evolution and sign flipping events.
+TemporalGraphNX now inherits from SignedGraphNX and includes all
+sign-flipping functionality that was previously in this class.
 """
 
-from .TemporalSignedGraphNX import TemporalSignedGraphNX
+from ..TemporalGraphNX.TemporalGraphNX import TemporalGraphNX
+
+# Alias for backward compatibility (no deprecation warning on import,
+# only the .py module-level warning fires if imported directly)
+TemporalSignedGraphNX = TemporalGraphNX
 
 # Backward compatibility alias
-TemporalSignedGraph = TemporalSignedGraphNX
+TemporalSignedGraph = TemporalGraphNX
 
 __all__ = [
     "TemporalSignedGraphNX",

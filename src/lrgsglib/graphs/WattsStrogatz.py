@@ -62,21 +62,8 @@ _NX_SPECIFIC_PARAMS = {
 _GT_SPECIFIC_PARAMS: set[str] = set()
 
 
-def WattsStrogatz(
-    n: int,
-    k: int,
-    p: float,
-    pflip: float = 0.0,
-    seed: Optional[int] = None,
-    engine: Optional[Union[str, GraphEngine]] = None,
-    **kwargs: Any,
-) -> "SignedGraphProtocol":
-    """
-    Create a Watts-Strogatz small-world signed graph.
-
-    This factory function creates a WS graph using the specified engine
-    backend, providing a consistent interface regardless of which engine
-    is used.
+class WattsStrogatz:
+    """Create a Watts-Strogatz small-world signed graph.
 
     Parameters
     ----------
@@ -89,106 +76,90 @@ def WattsStrogatz(
         Probability of rewiring each edge (0.0 to 1.0).
     pflip : float, default 0.0
         Fraction of edges to mark for sign flipping (0.0 to 1.0).
-        Call `flip_random_fract_edges()` to apply the flips.
     seed : int, optional
         Random seed for reproducibility.
     engine : str or GraphEngine, optional
-        Graph engine to use:
-        - 'nx': NetworkX (default)
-        - 'gt': graph-tool (high performance)
-        - 'ig': igraph (future support)
-        If None, uses the global default engine.
+        Graph engine ('nx', 'gt'). If None, uses the global default.
     **kwargs
-        Additional engine-specific parameters:
-        - NetworkX: stdFnameSFFX, sgpathn, only_const_mode, path_data,
-          path_plot, init_nw_dict
-        - graph-tool: (currently no additional parameters)
-
-    Returns
-    -------
-    SignedGraphProtocol
-        A Watts-Strogatz graph instance supporting the signed graph protocol.
+        Additional engine-specific parameters.
 
     Examples
     --------
-    Create a WS graph with NetworkX:
-
     >>> ws = WattsStrogatz(n=100, k=4, p=0.3, pflip=0.1, engine='nx')
     >>> ws.flip_random_fract_edges()
-    >>> print(f"Nodes: {ws.N}, Negative edges: {ws.count_negative_edges()}")
-
-    Create with graph-tool (fast C++ backend):
 
     >>> ws = WattsStrogatz(n=1000, k=6, p=0.2, engine='gt')
-    >>> print(f"Nodes: {ws.N}, Edges: {ws.num_edges}")
-
-    Notes
-    -----
-    - The `pflip` parameter marks edges for flipping but doesn't apply the
-      flips immediately. Call `flip_random_fract_edges()` to apply.
-    - The WS model interpolates between regular lattices (p=0) and random
-      graphs (p=1), producing small-world networks for intermediate p.
-    - NetworkX uses connected_watts_strogatz_graph (always connected).
 
     See Also
     --------
     lrgsglib.graphs.nx.random.WattsStrogatzNX : NetworkX implementation
     lrgsglib.graphs.gt.random.WattsStrogatzGT : graph-tool implementation
     """
-    # Resolve engine
-    if engine is not None and isinstance(engine, str):
-        engine = GraphEngine(engine)
 
-    # Get implementation class
-    impl_cls = get_implementation("WattsStrogatz", engine)
+    def __new__(
+        cls,
+        n: int,
+        k: int,
+        p: float,
+        pflip: float = 0.0,
+        seed: Optional[int] = None,
+        engine: Optional[Union[str, GraphEngine]] = None,
+        **kwargs: Any,
+    ):
+        # Resolve engine
+        if engine is not None and isinstance(engine, str):
+            engine = GraphEngine(engine)
 
-    # Determine which engine we got (may have fallen back)
-    impl_module = impl_cls.__module__
+        # Get implementation class
+        impl_cls = get_implementation("WattsStrogatz", engine)
 
-    # Build kwargs for the specific implementation
-    if "graphs.nx" in impl_module:
-        # NetworkX implementation
-        impl_kwargs = {
-            "n": n,
-            "k": k,
-            "p": p,
-            "pflip": pflip,
-            "seed": seed,
-        }
+        # Determine which engine we got (may have fallen back)
+        impl_module = impl_cls.__module__
 
-        # Pass through NX-specific kwargs
-        for key in _NX_SPECIFIC_PARAMS:
-            if key in kwargs:
-                impl_kwargs[key] = kwargs.pop(key)
+        # Build kwargs for the specific implementation
+        if "graphs.nx" in impl_module:
+            # NetworkX implementation
+            impl_kwargs = {
+                "n": n,
+                "k": k,
+                "p": p,
+                "pflip": pflip,
+                "seed": seed,
+            }
 
-        # Pass remaining kwargs
-        impl_kwargs.update(kwargs)
+            # Pass through NX-specific kwargs
+            for key in _NX_SPECIFIC_PARAMS:
+                if key in kwargs:
+                    impl_kwargs[key] = kwargs.pop(key)
 
-    elif "graphs.gt" in impl_module:
-        # graph-tool implementation
-        impl_kwargs = {
-            "n": n,
-            "k": k,
-            "p": p,
-            "pflip": pflip,
-            "seed": seed,
-        }
+            # Pass remaining kwargs
+            impl_kwargs.update(kwargs)
 
-        # Filter out NX-specific params
-        for key in _NX_SPECIFIC_PARAMS:
-            kwargs.pop(key, None)
+        elif "graphs.gt" in impl_module:
+            # graph-tool implementation
+            impl_kwargs = {
+                "n": n,
+                "k": k,
+                "p": p,
+                "pflip": pflip,
+                "seed": seed,
+            }
 
-        impl_kwargs.update(kwargs)
+            # Filter out NX-specific params
+            for key in _NX_SPECIFIC_PARAMS:
+                kwargs.pop(key, None)
 
-    else:
-        # Unknown implementation, pass all params
-        impl_kwargs = {
-            "n": n,
-            "k": k,
-            "p": p,
-            "pflip": pflip,
-            "seed": seed,
-            **kwargs,
-        }
+            impl_kwargs.update(kwargs)
 
-    return impl_cls(**impl_kwargs)
+        else:
+            # Unknown implementation, pass all params
+            impl_kwargs = {
+                "n": n,
+                "k": k,
+                "p": p,
+                "pflip": pflip,
+                "seed": seed,
+                **kwargs,
+            }
+
+        return impl_cls(**impl_kwargs)

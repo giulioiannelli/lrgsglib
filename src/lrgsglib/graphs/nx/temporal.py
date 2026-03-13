@@ -1,15 +1,15 @@
 """Temporal graph facade module.
 
-Re-exports temporal graph classes from TemporalGraphNX and TemporalSignedGraphNX
-packages for cleaner imports.
+Re-exports temporal graph classes. TemporalSignedGraphNX is deprecated —
+TemporalGraphNX now inherits from SignedGraphNX directly.
 """
 
 from .TemporalGraphNX import TemporalGraphNX
-from .TemporalSignedGraphNX import TemporalSignedGraphNX
 
 # Backward compatibility aliases
 TemporalGraph = TemporalGraphNX
-TemporalSignedGraph = TemporalSignedGraphNX
+TemporalSignedGraphNX = TemporalGraphNX  # deprecated alias
+TemporalSignedGraph = TemporalGraphNX  # deprecated alias
 
 __all__ = [
     "TemporalGraphNX",

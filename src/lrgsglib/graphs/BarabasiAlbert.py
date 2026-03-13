@@ -63,21 +63,13 @@ _NX_SPECIFIC_PARAMS = {
 _GT_SPECIFIC_PARAMS: set[str] = set()
 
 
-def BarabasiAlbert(
-    n: int,
-    m: int,
-    pflip: float = 0.0,
-    seed: Optional[int] = None,
-    engine: Optional[Union[str, GraphEngine]] = None,
-    **kwargs: Any,
-) -> "SignedGraphProtocol":
+class BarabasiAlbert:
     """
-    Create a Barabasi-Albert scale-free signed graph.
+    Barabasi-Albert scale-free signed graph.
 
-    This factory function creates a BA graph using the specified engine
-    backend, providing a consistent interface regardless of which engine
-    is used. The BA model produces scale-free networks with power-law
-    degree distributions.
+    This class dispatches to the appropriate engine-specific implementation
+    (NetworkX or graph-tool) via ``__new__``. The BA model produces
+    scale-free networks with power-law degree distributions.
 
     Parameters
     ----------
@@ -85,113 +77,79 @@ def BarabasiAlbert(
         Number of nodes in the final graph.
     m : int
         Number of edges each new node creates (must be <= n).
-        This determines the connectivity of the resulting network.
     pflip : float, default 0.0
         Fraction of edges to mark for sign flipping (0.0 to 1.0).
-        Call `flip_random_fract_edges()` to apply the flips.
+        Call ``flip_random_fract_edges()`` to apply the flips.
     seed : int, optional
         Random seed for reproducibility.
     engine : str or GraphEngine, optional
-        Graph engine to use:
-        - 'nx': NetworkX (default)
-        - 'gt': graph-tool (high performance)
-        - 'ig': igraph (future support)
+        Graph engine to use ('nx', 'gt', or 'ig').
         If None, uses the global default engine.
     **kwargs
-        Additional engine-specific parameters:
-        - NetworkX: stdFnameSFFX, sgpathn, only_const_mode, path_data,
-          path_plot, init_nw_dict
-        - graph-tool: (currently no additional parameters)
-
-    Returns
-    -------
-    SignedGraphProtocol
-        A Barabasi-Albert graph instance supporting the signed graph protocol.
+        Additional engine-specific parameters.
 
     Examples
     --------
-    Create a BA graph with NetworkX:
-
     >>> ba = BarabasiAlbert(n=500, m=2, pflip=0.15, engine='nx')
     >>> ba.flip_random_fract_edges()
     >>> print(f"Nodes: {ba.N}, Negative edges: {ba.count_negative_edges()}")
-
-    Create with graph-tool (fast C++ backend):
-
-    >>> ba = BarabasiAlbert(n=1000, m=3, engine='gt')
-    >>> print(f"Nodes: {ba.N}, Edges: {ba.num_edges}")
-
-    Analyze hub structure:
-
-    >>> ba = BarabasiAlbert(n=500, m=2)
-    >>> hubs = ba.get_hub_nodes(top_k=5)
-    >>> print(f"Top hubs: {hubs}")
-
-    Notes
-    -----
-    - The BA model produces networks with P(k) ~ k^(-gamma), gamma ~ 3.
-    - The `pflip` parameter marks edges for flipping but doesn't apply the
-      flips immediately. Call `flip_random_fract_edges()` to apply.
-    - BA graphs are always connected by construction.
-    - Expected number of edges: (n - m - 1) * m + m*(m+1)/2 for complete
-      initial core.
 
     See Also
     --------
     lrgsglib.graphs.nx.random.BarabasiAlbertNX : NetworkX implementation
     lrgsglib.graphs.gt.random.BarabasiAlbertGT : graph-tool implementation
     """
-    # Resolve engine
-    if engine is not None and isinstance(engine, str):
-        engine = GraphEngine(engine)
 
-    # Get implementation class
-    impl_cls = get_implementation("BarabasiAlbert", engine)
+    def __new__(
+        cls,
+        n: int,
+        m: int,
+        pflip: float = 0.0,
+        seed: Optional[int] = None,
+        engine: Optional[Union[str, GraphEngine]] = None,
+        **kwargs: Any,
+    ):
+        # Resolve engine
+        if engine is not None and isinstance(engine, str):
+            engine = GraphEngine(engine)
 
-    # Determine which engine we got (may have fallen back)
-    impl_module = impl_cls.__module__
+        # Get implementation class
+        impl_cls = get_implementation("BarabasiAlbert", engine)
 
-    # Build kwargs for the specific implementation
-    if "graphs.nx" in impl_module:
-        # NetworkX implementation
-        impl_kwargs = {
-            "n": n,
-            "m": m,
-            "pflip": pflip,
-            "seed": seed,
-        }
+        # Determine which engine we got (may have fallen back)
+        impl_module = impl_cls.__module__
 
-        # Pass through NX-specific kwargs
-        for key in _NX_SPECIFIC_PARAMS:
-            if key in kwargs:
-                impl_kwargs[key] = kwargs.pop(key)
+        # Build kwargs for the specific implementation
+        if "graphs.nx" in impl_module:
+            impl_kwargs = {
+                "n": n,
+                "m": m,
+                "pflip": pflip,
+                "seed": seed,
+            }
+            for key in _NX_SPECIFIC_PARAMS:
+                if key in kwargs:
+                    impl_kwargs[key] = kwargs.pop(key)
+            impl_kwargs.update(kwargs)
 
-        # Pass remaining kwargs
-        impl_kwargs.update(kwargs)
+        elif "graphs.gt" in impl_module:
+            impl_kwargs = {
+                "n": n,
+                "m": m,
+                "pflip": pflip,
+                "seed": seed,
+            }
+            for key in _NX_SPECIFIC_PARAMS:
+                kwargs.pop(key, None)
+            impl_kwargs.update(kwargs)
 
-    elif "graphs.gt" in impl_module:
-        # graph-tool implementation
-        impl_kwargs = {
-            "n": n,
-            "m": m,
-            "pflip": pflip,
-            "seed": seed,
-        }
+        else:
+            impl_kwargs = {
+                "n": n,
+                "m": m,
+                "pflip": pflip,
+                "seed": seed,
+                **kwargs,
+            }
 
-        # Filter out NX-specific params
-        for key in _NX_SPECIFIC_PARAMS:
-            kwargs.pop(key, None)
-
-        impl_kwargs.update(kwargs)
-
-    else:
-        # Unknown implementation, pass all params
-        impl_kwargs = {
-            "n": n,
-            "m": m,
-            "pflip": pflip,
-            "seed": seed,
-            **kwargs,
-        }
-
-    return impl_cls(**impl_kwargs)
+        return impl_cls(**impl_kwargs)
