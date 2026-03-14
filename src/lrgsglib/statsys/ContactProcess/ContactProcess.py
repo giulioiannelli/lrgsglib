@@ -3,14 +3,17 @@
 This module provides two flavours of contact-process dynamics:
 
 * :class:`ContactProcessSIR` implements the infection/recovery process
-  parameterised by an infection rate ``mu``. Use this class with the pure
-  Python backend (``runlang="py"``) or the ``C0`` runlang to mirror the
-  ``ContactSimulator0`` C kernel.
+  parameterised by an infection rate ``mu``. Use ``runlang="C0"`` for the
+  C backend or ``runlang="py"`` for pure Python.
 * :class:`ContactProcessEI` implements excitation-inhibition dynamics driven
-  by ``gamma`` and activation choice, mapping to the ``ContactSimulator1*``
-  kernels (``runlang`` values ``C1``, ``C1a``, ``C1b``, ``C1c``, ``C1d``,
-  ``C1e``). This path encapsulates the degree rescaling expected by the C
-  implementations.
+  by ``gamma`` and activation choice. Use ``runlang="C1"`` (final output),
+  ``"C1D"`` (density tracking), or ``"C1S"`` (snapshots) for the C backend.
+
+Runlang convention: ``C<digit><letters>``
+  - digit 0 = SIR, digit 1 = EI
+  - letters: D = density, S = snapshots (bare digit = final state only)
+  - Update mode selected via ``--update-mode`` flag (naive, cached, frontier,
+    adaptive, gillespie)
 
 Examples
 --------
@@ -20,15 +23,16 @@ Run the infection/recovery process in Python:
 >>> cp.init_contact_dynamics()
 >>> cp.run(steps=10, tqdm_on=False)
 
-Use the excitation-inhibition C backend (requires compiled C cores):
+Use the excitation-inhibition C backend with density tracking:
 
->>> cp = ContactProcessEI(signed_graph, gamma=1.5, runlang="C1c")
+>>> cp = ContactProcessEI(signed_graph, gamma=1.5, runlang="C1D")
 >>> cp.init_contact_dynamics()
 >>> cp.run(verbose=False)
 """
 
 from __future__ import annotations
 
+import warnings as _warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, Literal, cast
 
@@ -42,6 +46,76 @@ from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
     from ...graphs.protocols import SignedGraphProtocol as SignedGraph
+
+
+# ========================================================================
+# Contact Process runlang scheme
+# ========================================================================
+# New: C<digit><letters> where digit={0=SIR, 1=EI}, letters={D=density, S=snapshots}
+# Bare digit = final state only.
+
+_CP_SAVE_LETTERS: dict[str, str] = {
+    "D": "density",
+    "S": "snapshots",
+}
+
+# Deprecated legacy codes → (update_mode, output_mode, new_equivalent)
+_CP_EI_DEPRECATED: dict[str, tuple[str, str, str]] = {
+    "C1A": ("naive",     "snapshots", "C1S"),
+    "C1B": ("naive",     "final",     "C1"),
+    "C1C": ("naive",     "density",   "C1D"),
+    "C1D": ("adaptive",  "density",   "C1D --update-mode adaptive"),
+    "C1E": ("cached",    "density",   "C1D --update-mode cached"),
+    "C1F": ("gillespie", "density",   "C1D --update-mode gillespie"),
+    "C1G": ("cached",    "snapshots", "C1S --update-mode cached"),
+    "CU":  ("naive",     "final",     "C1"),
+}
+
+
+def _parse_cp_ei_runlang(code: str) -> tuple[str, str]:
+    """Parse CP EI runlang code → (update_mode, output_mode).
+
+    For new-format codes (C1, C1D, C1S), returns default update_mode="naive".
+    For deprecated codes (C1A-G, CU), returns legacy mapping with warning.
+    """
+    upper = code.strip().upper()
+
+    # Handle CU separately (no digit prefix)
+    if upper == "CU":
+        _warnings.warn(
+            "runlang='CU' is deprecated. Use 'C1' instead.",
+            DeprecationWarning, stacklevel=4,
+        )
+        return "naive", "final"
+
+    if not upper.startswith("C1"):
+        raise ValueError(f"Expected C1-based EI code, got '{code}'")
+
+    rest = upper[2:]  # after "C1"
+
+    # New-format: letters are all valid save letters
+    if rest == "" or all(c in _CP_SAVE_LETTERS for c in rest):
+        if rest:
+            # Use first letter for output mode (D or S)
+            output_mode = _CP_SAVE_LETTERS[rest[0]]
+        else:
+            output_mode = "final"
+        return "naive", output_mode
+
+    # Check deprecated codes
+    full_code = f"C1{rest}"
+    if full_code in _CP_EI_DEPRECATED:
+        update_mode, output_mode, new_equiv = _CP_EI_DEPRECATED[full_code]
+        _warnings.warn(
+            f"runlang='{code}' is deprecated. Use '{new_equiv}' instead.",
+            DeprecationWarning, stacklevel=4,
+        )
+        return update_mode, output_mode
+
+    raise ValueError(
+        f"Unknown CP runlang code: '{code}'. "
+        f"Valid: C0 (SIR), C1[D|S] (EI), or legacy codes."
+    )
 
 
 # ========================================================================
@@ -107,7 +181,7 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
 
     # CBackendMixin configuration
     _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
-    _c_program_name_template = "ContactSimulator{}"
+    _c_program_name_template = "ContactProcess{}"
     _allowed_c_keys: tuple[str, ...] = ()
 
     def __init__(
@@ -194,18 +268,11 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
     # C backend integration (via CBackendMixin)
     # ------------------------------------------------------------------
     def _c_program_suffix(self) -> str:
-        """Extract program suffix for ContactSimulator.
+        """Extract program suffix for ContactProcess binary name.
 
-        Maps: C0 -> "0", C1 -> "1", C1A -> "1a", CU -> "" (unified).
+        Overridden by subclasses: SIR -> "SIR", EI -> "EI".
         """
-        key = self._c_program_key()
-        if key == "C0":
-            return "0"
-        elif key == "C1":
-            return "1"
-        elif key == "CU":
-            return ""  # Unified binary: ContactSimulator (no suffix)
-        return key[1:].lower()
+        raise NotImplementedError("Subclasses must override _c_program_suffix")
 
     def _get_cleanup_paths(self) -> list[Path | None]:
         """Return paths to clean up after C run."""
@@ -277,10 +344,13 @@ class ContactProcessSIR(ContactProcessBase):
 
     Use this class for the standard infection/recovery dynamics. The Python
     backend (``runlang="py"``) mirrors the logic in :meth:`ds1step`, while the
-    ``C0`` runlang targets the ``ContactSimulator0`` executable.
+    ``C0`` runlang targets the ``ContactProcessSIR`` executable.
     """
 
     _allowed_c_keys = ("C0",)
+
+    def _c_program_suffix(self) -> str:
+        return "SIR"
 
     def __init__(
         self,
@@ -327,7 +397,7 @@ class ContactProcessSIR(ContactProcessBase):
 
 
 class ContactProcessEI(ContactProcessBase):
-    """Excitation-inhibition contact process targeting ``C1`` kernels.
+    """Excitation-inhibition contact process targeting the ``ContactProcessEI`` binary.
 
     Parameters
     ----------
@@ -335,20 +405,19 @@ class ContactProcessEI(ContactProcessBase):
         Excitation strength (rescaled internally by the average degree to match
         the original ``ContactSimulator1*`` interfaces).
     activation : {"tanh", "relu"}, optional
-        Non-linearity used by the C1 kernels; ignored by other backends.
+        Non-linearity used by the C kernels; ignored by other backends.
     num_log_samples : int, optional
-        Number of log samples used by the ``C1c``, ``C1d``, ``C1e``, ``C1f``, and ``C1g`` variants.
+        Number of log-spaced sample points for density/snapshot output modes.
     update_mode : {"naive", "cached", "frontier", "adaptive", "gillespie"}, optional
-        Update strategy for the unified ``CU`` backend (default: "naive").
+        Update strategy for the C backend (default: "naive").
     output_mode : {"final", "density", "snapshots"}, optional
-        Output mode for the unified ``CU`` backend (default: "final").
+        Output mode for the C backend (default: "final").
 
     Notes
     -----
-    This class is intended for the C backends (``runlang`` starting with
-    ``C1`` or ``CU`` for the unified backend). The ``CU`` runlang targets
-    the unified ``ContactSimulator`` binary which supports all update and
-    output mode combinations. Legacy runlang values map to specific combinations:
+    All C backends (``runlang`` starting with ``C1`` or ``CU``) now target
+    the unified ``ContactProcessEI`` binary. Legacy runlang values auto-resolve
+    to the appropriate update/output mode combination:
 
     - ``C1``, ``C1B``: naive + final
     - ``C1A``: naive + snapshots
@@ -361,7 +430,8 @@ class ContactProcessEI(ContactProcessBase):
     Python dynamics are also available (``runlang="py"``).
     """
 
-    _allowed_c_keys = ("C1", "C1A", "C1B", "C1C", "C1D", "C1E", "C1F", "C1G", "CU")
+    # Validation handled by _parse_cp_ei_runlang() instead of whitelist
+    _allowed_c_keys: tuple[str, ...] = ()
 
     # Valid update modes for unified ContactSimulator
     _valid_update_modes = frozenset({"naive", "cached", "frontier", "adaptive", "gillespie"})
@@ -591,29 +661,22 @@ class ContactProcessEI(ContactProcessBase):
     # ------------------------------------------------------------------
     # C backend integration
     # ------------------------------------------------------------------
+    def _c_program_suffix(self) -> str:
+        return "EI"
+
     def _build_c_arglist(self) -> list[str]:
         base_args = self._build_c_arglist_base()
-        key = self._c_program_key()
 
-        if key == "CU":
-            # Unified ContactSimulator argument format:
-            # N p gamma steps datdir syshape run_id out_id activation update_mode output_mode [num_samples]
-            args = [
-                base_args[0],  # N
-                base_args[1],  # p
-                f"{self.gamma_eff:.12g}",
-                f"{self.steps}",
-            ] + base_args[2:] + [
-                self.activation,
-                self.update_mode,
-                self.output_mode,
-            ]
-            # Add num_samples for density/snapshots modes
-            if self.output_mode in ("density", "snapshots"):
-                args.append(f"{self.num_log_samples}")
-            return args
+        # Parse runlang to get update/output modes (handles new + deprecated)
+        update_mode, output_mode = _parse_cp_ei_runlang(self.runlang)
+        # Explicit params override parsed defaults
+        if self.update_mode != "naive":
+            update_mode = self.update_mode
+        if self.output_mode != "final":
+            output_mode = self.output_mode
 
-        # Legacy ContactSimulator1* argument format
+        # Unified ContactProcessEI argument format:
+        # N p gamma steps datdir syshape run_id out_id activation update_mode output_mode [num_samples]
         args = [
             base_args[0],  # N
             base_args[1],  # p
@@ -621,14 +684,12 @@ class ContactProcessEI(ContactProcessBase):
             f"{self.steps}",
         ] + base_args[2:] + [
             self.activation,
+            update_mode,
+            output_mode,
         ]
-
-        if key == "C1A":
-            nSampleLog = getattr(self, "nSampleLog", 100)
-            args.append(f"{nSampleLog}")
-        elif key in ("C1C", "C1D", "C1E", "C1F", "C1G"):
+        # Add num_samples for density/snapshots modes
+        if output_mode in ("density", "snapshots"):
             args.append(f"{self.num_log_samples}")
-
         return args
 
     def run(
@@ -656,8 +717,8 @@ class ContactProcessEI(ContactProcessBase):
         """
         runlang_upper = self.runlang.upper()
 
-        if runlang_upper.startswith("C1") or runlang_upper == "CU":
-            # Use C backend (legacy C1* or unified CU)
+        if runlang_upper.startswith("C1") or runlang_upper in ("CU",):
+            # Use C backend (C1, C1D, C1S, or deprecated C1a-g/CU)
             super().run(
                 tqdm_on=tqdm_on,
                 steps=steps,

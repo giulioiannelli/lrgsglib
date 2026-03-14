@@ -2,8 +2,26 @@
 
 from pathlib import Path
 
-from pybind11.setup_helpers import Pybind11Extension, build_ext
+from pybind11.setup_helpers import Pybind11Extension, build_ext as _build_ext
 from setuptools import setup
+
+
+class build_ext(_build_ext):
+    """Strip C++-only flags when compiling plain C sources."""
+
+    def build_extensions(self):
+        original_compile = self.compiler._compile
+
+        def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
+            if src.endswith(".c"):
+                extra_postargs = [
+                    f for f in extra_postargs
+                    if not f.startswith(("-std=c++", "-std=gnu++"))
+                ]
+            original_compile(obj, src, ext, cc_args, extra_postargs, pp_opts)
+
+        self.compiler._compile = _compile
+        super().build_extensions()
 
 HERE = Path(__file__).resolve().parent
 CCORE_DIR = HERE.parent          # IsingDynamics/ccore

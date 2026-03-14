@@ -222,7 +222,7 @@ def test_ising_c_ground_state(tmp_path, n_steps):
     # C backend needs more sweeps than Python to order
     c_steps = max(n_steps, 500)
     ising = IsingDynamics(
-        sg=lat, T=0.1, steps=c_steps, runlang="C1b", seed=42,
+        sg=lat, T=0.1, steps=c_steps, runlang="C0E", seed=42,
     )
     ising.init_ising_dynamics()
     ising.run(tqdm_on=False, verbose=False)
@@ -244,7 +244,7 @@ def test_ising_c_high_temperature(tmp_path, n_steps):
         init_nw_dict=False,
     )
     ising = IsingDynamics(
-        sg=lat, T=100.0, steps=n_steps, runlang="C1b", seed=42,
+        sg=lat, T=100.0, steps=n_steps, runlang="C0E", seed=42,
     )
     ising.init_ising_dynamics()
     ising.run(tqdm_on=False, verbose=False)

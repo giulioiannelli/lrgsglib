@@ -1,8 +1,14 @@
-"""Voter-model dynamics on signed graphs."""
+"""Voter-model dynamics on signed graphs.
+
+Runlang convention: ``C<digit><letters>``
+  - digit 0 = voter dynamics (single algorithm)
+  - letters: S = snapshots (bare digit = final state only)
+"""
 
 from __future__ import annotations
 
 import random
+import warnings as _warnings
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +18,19 @@ import tqdm
 from .._c_backend import CBackendMixin
 from ..BinDynSys import BinDynSys
 from ...utils.tools.chronometer import time_function_accumulate
+
+# Voter save-mode letters
+_VOTER_SAVE_LETTERS: dict[str, str] = {
+    "S": "snapshots",
+}
+
+# Valid new-style codes (snapshot mode determined by presence of "S")
+_VOTER_VALID_CODES: set[str] = {"C0", "C0S"}
+
+# Deprecated legacy codes → (new_equivalent, snapshot_mode)
+_VOTER_DEPRECATED: dict[str, tuple[str, bool]] = {
+    "C1": ("C0S", True),
+}
 
 
 class VoterModel(CBackendMixin, BinDynSys):
@@ -54,11 +73,13 @@ class VoterModel(CBackendMixin, BinDynSys):
     # CBackendMixin configuration
     _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "VoterSimulator{}"
-    _allowed_c_keys = ("C0", "C1")
+    # Validation handled by suffix method
+    _allowed_c_keys: tuple[str, ...] = ()
 
     # Class-level observable defaults (will be overwritten per instance)
     magn: list[float] = []
     s_t: list[np.ndarray] = []
+    _voter_snapshot_mode: bool = False
 
     def __init__(
         self,
@@ -165,12 +186,37 @@ class VoterModel(CBackendMixin, BinDynSys):
     # C backend integration (via CBackendMixin)
     # ------------------------------------------------------------------
     def _c_program_suffix(self) -> str:
-        """Extract suffix for VoterSimulator (e.g., 'C1' -> '1')."""
-        # VoterSimulator uses single digit: VoterSimulator0, VoterSimulator1
-        return self.runlang[-1]
+        """Map runlang to unified VoterSimulator (always returns '').
+
+        Sets ``_voter_snapshot_mode`` as a side effect.
+
+        New codes: C0 (final), C0S (snapshots).
+        Deprecated: C1 → C0S.
+        """
+        upper = self.runlang.strip().upper()
+        if upper in _VOTER_VALID_CODES:
+            self._voter_snapshot_mode = "S" in upper[2:]
+            return ""
+        if upper in _VOTER_DEPRECATED:
+            new_equiv, snapshot = _VOTER_DEPRECATED[upper]
+            _warnings.warn(
+                f"runlang='{self.runlang}' is deprecated. "
+                f"Use '{new_equiv}' instead.",
+                DeprecationWarning, stacklevel=3,
+            )
+            self._voter_snapshot_mode = snapshot
+            return ""
+        # Bare "C" defaults to C0 (final output)
+        if upper == "C":
+            self._voter_snapshot_mode = False
+            return ""
+        raise ValueError(
+            f"Unknown Voter runlang code: '{self.runlang}'. "
+            f"Valid: C0 (final), C0S (snapshots)."
+        )
 
     def _build_c_arglist(self) -> list[str]:
-        """Build argument list for VoterSimulator."""
+        """Build argument list for unified VoterSimulator."""
         try:
             datdir = self.sg.path_sgdata.relative_to(Path.cwd())
         except ValueError:
@@ -179,7 +225,15 @@ class VoterModel(CBackendMixin, BinDynSys):
         self.out_id = self.out_suffix
         self.magn_path = self.dynpath / self.sg.get_p_fname('m', self.out_id)
 
-        # Base arguments common to all simulators
+        # Track snapshot output path for cleanup
+        if self._voter_snapshot_mode:
+            self.sout_path = self.dynpath / self.sg.get_p_fname(
+                'sout', self.out_id,
+            )
+        else:
+            self.sout_path = None
+
+        # Base arguments (always 7)
         arglist = [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
@@ -190,8 +244,8 @@ class VoterModel(CBackendMixin, BinDynSys):
             self._c_suffix_arg(self.out_id),
         ]
 
-        # Add extra arguments for VoterSimulator1 and above
-        if self.runlang[-1] != "0":
+        # 8th arg triggers snapshot mode in unified binary
+        if self._voter_snapshot_mode:
             arglist.append(f"{self.nSampleLog}")
 
         return arglist
@@ -209,6 +263,7 @@ class VoterModel(CBackendMixin, BinDynSys):
         return [
             getattr(self, 'sfout', None),
             self.magn_path,
+            getattr(self, 'sout_path', None),
         ]
 
     # ------------------------------------------------------------------

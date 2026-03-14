@@ -85,7 +85,12 @@ class TestVoterModel(unittest.TestCase):
 
     def test_run_c_raises_when_binary_missing(self):
         sg = self._make_graph()
-        model = self.VoterModel(sg, runlang="C", eqSTEP=1, seed=0)
+        model = self.VoterModel(sg, runlang="C0", eqSTEP=1, seed=0)
+        # Point to an existing but empty dir so _check_c_backend_or_fallback
+        # passes (dir exists) but the binary itself is missing.
+        empty_bin_dir = Path(self._tmp_dir.name) / "empty_bin"
+        empty_bin_dir.mkdir(exist_ok=True)
+        model._c_bin_dir = empty_bin_dir
         model.init_voter_dynamics()
         with self.assertRaises(FileNotFoundError):
             model.run(tqdm_on=False, clean_export=False)

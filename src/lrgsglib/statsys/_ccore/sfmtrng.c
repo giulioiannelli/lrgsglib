@@ -31,8 +31,10 @@ double SFMTrng_dbl(void)
  * @brief Initializes the SFMT (SIMD-oriented Fast Mersenne Twister) random number generator with a predefined seed array.
  *
  * This function sets the seed for the SFMT random number generator using a predefined
- * array of seeds. It also prints the seed array and the initial index of the SFMT state
- * for debugging purposes.
+ * array of seeds. Seed components: SEED and SIID are fixed constants; CEED and CIID
+ * are derived from time(0) and getpid() for per-invocation uniqueness.
+ *
+ * Compile with -DSFMT_VERBOSE to print the seed array and initial SFMT index to stderr.
  *
  * @param void No parameters.
  */
@@ -45,10 +47,11 @@ extern void __set_seed_SFMT(void)
     // Initialize the SFMT state with the seed array
     sfmt_init_by_array(&sfmt, seed_rand, LENSRND);
 
-    // Debug: Print the seed array and initial index to stderr
-    fprintf(stderr, "Seed Array: %u, %u, %u, %u\n", seed_rand[0], 
+#ifdef SFMT_VERBOSE
+    fprintf(stderr, "Seed Array: %u, %u, %u, %u\n", seed_rand[0],
         seed_rand[1], seed_rand[2], seed_rand[3]);
     fprintf(stderr, "Initial sfmt.idx: %d\n", sfmt.idx);
+#endif
 }
 
 /** print N_PRIGNG random numbers, integers and floating point types on stdout

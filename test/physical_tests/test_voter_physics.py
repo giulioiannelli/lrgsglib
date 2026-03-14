@@ -70,7 +70,6 @@ def test_voter_consensus_complete_graph(tmp_path):
 
 @pytest.mark.physical
 @pytest.mark.integration
-@pytest.mark.xfail(reason="VoterSimulator1 SIGFPE on small lattices", strict=False)
 def test_voter_c_backend_spins(tmp_path):
     """C backend: voter spins must be valid."""
     from lrgsglib.graphs.nx import Lattice2DNX
@@ -81,7 +80,7 @@ def test_voter_c_backend_spins(tmp_path):
         seed=42, path_data=tmp_path, path_plot=tmp_path,
         init_nw_dict=False,
     )
-    voter = VoterModel(sg=lat, steps=50, runlang="C1", seed=42)
+    voter = VoterModel(sg=lat, steps=50, runlang="C0S", seed=42)
     voter.init_voter_dynamics()
     voter.run(tqdm_on=False, verbose=False)
 

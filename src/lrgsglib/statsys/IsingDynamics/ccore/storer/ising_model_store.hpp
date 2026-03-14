@@ -46,9 +46,9 @@ private:
     std::uniform_real_distribution<> dist{0.0, 1.0};
     std::uniform_int_distribution<> node_dist;
 
-    py::list frame_spins;
-    py::list frame_energies;
-    py::list frame_magnetizations;
+    std::vector<std::vector<int>> frame_spins;
+    std::vector<double> frame_energies;
+    std::vector<double> frame_magnetizations;
 };
 
 #endif // ISING_MODEL_HPP

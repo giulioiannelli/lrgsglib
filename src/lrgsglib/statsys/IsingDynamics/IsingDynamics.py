@@ -26,24 +26,51 @@ LadderType = Literal["geometric", "linear", "custom"]
 # ---------------------------------------------------------------------------
 # runlang naming convention
 # ---------------------------------------------------------------------------
-# Format: <backend>_<algorithm>[_<output>]
-#   backend:   py, c, pb (pybind), cu (cuda)
-#   algorithm: met (Metropolis), sa (simulated annealing), pt (parallel tempering)
-#   output:    em (energy+magnetization), snap (snapshots), clust (clusters)
+# New systematic format: C<digit><letters>
+#   digit:   0 = Metropolis, 1 = SA, 2 = PT
+#   letters: E = energy+magnetization, S = snapshots, K = cluster,
+#            V = eigvec overlap, H = external field
 #
-# Legacy codes are mapped to the new scheme automatically.
+# Bare digit (e.g. C0) defaults to E (energy+magnetization).
+# Compound: C0ES = Metropolis + energy/magnetization + snapshots.
+#
+# Non-C backends: py, pb_met, cu_met, etc.
+
+import warnings as _warnings
+
+# Algorithm digit → backend key
+_ISING_ALGORITHMS: dict[str, str] = {
+    "0": "c_met",
+    "1": "c_sa",
+    "2": "c_pt",
+}
+
+# Save-mode letter → C binary flag
+_ISING_SAVE_LETTERS: dict[str, str] = {
+    "E": "em",
+    "S": "snap",
+    "K": "clust",
+    "V": "eigvec",
+    "H": "hfield",
+}
+
+_ISING_DEFAULT_SAVE = "em"
+
+# Deprecated legacy codes → (backend, save_flags, new_equivalent)
+_ISING_DEPRECATED: dict[str, tuple[str, str, str]] = {
+    "C0":  ("c_met", "em",              "C0E"),
+    "C1":  ("c_met", "clust",           "C0K"),
+    "C1B": ("c_met", "em",              "C0E"),
+    "C2":  ("c_met", "snap",            "C0S"),
+    "C3":  ("c_met", "em,snap",         "C0ES"),
+    "C3B": ("c_sa",  "em",              "C1E"),
+    "C4":  ("c_met", "clust,eigvec",    "C0KV"),
+    "C4B": ("c_pt",  "em",              "C2E"),
+    "C5":  ("c_met", "em,snap,hfield",  "C0ESH"),
+}
+
+# Convenience aliases (non-C backends)
 _RUNLANG_ALIASES: dict[str, str] = {
-    # Legacy → new (case-insensitive keys normalised in _resolve_runlang)
-    "C0":  "c_met_em",
-    "C1":  "c_met",
-    "C1B": "c_met_em",
-    "C2":  "c_met_snap",
-    "C3":  "c_sa",
-    "C3B": "c_sa_em",
-    "C4":  "c_pt",
-    "C4B": "c_pt_em",
-    "C5":  "c_met_clust",
-    # Convenience aliases
     "py":       "py_met",
     "python":   "py_met",
     "Python":   "py_met",
@@ -52,45 +79,98 @@ _RUNLANG_ALIASES: dict[str, str] = {
     "cu":       "cu_met",
     "cuda":     "cu_met",
     "gpu":      "cu_met",
-    # Cluster algorithm aliases
     "wolff":    "py_wolff",
     "sw":       "py_sw",
-    # Topological algorithm aliases
     "topo_met": "py_topo_met",
     "topo_fca": "py_topo_fca",
 }
 
-# Reverse map: new name → legacy C key (for subprocess backend)
-_NEW_TO_LEGACY_C: dict[str, str] = {
-    "c_met":      "C1",
-    "c_met_em":   "C1B",
-    "c_met_snap": "C2",
-    "c_sa":       "C3",
-    "c_sa_em":    "C3B",
-    "c_pt":       "C4",
-    "c_pt_em":    "C4B",
-    "c_met_clust":"C5",
+# Canonical algorithm → unified binary name
+_C_UNIFIED_BINARY: dict[str, str] = {
+    "c_met": "IsingMetropolis",
+    "c_sa":  "IsingSimulatedAnnealing",
+    "c_pt":  "IsingParallelTempering",
 }
+
+
+def _parse_ising_c_runlang(code: str) -> tuple[str, str]:
+    """Parse C<digit><letters> → (backend, save_flags).
+
+    Parameters
+    ----------
+    code : str
+        Runlang code starting with 'C' (e.g., 'C0E', 'C0ES', 'C1E').
+
+    Returns
+    -------
+    tuple[str, str]
+        (backend_key, comma_separated_save_flags)
+
+    Raises
+    ------
+    ValueError
+        If the code is invalid.
+    """
+    upper = code.strip().upper()
+    if not upper.startswith("C"):
+        raise ValueError(f"Expected C-backend code, got '{code}'")
+
+    rest = upper[1:]
+    if not rest:
+        raise ValueError(f"Empty runlang code: '{code}'")
+
+    digit = rest[0]
+    letters = rest[1:]
+
+    # New-format code: digit is a valid algorithm, letters are all valid save letters
+    if digit in _ISING_ALGORITHMS:
+        if letters == "" or all(c in _ISING_SAVE_LETTERS for c in letters):
+            backend = _ISING_ALGORITHMS[digit]
+            if letters:
+                flags = ",".join(_ISING_SAVE_LETTERS[c] for c in letters)
+            else:
+                flags = _ISING_DEFAULT_SAVE
+            return backend, flags
+
+    # Check deprecated legacy codes
+    full_code = f"C{rest}"
+    if full_code in _ISING_DEPRECATED:
+        backend, flags, new_equiv = _ISING_DEPRECATED[full_code]
+        _warnings.warn(
+            f"runlang='{code}' is deprecated. Use '{new_equiv}' instead.",
+            DeprecationWarning,
+            stacklevel=4,
+        )
+        return backend, flags
+
+    raise ValueError(
+        f"Unknown Ising runlang code: '{code}'. "
+        f"Valid: C<digit><letters> where digit={{0,1,2}} and "
+        f"letters⊆{{E,S,K,V,H}}, or legacy codes."
+    )
 
 
 def _resolve_runlang(raw: str) -> str:
     """Normalise a runlang string to the canonical form.
 
-    Accepts both legacy codes (``'C1b'``) and new-style names
-    (``'pb_met'``).  Returns the canonical new-style name.
+    Accepts new systematic codes (``'C0E'``), legacy codes (``'C1b'``),
+    and named backends (``'pb_met'``).
     """
     key = raw.strip()
-    # Already canonical?
+    # Already canonical (contains underscore)?
     if "_" in key:
         return key
-    # Try legacy lookup (case-insensitive)
+    # Non-C convenience alias?
     upper = key.upper()
     if upper in _RUNLANG_ALIASES:
         return _RUNLANG_ALIASES[upper]
-    # Exact match (e.g. "py", "pb_met")
     if key in _RUNLANG_ALIASES:
         return _RUNLANG_ALIASES[key]
-    # Pass through (unknown — let downstream validation catch it)
+    # C-backend code: parse via new scheme (handles both new and deprecated)
+    if upper.startswith("C"):
+        backend, _ = _parse_ising_c_runlang(key)
+        return backend
+    # Pass through
     return key
 
 
@@ -99,34 +179,38 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
     Naming convention for ``runlang``
     ---------------------------------
-    Format: ``<backend>_<algorithm>[_<output>]``
+    **C subprocess format:** ``C<digit><letters>``
 
-    ========= ======== ========================================
-    backend   meaning  description
-    ========= ======== ========================================
-    ``py``    Python   Pure-Python Metropolis / SA / PT
-    ``c``     C sub    C subprocess (file I/O, NX graphs only)
-    ``pb``    pybind11 C kernels called in-process via numpy
-    ``cu``    CUDA     GPU checkerboard Metropolis (lattices)
-    ========= ======== ========================================
+    ===== ============================================
+    digit algorithm
+    ===== ============================================
+    ``0`` Glauber-Metropolis at fixed *T*
+    ``1`` Simulated Annealing
+    ``2`` Parallel Tempering (Replica Exchange)
+    ===== ============================================
 
-    ========= ============================================
-    algorithm meaning
-    ========= ============================================
-    ``met``   Glauber–Metropolis at fixed *T*
-    ``sa``    Simulated Annealing
-    ``pt``    Parallel Tempering (Replica Exchange)
-    ========= ============================================
+    ====== ============================================
+    letter save mode
+    ====== ============================================
+    ``E``  energy + magnetization time series
+    ``S``  spin snapshots
+    ``K``  cluster magnetization
+    ``V``  eigenvector overlap
+    ``H``  external field (read from file)
+    ====== ============================================
 
-    ======== ===========================================
-    output   meaning (C subprocess only)
-    ======== ===========================================
-    ``em``   energy + magnetization time series
-    ``snap`` spin snapshots
-    ``clust``cluster export
-    ======== ===========================================
+    Bare digit defaults to ``E``. Combine letters for multiple outputs:
+    ``C0ES`` = Metropolis + energy/magnetization + snapshots.
 
-    Legacy codes (``"C1b"``, ``"C3b"``, …) are mapped automatically.
+    **Other backends:**
+
+    ========= ========================================
+    backend   description
+    ========= ========================================
+    ``pb_met``  pybind11 Metropolis (fastest, any graph)
+    ``cu_met``  CUDA GPU Metropolis (lattices only)
+    ``py``      Pure-Python Metropolis
+    ========= ========================================
 
     Parameters
     ----------
@@ -152,25 +236,16 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     >>> ising.init_ising_dynamics()
     >>> ising.run(verbose=False)
 
-    >>> # Legacy C subprocess (NX graphs only):
-    >>> ising = IsingDynamics(lattice, T=2.0, steps=1000, runlang='C1b')
+    >>> # C subprocess Metropolis with energy+magnetization output:
+    >>> ising = IsingDynamics(lattice, T=2.0, steps=1000, runlang='C0E')
     """
 
     dyn_UVclass = "ising_dynamics"
 
     # CBackendMixin configuration
     _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
-    _c_program_name_template = "IsingSimulator{}"
-    _allowed_c_keys: tuple[str, ...] = (
-        # New Metropolis variants
-        "C1B",
-        # Simulated Annealing variants
-        "C3B",
-        # Parallel Tempering variants
-        "C4B",
-        # Legacy aliases (deprecated but supported)
-        "C0", "C1", "C2", "C3", "C4", "C5",
-    )
+    _c_program_name_template = ""  # Overridden by build_cprogram_command
+    _allowed_c_keys: tuple[str, ...] = ()
     magn = []
     ene = []
     s_t = []
@@ -189,6 +264,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         steps: int | None = None,
         simref: float | None = None,
         nstepsIsing: int | None = None,
+        save: str | None = None,
         save_magnetization: bool = False,
         upd_mode: str = "asynchronous",
         # Simulated Annealing parameters
@@ -232,6 +308,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.thrmSTEP = thrmSTEP
         self.freq = freq
         self.save_magnetization = save_magnetization
+        self.save = save  # output mode for unified C binaries
         self.NoClust = NoClust
         self.NeigV = -1
         self.upd_mode = upd_mode
@@ -348,58 +425,65 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     # ------------------------------------------------------------------
     # C backend configuration (overrides CBackendMixin)
     # ------------------------------------------------------------------
-    def _c_program_key(self) -> str:
-        """Convert runlang to internal key (e.g., 'c1b' -> 'C1B').
 
-        Overrides mixin to default to C1B when no suffix is provided.
-        Supports both legacy codes (``C1B``) and canonical names (``c_met_em``).
+    def _resolve_c_backend(self) -> str:
+        """Determine canonical backend+algorithm from runlang.
+
+        Returns one of: ``'c_met'``, ``'c_sa'``, ``'c_pt'``.
         """
+        upper = self.runlang.strip().upper()
+        if upper.startswith("C") and "_" not in self.runlang:
+            backend, _ = _parse_ising_c_runlang(self.runlang)
+            return backend
+        # Canonical name: extract backend+algorithm
+        rl = _resolve_runlang(self.runlang)
+        parts = rl.split("_")
+        if len(parts) >= 2 and parts[0] == "c":
+            return f"c_{parts[1]}"
+        return "c_met"
+
+    def _resolve_save_flags(self) -> str:
+        """Determine output mode flags.
+
+        Uses explicit ``self.save`` if set, otherwise derives from
+        runlang code (new systematic or deprecated legacy).
+        Defaults to ``"em"``.
+        """
+        if self.save:
+            return self.save
+        upper = self.runlang.strip().upper()
+        if upper.startswith("C") and "_" not in self.runlang:
+            _, flags = _parse_ising_c_runlang(self.runlang)
+            return flags
+        return _ISING_DEFAULT_SAVE
+
+    def _c_program_key(self) -> str:
+        """Convert runlang to internal key for unified binaries."""
         if not self.runlang:
             raise ValueError("C backend requires a runlang value")
-        rl = self.runlang.strip()
-        # Canonical new-style name → legacy key via reverse map
-        if rl in _NEW_TO_LEGACY_C:
-            key = _NEW_TO_LEGACY_C[rl]
-        elif rl.upper().startswith("C") and "_" not in rl:
-            # Legacy code path (e.g. "C1", "C1b", "C3B")
-            suffix = rl[1:]
-            key = f"C{suffix.upper()}" if suffix else "C1B"
-        else:
-            raise ValueError(
-                f"runlang '{self.runlang}' cannot be mapped to a C program key"
-            )
-        if self._allowed_c_keys and key not in self._allowed_c_keys:
-            raise ValueError(
-                f"runlang '{self.runlang}' not supported for {self.__class__.__name__}. "
-                f"Allowed: {self._allowed_c_keys}"
-            )
-        return key
+        backend = self._resolve_c_backend()
+        key_map = {
+            "c_met": "UNIFIED_MET",
+            "c_sa": "UNIFIED_SA",
+            "c_pt": "UNIFIED_PT",
+        }
+        return key_map.get(backend, "UNIFIED_MET")
 
-    def _c_program_suffix(self) -> str:
-        """Extract program suffix for IsingSimulator (handles legacy variants).
-
-        Legacy single-digit variants (C0-C5) map to simple digits.
-        New variants (C1B, C3B, etc.) use lowercase suffix.
-        """
-        key = self._c_program_key()
-        legacy_map = {"C0": "0", "C1": "1", "C2": "2", "C3": "3", "C4": "4", "C5": "5"}
-        if key in legacy_map:
-            return legacy_map[key]
-        return key[1:].lower()  # "C1B" -> "1b", "C3B" -> "3b"
+    def build_cprogram_command(self) -> None:
+        """Build command for unified C binary."""
+        backend = self._resolve_c_backend()
+        binary_name = _C_UNIFIED_BINARY.get(backend, "IsingMetropolis")
+        self.CbaseName = binary_name
+        arglist = self._build_c_arglist()
+        self.cprogram = [self._get_bin_dir() / binary_name] + arglist
 
     def _is_sa_variant(self) -> bool:
-        """Check if current runlang is simulated annealing (new variant only).
-
-        Note: C3 is a legacy variant that uses equilibrium arguments.
-        Only C3B uses the new simulated annealing argument format.
-        """
-        key = self._c_program_key()
-        return key.startswith("C3") and key != "C3"  # C3 is legacy
+        """Check if current runlang is simulated annealing."""
+        return self._resolve_c_backend() == "c_sa"
 
     def _is_pt_variant(self) -> bool:
         """Check if current runlang is parallel tempering."""
-        key = self._c_program_key()
-        return key.startswith("C4") and key != "C4"  # C4 is legacy
+        return self._resolve_c_backend() == "c_pt"
 
     # ------------------------------------------------------------------
     # Argument building (model-specific)
@@ -414,7 +498,8 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             return self._build_equilibrium_arglist()
 
     def _build_equilibrium_arglist(self) -> list[str]:
-        """Arguments for standard Metropolis equilibrium variants."""
+        """Arguments for unified IsingMetropolis binary."""
+        save_flags = self._resolve_save_flags()
         return [
             f"{self.N}",
             f"{self.T:.3g}",
@@ -428,11 +513,12 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             self._c_suffix_arg(self.out_suffix),
             self.upd_mode,
             f"{self.freq}",
-            f"{self.NeigV}"
+            f"{self.NeigV}",
+            save_flags,
         ]
 
     def _build_sa_arglist(self) -> list[str]:
-        """Arguments for simulated annealing variants."""
+        """Arguments for unified IsingSimulatedAnnealing binary."""
         return [
             f"{self.N}",
             f"{self.sg.pflip:.3g}",
@@ -450,7 +536,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ]
 
     def _build_pt_arglist(self) -> list[str]:
-        """Arguments for parallel tempering variants."""
+        """Arguments for unified IsingParallelTempering binary."""
         ladder_type_map = {"geometric": "0", "linear": "1", "custom": "2"}
         return [
             f"{self.N}",

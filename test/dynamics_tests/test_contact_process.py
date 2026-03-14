@@ -99,7 +99,7 @@ class TestContactProcess(unittest.TestCase):
         )
         model = self.ContactProcessEI(
             sg,
-            runlang="C1c",
+            runlang="C1D",
             gamma=0.6,
             activation="relu",
             num_log_samples=25,
@@ -114,15 +114,18 @@ class TestContactProcess(unittest.TestCase):
                 hasattr(model.sg, "path_exp_edgl")
                 and model.sg.path_exp_edgl.exists()
             )
-            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator1c")
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactProcessEI")
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertNotEqual(model.gamma_eff, model.gamma)
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
             self.assertEqual(model.cprogram[4], f"{model.steps}")
             self.assertEqual(model.cprogram[8], model.out_id)
-            self.assertEqual(model.cprogram[-2], model.activation)
-            self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
+            # C1D maps to naive + density via unified binary
+            self.assertEqual(model.cprogram[9], model.activation)
+            self.assertEqual(model.cprogram[10], "naive")
+            self.assertEqual(model.cprogram[11], "density")
+            self.assertEqual(model.cprogram[12], f"{model.num_log_samples}")
         finally:
             if model.stderr_fopen and not model.stderr_fopen.closed:
                 model.stderr_fopen.close()
@@ -142,9 +145,10 @@ class TestContactProcess(unittest.TestCase):
         )
         model = self.ContactProcessEI(
             sg,
-            runlang="C1e",
+            runlang="C1D",
             gamma=0.5,
             activation="tanh",
+            update_mode="cached",
             num_log_samples=15,
             seed=0,
             steps=1,
@@ -152,13 +156,16 @@ class TestContactProcess(unittest.TestCase):
         model._set_time_controls(steps=30)
         model.init_contact_dynamics()
         try:
-            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator1e")
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactProcessEI")
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
             self.assertEqual(model.cprogram[4], f"{model.steps}")
-            self.assertEqual(model.cprogram[-2], model.activation)
-            self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
+            # C1D + update_mode="cached" maps to cached + density via unified binary
+            self.assertEqual(model.cprogram[9], model.activation)
+            self.assertEqual(model.cprogram[10], "cached")
+            self.assertEqual(model.cprogram[11], "density")
+            self.assertEqual(model.cprogram[12], f"{model.num_log_samples}")
         finally:
             if model.stderr_fopen and not model.stderr_fopen.closed:
                 model.stderr_fopen.close()
@@ -178,9 +185,10 @@ class TestContactProcess(unittest.TestCase):
         )
         model = self.ContactProcessEI(
             sg,
-            runlang="C1f",
+            runlang="C1D",
             gamma=0.75,
             activation="relu",
+            update_mode="gillespie",
             num_log_samples=12,
             seed=1,
             steps=1,
@@ -188,13 +196,16 @@ class TestContactProcess(unittest.TestCase):
         model._set_time_controls(steps=25)
         model.init_contact_dynamics()
         try:
-            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator1f")
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactProcessEI")
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
             self.assertEqual(model.cprogram[4], f"{model.steps}")
-            self.assertEqual(model.cprogram[-2], model.activation)
-            self.assertEqual(model.cprogram[-1], f"{model.num_log_samples}")
+            # C1D + update_mode="gillespie" maps to gillespie + density via unified binary
+            self.assertEqual(model.cprogram[9], model.activation)
+            self.assertEqual(model.cprogram[10], "gillespie")
+            self.assertEqual(model.cprogram[11], "density")
+            self.assertEqual(model.cprogram[12], f"{model.num_log_samples}")
         finally:
             if model.stderr_fopen and not model.stderr_fopen.closed:
                 model.stderr_fopen.close()
@@ -239,7 +250,7 @@ class TestContactProcess(unittest.TestCase):
 
         ccore_dir = Path(self._tmp_dir.name) / "ccore_bin"
         ccore_dir.mkdir(exist_ok=True)
-        fake_binary = ccore_dir / "ContactSimulator0"
+        fake_binary = ccore_dir / "ContactProcessSIR"
         fake_binary.write_text("#!/bin/sh\n")
 
         stdout_state = np.ones(model.N, dtype=np.int8)
@@ -259,14 +270,14 @@ class TestContactProcess(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.cp_parser.parse_arguments(
                 self.cp_parser.parser,
-                ["4", "0.1", "--dynamics", "EI", "--runlang", "C1c"],
+                ["4", "0.1", "--dynamics", "EI", "--runlang", "C1D"],
             )
 
     def test_cli_validation_blocks_sir_c1(self):
         with self.assertRaises(SystemExit):
             self.cp_parser.parse_arguments(
                 self.cp_parser.parser,
-                ["4", "0.1", "--dynamics", "SIR", "--runlang", "C1c", "--mu", "0.5"],
+                ["4", "0.1", "--dynamics", "SIR", "--runlang", "C1D", "--mu", "0.5"],
             )
 
     def test_kernel_validates_backend_choice(self):
@@ -290,7 +301,7 @@ class TestContactProcess(unittest.TestCase):
     def test_l2d_contact_process_rejects_unwired_backends(self):
         args = self.cp_parser.parse_arguments(
             self.cp_parser.parser,
-            ["4", "0.1", "--dynamics", "EI", "--runlang", "C1a", "--gamma", "0.3"],
+            ["4", "-p", "0.1", "--dynamics", "EI", "--runlang", "C1S", "--gamma", "0.3"],
         )
         with self.assertRaises(NotImplementedError):
             self.cp_kernel.run_simulation(args)
@@ -306,7 +317,7 @@ class TestContactProcess(unittest.TestCase):
         model = self.ContactProcessEI(
             sg,
             gamma=0.499,
-            runlang="C1c",
+            runlang="C1D",
             simref=2,
             rndStr=True,
             out_suffix="uniform_rand",
@@ -336,7 +347,7 @@ class TestContactProcess(unittest.TestCase):
         )
         model = self.ContactProcessEI(
             sg,
-            runlang="CU",
+            runlang="C1",
             gamma=0.5,
             activation="tanh",
             update_mode="cached",
@@ -348,8 +359,8 @@ class TestContactProcess(unittest.TestCase):
         model._set_time_controls(steps=100)
         model.init_contact_dynamics()
         try:
-            # Unified binary: ContactSimulator (no suffix)
-            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator")
+            # All EI variants route to unified ContactProcessEI binary
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactProcessEI")
             self.assertEqual(model.cprogram[1], str(model.N))
             self.assertEqual(model.cprogram[2], f"{model.sg.pflip:.12g}")
             self.assertEqual(model.cprogram[3], f"{model.gamma_eff:.12g}")
@@ -368,7 +379,7 @@ class TestContactProcess(unittest.TestCase):
             model.sg.remove_exported_files()
 
     def test_cu_unified_builder_final_mode_no_samples(self):
-        """Test that CU with final output mode omits num_samples."""
+        """Test that C1 with final output mode omits num_samples."""
         path_graph = nx.path_graph(3)
         for u, v in path_graph.edges:
             path_graph[u][v]["weight"] = 1.0
@@ -381,7 +392,7 @@ class TestContactProcess(unittest.TestCase):
         )
         model = self.ContactProcessEI(
             sg,
-            runlang="CU",
+            runlang="C1",
             gamma=0.3,
             activation="relu",
             update_mode="naive",
@@ -392,7 +403,7 @@ class TestContactProcess(unittest.TestCase):
         model._set_time_controls(steps=50)
         model.init_contact_dynamics()
         try:
-            self.assertEqual(Path(model.cprogram[0]).name, "ContactSimulator")
+            self.assertEqual(Path(model.cprogram[0]).name, "ContactProcessEI")
             self.assertEqual(model.cprogram[9], "relu")
             self.assertEqual(model.cprogram[10], "naive")
             self.assertEqual(model.cprogram[11], "final")

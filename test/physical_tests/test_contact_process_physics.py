@@ -92,7 +92,7 @@ def test_cp_c_supercritical(tmp_path, n_steps):
         init_nw_dict=False,
     )
     cp = ContactProcessEI(
-        sg=lat, gamma=5.0, steps=n_steps, runlang="C1c", seed=42,
+        sg=lat, gamma=5.0, steps=n_steps, runlang="C1D", seed=42,
     )
     cp.init_contact_dynamics()
     cp.run(tqdm_on=False, verbose=False)

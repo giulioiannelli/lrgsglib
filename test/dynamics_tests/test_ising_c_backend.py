@@ -100,7 +100,7 @@ class TestIsingCBackend(unittest.TestCase):
         """Test that C1b variant executes and returns a valid spin state."""
         sg = self._make_small_lattice(side=8)
         ising = self.IsingDynamics(
-            sg, T=2.0, steps=100, runlang="C1b", seed=42
+            sg, T=2.0, steps=100, runlang="C0E", seed=42
         )
         ising.init_ising_dynamics()
 
@@ -128,7 +128,7 @@ class TestIsingCBackend(unittest.TestCase):
 
         # Run at low T - should stay ordered
         ising_low = self.IsingDynamics(
-            sg, T=0.5, steps=500, runlang="C1b", seed=12345, ic="custom"
+            sg, T=0.5, steps=500, runlang="C0E", seed=12345, ic="custom"
         )
         ising_low.init_ising_dynamics(custom=initial_state.copy())
 
@@ -138,7 +138,7 @@ class TestIsingCBackend(unittest.TestCase):
 
             # Run at high T - should become disordered
             ising_high = self.IsingDynamics(
-                sg, T=10.0, steps=500, runlang="C1b", seed=12345, ic="custom"
+                sg, T=10.0, steps=500, runlang="C0E", seed=12345, ic="custom"
             )
             ising_high.init_ising_dynamics(custom=initial_state.copy())
             ising_high.run(tqdm_on=False, clean_export=False)
@@ -162,13 +162,13 @@ class TestIsingCBackend(unittest.TestCase):
         """Test that different seeds produce different states."""
         sg1 = self._make_small_lattice(side=8)
         ising1 = self.IsingDynamics(
-            sg1, T=2.0, steps=1000, runlang="C1b", seed=111
+            sg1, T=2.0, steps=1000, runlang="C0E", seed=111
         )
         ising1.init_ising_dynamics()
 
         sg2 = self._make_small_lattice(side=8)
         ising2 = self.IsingDynamics(
-            sg2, T=2.0, steps=1000, runlang="C1b", seed=222
+            sg2, T=2.0, steps=1000, runlang="C0E", seed=222
         )
         ising2.init_ising_dynamics()
 
@@ -191,7 +191,7 @@ class TestIsingCBackend(unittest.TestCase):
         sg = self._make_small_lattice(side=16)
         # Very high temperature - spins should be roughly random
         ising = self.IsingDynamics(
-            sg, T=100.0, steps=500, runlang="C1b", seed=42
+            sg, T=100.0, steps=500, runlang="C0E", seed=42
         )
         ising.init_ising_dynamics()
 
@@ -217,7 +217,7 @@ class TestIsingCBackend(unittest.TestCase):
 
         # Very low temperature - should preserve initial ordering
         ising = self.IsingDynamics(
-            sg, T=0.1, steps=1000, runlang="C1b", seed=42, ic="custom"
+            sg, T=0.1, steps=1000, runlang="C0E", seed=42, ic="custom"
         )
         ising.init_ising_dynamics(custom=initial_state)
 
@@ -247,7 +247,7 @@ class TestIsingCBackend(unittest.TestCase):
         sg.flip_random_fract_edges()
 
         ising = self.IsingDynamics(
-            sg, T=2.0, steps=500, runlang="C1b", seed=42
+            sg, T=2.0, steps=500, runlang="C0E", seed=42
         )
         ising.init_ising_dynamics()
 
@@ -271,7 +271,7 @@ class TestIsingCBackend(unittest.TestCase):
         """Test that Python energy calculation gives valid result for C state."""
         sg = self._make_small_lattice(side=8)
         ising = self.IsingDynamics(
-            sg, T=2.0, steps=100, runlang="C1b", seed=42
+            sg, T=2.0, steps=100, runlang="C0E", seed=42
         )
         ising.init_ising_dynamics()
 
@@ -351,7 +351,7 @@ class TestIsingCBackendSA(unittest.TestCase):
             steps_per_T=100,
             n_temperatures=20,
             sa_enabled=True,
-            runlang="C3b",
+            runlang="C1E",
             seed=42,
         )
         ising.init_ising_dynamics()

@@ -133,7 +133,10 @@ class CBackendMixin:
             return
         upper = self.runlang.upper()
         # Only check C subprocess backend, not CuPy (cu_*) or pybind (pb_*)
-        if not (upper.startswith("C") and not upper.startswith("CU")):
+        # CuPy uses underscore format (cu_met), C subprocess uses C<digit> format
+        if not upper.startswith("C"):
+            return
+        if "_" in self.runlang and (upper.startswith("CU_") or upper.startswith("PB_")):
             return
 
         # Check if the graph supports file I/O required by C backend

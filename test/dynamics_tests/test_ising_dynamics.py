@@ -275,13 +275,13 @@ class TestIsingDynamics(unittest.TestCase):
         """Test C argument list for Metropolis variant."""
         sg = self._make_small_lattice(side=4)
         ising = self.IsingDynamics(
-            sg, T=2.0, steps=100, runlang="C1b"
+            sg, T=2.0, steps=100, runlang="C0E"
         )
         ising.init_ising_dynamics()
 
         try:
-            # Check CbaseName is set correctly
-            self.assertEqual(ising.CbaseName, "IsingSimulator1b")
+            # Check CbaseName is set correctly (unified binary)
+            self.assertEqual(ising.CbaseName, "IsingMetropolis")
 
             # Check argument list structure
             arglist = ising._build_c_arglist()
@@ -304,12 +304,12 @@ class TestIsingDynamics(unittest.TestCase):
             sa_enabled=True,
             T_init=10.0,
             T_final=0.01,
-            runlang="C3b",
+            runlang="C1E",
         )
         ising.init_ising_dynamics()
 
         try:
-            self.assertEqual(ising.CbaseName, "IsingSimulator3b")
+            self.assertEqual(ising.CbaseName, "IsingSimulatedAnnealing")
 
             arglist = ising._build_c_arglist()
             self.assertIsInstance(arglist, list)
@@ -324,9 +324,9 @@ class TestIsingDynamics(unittest.TestCase):
             ising.sg.remove_exported_files()
 
     def test_c_program_key_validation(self):
-        """Test that invalid runlang is rejected."""
+        """Test that missing runlang is rejected."""
         sg = self._make_small_lattice()
-        ising = self.IsingDynamics(sg, T=1.0, runlang="C99")
+        ising = self.IsingDynamics(sg, T=1.0, runlang="")
 
         with self.assertRaises(ValueError):
             ising._c_program_key()
@@ -337,7 +337,7 @@ class TestIsingDynamics(unittest.TestCase):
     def test_init_exports_required_files(self):
         """Test that init_ising_dynamics exports required files for C backend."""
         sg = self._make_small_lattice(side=4)
-        ising = self.IsingDynamics(sg, T=2.0, steps=10, runlang="C1b", seed=0)
+        ising = self.IsingDynamics(sg, T=2.0, steps=10, runlang="C0E", seed=0)
         ising.init_ising_dynamics()
 
         try:
@@ -357,7 +357,7 @@ class TestIsingDynamics(unittest.TestCase):
     def test_run_c_raises_when_binary_missing(self):
         """Test that running C backend without binary raises FileNotFoundError."""
         sg = self._make_small_lattice(side=4)
-        ising = self.IsingDynamics(sg, T=2.0, steps=1, runlang="C1b", seed=0)
+        ising = self.IsingDynamics(sg, T=2.0, steps=1, runlang="C0E", seed=0)
         ising.init_ising_dynamics()
 
         # Point to a non-existent bin directory to simulate missing binary

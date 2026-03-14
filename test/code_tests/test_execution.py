@@ -170,7 +170,7 @@ def test_ising_c_backend_runs(tmp_path):
         init_nw_dict=False,
     )
     ising = IsingDynamics(
-        sg=lat, T=2.0, steps=5, runlang="C1b",
+        sg=lat, T=2.0, steps=5, runlang="C0E",
         seed=42, save_magnetization=True,
     )
     ising.init_ising_dynamics()
@@ -191,7 +191,7 @@ def test_contact_process_c_backend_runs(tmp_path):
         init_nw_dict=False,
     )
     cp = ContactProcessEI(
-        sg=lat, gamma=1.5, steps=5, runlang="C1c", seed=42,
+        sg=lat, gamma=1.5, steps=5, runlang="C1D", seed=42,
     )
     cp.init_contact_dynamics()
     cp.run(tqdm_on=False, verbose=False)
@@ -200,9 +200,8 @@ def test_contact_process_c_backend_runs(tmp_path):
 
 @pytest.mark.code
 @pytest.mark.integration
-@pytest.mark.xfail(reason="VoterSimulator1 SIGFPE on small lattices", strict=False)
 def test_voter_c_backend_runs(tmp_path):
-    """Voter C1 backend runs without error."""
+    """Voter C backend runs without error (snapshot mode)."""
     from lrgsglib.graphs.nx import Lattice2DNX
     from lrgsglib.statsys import VoterModel
 
@@ -212,7 +211,7 @@ def test_voter_c_backend_runs(tmp_path):
         init_nw_dict=False,
     )
     voter = VoterModel(
-        sg=lat, steps=5, runlang="C1", seed=42,
+        sg=lat, steps=5, runlang="C0S", seed=42,
     )
     voter.init_voter_dynamics()
     voter.run(tqdm_on=False, verbose=False)

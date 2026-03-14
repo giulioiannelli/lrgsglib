@@ -94,15 +94,31 @@ double IsingModel::getMagnetization() const {
 }
 
 py::list IsingModel::getFrameSpins() const {
-    return frame_spins;
+    py::list result;
+    for (const auto& frame : frame_spins) {
+        py::list frame_list;
+        for (const auto& spin : frame) {
+            frame_list.append(spin);
+        }
+        result.append(frame_list);
+    }
+    return result;
 }
 
 py::list IsingModel::getFrameEnergies() const {
-    return frame_energies;
+    py::list result;
+    for (const auto& e : frame_energies) {
+        result.append(e);
+    }
+    return result;
 }
 
 py::list IsingModel::getFrameMagnetizations() const {
-    return frame_magnetizations;
+    py::list result;
+    for (const auto& m : frame_magnetizations) {
+        result.append(m);
+    }
+    return result;
 }
 
 void IsingModel::initializeNeighborsAndSigns(py::list edge_list, py::list sign_list) {
@@ -197,11 +213,7 @@ void IsingModel::asynchronousUpdate() {
 }
 
 void IsingModel::captureFrame(int step) {
-    py::list frame;
-    for (const auto& spin : spins) {
-        frame.append(spin);
-    }
-    frame_spins.append(frame);
-    frame_energies.append(getEnergy());
-    frame_magnetizations.append(getMagnetization());
+    frame_spins.push_back(spins);
+    frame_energies.push_back(getEnergy());
+    frame_magnetizations.push_back(getMagnetization());
 }

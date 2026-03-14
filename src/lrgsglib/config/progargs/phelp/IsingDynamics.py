@@ -5,7 +5,9 @@ phelp_runlang = (
     "pb_sa (pybind11 SA), pb_pt (pybind11 PT), "
     "cu_met/cu_sa/cu_pt (CuPy GPU), "
     "wolff/sw (cluster algorithms), "
-    "C1/C1b/C3/C3b/C4/C4b (C subprocess, NX only)"
+    "C<digit><letters> (C subprocess, NX only): "
+    "digit: 0=Metropolis, 1=SA, 2=PT; "
+    "letters: E=energy/magn, S=snapshots, K=cluster, V=eigvec, H=hfield"
 )
 phelp_thrmsteps = "Number of thermalization steps"
 phelp_eqstep = "Number of equilibrium/optimization MC steps (1 step = N proposals)"

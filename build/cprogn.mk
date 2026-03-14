@@ -1,53 +1,20 @@
 # C filenames
 # ============================================================================
-# Legacy Ising Simulators (old naming - kept for backwards compatibility)
-FN_RBIMSIM0 = IsingSimulator0
-FN_RBIMSIM1 = IsingSimulator1
-FN_RBIMSIM2 = IsingSimulator2
-FN_RBIMSIM3 = IsingSimulator3
-FN_RBIMSIM4 = IsingSimulator4
-FN_RBIMSIM5 = IsingSimulator5
+# Ising Simulators (unified, runtime-selectable output via flags)
+# ============================================================================
+FN_ISING_MET = IsingMetropolis
+FN_ISING_SA  = IsingSimulatedAnnealing
+FN_ISING_PT  = IsingParallelTempering
+
+FNS_ISING := $(FN_ISING_MET) $(FN_ISING_SA) $(FN_ISING_PT)
 
 # ============================================================================
-# New Ising Simulator naming convention:
-#   Number = Algorithm: 1=Metropolis, 2=Wolff(future), 3=SA, 4=PT, 5=SW(future)
-#   Letter = Output: a=final, b=E/M, c=snapshots, d=clusters, e=eigvec, f=exchange
-# ============================================================================
+# Voter Model Simulator (unified: final + snapshots via argc)
+FN_VMSIM    = VoterSimulator
 
-# Algorithm 1: Glauber-Metropolis
-FN_ISINGSIM1B  = IsingSimulator1b
-
-# Algorithm 3: Simulated Annealing
-FN_ISINGSIM3B  = IsingSimulator3b
-
-# Algorithm 4: Parallel Tempering
-FN_ISINGSIM4B  = IsingSimulator4b
-
-# Aggregate list of new Ising simulators
-FNS_ISING_NEW := $(FN_ISINGSIM1B) $(FN_ISINGSIM3B) $(FN_ISINGSIM4B)
-
-# Legacy Ising simulators aggregate
-FNS_ISING_LEGACY := $(FN_RBIMSIM0) $(FN_RBIMSIM1) $(FN_RBIMSIM2) \
-                    $(FN_RBIMSIM3) $(FN_RBIMSIM4) $(FN_RBIMSIM5)
-
-# ============================================================================
-# Voter Model Simulators
-FN_VMSIM0   = VoterSimulator0
-FN_VMSIM1   = VoterSimulator1
-
-# Contact Process Simulators
-# Unified simulator (consolidates 1, 1a-1g)
-FN_CPSIM    = ContactSimulator
-# Legacy variants (kept for backwards compatibility, deprecated)
-FN_CPSIM0   = ContactSimulator0
-FN_CPSIM1   = ContactSimulator1
-FN_CPSIM1A  = ContactSimulator1a
-FN_CPSIM1B  = ContactSimulator1b
-FN_CPSIM1C  = ContactSimulator1c
-FN_CPSIM1D  = ContactSimulator1d
-FN_CPSIM1E  = ContactSimulator1e
-FN_CPSIM1F  = ContactSimulator1f
-FN_CPSIM1G  = ContactSimulator1g
+# Contact Process Simulators (unified, meaningful names)
+FN_CP_EI    = ContactProcessEI
+FN_CP_SIR   = ContactProcessSIR
 
 # ============================================================================
 # Continuous Dynamics Simulators
@@ -83,18 +50,14 @@ SFMTSRC     = SFMT
 
 # ============================================================================
 # All programs to build
-# Note: FN_CPSIM (unified) replaces legacy FN_CPSIM1, FN_CPSIM1A-1G
-# Legacy variants still built for backwards compatibility
-FNS := $(FNS_ISING_LEGACY) $(FNS_ISING_NEW) \
-       $(FN_VMSIM0) $(FN_VMSIM1) $(FN_CPSIM) $(FN_CPSIM0) $(FN_CPSIM1) \
-       $(FN_CPSIM1A) $(FN_CPSIM1B) $(FN_CPSIM1C) $(FN_CPSIM1D) $(FN_CPSIM1E) $(FN_CPSIM1F) $(FN_CPSIM1G) \
+FNS := $(FNS_ISING) \
+       $(FN_VMSIM) $(FN_CP_EI) $(FN_CP_SIR) \
        $(FN_KURSIM0) $(FN_RDSIM0) $(FN_CODESIM0) \
        $(FN_POTTSSIM0) $(FN_XYSIM0) $(FN_HBERGSIM0) $(FN_MSPECSIM0)
 # Ising binaries go to per-model bin/ dirs; build PROGS list per-model
-PROGS_ISING := $(addprefix $(LRGSG_STATSYS_ISING_BIN)/, $(FNS_ISING_LEGACY) $(FNS_ISING_NEW))
-PROGS_VM    := $(addprefix $(LRGSG_STATSYS_VM_BIN)/, $(FN_VMSIM0) $(FN_VMSIM1))
-PROGS_CP    := $(addprefix $(LRGSG_STATSYS_CP_BIN)/, $(FN_CPSIM) $(FN_CPSIM0) $(FN_CPSIM1) \
-               $(FN_CPSIM1A) $(FN_CPSIM1B) $(FN_CPSIM1C) $(FN_CPSIM1D) $(FN_CPSIM1E) $(FN_CPSIM1F) $(FN_CPSIM1G))
+PROGS_ISING := $(addprefix $(LRGSG_STATSYS_ISING_BIN)/, $(FNS_ISING))
+PROGS_VM    := $(addprefix $(LRGSG_STATSYS_VM_BIN)/, $(FN_VMSIM))
+PROGS_CP    := $(addprefix $(LRGSG_STATSYS_CP_BIN)/, $(FN_CP_EI) $(FN_CP_SIR))
 PROGS_KUR   := $(addprefix $(LRGSG_STATSYS_KUR_BIN)/, $(FN_KURSIM0))
 PROGS_RD    := $(addprefix $(LRGSG_STATSYS_RD_BIN)/, $(FN_RDSIM0))
 PROGS_CODE  := $(addprefix $(LRGSG_STATSYS_CODE_BIN)/, $(FN_CODESIM0))

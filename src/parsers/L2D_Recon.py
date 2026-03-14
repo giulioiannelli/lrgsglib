@@ -1,7 +1,7 @@
 from lrgsglib.proglib import *
 #
 optional_args_dict_tmp = L2D_ISDYN_opt_args.copy()
-optional_args_dict_tmp[tuple(['-rl', '--runlang'])]['default'] = 'C3'
+optional_args_dict_tmp[tuple(['-rl', '--runlang'])]['default'] = 'C0ES'
 
 optionalaction_args_dict = {
     **L2D_opt_args,

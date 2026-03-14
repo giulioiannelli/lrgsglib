@@ -168,7 +168,7 @@ class TestIsingDynamics:
 
         args = _base_args(
             graph_engine="nx",
-            runlang="C3B",
+            runlang="C1E",
             sa_mode=True,
             T=1.0,
             L=[4],
@@ -185,7 +185,7 @@ class TestIsingDynamics:
 
         args = _base_args(
             graph_engine="gt",
-            runlang="C3B",
+            runlang="C1E",
             sa_mode=True,
             T=1.0,
             L=[4],
@@ -249,7 +249,7 @@ class TestCLI:
         """L3D_IsingDynamics.py runs successfully with basic args."""
         cmd = [
             sys.executable, str(L3D_SCRIPT),
-            "4", "0.15", "2.0",
+            "4", "-p", "0.15", "-T", "2.0",
             "-rl", "pb_met",
             "-ge", "nx",
             "-ts", "5",
@@ -270,7 +270,7 @@ class TestCLI:
         """L3D_IsingDynamics.py runs with SA mode."""
         cmd = [
             sys.executable, str(L3D_SCRIPT),
-            "4", "0.15", "1.0",
+            "4", "-p", "0.15", "-T", "1.0",
             "-rl", "pb_sa",
             "-ge", "nx",
             "--sa-mode",

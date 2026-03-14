@@ -87,41 +87,33 @@ cpp-make: sub_make  ## Compile all C++/pybind11 extensions
 # C SIMULATOR BUILD RULES (link against pre-compiled object files)
 # ============================================================================
 
-# --- Ising Model -----------------------------------------------------------
+# --- Ising Model (unified) -------------------------------------------------
 
-# Generic IsingSimulator pattern rule (legacy and Metropolis variants)
-$(LRGSG_STATSYS_ISING_BIN)/IsingSimulator%: $(LRGSG_STATSYS_ISING)/IsingSimulator%.c $(OBJS_ISING)
-	@printf "  $(_YEL)[CC]$(_RST) IsingSimulator%s\n" "$*"
+# Unified Metropolis (replaces IsingSimulator{0,1,1b,3,4,5})
+$(LRGSG_STATSYS_ISING_BIN)/IsingMetropolis: $(LRGSG_STATSYS_ISING)/IsingMetropolis.c $(OBJS_ISING)
+	@printf "  $(_YEL)[CC]$(_RST) IsingMetropolis\n"
 	@$(GCC) $(ALLFLAGS) $(INC_ISING) -o $@ $< $(OBJS_ISING) $(LMFLAG)
 
-# Simulated Annealing variants (need LRGSG_sa)
-$(LRGSG_STATSYS_ISING_BIN)/IsingSimulator3b: $(LRGSG_STATSYS_ISING)/IsingSimulator3b.c $(OBJS_ISING_SA)
-	@printf "  $(_YEL)[CC]$(_RST) IsingSimulator3b (SA)\n"
+# Unified Simulated Annealing (replaces IsingSimulator3b)
+$(LRGSG_STATSYS_ISING_BIN)/IsingSimulatedAnnealing: $(LRGSG_STATSYS_ISING)/IsingSimulatedAnnealing.c $(OBJS_ISING_SA)
+	@printf "  $(_YEL)[CC]$(_RST) IsingSimulatedAnnealing\n"
 	@$(GCC) $(ALLFLAGS) $(INC_ISING) -o $@ $< $(OBJS_ISING_SA) $(LMFLAG)
 
-# Parallel Tempering variants (need LRGSG_pt)
-$(LRGSG_STATSYS_ISING_BIN)/IsingSimulator4b: $(LRGSG_STATSYS_ISING)/IsingSimulator4b.c $(OBJS_ISING_PT)
-	@printf "  $(_YEL)[CC]$(_RST) IsingSimulator4b (PT)\n"
+# Unified Parallel Tempering (replaces IsingSimulator4b)
+$(LRGSG_STATSYS_ISING_BIN)/IsingParallelTempering: $(LRGSG_STATSYS_ISING)/IsingParallelTempering.c $(OBJS_ISING_PT)
+	@printf "  $(_YEL)[CC]$(_RST) IsingParallelTempering\n"
 	@$(GCC) $(ALLFLAGS) $(INC_ISING) -o $@ $< $(OBJS_ISING_PT) $(LMFLAG)
 
 # --- Voter Model -----------------------------------------------------------
 
-$(LRGSG_STATSYS_VM_BIN)/VoterSimulator0: $(LRGSG_STATSYS_VM)/VoterSimulator0.c $(OBJS_VM)
-	@printf "  $(_YEL)[CC]$(_RST) VoterSimulator0\n"
-	@$(GCC) $(ALLFLAGS) $(INC_PATHS) -o $@ $< $(OBJS_VM) $(LMFLAG)
-
-$(LRGSG_STATSYS_VM_BIN)/VoterSimulator%: $(LRGSG_STATSYS_VM)/VoterSimulator%.c $(OBJS_VM)
-	@printf "  $(_YEL)[CC]$(_RST) VoterSimulator%s\n" "$*"
+$(LRGSG_STATSYS_VM_BIN)/VoterSimulator: $(LRGSG_STATSYS_VM)/VoterSimulator.c $(OBJS_VM)
+	@printf "  $(_YEL)[CC]$(_RST) VoterSimulator\n"
 	@$(GCC) $(ALLFLAGS) $(INC_PATHS) -o $@ $< $(OBJS_VM) $(LMFLAG)
 
 # --- Contact Process -------------------------------------------------------
 
-$(LRGSG_STATSYS_CP_BIN)/ContactSimulator: $(LRGSG_STATSYS_CP)/ContactSimulator.c $(OBJS_CP)
-	@printf "  $(_YEL)[CC]$(_RST) ContactSimulator (unified)\n"
-	@$(GCC) $(ALLFLAGS) $(INC_PATHS) -o $@ $< $(OBJS_CP) $(LMFLAG)
-
-$(LRGSG_STATSYS_CP_BIN)/ContactSimulator%: $(LRGSG_STATSYS_CP)/ContactSimulator%.c $(OBJS_CP)
-	@printf "  $(_YEL)[CC]$(_RST) ContactSimulator%s\n" "$*"
+$(LRGSG_STATSYS_CP_BIN)/ContactProcess%: $(LRGSG_STATSYS_CP)/ContactProcess%.c $(OBJS_CP)
+	@printf "  $(_YEL)[CC]$(_RST) ContactProcess%s\n" "$*"
 	@$(GCC) $(ALLFLAGS) $(INC_PATHS) -o $@ $< $(OBJS_CP) $(LMFLAG)
 
 # --- Kuramoto Model --------------------------------------------------------
@@ -204,24 +196,43 @@ sub_make:
 # ============================================================================
 
 clean-subdirs:  ## Clean C++ extension build artifacts
-	$(foreach d,$(LRGSG_OBJ_DIRS),$(MAKE) --no-print-directory -C $(d) clean;)
+	@echo ""
+	@echo "$(_SEP)"
+	@echo "$(_BOLD)  Clean C++ extensions$(_RST)"
+	@echo "$(_SEP)"
+	@$(foreach d,$(LRGSG_OBJ_DIRS),\
+		printf "  $(_YEL)[clean]$(_RST) %s\n" "$(notdir $(patsubst %/,%,$(d)))"; \
+		$(MAKE) --no-print-directory -C $(d) clean 2>&1 | sed 's/^/       /'; \
+	)
 
 clean-progs:  ## Remove compiled C simulator binaries
-	@printf "  Removing C simulator binaries...\n"
+	@printf "  $(_YEL)[clean]$(_RST) C simulator binaries\n"
 	@rm -f $(PROGS)
 
 clean-obj:  ## Remove cached object files
-	@printf "  Removing cached object files...\n"
+	@printf "  $(_YEL)[clean]$(_RST) cached object files\n"
 	@rm -rf $(OBJ_DIR)
 
 clean-files:
+	@printf "  $(_YEL)[clean]$(_RST) misc build artifacts\n"
 	@rm -f $(RW_TARGET)
 	@rm -f *.o main
 
 clean-activations:  ## Remove conda activation scripts
+	@printf "  $(_YEL)[clean]$(_RST) conda activation scripts\n"
 	@rm -rf $(ACTIVATE_D) $(DEACTIVATE_D)
 
-clean: clean-progs clean-obj clean-subdirs clean-files clean-activations  ## Full clean
+clean:  ## Full clean
+	@echo ""
+	@echo "$(_SEP)"
+	@echo "$(_BOLD)  Clean$(_RST)"
+	@echo "$(_SEP)"
+	@$(MAKE) --no-print-directory clean-progs clean-obj clean-files clean-activations
+	@$(MAKE) --no-print-directory clean-subdirs
+	@echo ""
+	@echo "$(_SEP)"
+	@echo "$(_BOLD)$(_GRN)  Clean complete.$(_RST)"
+	@echo "$(_SEP)"
 
 # ============================================================================
 # HELP
