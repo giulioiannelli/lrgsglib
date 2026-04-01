@@ -655,6 +655,240 @@ static py::tuple topo_met_sampling(
 }
 
 
+/* ==================================================================
+ * Cross-Entropy Method: population-based spectral optimizer
+ * ==================================================================
+ *
+ * Samples K coefficient vectors c ~ N(mu, diag(sigma^2)),
+ * maps to spins via sign(V @ c), optionally applies greedy T=0
+ * quench, evaluates energy, selects elites, updates distribution.
+ * Multi-restart keeps the global best.
+ */
+
+/* Raw edge-sum energy: E = -sum_{i<j} w_ij * s_i * s_j (no normalization) */
+static inline double raw_edge_energy(
+    size_t N,
+    const int8_t *s,
+    const size_t *nlen,
+    const NodeEdges *ne
+) {
+    double E = 0.0;
+    for (size_t i = 0; i < N; ++i) {
+        double si = s[i];
+        for (size_t p = 0; p < nlen[i]; ++p) {
+            size_t j = ne[i].neighbors[p];
+            if (j > i) {
+                E -= ne[i].weights[p] * si * s[j];
+            }
+        }
+    }
+    return E;
+}
+
+/* T=0 greedy descent using graph CSR (no external field). */
+static inline void greedy_quench(
+    size_t N,
+    int8_t *s,
+    const size_t *nlen,
+    const NodeEdges *ne,
+    size_t max_sweeps
+) {
+    for (size_t sw = 0; sw < max_sweeps; ++sw) {
+        bool any_flip = false;
+        for (size_t i = 0; i < N; ++i) {
+            double h_eff = 0.0;
+            for (size_t p = 0; p < nlen[i]; ++p) {
+                h_eff += ne[i].weights[p] * s[ne[i].neighbors[p]];
+            }
+            double dE = 2.0 * s[i] * h_eff;
+            if (dE < 0.0) {
+                s[i] = -s[i];
+                any_flip = true;
+            }
+        }
+        if (!any_flip) break;
+    }
+}
+
+static py::tuple topo_cem_sampling(
+    const py::array_t<int64_t>& neigh_indices,
+    const py::array_t<double>&  neigh_weights,
+    const py::array_t<int64_t>& neigh_ptr,
+    const py::array_t<double, py::array::c_style>& subspace_vecs_in,  /* (M, N) */
+    size_t N,
+    size_t cem_iter,
+    size_t pop_size,
+    double elite_frac,
+    double init_sigma,
+    double smoothing,
+    double sigma_floor,
+    double sigma_ceiling,
+    size_t n_restarts,
+    bool   do_greedy,
+    size_t greedy_sweeps,
+    bool   do_final_polish,
+    size_t polish_sweeps,
+    uint64_t seed_val
+) {
+    /* ---- Parse subspace ---- */
+    auto sv_buf = subspace_vecs_in.request();
+    if (sv_buf.ndim != 2)
+        throw std::runtime_error("subspace_vecs must be 2-D (M, N)");
+    size_t M = static_cast<size_t>(sv_buf.shape[0]);
+    if (static_cast<size_t>(sv_buf.shape[1]) != N)
+        throw std::runtime_error("subspace_vecs cols must equal N");
+    const double *V = static_cast<const double*>(sv_buf.ptr);
+
+    GraphCSR graph(N, neigh_indices, neigh_weights, neigh_ptr);
+
+    size_t n_elite = static_cast<size_t>(elite_frac * pop_size);
+    if (n_elite < 1) n_elite = 1;
+
+    /* ---- Output arrays ---- */
+    std::vector<double> ene_trace(cem_iter);
+    std::vector<double> restart_energies(n_restarts);
+
+    double global_best_E = 1e30;
+    std::vector<int8_t> global_best_spins(N, 1);
+    std::vector<double> global_best_coeffs(M, 0.0);
+
+    /* ---- Population buffers ---- */
+    std::vector<double> coeffs_pop(pop_size * M);
+    std::vector<int8_t> spins_pop(pop_size * N);
+    std::vector<double> energies(pop_size);
+    std::vector<size_t> sorted_idx(pop_size);
+
+    {
+        py::gil_scoped_release release;
+        seed_rng(seed_val);
+
+        for (size_t r = 0; r < n_restarts; ++r) {
+            /* Initialize distribution */
+            std::vector<double> mu(M, 0.0);
+            std::vector<double> sigma(M, init_sigma);
+
+            double restart_best_E = 1e30;
+            std::vector<int8_t> restart_best_spins(N, 1);
+            std::vector<double> restart_best_coeffs(M, 0.0);
+
+            for (size_t it = 0; it < cem_iter; ++it) {
+                /* 1. Sample K coefficient vectors: c ~ N(mu, diag(sigma^2)) */
+                for (size_t k = 0; k < pop_size; ++k) {
+                    double *ck = coeffs_pop.data() + k * M;
+                    for (size_t j = 0; j < M; ++j) {
+                        ck[j] = mu[j] + sigma[j] * rng_normal();
+                    }
+                }
+
+                /* 2. Map to spins: sign(C @ V) and optionally greedy quench */
+                for (size_t k = 0; k < pop_size; ++k) {
+                    const double *ck = coeffs_pop.data() + k * M;
+                    int8_t *sk = spins_pop.data() + k * N;
+
+                    /* field_i = sum_j ck[j] * V[j*N + i] */
+                    for (size_t i = 0; i < N; ++i) {
+                        double f = 0.0;
+                        for (size_t j = 0; j < M; ++j) {
+                            f += ck[j] * V[j * N + i];
+                        }
+                        sk[i] = (f > 0.0) ? 1 : ((f < 0.0) ? -1 : 1);
+                    }
+
+                    /* Optional greedy quench */
+                    if (do_greedy) {
+                        greedy_quench(N, sk, graph.nlen.data(),
+                                      graph.node_edges.data(), greedy_sweeps);
+                    }
+
+                    /* Evaluate energy */
+                    energies[k] = raw_edge_energy(N, sk, graph.nlen.data(),
+                                                  graph.node_edges.data());
+                }
+
+                /* 3. Sort by energy (ascending) */
+                for (size_t k = 0; k < pop_size; ++k) sorted_idx[k] = k;
+                std::sort(sorted_idx.begin(), sorted_idx.end(),
+                          [&](size_t a, size_t b) { return energies[a] < energies[b]; });
+
+                /* 4. Elite statistics */
+                std::vector<double> new_mu(M, 0.0);
+                std::vector<double> new_var(M, 0.0);
+                for (size_t e = 0; e < n_elite; ++e) {
+                    const double *ck = coeffs_pop.data() + sorted_idx[e] * M;
+                    for (size_t j = 0; j < M; ++j) new_mu[j] += ck[j];
+                }
+                for (size_t j = 0; j < M; ++j) new_mu[j] /= n_elite;
+
+                for (size_t e = 0; e < n_elite; ++e) {
+                    const double *ck = coeffs_pop.data() + sorted_idx[e] * M;
+                    for (size_t j = 0; j < M; ++j) {
+                        double d = ck[j] - new_mu[j];
+                        new_var[j] += d * d;
+                    }
+                }
+                for (size_t j = 0; j < M; ++j) {
+                    double new_sig = std::sqrt(new_var[j] / n_elite) + 1e-12;
+                    mu[j] = smoothing * mu[j] + (1.0 - smoothing) * new_mu[j];
+                    sigma[j] = smoothing * sigma[j] + (1.0 - smoothing) * new_sig;
+                    if (sigma[j] < sigma_floor)   sigma[j] = sigma_floor;
+                    if (sigma[j] > sigma_ceiling)  sigma[j] = sigma_ceiling;
+                }
+
+                /* Track best this iteration */
+                size_t best_k = sorted_idx[0];
+                if (energies[best_k] < restart_best_E) {
+                    restart_best_E = energies[best_k];
+                    std::memcpy(restart_best_spins.data(),
+                                spins_pop.data() + best_k * N, N);
+                    std::memcpy(restart_best_coeffs.data(),
+                                coeffs_pop.data() + best_k * M, M * sizeof(double));
+                }
+
+                ene_trace[it] = restart_best_E;
+            }
+
+            /* Optional final polish */
+            if (do_final_polish) {
+                greedy_quench(N, restart_best_spins.data(),
+                              graph.nlen.data(), graph.node_edges.data(),
+                              polish_sweeps);
+                double E_pol = raw_edge_energy(N, restart_best_spins.data(),
+                                               graph.nlen.data(),
+                                               graph.node_edges.data());
+                if (E_pol < restart_best_E) restart_best_E = E_pol;
+            }
+
+            restart_energies[r] = restart_best_E;
+
+            if (restart_best_E < global_best_E) {
+                global_best_E = restart_best_E;
+                global_best_spins = restart_best_spins;
+                global_best_coeffs = restart_best_coeffs;
+            }
+        }
+    }
+
+    /* ---- Convert to numpy ---- */
+    auto out_spins = py::array_t<int8_t>(N);
+    std::memcpy(out_spins.mutable_data(), global_best_spins.data(), N);
+
+    auto out_coeffs = py::array_t<double>(M);
+    std::memcpy(out_coeffs.mutable_data(), global_best_coeffs.data(),
+                M * sizeof(double));
+
+    auto out_restart_E = py::array_t<double>(n_restarts);
+    std::memcpy(out_restart_E.mutable_data(), restart_energies.data(),
+                n_restarts * sizeof(double));
+
+    auto out_ene = py::array_t<double>(cem_iter);
+    std::memcpy(out_ene.mutable_data(), ene_trace.data(),
+                cem_iter * sizeof(double));
+
+    return py::make_tuple(out_spins, global_best_E, out_coeffs,
+                          out_restart_E, out_ene);
+}
+
+
 static double calc_energy(
     py::array_t<int8_t, py::array::c_style> spins_in,
     const py::array_t<int64_t>& neigh_indices,
@@ -823,6 +1057,58 @@ tuple
         py::arg("T"), py::arg("n_steps"),
         py::arg("sigma_init"), py::arg("chunk_size"),
         py::arg("do_polish"), py::arg("polish_sweeps"),
+        py::arg("seed"));
+
+    m.def("topo_cem_sampling", &topo_cem_sampling,
+        R"pbdoc(
+Run Cross-Entropy Method spectral optimizer.
+
+Parameters
+----------
+neigh_indices, neigh_weights, neigh_ptr : CSR graph arrays.
+subspace_vecs : ndarray[float64]
+    Eigenvectors (M, N) row-major.
+N : int
+    Number of nodes.
+cem_iter : int
+    CEM iterations per restart.
+pop_size : int
+    Population size K.
+elite_frac : float
+    Fraction of elites.
+init_sigma : float
+    Initial coefficient std.
+smoothing : float
+    Exponential smoothing for mu/sigma updates.
+sigma_floor, sigma_ceiling : float
+    Sigma bounds.
+n_restarts : int
+    Number of independent CEM restarts.
+do_greedy : bool
+    Greedy T=0 quench per sample.
+greedy_sweeps : int
+    Max sweeps per greedy quench.
+do_final_polish : bool
+    Final polish of restart best.
+polish_sweeps : int
+    Max sweeps for final polish.
+seed : int
+    RNG seed.
+
+Returns
+-------
+tuple
+    (best_spins, best_energy, best_coeffs, restart_energies, ene_trace)
+        )pbdoc",
+        py::arg("neigh_indices"), py::arg("neigh_weights"),
+        py::arg("neigh_ptr"), py::arg("subspace_vecs"),
+        py::arg("N"),
+        py::arg("cem_iter"), py::arg("pop_size"),
+        py::arg("elite_frac"), py::arg("init_sigma"),
+        py::arg("smoothing"), py::arg("sigma_floor"),
+        py::arg("sigma_ceiling"), py::arg("n_restarts"),
+        py::arg("do_greedy"), py::arg("greedy_sweeps"),
+        py::arg("do_final_polish"), py::arg("polish_sweeps"),
         py::arg("seed"));
 
     m.def("calc_energy", &calc_energy,

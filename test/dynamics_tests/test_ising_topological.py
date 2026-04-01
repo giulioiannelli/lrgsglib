@@ -426,3 +426,176 @@ class TestIntegration:
         ising.init_ising_dynamics()
         ising.run(verbose=False, tqdm_on=False)
         assert len(ising.sa_energy) == 100
+
+
+# ---------------------------------------------------------------------------
+# Cross-Entropy Method (CEM) tests
+# ---------------------------------------------------------------------------
+
+class TestPyTopoCEM:
+    """Tests for Python Cross-Entropy Method spectral optimizer."""
+
+    def test_smoke(self, frustrated_lattice):
+        ising = IsingDynamics(
+            sg=frustrated_lattice, T=0.0, steps=10,
+            runlang="py_topo_cem",
+            topo_n_modes=8, topo_polish=False,
+            cem_iter=3, cem_pop_size=16, cem_restarts=2,
+            cem_greedy=False, seed=42,
+        )
+        ising.init_ising_dynamics()
+        ising.run(verbose=False, tqdm_on=False)
+        assert hasattr(ising, "topo_cem_best_energy")
+        assert hasattr(ising, "topo_cem_best_spins")
+        assert ising.topo_cem_best_spins.shape == (ising.N,)
+
+    def test_coeffs_stored(self, frustrated_lattice):
+        ising = IsingDynamics(
+            sg=frustrated_lattice, T=0.0, steps=10,
+            runlang="py_topo_cem",
+            topo_n_modes=6, cem_iter=3, cem_pop_size=8,
+            cem_restarts=2, cem_greedy=False, seed=42,
+        )
+        ising.init_ising_dynamics()
+        ising.run(verbose=False, tqdm_on=False)
+        assert ising.topo_cem_best_coeffs.shape == (6,)
+        assert ising.topo_cem_restart_energies.shape == (2,)
+
+    def test_energy_valid(self, frustrated_lattice):
+        ising = IsingDynamics(
+            sg=frustrated_lattice, T=0.0, steps=10,
+            runlang="py_topo_cem",
+            topo_n_modes=8, cem_iter=5, cem_pop_size=16,
+            cem_restarts=2, cem_greedy=False, seed=42,
+        )
+        ising.init_ising_dynamics()
+        ising.run(verbose=False, tqdm_on=False)
+        recomputed = ising.compute_energy(ising.topo_cem_best_spins)
+        assert abs(recomputed - ising.topo_cem_best_energy) < 1e-10
+
+    def test_greedy_improves_or_equals(self, frustrated_lattice):
+        """CEM with greedy should find <= energy vs without."""
+        common = dict(
+            sg=frustrated_lattice, T=0.0, steps=10,
+            runlang="py_topo_cem",
+            topo_n_modes=8, topo_polish=False,
+            cem_iter=5, cem_pop_size=16, cem_restarts=3, seed=42,
+        )
+        no_greedy = IsingDynamics(**common, cem_greedy=False)
+        no_greedy.init_ising_dynamics()
+        no_greedy.run(verbose=False, tqdm_on=False)
+
+        with_greedy = IsingDynamics(
+            **common, cem_greedy=True, cem_greedy_sweeps=20,
+        )
+        with_greedy.init_ising_dynamics()
+        with_greedy.run(verbose=False, tqdm_on=False)
+        assert with_greedy.topo_cem_best_energy <= (
+            no_greedy.topo_cem_best_energy + 1e-10
+        )
+
+    def test_deterministic_seed(self, frustrated_lattice):
+        kwargs = dict(
+            sg=frustrated_lattice, T=0.0, steps=10,
+            runlang="py_topo_cem",
+            topo_n_modes=6, cem_iter=3, cem_pop_size=8,
+            cem_restarts=2, cem_greedy=False, seed=123,
+        )
+        i1 = IsingDynamics(**kwargs)
+        i1.init_ising_dynamics()
+        i1.run(verbose=False, tqdm_on=False)
+
+        i2 = IsingDynamics(**kwargs)
+        i2.init_ising_dynamics()
+        i2.run(verbose=False, tqdm_on=False)
+
+        assert i1.topo_cem_best_energy == i2.topo_cem_best_energy
+        np.testing.assert_array_equal(
+            i1.topo_cem_best_spins, i2.topo_cem_best_spins,
+        )
+
+    def test_alias_dispatch(self, frustrated_lattice):
+        """Aliases 'topo_cem' and 'cem' should resolve and run."""
+        for rl in ("topo_cem", "cem"):
+            ising = IsingDynamics(
+                sg=frustrated_lattice, T=0.0, steps=10,
+                runlang=rl, topo_n_modes=5,
+                cem_iter=2, cem_pop_size=8, cem_restarts=1,
+                cem_greedy=False, seed=42,
+            )
+            ising.init_ising_dynamics()
+            ising.run(verbose=False, tqdm_on=False)
+            assert hasattr(ising, "topo_cem_best_energy")
+
+
+class TestCEMGreedyPolishCSR:
+    """Tests for the CSR-based greedy polish used by CEM."""
+
+    def test_never_increases_energy(self, frustrated_lattice):
+        ising = IsingDynamics(
+            sg=frustrated_lattice, T=0.5, steps=10,
+            runlang="py_topo_met", topo_n_modes=10, seed=42,
+        )
+        ising.init_ising_dynamics()
+        ising._ensure_spectral_subspace(10)
+        spins, _ = ising._best_eigenvector_seed(10)
+        ni, nw, nptr = ising._build_graph_csr()
+        edges = frustrated_lattice.get_edges_with_weights()
+        E_before = float(compute_ising_pairwise_energy(spins, edges))
+        polished = ising._greedy_polish_csr(
+            spins, ni, nw, nptr, max_sweeps=50,
+        )
+        E_after = float(compute_ising_pairwise_energy(polished, edges))
+        assert E_after <= E_before + 1e-10
+
+
+class TestPybindTopoCEM:
+    """Tests for pybind11 CEM backend."""
+
+    def test_smoke(self, frustrated_lattice):
+        ising = IsingDynamics(
+            sg=frustrated_lattice, T=0.0, steps=10,
+            runlang="pb_topo_cem",
+            topo_n_modes=8, topo_polish=False,
+            cem_iter=3, cem_pop_size=16, cem_restarts=2,
+            cem_greedy=False, seed=42,
+        )
+        ising.init_ising_dynamics()
+        ising.run(verbose=False, tqdm_on=False)
+        assert hasattr(ising, "topo_cem_best_energy")
+        assert ising.topo_cem_best_spins.shape == (ising.N,)
+        assert ising.topo_cem_best_coeffs.shape == (8,)
+        assert ising.topo_cem_restart_energies.shape == (2,)
+
+    def test_energy_matches_recomputed(self, frustrated_lattice):
+        ising = IsingDynamics(
+            sg=frustrated_lattice, T=0.0, steps=10,
+            runlang="pb_topo_cem",
+            topo_n_modes=8, cem_iter=5, cem_pop_size=16,
+            cem_restarts=2, cem_greedy=True,
+            cem_greedy_sweeps=20, seed=42,
+        )
+        ising.init_ising_dynamics()
+        ising.run(verbose=False, tqdm_on=False)
+        recomputed = ising.compute_energy(ising.topo_cem_best_spins)
+        assert abs(recomputed - ising.topo_cem_best_energy) < 1e-10
+
+    def test_pb_finds_comparable_energy(self, frustrated_lattice):
+        """Pybind11 should find energy in same ballpark as Python."""
+        common = dict(
+            sg=frustrated_lattice, T=0.0, steps=10,
+            topo_n_modes=8, topo_polish=False,
+            cem_iter=8, cem_pop_size=32, cem_restarts=3,
+            cem_greedy=True, cem_greedy_sweeps=30, seed=42,
+        )
+        py = IsingDynamics(**common, runlang="py_topo_cem")
+        py.init_ising_dynamics()
+        py.run(verbose=False, tqdm_on=False)
+
+        pb = IsingDynamics(**common, runlang="pb_topo_cem")
+        pb.init_ising_dynamics()
+        pb.run(verbose=False, tqdm_on=False)
+
+        # Different RNGs → different exact energies, but same ballpark
+        assert pb.topo_cem_best_energy <= py.topo_cem_best_energy * 0.9 or \
+               pb.topo_cem_best_energy <= py.topo_cem_best_energy + 10.0

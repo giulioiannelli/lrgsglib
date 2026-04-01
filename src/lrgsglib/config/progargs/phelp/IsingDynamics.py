@@ -36,6 +36,17 @@ phelp_topo_polish = "Enable T=0 greedy polish after each chunk"
 phelp_topo_polish_sweeps = "Max sweeps per greedy polish"
 phelp_topo_tau = "Softmax temperature for TFCA field weights"
 phelp_topo_field_strength = "Overall field magnitude scale for TFCA"
+# Cross-Entropy Method help text
+phelp_cem_iter = "Number of CEM iterations per restart"
+phelp_cem_pop_size = "Population size (K) for CEM sampling"
+phelp_cem_elite_frac = "Fraction of population used as elite set"
+phelp_cem_init_sigma = "Initial std deviation for CEM coefficient sampling"
+phelp_cem_smoothing = "Exponential smoothing factor for CEM distribution updates"
+phelp_cem_sigma_floor = "Minimum allowed sigma (prevents premature convergence)"
+phelp_cem_sigma_ceiling = "Maximum allowed sigma (prevents divergence)"
+phelp_cem_restarts = "Number of independent CEM restarts (best-of-R)"
+phelp_cem_greedy = "Apply T=0 greedy quench to each CEM sample"
+phelp_cem_greedy_sweeps = "Max sweeps per greedy quench within CEM"
 # Thermal averaging help text
 phelp_n_thermal = "Number of independent thermal runs per disorder realization"
 # Result persistence help text

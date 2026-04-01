@@ -17,6 +17,7 @@ from kernels.Serializer import (
     format_slanzarv_command,
 )
 from lrgsglib import *
+from lrgsglib.config.progargs.defs.IsingDynamics import *
 from parsers.L3D_IsingDynamics import L3D_ISDYN_progname, L3D_ISDYN_progname_shrt
 from parsers.L3D_IsingDynamics_Serialiser import parser
 
@@ -85,39 +86,71 @@ def _build_passthrough_flags(args) -> list[str]:
     # Topological algorithm parameters
     rl_lower = rl.lower()
     if 'topo' in rl_lower:
-        topo_n = getattr(args, 'topo_n_modes', 40)
-        if topo_n != 40:
+        topo_n = getattr(args, 'topo_n_modes', DEFAULT_TOPO_N_MODES)
+        if topo_n != DEFAULT_TOPO_N_MODES:
             flags.extend(['--topo-n-modes', str(topo_n)])
-        sigma = getattr(args, 'topo_sigma_init', 0.15)
-        if sigma != 0.15:
+        sigma = getattr(args, 'topo_sigma_init', DEFAULT_TOPO_SIGMA_INIT)
+        if sigma != DEFAULT_TOPO_SIGMA_INIT:
             flags.extend(['--topo-sigma-init', str(sigma)])
-        chunk = getattr(args, 'topo_chunk_size', 5000)
-        if chunk != 5000:
+        chunk = getattr(args, 'topo_chunk_size', DEFAULT_TOPO_CHUNK_SIZE)
+        if chunk != DEFAULT_TOPO_CHUNK_SIZE:
             flags.extend(['--topo-chunk-size', str(chunk)])
-        if not getattr(args, 'topo_polish', True):
+        if not getattr(args, 'topo_polish', DEFAULT_TOPO_POLISH):
             flags.append('--no-topo-polish')
-        psweeps = getattr(args, 'topo_polish_sweeps', 50)
-        if psweeps != 50:
+        psweeps = getattr(args, 'topo_polish_sweeps', DEFAULT_TOPO_POLISH_SWEEPS)
+        if psweeps != DEFAULT_TOPO_POLISH_SWEEPS:
             flags.extend(['--topo-polish-sweeps', str(psweeps)])
-        tau = getattr(args, 'topo_tau', 1.0)
-        if tau != 1.0:
+        tau = getattr(args, 'topo_tau', DEFAULT_TOPO_TAU)
+        if tau != DEFAULT_TOPO_TAU:
             flags.extend(['--topo-tau', str(tau)])
-        fstr = getattr(args, 'topo_field_strength', 1.0)
-        if fstr != 1.0:
+        fstr = getattr(args, 'topo_field_strength', DEFAULT_TOPO_FIELD_STRENGTH)
+        if fstr != DEFAULT_TOPO_FIELD_STRENGTH:
             flags.extend(['--topo-field-strength', str(fstr)])
         # topo_fca needs SA params — ensure --sa-mode is set
         if 'topo_fca' in rl_lower and not getattr(args, 'sa_mode', False):
             flags.append('--sa-mode')
-            flags.extend(['--T-init', str(getattr(args, 'T_init', 10.0))])
-            flags.extend(['--T-final', str(getattr(args, 'T_final', 0.01))])
+            flags.extend(['--T-init', str(getattr(args, 'T_init', DEFAULT_SA_T_INIT))])
+            flags.extend(['--T-final', str(getattr(args, 'T_final', DEFAULT_SA_T_FINAL))])
             flags.extend(['--cooling-schedule',
-                          getattr(args, 'cooling_schedule', 'exponential')])
+                          getattr(args, 'cooling_schedule', DEFAULT_SA_COOLING_SCHEDULE)])
             flags.extend(['--cooling-rate',
-                          str(getattr(args, 'cooling_rate', 0.95))])
+                          str(getattr(args, 'cooling_rate', DEFAULT_SA_COOLING_RATE))])
             flags.extend(['--steps-per-T',
-                          str(getattr(args, 'steps_per_T', 100))])
+                          str(getattr(args, 'steps_per_T', DEFAULT_SA_STEPS_PER_T))])
             flags.extend(['--n-temperatures',
-                          str(getattr(args, 'n_temperatures', 100))])
+                          str(getattr(args, 'n_temperatures', DEFAULT_SA_N_TEMPERATURES))])
+
+    # CEM parameters
+    if 'cem' in rl_lower:
+        cem_iter = getattr(args, 'cem_iter', DEFAULT_CEM_ITER)
+        if cem_iter != DEFAULT_CEM_ITER:
+            flags.extend(['--cem-iter', str(cem_iter)])
+        pop = getattr(args, 'cem_pop_size', DEFAULT_CEM_POP_SIZE)
+        if pop != DEFAULT_CEM_POP_SIZE:
+            flags.extend(['--cem-pop-size', str(pop)])
+        elite = getattr(args, 'cem_elite_frac', DEFAULT_CEM_ELITE_FRAC)
+        if elite != DEFAULT_CEM_ELITE_FRAC:
+            flags.extend(['--cem-elite-frac', str(elite)])
+        isig = getattr(args, 'cem_init_sigma', DEFAULT_CEM_INIT_SIGMA)
+        if isig != DEFAULT_CEM_INIT_SIGMA:
+            flags.extend(['--cem-init-sigma', str(isig)])
+        sm = getattr(args, 'cem_smoothing', DEFAULT_CEM_SMOOTHING)
+        if sm != DEFAULT_CEM_SMOOTHING:
+            flags.extend(['--cem-smoothing', str(sm)])
+        sf_ = getattr(args, 'cem_sigma_floor', DEFAULT_CEM_SIGMA_FLOOR)
+        if sf_ != DEFAULT_CEM_SIGMA_FLOOR:
+            flags.extend(['--cem-sigma-floor', str(sf_)])
+        sc_ = getattr(args, 'cem_sigma_ceiling', DEFAULT_CEM_SIGMA_CEILING)
+        if sc_ != DEFAULT_CEM_SIGMA_CEILING:
+            flags.extend(['--cem-sigma-ceiling', str(sc_)])
+        rst = getattr(args, 'cem_restarts', DEFAULT_CEM_RESTARTS)
+        if rst != DEFAULT_CEM_RESTARTS:
+            flags.extend(['--cem-restarts', str(rst)])
+        if not getattr(args, 'cem_greedy', DEFAULT_CEM_GREEDY):
+            flags.append('--no-cem-greedy')
+        gsw = getattr(args, 'cem_greedy_sweeps', DEFAULT_CEM_GREEDY_SWEEPS)
+        if gsw != DEFAULT_CEM_GREEDY_SWEEPS:
+            flags.extend(['--cem-greedy-sweeps', str(gsw)])
 
     # Result persistence
     if getattr(args, 'save_results', False):
@@ -190,10 +223,11 @@ def main():
 
     total_printed = total_executed = 0
 
-    # In SA/PT mode, temperature is controlled by the schedule — no T sweep
+    # In SA/PT/CEM mode, temperature is controlled internally — no T sweep
     use_sa = getattr(args, "sa_mode", False)
     use_pt = getattr(args, "pt_mode", False)
-    if use_sa or use_pt:
+    use_cem = "cem" in getattr(args, "runlang", "").lower()
+    if use_sa or use_pt or use_cem:
         temp_list = [None]
 
     def dispatch(L: int, p: float, T: float | None) -> None:

@@ -138,6 +138,9 @@ class CBackendMixin:
             return
         if "_" in self.runlang and (upper.startswith("CU_") or upper.startswith("PB_")):
             return
+        # C subprocess codes are C<digit>...; skip aliases like "cem"
+        if len(upper) < 2 or not upper[1].isdigit():
+            return
 
         # Check if the graph supports file I/O required by C backend
         from ..graphs.protocols import DynamicsGraphProtocol

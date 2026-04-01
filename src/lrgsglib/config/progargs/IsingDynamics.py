@@ -206,6 +206,59 @@ IsDyn_topo_args = {
         'default': DEFAULT_TOPO_FIELD_STRENGTH,
     },
 }
+# Cross-Entropy Method arguments
+IsDyn_cem_args = {
+    tuple(['--cem-iter']): {
+        'help': phelp_cem_iter,
+        'type': int,
+        'default': DEFAULT_CEM_ITER,
+    },
+    tuple(['--cem-pop-size']): {
+        'help': phelp_cem_pop_size,
+        'type': int,
+        'default': DEFAULT_CEM_POP_SIZE,
+    },
+    tuple(['--cem-elite-frac']): {
+        'help': phelp_cem_elite_frac,
+        'type': float,
+        'default': DEFAULT_CEM_ELITE_FRAC,
+    },
+    tuple(['--cem-init-sigma']): {
+        'help': phelp_cem_init_sigma,
+        'type': float,
+        'default': DEFAULT_CEM_INIT_SIGMA,
+    },
+    tuple(['--cem-smoothing']): {
+        'help': phelp_cem_smoothing,
+        'type': float,
+        'default': DEFAULT_CEM_SMOOTHING,
+    },
+    tuple(['--cem-sigma-floor']): {
+        'help': phelp_cem_sigma_floor,
+        'type': float,
+        'default': DEFAULT_CEM_SIGMA_FLOOR,
+    },
+    tuple(['--cem-sigma-ceiling']): {
+        'help': phelp_cem_sigma_ceiling,
+        'type': float,
+        'default': DEFAULT_CEM_SIGMA_CEILING,
+    },
+    tuple(['--cem-restarts']): {
+        'help': phelp_cem_restarts,
+        'type': int,
+        'default': DEFAULT_CEM_RESTARTS,
+    },
+    tuple(['--cem-greedy']): {
+        'help': phelp_cem_greedy,
+        'action': argparse.BooleanOptionalAction,
+        'default': DEFAULT_CEM_GREEDY,
+    },
+    tuple(['--cem-greedy-sweeps']): {
+        'help': phelp_cem_greedy_sweeps,
+        'type': int,
+        'default': DEFAULT_CEM_GREEDY_SWEEPS,
+    },
+}
 IsDyn_srun_list_args = {
     tuple(['-s1', '--side1_list']): {
         'help': phelp_side1_list,
@@ -270,7 +323,7 @@ L2D_ISDYN_action_args = {
         'default': DEFAULT_SAVE_RESULTS,
     },
 }
-L2D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args}
+L2D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args, **IsDyn_cem_args}
 L2D_ISDYN_srun_opt_args = {**IsDyn_srun_list_args, **IsDyn_srun_args}
 L2D_ISDYN_srun_action_args = {**srun_action_args}
 # Lattice3D args
@@ -292,7 +345,7 @@ L3D_ISDYN_action_args = {
         'default': DEFAULT_SAVE_RESULTS,
     },
 }
-L3D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args}
+L3D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args, **IsDyn_cem_args}
 L3D_ISDYN_srun_opt_args = {**IsDyn_srun_list_args, **IsDyn_srun_args}
 L3D_ISDYN_srun_action_args = {**srun_action_args}
 # ErdosRenyi args
@@ -306,4 +359,4 @@ ER_ISDYN_description = f"""
 ## arg parsers dict
 ER_ISDYN_args = {**ER_args, **IsDyn_args}
 ER_ISDYN_action_args = {**action_args_dict}
-ER_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args}
+ER_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args, **IsDyn_cem_args}

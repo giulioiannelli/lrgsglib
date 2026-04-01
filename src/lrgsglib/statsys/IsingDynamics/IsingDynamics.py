@@ -83,6 +83,8 @@ _RUNLANG_ALIASES: dict[str, str] = {
     "sw":       "py_sw",
     "topo_met": "py_topo_met",
     "topo_fca": "py_topo_fca",
+    "topo_cem": "py_topo_cem",
+    "cem":      "py_topo_cem",
 }
 
 # Canonical algorithm → unified binary name
@@ -295,6 +297,17 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         # Topological Field Cooling Annealing parameters
         topo_tau: float = 1.0,
         topo_field_strength: float = 1.0,
+        # Cross-Entropy Method parameters
+        cem_iter: int = 30,
+        cem_pop_size: int = 128,
+        cem_elite_frac: float = 0.2,
+        cem_init_sigma: float = 1.2,
+        cem_smoothing: float = 0.6,
+        cem_sigma_floor: float = 1e-3,
+        cem_sigma_ceiling: float = 5.0,
+        cem_restarts: int = 10,
+        cem_greedy: bool = True,
+        cem_greedy_sweeps: int = 120,
         **kwargs
     ) -> None:
         dynpath = getattr(sg, 'path_ising', None)
@@ -344,6 +357,18 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         # Topological Field Cooling Annealing parameters
         self.topo_tau = topo_tau
         self.topo_field_strength = topo_field_strength
+
+        # Cross-Entropy Method parameters
+        self.cem_iter = cem_iter
+        self.cem_pop_size = cem_pop_size
+        self.cem_elite_frac = cem_elite_frac
+        self.cem_init_sigma = cem_init_sigma
+        self.cem_smoothing = cem_smoothing
+        self.cem_sigma_floor = cem_sigma_floor
+        self.cem_sigma_ceiling = cem_sigma_ceiling
+        self.cem_restarts = cem_restarts
+        self.cem_greedy = cem_greedy
+        self.cem_greedy_sweeps = cem_greedy_sweeps
 
     @property
     def eqSTEP(self) -> int:
@@ -562,10 +587,41 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         Calls parent implementation for subprocess execution and state parsing,
         then reads energy/magnetization files for variants that output them.
         """
-        super().run_cprogram(verbose)
-        # Read energy/magnetization files for 'b' variants
+        if self._is_pt_variant():
+            # PT outputs all replicas concatenated — parse manually
+            self._run_pt_cprogram(verbose)
+        else:
+            super().run_cprogram(verbose)
+        # Read energy/magnetization files
         if self._output_includes_em():
             self._read_c_em_output()
+
+    def _run_pt_cprogram(self, verbose: bool = False) -> None:
+        """Execute PT binary and parse multi-replica output."""
+        import subprocess
+
+        if not self.cprogram:
+            raise RuntimeError("C program command has not been initialised.")
+        binary_path = Path(self.cprogram[0])
+        if not binary_path.exists():
+            self._close_stderr_handle()
+            raise FileNotFoundError(
+                f"C backend executable '{binary_path}' not found."
+            )
+        result = subprocess.run(
+            self.cprogram, stderr=self.stderr_fopen,
+            stdout=subprocess.PIPE, check=False,
+        )
+        self._close_stderr_handle()
+        total = self.n_replicas * self.N
+        all_spins = np.frombuffer(result.stdout, dtype=np.int8)
+        if all_spins.size != total:
+            raise RuntimeError(
+                f"PT backend returned {all_spins.size} bytes, "
+                f"expected {total} ({self.n_replicas} replicas × {self.N})"
+            )
+        self.s_replicas = all_spins.reshape(self.n_replicas, self.N).copy()
+        self.s = self.s_replicas[0].copy()  # lowest-T replica
 
     def _get_cleanup_paths(self) -> list[Path | None]:
         """Return paths to clean up after C run.
@@ -584,8 +640,8 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     #
     def _output_includes_em(self) -> bool:
         """Check if current variant outputs energy/magnetization time series."""
-        key = self._c_program_key()
-        return key.endswith('B') or key in ('C0',)
+        save_flags = self._resolve_save_flags()
+        return "em" in save_flags
     #
     def _read_c_em_output(self) -> None:
         """Read energy and magnetization binary files from C backend output."""
@@ -1290,13 +1346,20 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     def _ensure_spectral_subspace(self, n_modes: int) -> None:
         """Compute partial Laplacian spectrum if not already cached.
 
-        Calls ``self.sg.compute_k_eigvV(k=n_modes)`` which is a no-op
-        when eigenvectors are already available.
+        Forces the sparse ``eigsh`` solver (via ``backend='scipy'``) on
+        large graphs (N > 500) where dense diagonalisation is impractical.
         """
         # If full spectrum already computed, nothing to do
         if getattr(self.sg, "eigV", None) is not None:
             return
-        self.sg.compute_k_eigvV(k=n_modes)
+        kwargs: dict = {"k": n_modes}
+        # Force sparse solver for large graphs to avoid O(N^3) dense eigh
+        if self.N > 500 and n_modes < self.N // 2:
+            import inspect
+            sig = inspect.signature(self.sg.compute_k_eigvV)
+            if "backend" in sig.parameters:
+                kwargs["backend"] = "scipy"
+        self.sg.compute_k_eigvV(**kwargs)
 
     def _build_subspace_matrix(self, n_modes: int) -> np.ndarray:
         """Return ``(n_modes, N)`` matrix of continuous eigenvectors.
@@ -1391,6 +1454,36 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 h_eff = sum(w * s[nn] for nn, w in adj[node])
                 dE = 2.0 * s[node] * h_eff
                 if dE < 0:           # flipping reduces energy
+                    s[node] = -s[node]
+                    any_flip = True
+            if not any_flip:
+                break
+        return s.astype(np.int8)
+
+    def _greedy_polish_csr(
+        self,
+        spins: np.ndarray,
+        neigh_indices: np.ndarray,
+        neigh_weights: np.ndarray,
+        neigh_ptr: np.ndarray,
+        max_sweeps: int = 50,
+    ) -> np.ndarray:
+        """T=0 greedy sweeps using pre-built CSR adjacency.
+
+        Faster than :meth:`_greedy_polish` when called many times on
+        the same graph (avoids rebuilding adjacency per call).
+        """
+        s = spins.astype(np.float64).copy()
+        N = len(s)
+        for _ in range(max_sweeps):
+            any_flip = False
+            for node in range(N):
+                start, end = int(neigh_ptr[node]), int(neigh_ptr[node + 1])
+                h_eff = 0.0
+                for idx in range(start, end):
+                    h_eff += neigh_weights[idx] * s[neigh_indices[idx]]
+                dE = 2.0 * s[node] * h_eff
+                if dE < 0:
                     s[node] = -s[node]
                     any_flip = True
             if not any_flip:
@@ -1558,6 +1651,150 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.T, self.steps = saved_T, saved_steps
 
     # =========================================================================
+    # Cross-Entropy Method Spectral Optimizer  (py_topo_cem)
+    # =========================================================================
+
+    def cem_spectral_sampling(
+        self, tqdm_on: bool = True,
+    ) -> None:
+        """Population-based CEM optimizer in spectral coefficient space.
+
+        For each restart, samples K coefficient vectors from a diagonal
+        Gaussian, maps to spins via ``sign(V_M c)``, optionally applies
+        a greedy T=0 quench, selects elites, and updates the distribution.
+        Multi-restart keeps the global best across R restarts.
+
+        Results stored as ``topo_cem_best_spins``, ``topo_cem_best_energy``,
+        ``topo_cem_best_coeffs``, ``topo_cem_restart_energies``.
+        """
+        n_modes = min(self.topo_n_modes, self.N)
+        self._ensure_spectral_subspace(n_modes)
+        V = self._build_subspace_matrix(n_modes)  # (M, N)
+
+        # Pre-build CSR for greedy polish and edge list for energy
+        ni, nw, nptr = self._build_graph_csr()
+        edges = self.sg.get_edges_with_weights()
+
+        K = self.cem_pop_size
+        n_elite = max(1, int(self.cem_elite_frac * K))
+        M = n_modes
+        rng = np.random.default_rng(self.seed)
+
+        global_best_E = np.inf
+        global_best_spins: np.ndarray | None = None
+        global_best_coeffs: np.ndarray | None = None
+        restart_energies = np.zeros(self.cem_restarts, dtype=np.float64)
+
+        outer_iter = (
+            tqdm.tqdm(range(self.cem_restarts), desc="CEM restarts")
+            if tqdm_on else range(self.cem_restarts)
+        )
+
+        for r in outer_iter:
+            mu = np.zeros(M, dtype=np.float64)
+            sigma = np.full(M, self.cem_init_sigma, dtype=np.float64)
+
+            restart_best_E = np.inf
+            restart_best_spins: np.ndarray | None = None
+            restart_best_coeffs: np.ndarray | None = None
+            ene_trace: list[float] = []
+
+            for _it in range(self.cem_iter):
+                # 1. Sample K coefficient vectors
+                coeffs_pop = rng.normal(
+                    loc=mu, scale=sigma, size=(K, M),
+                )
+
+                # 2. Map to spins: sign(C @ V) -> (K, N)
+                fields = coeffs_pop @ V
+                spins_pop = np.sign(fields).astype(np.int8)
+                spins_pop[spins_pop == 0] = 1
+
+                # 3. Optionally greedy quench each sample
+                if self.cem_greedy:
+                    for k in range(K):
+                        spins_pop[k] = self._greedy_polish_csr(
+                            spins_pop[k], ni, nw, nptr,
+                            max_sweeps=self.cem_greedy_sweeps,
+                        )
+
+                # 4. Evaluate energies
+                energies = np.array([
+                    float(compute_ising_pairwise_energy(
+                        spins_pop[k], edges,
+                    ))
+                    for k in range(K)
+                ])
+
+                # 5. Elite selection
+                elite_idx = np.argsort(energies)[:n_elite]
+                elite_coeffs = coeffs_pop[elite_idx]
+
+                # 6. Update distribution with exponential smoothing
+                new_mu = elite_coeffs.mean(axis=0)
+                new_sigma = elite_coeffs.std(axis=0) + 1e-12
+                alpha = self.cem_smoothing
+                mu = alpha * mu + (1.0 - alpha) * new_mu
+                sigma = alpha * sigma + (1.0 - alpha) * new_sigma
+                sigma = np.clip(
+                    sigma, self.cem_sigma_floor, self.cem_sigma_ceiling,
+                )
+
+                # Track best this iteration
+                best_k = int(elite_idx[0])
+                if energies[best_k] < restart_best_E:
+                    restart_best_E = float(energies[best_k])
+                    restart_best_spins = spins_pop[best_k].copy()
+                    restart_best_coeffs = coeffs_pop[best_k].copy()
+
+                ene_trace.append(restart_best_E)
+
+            # Optional final polish of restart best
+            if (
+                self.topo_polish
+                and restart_best_spins is not None
+            ):
+                polished = self._greedy_polish_csr(
+                    restart_best_spins, ni, nw, nptr,
+                    max_sweeps=self.topo_polish_sweeps,
+                )
+                E_pol = float(
+                    compute_ising_pairwise_energy(polished, edges)
+                )
+                if E_pol < restart_best_E:
+                    restart_best_E = E_pol
+                    restart_best_spins = polished
+
+            restart_energies[r] = restart_best_E
+
+            if restart_best_E < global_best_E:
+                global_best_E = restart_best_E
+                global_best_spins = (
+                    restart_best_spins.copy()
+                    if restart_best_spins is not None
+                    else None
+                )
+                global_best_coeffs = (
+                    restart_best_coeffs.copy()
+                    if restart_best_coeffs is not None
+                    else None
+                )
+
+        # Store results
+        if global_best_spins is not None:
+            self.s = global_best_spins.astype(np.int8)
+        self.topo_cem_best_spins = global_best_spins
+        self.topo_cem_best_energy = global_best_E
+        self.topo_cem_best_coeffs = global_best_coeffs
+        self.topo_cem_restart_energies = restart_energies
+        self.ene = ene_trace
+        self.magn = [
+            float(np.sum(global_best_spins))
+            if global_best_spins is not None
+            else 0.0
+        ]
+
+    # =========================================================================
     # Pybind11 Topological FCA  (pb_topo_fca)
     # =========================================================================
 
@@ -1639,6 +1876,47 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.topo_met_best_energy = float(best_E)
 
     # =========================================================================
+    # Pybind11 Topological CEM  (pb_topo_cem) — stub
+    # =========================================================================
+
+    def _run_pybind_topo_cem(self) -> None:
+        """Run CEM via pybind11 native kernel."""
+        mod = self._load_native_module()
+        ni, nw, nptr = self._build_graph_csr()
+
+        n_modes = min(self.topo_n_modes, self.N)
+        self._ensure_spectral_subspace(n_modes)
+        V = self._build_subspace_matrix(n_modes)  # (M, N)
+
+        best_spins, best_E, best_coeffs, restart_E, ene_trace = (
+            mod.topo_cem_sampling(
+                ni, nw, nptr,
+                V.astype(np.float64),
+                int(self.N),
+                int(self.cem_iter),
+                int(self.cem_pop_size),
+                float(self.cem_elite_frac),
+                float(self.cem_init_sigma),
+                float(self.cem_smoothing),
+                float(self.cem_sigma_floor),
+                float(self.cem_sigma_ceiling),
+                int(self.cem_restarts),
+                bool(self.cem_greedy),
+                int(self.cem_greedy_sweeps),
+                bool(self.topo_polish),
+                int(self.topo_polish_sweeps),
+                int(self.seed),
+            )
+        )
+        self.s = best_spins.copy()
+        self.topo_cem_best_spins = best_spins
+        self.topo_cem_best_energy = float(best_E)
+        self.topo_cem_best_coeffs = np.asarray(best_coeffs)
+        self.topo_cem_restart_energies = np.asarray(restart_E)
+        self.ene = ene_trace.tolist()
+        self.magn = [float(np.sum(best_spins))]
+
+    # =========================================================================
     # Run Method
     # =========================================================================
 
@@ -1691,7 +1969,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # ---- Pybind11 backend ----
         if rl.startswith("pb_"):
-            if "topo_met" in rl:
+            if "topo_cem" in rl:
+                self._run_pybind_topo_cem()
+            elif "topo_met" in rl:
                 self._run_pybind_topo_met()
             elif "topo_fca" in rl:
                 self._run_pybind_topo_fca()
@@ -1708,7 +1988,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # ---- CuPy (GPU) backend ----
         elif rl.startswith("cu_"):
-            if "topo_met" in rl:
+            if "topo_cem" in rl:
+                self.cem_spectral_sampling(tqdm_on)
+            elif "topo_met" in rl:
                 # CuPy topological not yet implemented — fall back to Python
                 self.topological_metropolis_sampling(tqdm_on)
             elif "topo_fca" in rl:
@@ -1725,7 +2007,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 self._run_cupy_met()
 
         # ---- C subprocess backend ----
-        elif rl.startswith("c_") or self.runlang.upper().startswith("C"):
+        elif rl.startswith("c_") or (
+            self.runlang.upper().startswith("C")
+            and len(self.runlang) >= 2
+            and self.runlang[1].isdigit()
+        ):
             self.build_cprogram_command()
             self.run_cprogram(verbose)
             if clean_export:
@@ -1734,7 +2020,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # ---- Python backend ----
         else:
-            if "topo_met" in rl:
+            if "topo_cem" in rl:
+                self.cem_spectral_sampling(tqdm_on)
+            elif "topo_met" in rl:
                 self.topological_metropolis_sampling(tqdm_on)
             elif "topo_fca" in rl:
                 self.topological_fca_sampling(tqdm_on)

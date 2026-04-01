@@ -80,6 +80,20 @@ def initialize_ising_dict_args(args, out_suffix, NoClust):
             topo_tau=getattr(args, 'topo_tau', 1.0),
             topo_field_strength=getattr(args, 'topo_field_strength', 1.0),
         )
+        # CEM-specific parameters
+        if 'cem' in rl.lower():
+            base_args.update(
+                cem_iter=getattr(args, 'cem_iter', 30),
+                cem_pop_size=getattr(args, 'cem_pop_size', 128),
+                cem_elite_frac=getattr(args, 'cem_elite_frac', 0.2),
+                cem_init_sigma=getattr(args, 'cem_init_sigma', 1.2),
+                cem_smoothing=getattr(args, 'cem_smoothing', 0.6),
+                cem_sigma_floor=getattr(args, 'cem_sigma_floor', 1e-3),
+                cem_sigma_ceiling=getattr(args, 'cem_sigma_ceiling', 5.0),
+                cem_restarts=getattr(args, 'cem_restarts', 10),
+                cem_greedy=getattr(args, 'cem_greedy', True),
+                cem_greedy_sweeps=getattr(args, 'cem_greedy_sweeps', 120),
+            )
         # topo_fca quench uses n_temperatures*steps_per_T for total sweeps
         if 'topo_fca' in rl.lower() and not base_args.get('sa_enabled', False):
             base_args.update(
@@ -166,6 +180,8 @@ _STACKABLE_MAGN = ("magn", "sa_magn")
 _STACKABLE_SOUT = ("s_t",)
 _STACKABLE_COEFFS = (
     "topo_met_coeffs", "topo_met_best_spins", "topo_met_best_energy",
+    "topo_cem_best_coeffs", "topo_cem_best_spins", "topo_cem_best_energy",
+    "topo_cem_restart_energies",
 )
 # Keys stored once (shared across thermal runs).
 _SHARED_KEYS = ("sa_temps",)
@@ -194,7 +210,7 @@ def resolve_save_flags(args: Any) -> dict[str, bool]:
         "ene": save_all or getattr(args, "save_ene", True),
         "magn": save_all or getattr(args, "save_magn", True),
         "sout": save_all or getattr(args, "save_sout", False),
-        "coeffs": (save_all or True) if "topo_met" in rl else False,
+        "coeffs": (save_all or True) if ("topo_met" in rl or "topo_cem" in rl) else False,
     }
 
 
@@ -386,14 +402,24 @@ def extract_sout_data(isdy: Any) -> dict[str, Any]:
 
 
 def extract_coeffs_data(isdy: Any) -> dict[str, Any]:
-    """Extract topo_met coefficients and best-spin data."""
+    """Extract topo_met/topo_cem coefficients and best-spin data."""
     d: dict[str, Any] = {}
+    # topo_met data
     if hasattr(isdy, "topo_met_coeffs") and isdy.topo_met_coeffs is not None:
         d["topo_met_coeffs"] = np.asarray(isdy.topo_met_coeffs)
     if hasattr(isdy, "topo_met_best_energy"):
         d["topo_met_best_energy"] = np.float64(isdy.topo_met_best_energy)
     if hasattr(isdy, "topo_met_best_spins") and isdy.topo_met_best_spins is not None:
         d["topo_met_best_spins"] = np.asarray(isdy.topo_met_best_spins)
+    # topo_cem data
+    if hasattr(isdy, "topo_cem_best_coeffs") and isdy.topo_cem_best_coeffs is not None:
+        d["topo_cem_best_coeffs"] = np.asarray(isdy.topo_cem_best_coeffs)
+    if hasattr(isdy, "topo_cem_best_energy"):
+        d["topo_cem_best_energy"] = np.float64(isdy.topo_cem_best_energy)
+    if hasattr(isdy, "topo_cem_best_spins") and isdy.topo_cem_best_spins is not None:
+        d["topo_cem_best_spins"] = np.asarray(isdy.topo_cem_best_spins)
+    if hasattr(isdy, "topo_cem_restart_energies") and isdy.topo_cem_restart_energies is not None:
+        d["topo_cem_restart_energies"] = np.asarray(isdy.topo_cem_restart_energies)
     return d
 
 
@@ -437,6 +463,14 @@ def _build_metadata(
             "topo_n_modes", "topo_sigma_init", "topo_chunk_size",
             "topo_polish", "topo_polish_sweeps", "topo_tau",
             "topo_field_strength",
+        ):
+            meta[key] = getattr(args, key, 0)
+    # CEM params
+    if "cem" in rl.lower():
+        for key in (
+            "cem_iter", "cem_pop_size", "cem_elite_frac",
+            "cem_init_sigma", "cem_smoothing", "cem_restarts",
+            "cem_greedy", "cem_greedy_sweeps",
         ):
             meta[key] = getattr(args, key, 0)
     return meta
