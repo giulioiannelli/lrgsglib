@@ -1,23 +1,29 @@
+import warnings
+
 from networkx import Graph
 
 from .config import *
 from .utils import *
 from .graphs.nx import *
 from .statsys import *
-#
-# __all__ = [
-#     "np",
-#     "nx",
-#     "plt",
-#     "powerlaw",
-#     "SignedLaplacianAnalysis",
-#     "IsingDynamics",
-#     "FullyConnected",
-#     "Lattice2D",
-# ]
-#
-# renormalization group for heterogenous network functions
+
+__all__ = [
+    "SignedLaplacianAnalysis",
+]
+
+
 class SignedLaplacianAnalysis:
+    """Laplacian Renormalization Group analysis for signed graphs.
+
+    .. deprecated::
+        This class is deprecated. Use ``SignedGraphNX`` methods directly:
+
+        - Entropy/specific heat: ``sg.compute_signed_laplacian_entropy()``
+        - Spectral analysis: ``get_graph_lspectrum()`` + ``compute_entropy_observables_from_eigenvalues()``
+        - Animation: ``lrgsglib.plotlib.animation.make_animation_fromFrames()``
+
+        Will be removed in a future major version.
+    """
     Sm1 = None
     VarL = None
     Cspe = None
@@ -42,6 +48,13 @@ class SignedLaplacianAnalysis:
         no_obs=1,
         initspect: bool = True
     ) -> None:
+        warnings.warn(
+            "SignedLaplacianAnalysis is deprecated. Use SignedGraphNX methods "
+            "directly (e.g., sg.compute_signed_laplacian_entropy()). "
+            "Will be removed in a future major version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.sg = sg
         self.initspect = initspect
         self.nreplica = nreplica

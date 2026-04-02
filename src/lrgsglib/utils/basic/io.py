@@ -1,4 +1,4 @@
-from .common import *
+from typing import Any
 
 def verbose_print(
     message: Any,

@@ -135,7 +135,7 @@ class PositionMixin:
                 pos_h = {node: (float(node[0]), float(node[1])) for node in h_nodes}
             elif len(first_node) == 3:
                 # 3D coordinates - project to 2D
-                from ....utils.basic.geometry import project_3d_to_2d
+                from ....utils.basic.linalg import project_3d_to_2d
 
                 theta = getattr(self, "theta", 0.5236)  # pi/6
                 phi = getattr(self, "phi", 0.5236)

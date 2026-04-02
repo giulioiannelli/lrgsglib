@@ -1,7 +1,7 @@
 from lrgsglib.core import *
 #
 description = """
-    Serialiser for Lattice2D_SlaplSpect.py
+    Serializer for Lattice2D_SlaplSpect.py
 """
 L2D_SlaplSpect_progName = "L2D_SlaplSpect"
 L2D_SlaplSpect_progNameShrt = "L2DSS"
@@ -22,10 +22,10 @@ DEFAULT_mMB = 2**10
 DEFAULT_MMB = 2**14
 # Helpers for argparse descriptions
 phelp_print = f"""
-    Option to print the output of the Serialiser. 
+    Option to print the output of the Serializer. 
 """
 phelp_exc = f"""
-    Option to exec the output of the Serialiser.
+    Option to exec the output of the Serializer.
 """
 phelp_mMB = f"""
     Minimum MB quantity to be allocated for the single process 

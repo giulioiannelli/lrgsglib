@@ -21,12 +21,21 @@ find_package(OpenMP QUIET)
 set(SFMT_MEXP 19937 CACHE STRING "Mersenne exponent for SFMT")
 add_compile_definitions(DSFMT_MEXP=${SFMT_MEXP})
 
-# SIMD detection
+# SIMD detection (platform-aware)
 include(CheckCCompilerFlag)
-check_c_compiler_flag("-msse2" HAS_SSE2)
-if(HAS_SSE2)
-    add_compile_options(-msse2)
-    add_compile_definitions(HAVE_SSE2)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64|ARM64")
+    # ARM: check for NEON (default on AArch64)
+    check_c_compiler_flag("-march=armv8-a" HAS_NEON)
+    if(HAS_NEON)
+        add_compile_definitions(HAVE_NEON)
+    endif()
+else()
+    # x86/x86_64: check for SSE2
+    check_c_compiler_flag("-msse2" HAS_SSE2)
+    if(HAS_SSE2)
+        add_compile_options(-msse2)
+        add_compile_definitions(HAVE_SSE2)
+    endif()
 endif()
 
 # ===========================================================================
@@ -188,47 +197,32 @@ endfunction()
 # Ising simulators
 # ===========================================================================
 
-# Legacy Ising simulators (Algorithm number only)
+# Unified Ising simulators (canonical names used by Python dispatch)
+add_ising_simulator(IsingMetropolis)
+add_ising_sa_simulator(IsingSimulatedAnnealing)
+add_ising_pt_simulator(IsingParallelTempering)
+
+# Legacy Ising simulators (kept for backwards compatibility with old scripts)
 add_ising_simulator(IsingSimulator0)
 add_ising_simulator(IsingSimulator1)
 add_ising_simulator(IsingSimulator2)
 add_ising_simulator(IsingSimulator3)
 add_ising_simulator(IsingSimulator4)
 add_ising_simulator(IsingSimulator5)
-
-# New naming convention simulators
-# Algorithm 1: Glauber-Metropolis, b = E/M output
 add_ising_simulator(IsingSimulator1b)
-
-# Algorithm 3: Simulated Annealing, b = E/M output
 add_ising_sa_simulator(IsingSimulator3b)
-
-# Algorithm 4: Parallel Tempering, b = E/M output
 add_ising_pt_simulator(IsingSimulator4b)
 
 # ===========================================================================
 # Voter Model simulators
 # ===========================================================================
-add_voter_simulator(VoterSimulator0)
-add_voter_simulator(VoterSimulator1)
+add_voter_simulator(VoterSimulator)
 
 # ===========================================================================
 # Contact Process simulators
 # ===========================================================================
-
-# Unified simulator (consolidates legacy 1, 1a-1g)
-add_contact_simulator(ContactSimulator)
-
-# Legacy variants (kept for backwards compatibility)
-add_contact_simulator(ContactSimulator0)
-add_contact_simulator(ContactSimulator1)
-add_contact_simulator(ContactSimulator1a)
-add_contact_simulator(ContactSimulator1b)
-add_contact_simulator(ContactSimulator1c)
-add_contact_simulator(ContactSimulator1d)
-add_contact_simulator(ContactSimulator1e)
-add_contact_simulator(ContactSimulator1f)
-add_contact_simulator(ContactSimulator1g)
+add_contact_simulator(ContactProcessSIR)
+add_contact_simulator(ContactProcessEI)
 
 # ===========================================================================
 # Kuramoto Model simulators

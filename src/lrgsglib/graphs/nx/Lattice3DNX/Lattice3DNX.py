@@ -10,9 +10,9 @@ from os.path import join as pth_join
 from ....config.const import *
 from ....config.errwar import Lattice2DWarning
 import numpy as np
-from ....utils.basic.geometry import project_3d_to_2d
+from ....utils.basic.linalg import project_3d_to_2d
 from ....utils.basic.numeric import is_positive_int
-from ....utils.basic.functions import compose
+from ....utils.basic.iterables import compose
 from ..funcs import LatticeND_graph_FastPatch, remove_edges
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 from .generators_3d import *

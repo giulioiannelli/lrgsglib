@@ -46,7 +46,7 @@ L2D_Recon_description = f"""
     Computational resourses regarding the reconstruction of laplacian eigenmodes
     of 2D lattices: {L2D_Recon_progName}.py
 """
-L2D_Recon_srun_description = f"""Serialiser for {L2D_Recon_progName}.py"""
+L2D_Recon_srun_description = f"""Serializer for {L2D_Recon_progName}.py"""
 ## arg parsers dict
 L2D_Recon_args = {**L2D_ISDYN_args}
 L2D_Recon_optional_args_dict = {**recon_opt_args_dict}
@@ -59,7 +59,7 @@ L3D_Recon_description = f"""
     Computational resourses regarding the reconstruction of laplacian eigenmodes
     of 3D lattices: {L3D_Recon_progName}.py
 """
-L3D_Recon_srun_description = f"""Serialiser for {L3D_Recon_progName}.py"""
+L3D_Recon_srun_description = f"""Serializer for {L3D_Recon_progName}.py"""
 ## arg parsers dict
 L3D_Recon_args = {**L3D_ISDYN_args}
 L3D_Recon_optional_args_dict = {**recon_opt_args_dict}

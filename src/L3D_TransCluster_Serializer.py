@@ -12,7 +12,7 @@ from kernels.Serializer import (
     _collect_values,
     _collect_values_typed,
 )
-from parsers.L3D_TransCluster_Serialiser import parser, L3D_TransCluster_progName, L3D_TransCluster_progNameShrt
+from parsers.L3D_TransCluster_Serializer import parser, L3D_TransCluster_progName, L3D_TransCluster_progNameShrt
 from lrgsglib.config.progargs import (
     DEFAULT_L3D_TRANSCLUSTER_SRUN_L_LIST,
     DEFAULT_L3D_TRANSCLUSTER_SRUN_P_LIST,

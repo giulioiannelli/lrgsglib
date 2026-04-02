@@ -12,7 +12,7 @@ from kernels.Serializer import (
     _collect_values,
     _collect_values_typed,
 )
-from parsers.L2D_TransCluster_Serialiser import parser, L2D_TransCluster_progName, L2D_TransCluster_progNameShrt
+from parsers.L2D_TransCluster_Serializer import parser, L2D_TransCluster_progName, L2D_TransCluster_progNameShrt
 from lrgsglib.config.progargs import (
     DEFAULT_L2D_TRANSCLUSTER_SRUN_L_LIST,
     DEFAULT_L2D_TRANSCLUSTER_SRUN_P_LIST,

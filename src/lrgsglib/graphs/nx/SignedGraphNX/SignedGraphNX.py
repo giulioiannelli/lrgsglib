@@ -503,6 +503,24 @@ class SignedGraphNX:
         """
         return len(self.fleset[self.on_g])
 
+    @property
+    def pflip(self) -> float:
+        """Fraction of edges that are negative."""
+        return self._pflip
+
+    @pflip.setter
+    def pflip(self, value: float) -> None:
+        self._pflip = value
+
+    @property
+    def seed(self) -> Optional[int]:
+        """Random seed used for graph generation."""
+        return self._seed
+
+    @seed.setter
+    def seed(self, value: Optional[int]) -> None:
+        self._seed = value
+
     def count_negative_edges(self) -> int:
         """Count number of negative edges (GT compatibility).
 
@@ -658,15 +676,15 @@ class SignedGraphNX:
         If CuPy is unavailable or fails to initialize, a warning is issued 
         but execution continues without GPU-accelerated random operations.
         """
-        self.seed = seed or (
+        self._seed = seed or (
             (int(time.time() * 1_000_000) + os.getpid() + id(self)) % (2**32 - 1)
         )
-        random.seed(self.seed)
+        random.seed(self._seed)
         try:
-            cp.random.seed(self.seed)
-        except Exception:
+            cp.random.seed(self._seed)
+        except (ImportError, ModuleNotFoundError, AttributeError):
             pass
-        np.random.seed(self.seed)
+        np.random.seed(self._seed)
         #
         self.rand_str = generate_random_id()
     #
@@ -784,7 +802,7 @@ class SignedGraphNX:
                         self.syshapePth = f"N={len(self.G)}"
                     else:
                         self.syshapePth = "N=unknown"
-                except Exception:
+                except (TypeError, AttributeError):
                     self.syshapePth = "N=unknown"
 
         # Create paths for graph-related subdirectories only
@@ -900,8 +918,8 @@ class SignedGraphNX:
             self.fleset[on_g] = set([
                 (u, v) for u, v, _ in edges_data if _.get('weight', 1) < 0
             ])
-            self.pflip = self.Ne_n / self.Ne
-            self.Ne_flips = int(self.pflip * self.Ne)
+            self._pflip = self.Ne_n / self.Ne
+            self.Ne_flips = int(self._pflip * self.Ne)
             self.lfeset[on_g] = self.eset[on_g].difference(self.fleset[on_g])
         else:
             self.nflip = int(self.pflip * self.N)
@@ -980,7 +998,7 @@ class SignedGraphNX:
         if not is_in_range(pflip, LB_PFLIP, UB_PFLIP):
             raise ValueError(SG_ERRMSG_PFLIP)
         else:
-            self.pflip = pflip
+            self._pflip = pflip
             from ....config.funcs import peq_fstr
             self.peq_str = peq_fstr(pflip)
     #

@@ -516,7 +516,7 @@ def analyze_proteins_with_residue_range(
                     })
                     if len(selected_proteins) >= 5:
                         break
-            except:
+            except (OSError, ValueError, KeyError, IndexError):
                 continue
     
     # Determine network sizing

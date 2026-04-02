@@ -50,6 +50,13 @@ from .quantum import (
     compute_quantum_observables_from_eigenvalues,
 )
 from .quantum_core import QuantumSignedLaplacianAnalysis
+from .percolation import (
+    percolation_sweep,
+    find_threshold,
+    dual_percolation_sweep,
+    compute_pareto_point,
+    default_p_range,
+)
 
 __all__ = [
     # spectral
@@ -91,4 +98,10 @@ __all__ = [
     "compute_interference_visibility",
     "compute_quantum_observables_from_eigenvalues",
     "QuantumSignedLaplacianAnalysis",
+    # percolation
+    "percolation_sweep",
+    "find_threshold",
+    "dual_percolation_sweep",
+    "compute_pareto_point",
+    "default_p_range",
 ]

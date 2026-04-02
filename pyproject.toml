@@ -62,7 +62,7 @@ docs = [
 [project.urls]
 "Homepage" = "https://github.com/giulioiannelli/lrgsglib"
 "Bug Tracker" = "https://github.com/giulioiannelli/lrgsglib/issues"
-"Documentation" = "https://github.com/giulioiannelli/lrgsglib/wiki"
+"Documentation" = "https://github.com/giulioiannelli/lrgsglib/tree/main/docs"
 "Source Code" = "https://github.com/giulioiannelli/lrgsglib"
 
 [tool.scikit-build]

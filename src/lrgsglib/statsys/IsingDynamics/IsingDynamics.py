@@ -397,7 +397,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         neighbors = self.sg.get_neighbors_with_weights(node)
         return [w * self.s[nn] for nn, w in neighbors]
     #
-    def metropolis(self, node):
+    def metropolis(self, node: int) -> None:
         neigh = self.neigh_wghtmagn(node)
         neighene = self.neigh_ene(neigh)
         DeltaE = 2 * self.s[node] * neighene
@@ -412,7 +412,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ])
         return -np.dot(self.s, neigh_energies)
     #
-    def init_ising_dynamics(self, custom: Any = None, exName: str = ""):
+    def init_ising_dynamics(self, custom: Any = None, exName: str = "") -> None:
         self._check_c_backend_or_fallback()
         self.init_s(custom)
         rl = _resolve_runlang(self.runlang)
@@ -437,11 +437,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
     def initialize_run_parameters(
         self,
-        T_ising,
+        T_ising: float | None,
         steps: int | None = None,
         simref: float | None = None,
         eqSTEP: int | None = None,
-    ):
+    ) -> None:
         if T_ising:
             self.T = T_ising
         chosen_steps = steps if steps is not None else eqSTEP

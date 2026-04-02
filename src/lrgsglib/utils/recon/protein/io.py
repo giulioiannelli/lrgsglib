@@ -37,12 +37,12 @@ def download_pdb(pdb_id: str, storage_dir: Optional[Path] = None) -> str:
         return pdb_file_path.read_text()
 
     url = f"https://files.rcsb.org/download/{pdb_id.upper()}.pdb"
-    response = requests.get(url)
+    response = requests.get(url, timeout=30)
     if response.status_code == 200:
         pdb_file_path.write_text(response.text)
         print(f"  Downloaded {pdb_id} → {pdb_file_path}")
         return response.text
-    raise Exception(f"Failed to download PDB {pdb_id}: HTTP {response.status_code}")
+    raise ConnectionError(f"Failed to download PDB {pdb_id}: HTTP {response.status_code}")
 
 
 def extract_ca_coordinates(pdb_content: str) -> np.ndarray:

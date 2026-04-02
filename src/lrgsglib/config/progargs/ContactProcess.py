@@ -95,7 +95,7 @@ L2D_CPROC_opt_args = {**L2D_opt_args, **Contact_opt_args}
 L2D_CPROC_action_args = {**action_args_dict}
 
 L2D_ContactProcess_srun_description = (
-    f"Serialiser for {L2D_CPROC_progname}.py"
+    f"Serializer for {L2D_CPROC_progname}.py"
 )
 
 L2D_ContactProcess_srun_optional_args_dict = {

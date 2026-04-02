@@ -1,4 +1,4 @@
-from parsers.L2D_SlaplSpect_Serialiser import *
+from parsers.L2D_SlaplSpect_Serializer import *
 #
 args = parser.parse_args()
 #

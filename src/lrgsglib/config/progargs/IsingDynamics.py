@@ -312,7 +312,7 @@ L2D_ISDYN_description = f"""
     Computational resourses regarding the Ising Dynamics of 2D 
     lattices: {L2D_ISDYN_progname}.py
 """
-L2D_ISDYN_srun_description = f"""Serialiser for {L2D_ISDYN_progname}.py"""
+L2D_ISDYN_srun_description = f"""Serializer for {L2D_ISDYN_progname}.py"""
 ## arg parsers dict
 L2D_ISDYN_args = {**L2D_args, **IsDyn_args}
 L2D_ISDYN_action_args = {
@@ -334,7 +334,7 @@ L3D_ISDYN_description = f"""
     Computational resourses regarding the Ising Dynamics of 3D
     lattices: {L3D_ISDYN_progname}.py
 """
-L3D_ISDYN_srun_description = f"""Serialiser for {L3D_ISDYN_progname}.py"""
+L3D_ISDYN_srun_description = f"""Serializer for {L3D_ISDYN_progname}.py"""
 ## arg parsers dict
 L3D_ISDYN_args = {**L3D_args, **IsDyn_args}
 L3D_ISDYN_action_args = {

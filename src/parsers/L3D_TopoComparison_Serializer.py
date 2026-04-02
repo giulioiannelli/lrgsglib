@@ -1,4 +1,4 @@
-"""Parser for L3D_TopoComparison_Serialiser.
+"""Parser for L3D_TopoComparison_Serializer.
 
 Sweeps over side lengths and pflip values. Temperature is only relevant
 for SA/topo_fca (annealing schedules), not for topo_met.  The comparison

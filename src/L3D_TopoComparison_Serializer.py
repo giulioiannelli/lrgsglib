@@ -11,11 +11,11 @@ Usage
 -----
 Print commands without executing::
 
-    python src/L3D_TopoComparison_Serialiser.py -s1 8 10 -pFT 0.3 0.3 --print
+    python src/L3D_TopoComparison_Serializer.py -s1 8 10 -pFT 0.3 0.3 --print
 
 Execute on cluster::
 
-    python src/L3D_TopoComparison_Serialiser.py -s1 8 10 12 \\
+    python src/L3D_TopoComparison_Serializer.py -s1 8 10 12 \\
         -pFT 0.1 0.5 5 -na 100 --exec
 """
 
@@ -32,7 +32,7 @@ from kernels.Serializer import (
 )
 from lrgsglib import *
 from parsers.L3D_IsingDynamics import L3D_ISDYN_progname, L3D_ISDYN_progname_shrt
-from parsers.L3D_TopoComparison_Serialiser import parser
+from parsers.L3D_TopoComparison_Serializer import parser
 
 # Methods to compare: (runlang, needs_sa_mode, short_label)
 _METHODS = [

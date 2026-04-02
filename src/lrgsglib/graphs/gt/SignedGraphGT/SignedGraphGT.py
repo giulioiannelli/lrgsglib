@@ -101,8 +101,8 @@ class SignedGraphGT:
                 "conda install -c conda-forge graph-tool"
             )
 
-        self.pflip = pflip
-        self.seed = seed
+        self._pflip = pflip
+        self._seed = seed
         self._rng = np.random.default_rng(seed)
 
         if G is not None:
@@ -160,6 +160,24 @@ class SignedGraphGT:
     def Ne_n(self) -> int:
         """Number of negative edges."""
         return self.count_negative_edges()
+
+    @property
+    def pflip(self) -> float:
+        """Fraction of edges that are negative."""
+        return self._pflip
+
+    @pflip.setter
+    def pflip(self, value: float) -> None:
+        self._pflip = value
+
+    @property
+    def seed(self) -> Optional[int]:
+        """Random seed used for graph generation."""
+        return self._seed
+
+    @seed.setter
+    def seed(self, value: Optional[int]) -> None:
+        self._seed = value
 
     @property
     def gr(self) -> Dict[str, "Graph"]:

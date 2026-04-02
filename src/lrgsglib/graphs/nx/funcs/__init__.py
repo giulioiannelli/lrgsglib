@@ -27,6 +27,10 @@ from .thresholding import (
     select_threshold_and_graph,
     threshold_graph,
 )
+from .dual import (
+    build_planar_dual,
+    build_signed_dual,
+)
 
 __all__ = [
     'fast_set_weights_from_matrix',
@@ -45,4 +49,6 @@ __all__ = [
     'compute_threshold_stats_fast',
     'select_threshold_and_graph',
     'threshold_graph',
+    'build_planar_dual',
+    'build_signed_dual',
 ]

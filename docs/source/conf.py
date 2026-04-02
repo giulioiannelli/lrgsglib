@@ -5,6 +5,7 @@
 
 import os
 import sys
+from importlib.metadata import version as get_version
 from pathlib import Path
 
 # -- Path setup --------------------------------------------------------------
@@ -17,8 +18,11 @@ sys.path.insert(0, str(Path(__file__).parents[2] / 'src'))
 project = 'lrgsglib'
 copyright = '2025, Giulio Iannelli, Pablo Villegas'
 author = 'Giulio Iannelli, Pablo Villegas'
-release = '0.1.0'
-version = '0.1.0'
+try:
+    release = get_version('lrgsglib')
+except Exception:
+    release = '0.1.0'
+version = '.'.join(release.split('.')[:2])
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -102,8 +106,8 @@ import matplotlib.pyplot as plt
 from lrgsglib import *
 """
 
-# Bibliography
-bibtex_bibfiles = []  # Will add bibliography files later
+# Bibliography (add .bib files to docs/source/ when references are needed)
+bibtex_bibfiles = []
 
 # Templates path
 templates_path = ['_templates']

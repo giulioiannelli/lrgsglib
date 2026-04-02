@@ -1,6 +1,6 @@
 from lrgsglib import *
 from parsers.L2D_IsingDynamics import L2D_ISDYN_progname, L2D_ISDYN_progname_shrt
-from parsers.L2D_IsingDynamics_Serialiser import parse_arguments, parser
+from parsers.L2D_IsingDynamics_Serializer import parse_arguments, parser
 #
 def main():
     args, unknown = parser.parse_known_args()

@@ -23,7 +23,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parents[2]
 SRC_DIR = ROOT_DIR / "src"
 L3D_SCRIPT = SRC_DIR / "L3D_IsingDynamics.py"
-L3D_SERIALISER = SRC_DIR / "L3D_IsingDynamics_Serialiser.py"
+L3D_SERIALIZER = SRC_DIR / "L3D_IsingDynamics_Serializer.py"
 
 # Add src/ to path so `from kernels.L3D import ...` works
 if str(SRC_DIR) not in sys.path:
@@ -292,11 +292,11 @@ class TestCLI:
     @pytest.mark.slow
     def test_serializer_print_mode(self):
         """Serializer --print produces valid commands."""
-        if not L3D_SERIALISER.exists():
-            pytest.skip("L3D_IsingDynamics_Serialiser.py not found")
+        if not L3D_SERIALIZER.exists():
+            pytest.skip("L3D_IsingDynamics_Serializer.py not found")
 
         cmd = [
-            sys.executable, str(L3D_SERIALISER),
+            sys.executable, str(L3D_SERIALIZER),
             "-s1", "4", "6",
             "-pFT", "(0.1,0.3,2)",
             "-TT", "(1.0,2.0,2)",

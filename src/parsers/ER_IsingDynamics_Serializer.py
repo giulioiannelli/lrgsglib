@@ -4,7 +4,7 @@ ER_IsingDynamics_progName = "ER_IsingDynamics"
 ER_IsingDynamics_progNameShrt = "ERID"
 #
 description = f"""
-    Serialiser for {ER_IsingDynamics_progName}.py
+    Serializer for {ER_IsingDynamics_progName}.py
         - Computes the dynamics of the Ising model on an Erdos-Renyi graph with
             a given average degree and flipping different configuration of 
             edges.
@@ -36,10 +36,10 @@ phelp_thrmsteps = f"""
     Number of thermalisation steps to compute
 """
 phelp_print = f"""
-    Option to print the output of the Serialiser.
+    Option to print the output of the Serializer.
 """
 phelp_exc = f"""
-    Option to exec the output of the Serialiser.
+    Option to exec the output of the Serializer.
 """
 phelp_mMB = f"""
     Minimum MB quantity to be allocated for the single process

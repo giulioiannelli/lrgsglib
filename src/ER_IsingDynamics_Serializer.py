@@ -1,4 +1,4 @@
-from parsers.ER_IsingDynamics_Serialiser import *
+from parsers.ER_IsingDynamics_Serializer import *
 #
 args = parser.parse_args()
 #

@@ -3,6 +3,7 @@ import numpy as np
 from typing import List, Tuple, Union
 #
 from numpy.typing import NDArray
+from scipy.interpolate import griddata
 from scipy.spatial.distance import cdist
 
 __all__ = [
@@ -18,6 +19,8 @@ __all__ = [
     'obtain_coeffs',
     'reconstruct_from_projections',
     'versor',
+    'interpolate_grid_data',
+    'project_3d_to_2d',
 ]
 #
 def basis_random_combination(
@@ -446,4 +449,84 @@ def versor(state_time: NDArray) -> NDArray:
     if norm == 0:
         raise ValueError("Zero vector cannot be normalized.")
     return state_time / norm
-#
+
+
+# --- Merged from datanalysis.py ---
+
+
+def interpolate_grid_data(
+    x: NDArray,
+    y: NDArray,
+    z: NDArray,
+    num_points: int = 1000,
+    method: str = 'cubic',
+    fill_value: float = np.nan
+) -> Tuple[NDArray, NDArray, NDArray]:
+    """
+    Performs interpolation of z-data over a uniformly spaced grid.
+
+    Parameters
+    ----------
+    x : NDArray
+        Meshgrid of x-coordinate values.
+    y : NDArray
+        Meshgrid of y-coordinate values.
+    z : NDArray
+        Matrix of computed z-values corresponding to each (x, y) pair.
+    num_points : int, optional
+        Number of points along each axis for the new grid. Defaults to 1000.
+    method : str, optional
+        Interpolation method ('linear', 'nearest', 'cubic'). Defaults to 'cubic'.
+    fill_value : float, optional
+        Fill value for points outside convex hull. Defaults to np.nan.
+
+    Returns
+    -------
+    Tuple[NDArray, NDArray, NDArray]
+        (grid_x, grid_y, z_new) interpolated values on the new grid.
+    """
+    points = np.column_stack((x.ravel(), y.ravel()))
+    grid_x, grid_y = np.meshgrid(
+        np.linspace(x.min(), x.max(), num_points),
+        np.linspace(y.min(), y.max(), num_points)
+    )
+    z_new = griddata(
+        points, z.ravel(), (grid_x, grid_y), method=method, fill_value=fill_value
+    )
+    return grid_x, grid_y, z_new
+
+
+# --- Merged from geometry.py ---
+
+
+def project_3d_to_2d(x, y, z, theta=0., phi=0.):
+    """
+    Projects a 3D point (x, y, z) onto a 2D plane using rotation angles.
+
+    Parameters
+    ----------
+    x, y, z : float
+        3D coordinates.
+    theta : float, optional
+        Rotation angle around the y-axis, in radians.
+    phi : float, optional
+        Rotation angle around the x-axis, in radians.
+
+    Returns
+    -------
+    tuple of float
+        The (x, y) coordinates of the projected point.
+    """
+    R_theta = np.array([
+        [np.cos(theta), 0, np.sin(theta)],
+        [0, 1, 0],
+        [-np.sin(theta), 0, np.cos(theta)]
+    ])
+    R_phi = np.array([
+        [1, 0, 0],
+        [0, np.cos(phi), -np.sin(phi)],
+        [0, np.sin(phi), np.cos(phi)]
+    ])
+    position = np.array([x, y, z])
+    position_rotated = R_phi @ R_theta @ position
+    return position_rotated[0], position_rotated[1]

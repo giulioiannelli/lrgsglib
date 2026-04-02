@@ -10,6 +10,8 @@ This section contains the detailed API documentation for all modules, classes, a
    utils
    statsys
    plotlib
+   animations
+   bindings
    config
 
 Module Overview
@@ -27,6 +29,12 @@ Module Overview
 
 **plotlib**
    Plotting and visualization functions specialized for signed graphs and lattices
+
+**animations**
+   Animation tools for visualizing dynamics on graphs
+
+**bindings**
+   Native language bindings for performance-critical operations
 
 **config**
    Configuration management, error handling, and program arguments

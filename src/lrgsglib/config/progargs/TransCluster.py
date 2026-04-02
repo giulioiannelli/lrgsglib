@@ -58,7 +58,7 @@ L2D_TransCluster_optional_args_dict = {
 L2D_TransCluster_action_args_dict = {**action_args_dict}
 
 L2D_TransCluster_srun_description = (
-    f"Serialiser for {L2D_TransCluster_progName}.py"
+    f"Serializer for {L2D_TransCluster_progName}.py"
 )
 
 L2D_TransCluster_srun_optional_args_dict = {
@@ -165,7 +165,7 @@ L3D_TransCluster_optional_args_dict = {
 L3D_TransCluster_action_args_dict = {**action_args_dict}
 
 L3D_TransCluster_srun_description = (
-    f"Serialiser for {L3D_TransCluster_progName}.py"
+    f"Serializer for {L3D_TransCluster_progName}.py"
 )
 
 L3D_TransCluster_srun_optional_args_dict = {
@@ -292,7 +292,7 @@ SCS_TransCluster_optional_args_dict = {
 SCS_TransCluster_action_args_dict = {**SCSGeneralized_action_args_dict}
 
 SCS_TransCluster_srun_description = (
-    f"Serialiser for {SCS_TransCluster_progName}.py"
+    f"Serializer for {SCS_TransCluster_progName}.py"
 )
 
 SCS_TransCluster_srun_optional_args_dict = {

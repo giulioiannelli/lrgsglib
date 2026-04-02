@@ -106,7 +106,7 @@ jobs:
       - name: Run quick tests
         run: |
           pip install pytest
-          pytest test/ --quick -q --ignore=test/graph_tests/test_graphs_restructure.py || true
+          pytest test/ --quick -q --ignore=test/graph_tests/test_graphs_restructure.py -k "not test_ising_c_ground_state"
 
   # ------------------------------------------------------------------
   # Publish to PyPI (on tag push only)

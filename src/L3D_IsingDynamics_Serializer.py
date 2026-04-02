@@ -19,7 +19,7 @@ from kernels.Serializer import (
 from lrgsglib import *
 from lrgsglib.config.progargs.defs.IsingDynamics import *
 from parsers.L3D_IsingDynamics import L3D_ISDYN_progname, L3D_ISDYN_progname_shrt
-from parsers.L3D_IsingDynamics_Serialiser import parser
+from parsers.L3D_IsingDynamics_Serializer import parser
 
 
 def _build_passthrough_flags(args) -> list[str]:

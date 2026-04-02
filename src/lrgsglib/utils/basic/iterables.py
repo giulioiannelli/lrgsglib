@@ -1,4 +1,8 @@
-from .common import *
+from itertools import product
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+
+import numpy as np
+from numpy.typing import NDArray
 #
 __all__ = [
     'boolean_overlap_fraction',
@@ -12,7 +16,8 @@ __all__ = [
     'sort_array_by_column',
     'sum_tuples',
     'uniques',
-    'unzip_dict_items'
+    'unzip_dict_items',
+    'compose',
 ]
 #
 def boolean_overlap_fraction(boolist1, boolist2):
@@ -425,4 +430,43 @@ def unzip_dict_items(input_dict: Dict[Any, Any]) -> Tuple[List[Any], List[Any]]:
     """
     keys, values = zip(*input_dict.items()) if input_dict else ([], [])
     return list(keys), list(values)
+
+
+# --- Merged from functions.py ---
+
+
+def compose(
+    f: Callable[..., Any],
+    g: Callable[..., Any],
+    g_args: Tuple[Any, ...] = (),
+    g_kwargs: Optional[Dict[str, Any]] = None
+) -> Callable[..., Any]:
+    """
+    Return a function that applies f to its arguments and then applies g to f's result.
+
+    Parameters
+    ----------
+    f : Callable[..., Any]
+        First function to apply; accepts any arguments.
+    g : Callable[..., Any]
+        Second function to apply; its first argument is the output of ``f``,
+        followed by any ``g_args`` and ``g_kwargs``.
+    g_args : Tuple[Any, ...], optional
+        Positional arguments to append when calling ``g`` (default is ()).
+    g_kwargs : Dict[str, Any], optional
+        Keyword arguments to pass to ``g`` (default is None, treated as {}).
+
+    Returns
+    -------
+    Callable[..., Any]
+        A function ``h`` such that ``h(*args, **kwargs)`` returns
+        ``g(f(*args, **kwargs), *g_args, **g_kwargs)``.
+    """
+    g_kwargs = g_kwargs or {}
+
+    def composed(*args: Any, **kwargs: Any) -> Any:
+        result = f(*args, **kwargs)
+        return g(result, *g_args, **g_kwargs)
+
+    return composed
 

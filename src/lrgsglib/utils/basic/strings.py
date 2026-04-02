@@ -1,4 +1,6 @@
-from .common import *
+import random
+import re
+import string
 
 def generate_random_id(
     length: int = 10,
