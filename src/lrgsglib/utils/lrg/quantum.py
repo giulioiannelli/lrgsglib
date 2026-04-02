@@ -44,6 +44,7 @@ __all__ = [
     "quantum_classical_divergence",
     "compute_interference_visibility",
     "compute_quantum_observables_from_eigenvalues",
+    "compute_quantum_distance_matrix",
 ]
 
 
@@ -675,3 +676,89 @@ def compute_quantum_observables_from_eigenvalues(
     }
 
     return observables
+
+
+def compute_quantum_distance_matrix(
+    eigenvectors: NDArray,
+    method: str = "overlap",
+) -> NDArray:
+    """
+    Compute quantum distance matrix from eigenvector statistics.
+
+    Parameters
+    ----------
+    eigenvectors : NDArray, shape (N, N)
+        Eigenvectors in **column-major** format (each column is an
+        eigenvector).  NX convention stores row-major
+        (``eigV[k, :] = k``-th eigvec), so callers should pass
+        ``eigV.T``.
+    method : str
+        Distance method:
+
+        - ``"overlap"``:
+          ``d(i,j) = -log(sum_k |v_k(i)|^2 |v_k(j)|^2)``
+          Based on the time-averaged quantum walk transition probability.
+        - ``"hellinger"``:
+          ``d(i,j) = sqrt(1 - sum_k |v_k(i)| |v_k(j)|)``
+          Hellinger-like distance on eigenvector amplitudes.
+
+    Returns
+    -------
+    dist_matrix : NDArray, shape (N, N)
+        Symmetric distance matrix with zero diagonal.
+
+    Notes
+    -----
+    The overlap distance is derived from the long-time average of the
+    quantum walk transition probability:
+
+    .. math::
+
+        \\langle |\\langle j|U(t)|i\\rangle|^2 \\rangle_T
+        = \\sum_k |v_k(i)|^2 \\, |v_k(j)|^2
+
+    This quantity is **eigenvalue-independent** --- it depends only on
+    eigenvector geometry, not on the Laplacian spectrum magnitudes.  This
+    makes it naturally suited for signed graphs where negative eigenvalues
+    cause problems for classical diffusion distances.
+
+    The overlap matrix
+    ``O_{ij} = sum_k |v_k(i)|^2 |v_k(j)|^2`` is related to the Inverse
+    Participation Ratio: ``O_{ii} = IPR(node i) = sum_k |v_k(i)|^4``.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from lrgsglib.utils.lrg.quantum import (
+    ...     compute_quantum_distance_matrix,
+    ... )
+    >>> V = np.eye(4)  # trivial eigenvectors (column-major)
+    >>> D = compute_quantum_distance_matrix(V, method="overlap")
+    >>> print(D.shape)
+    (4, 4)
+    >>> print(np.allclose(np.diag(D), 0))
+    True
+    """
+    N = eigenvectors.shape[0]
+
+    if method == "overlap":
+        # V2[i, k] = |v_k(i)|^2  (column-major input)
+        V2 = eigenvectors ** 2  # shape (N, N)
+        # Overlap matrix: O_ij = sum_k V2[i,k] * V2[j,k] = V2 @ V2.T
+        overlap = V2 @ V2.T  # shape (N, N)
+        # Distance: d = -log(overlap), handle zeros
+        with np.errstate(divide="ignore"):
+            dist_matrix = -np.log(np.maximum(overlap, 1e-300))
+        np.fill_diagonal(dist_matrix, 0.0)
+        # Symmetrize (should already be, but numerical safety)
+        dist_matrix = 0.5 * (dist_matrix + dist_matrix.T)
+    elif method == "hellinger":
+        V_abs = np.abs(eigenvectors)  # |v_k(i)|
+        # Hellinger-like: H_ij = sum_k |v_k(i)| * |v_k(j)|
+        H = V_abs @ V_abs.T
+        dist_matrix = np.sqrt(np.maximum(1.0 - H, 0.0))
+        np.fill_diagonal(dist_matrix, 0.0)
+    else:
+        raise ValueError(f"Unknown method: {method}")
+
+    return dist_matrix
