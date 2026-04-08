@@ -45,6 +45,8 @@ __all__ = [
     "compute_interference_visibility",
     "compute_quantum_observables_from_eigenvalues",
     "compute_quantum_distance_matrix",
+    "compute_ldos_entropy",
+    "compute_ldos_specific_heat",
 ]
 
 
@@ -762,3 +764,198 @@ def compute_quantum_distance_matrix(
         raise ValueError(f"Unknown method: {method}")
 
     return dist_matrix
+
+
+def compute_ldos_entropy(
+    eigenvalues: NDArray,
+    eigenvectors: NDArray,
+    tau: float,
+    use_abs: bool = True,
+) -> Tuple[NDArray, float]:
+    """
+    Compute the unified LDOS-based entropy S(tau, i) from the local density
+    of states.
+
+    This is the central quantity of the unified spectral framework.  It
+    combines eigenvalue-based scale detection (classical LRG) with
+    eigenvector-based spatial detection into a single object parametrized
+    by diffusion time tau.
+
+    The local density of states (LDOS) at node i is:
+        rho_i(E) = sum_k |v_k(i)|^2 delta(E - lambda_k)
+
+    The LDOS-weighted entropy at scale tau is:
+        S(tau, i) = -sum_k w_k(tau,i) log w_k(tau,i)
+    where:
+        w_k(tau, i) = |v_k(i)|^2 exp(-tau|lambda_k|) / Z_i(tau)
+        Z_i(tau) = sum_k |v_k(i)|^2 exp(-tau|lambda_k|)
+
+    Reductions:
+        - tau -> 0: S(0, i) = S_spec(i) = -sum_k |v_k(i)|^2 log|v_k(i)|^2
+          (spectral entropy, purely eigenvector-based)
+        - Uniform eigenvectors: S(tau, i) = S_classical(tau) for all i
+          (classical LRG entropy, purely eigenvalue-based)
+        - Average LDOS over nodes then entropy: S_global(tau) = classical S(tau)
+
+    Parameters
+    ----------
+    eigenvalues : NDArray, shape (N,)
+        Eigenvalues of the (signed) Laplacian.
+    eigenvectors : NDArray, shape (N, N)
+        Eigenvectors in **column-major** format (each column is an
+        eigenvector).  NX convention stores row-major
+        (``eigV[k, :] = k``-th eigvec), so callers should pass
+        ``eigV.T``.
+    tau : float
+        Diffusion time / inverse temperature parameter.  Controls the
+        scale:
+
+        - Small tau: all modes weighted equally -> spatial information
+          dominates
+        - Large tau: low-eigenvalue modes dominate -> scale detection
+    use_abs : bool, optional
+        If True (default), use |lambda_k| in the Boltzmann factor.
+        This ensures the function works for signed graphs where
+        eigenvalues may be negative.  For unsigned graphs (all
+        lambda >= 0), |lambda| = lambda and the result is identical
+        to the classical LRG.
+
+    Returns
+    -------
+    S_local : NDArray, shape (N,)
+        Per-node LDOS entropy S(tau, i), normalized by log(N) to
+        range [0, 1].
+    S_global : float
+        Global entropy from the averaged LDOS (= classical S(tau)),
+        normalized by log(N).
+
+    Notes
+    -----
+    The global entropy is computed from eigenvalues only:
+        p_k(tau) = exp(-tau|lambda_k|) / sum_m exp(-tau|lambda_m|)
+        S_global = -sum_k p_k log p_k / log(N)
+
+    This is identical to the classical von Neumann entropy of the LRG
+    because sum_i |v_k(i)|^2 = 1 (eigenvector normalization), so the
+    eigenvectors drop out when the LDOS is averaged over nodes.
+
+    The difference S_global - <S_local> measures the spatial
+    heterogeneity (Jensen gap).  It is zero for uniform eigenvectors
+    and positive otherwise.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from lrgsglib.utils.lrg.quantum import compute_ldos_entropy
+    >>> # Identity eigenvectors (fully localized)
+    >>> eigvals = np.array([0.0, 1.0, 2.0, 3.0])
+    >>> eigvecs = np.eye(4)
+    >>> S_local, S_global = compute_ldos_entropy(eigvals, eigvecs, tau=1.0)
+    >>> print(S_local.shape)
+    (4,)
+    """
+    N = len(eigenvalues)
+    log_N = np.log(N)
+
+    lam = np.abs(eigenvalues) if use_abs else eigenvalues
+    boltz = np.exp(-tau * lam)  # shape (N,)
+
+    # --- Global entropy (classical, eigenvalue-only) ---
+    Z_global = np.sum(boltz)
+    p_global = boltz / Z_global
+    mask_g = p_global > 1e-30
+    S_global = (
+        -np.sum(p_global[mask_g] * np.log(p_global[mask_g])) / log_N
+    )
+
+    # --- Local entropy per node ---
+    # eigenvectors is column-major: eigenvectors[i, k] = v_k(i)
+    V2 = eigenvectors ** 2  # V2[i, k] = |v_k(i)|^2
+
+    # Unnormalized weights: W[i, k] = |v_k(i)|^2 * exp(-tau|lambda_k|)
+    W = V2 * boltz[np.newaxis, :]  # broadcast (N, N)
+
+    # Normalize per node: Z_i = sum_k W[i, k]
+    Z_i = np.sum(W, axis=1)  # shape (N,)
+    Z_i = np.maximum(Z_i, 1e-300)  # avoid division by zero
+
+    # w[i, k] = W[i, k] / Z_i[i]
+    w = W / Z_i[:, np.newaxis]
+
+    # S(tau, i) = -sum_k w[i,k] log w[i,k] / log(N)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log_w = np.where(w > 1e-30, np.log(w), 0.0)
+    S_local = -np.sum(w * log_w, axis=1) / log_N
+
+    return S_local, S_global
+
+
+def compute_ldos_specific_heat(
+    eigenvalues: NDArray,
+    eigenvectors: NDArray,
+    tau_grid: NDArray,
+    use_abs: bool = True,
+) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
+    """
+    Compute the LDOS-based specific heat C(tau, i) = d(1-S)/d(log tau)
+    over a grid.
+
+    Parameters
+    ----------
+    eigenvalues : NDArray, shape (N,)
+        Eigenvalues of the (signed) Laplacian.
+    eigenvectors : NDArray, shape (N, N)
+        Eigenvectors in column-major format.
+    tau_grid : NDArray, shape (n_tau,)
+        Array of tau values (typically log-spaced).
+    use_abs : bool, optional
+        Use |lambda| in Boltzmann weights (default True).
+
+    Returns
+    -------
+    S_local_grid : NDArray, shape (n_tau, N)
+        Per-node entropy at each tau.
+    S_global_grid : NDArray, shape (n_tau,)
+        Global (classical) entropy at each tau.
+    C_local_grid : NDArray, shape (n_tau, N)
+        Per-node specific heat d(1-S)/d(log tau).
+    C_global_grid : NDArray, shape (n_tau,)
+        Global specific heat (= classical C(tau)).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from lrgsglib.utils.lrg.quantum import compute_ldos_specific_heat
+    >>> eigvals = np.array([0.0, 1.0, 2.0, 3.0])
+    >>> eigvecs = np.eye(4)
+    >>> tau_grid = np.logspace(-2, 2, 50)
+    >>> S_loc, S_glob, C_loc, C_glob = compute_ldos_specific_heat(
+    ...     eigvals, eigvecs, tau_grid
+    ... )
+    >>> print(S_loc.shape, C_loc.shape)
+    (50, 4) (50, 4)
+    """
+    n_tau = len(tau_grid)
+    N = len(eigenvalues)
+
+    S_local_grid = np.zeros((n_tau, N))
+    S_global_grid = np.zeros(n_tau)
+
+    for i, tau in enumerate(tau_grid):
+        S_local_grid[i], S_global_grid[i] = compute_ldos_entropy(
+            eigenvalues, eigenvectors, tau, use_abs
+        )
+
+    log_tau = np.log(tau_grid)
+
+    # Global specific heat
+    C_global_grid = np.gradient(1 - S_global_grid, log_tau)
+
+    # Per-node specific heat
+    C_local_grid = np.zeros_like(S_local_grid)
+    for j in range(N):
+        C_local_grid[:, j] = np.gradient(
+            1 - S_local_grid[:, j], log_tau
+        )
+
+    return S_local_grid, S_global_grid, C_local_grid, C_global_grid
