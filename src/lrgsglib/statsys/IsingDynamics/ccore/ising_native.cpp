@@ -665,8 +665,9 @@ static py::tuple topo_met_sampling(
  * Multi-restart keeps the global best.
  */
 
-/* Raw edge-sum energy: E = -sum_{i<j} w_ij * s_i * s_j (no normalization) */
-static inline double raw_edge_energy(
+/* Per-site energy: E/N = -sum_{i<j} w_ij * s_i * s_j / N
+ * Same convention as calc_totEnergy used by SA/Metropolis/PT. */
+static inline double persite_edge_energy(
     size_t N,
     const int8_t *s,
     const size_t *nlen,
@@ -682,7 +683,7 @@ static inline double raw_edge_energy(
             }
         }
     }
-    return E;
+    return E / N;
 }
 
 /* T=0 greedy descent using graph CSR (no external field). */
@@ -801,7 +802,7 @@ static py::tuple topo_cem_sampling(
                     }
 
                     /* Evaluate energy */
-                    energies[k] = raw_edge_energy(N, sk, graph.nlen.data(),
+                    energies[k] = persite_edge_energy(N, sk, graph.nlen.data(),
                                                   graph.node_edges.data());
                 }
 
@@ -852,7 +853,7 @@ static py::tuple topo_cem_sampling(
                 greedy_quench(N, restart_best_spins.data(),
                               graph.nlen.data(), graph.node_edges.data(),
                               polish_sweeps);
-                double E_pol = raw_edge_energy(N, restart_best_spins.data(),
+                double E_pol = persite_edge_energy(N, restart_best_spins.data(),
                                                graph.nlen.data(),
                                                graph.node_edges.data());
                 if (E_pol < restart_best_E) restart_best_E = E_pol;

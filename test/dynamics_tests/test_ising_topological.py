@@ -197,8 +197,8 @@ class TestPyTopoMet:
         ising.run(verbose=False, tqdm_on=False)
         edges = ferro_lattice.get_edges_with_weights()
         n_edges = len(edges)
-        # Ground state E = -n_edges; best should be close
-        assert ising.topo_met_best_energy <= -0.8 * n_edges
+        # Ground state E/N = -n_edges/N; best should be close
+        assert ising.topo_met_best_energy <= -0.8 * n_edges / N
 
     def test_with_greedy_polish(self, frustrated_lattice):
         """Running with polish enabled should find ≤ energy of no polish."""
@@ -470,7 +470,8 @@ class TestPyTopoCEM:
         )
         ising.init_ising_dynamics()
         ising.run(verbose=False, tqdm_on=False)
-        recomputed = ising.compute_energy(ising.topo_cem_best_spins)
+        # stored energy is E/N; recompute and normalize
+        recomputed = ising.compute_energy(ising.topo_cem_best_spins) / ising.N
         assert abs(recomputed - ising.topo_cem_best_energy) < 1e-10
 
     def test_greedy_improves_or_equals(self, frustrated_lattice):
@@ -577,7 +578,7 @@ class TestPybindTopoCEM:
         )
         ising.init_ising_dynamics()
         ising.run(verbose=False, tqdm_on=False)
-        recomputed = ising.compute_energy(ising.topo_cem_best_spins)
+        recomputed = ising.compute_energy(ising.topo_cem_best_spins) / ising.N
         assert abs(recomputed - ising.topo_cem_best_energy) < 1e-10
 
     def test_pb_finds_comparable_energy(self, frustrated_lattice):

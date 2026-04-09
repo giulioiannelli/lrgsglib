@@ -1614,7 +1614,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.s = spins.astype(np.int8)
         self.topo_met_coeffs = coeffs
         self.topo_met_best_spins = best_s.astype(np.int8)
-        self.topo_met_best_energy = best_E
+        self.topo_met_best_energy = best_E / self.N
+        # Normalize ene trace to per-site E/N (same convention as SA)
+        self.ene = [e / self.N for e in self.ene]
 
     # =========================================================================
     # Topological Field Cooling Annealing  (py_topo_fca)
@@ -1780,16 +1782,16 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                     else None
                 )
 
-        # Store results
+        # Store results — normalize all energies to per-site E/N
         if global_best_spins is not None:
             self.s = global_best_spins.astype(np.int8)
         self.topo_cem_best_spins = global_best_spins
-        self.topo_cem_best_energy = global_best_E
+        self.topo_cem_best_energy = global_best_E / self.N
         self.topo_cem_best_coeffs = global_best_coeffs
-        self.topo_cem_restart_energies = restart_energies
-        self.ene = ene_trace
+        self.topo_cem_restart_energies = restart_energies / self.N
+        self.ene = [e / self.N for e in ene_trace]
         self.magn = [
-            float(np.sum(global_best_spins))
+            float(np.sum(global_best_spins)) / self.N
             if global_best_spins is not None
             else 0.0
         ]
@@ -1910,11 +1912,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         )
         self.s = best_spins.copy()
         self.topo_cem_best_spins = best_spins
-        self.topo_cem_best_energy = float(best_E)
+        self.topo_cem_best_energy = float(best_E)  # already E/N from C++
         self.topo_cem_best_coeffs = np.asarray(best_coeffs)
-        self.topo_cem_restart_energies = np.asarray(restart_E)
-        self.ene = ene_trace.tolist()
-        self.magn = [float(np.sum(best_spins))]
+        self.topo_cem_restart_energies = np.asarray(restart_E)  # already E/N
+        self.ene = ene_trace.tolist()  # already E/N
+        self.magn = [float(np.sum(best_spins)) / self.N]
 
     # =========================================================================
     # Run Method
