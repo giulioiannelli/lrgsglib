@@ -238,6 +238,8 @@ def main():
         if T is not None:
             prog_args.extend(["-T", f"{T:.3g}"])
             jobname_tokens.append(f"{T:.3g}")
+        if "topo" in getattr(args, "runlang", "").lower():
+            jobname_tokens.append(f"M{getattr(args, 'topo_n_modes', DEFAULT_TOPO_N_MODES)}")
 
         cmd = ["python", str(exec_path), *prog_args, *passthrough]
 
