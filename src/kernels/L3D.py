@@ -109,27 +109,20 @@ def prepare_lattice(args: Any, **kwargs: Any) -> Any:
         lattice.flip_random_fract_edges()
         return lattice
 
-    # Determine whether eigenspace computation is needed
-    ic = getattr(args, "init_cond", "rand")
-    runlang = str(getattr(args, "runlang", "")).lower()
-    # topo_cem / topo_met / topo_fca build their own M-mode subspace inside
-    # IsingDynamics via sparse eigsh — the lattice's full spectrum is never
-    # read, so skip the O(N^3) precomputation even when init_cond requests a
-    # ground-state start (the topo backends override it anyway).
-    is_topo = "topo" in runlang
-    needs_eigV = (ic.startswith("ground_state") or ic.startswith("gs")) and not is_topo
-
-    # Default NX path (preserves load_or_compute and cell_type logic)
+    # Default NX path: always construct the lattice without any eager
+    # spectral precomputation. Full-spectrum diagonalisation is O(N^3) and
+    # should never be performed implicitly — callers that truly need
+    # eigenvectors (e.g. ground-state init) get them lazily via
+    # get_eigV_check, which now routes through sparse eigsh for small k.
+    # The heavy load_or_compute_Lattice3D path is only taken when a
+    # non-default cell_type requires an explicit pattern application.
     base_kwargs = initialize_l3d_dict_args(args)
     cell_type = getattr(args, "cell_type", None)
-    if cell_type is not None:
+    if cell_type is not None and cell_type != "rand":
         base_kwargs["cell_type"] = cell_type
-
-    if needs_eigV:
         return load_or_compute_Lattice3D(**base_kwargs, **kwargs)
 
-    # Fast path: construct lattice without eigenspace computation
-    base_kwargs.pop("cell_type", None)  # only used by load_or_compute
+    # Fast path: construct lattice without eigenspace computation.
     lattice = Lattice3D(**base_kwargs, **kwargs)
     pflip = getattr(lattice, "pflip", 0.0)
     if pflip and pflip > 0.0:

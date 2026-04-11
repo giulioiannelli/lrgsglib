@@ -1375,6 +1375,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
     def _compute_rbim_energies(self, n_modes: int) -> np.ndarray:
         """Return ``(n_modes,)`` array of RBIM energies for binarized eigvecs."""
+        self._ensure_spectral_subspace(n_modes)
         self.sg.compute_rbim_energy_eigV_all()
         return np.array([
             self.sg.energy_eigV_RBIM[k]

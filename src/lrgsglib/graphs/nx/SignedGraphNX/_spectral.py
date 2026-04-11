@@ -337,27 +337,36 @@ def compute_k_eigvV(
             make_eigV_transposed(self)
         return
 
-    if (backend_name in ['numpy', 'cupy']) or k > self.N // 2:
+    # Routing logic: full-spectrum dense eigh is only justified when the
+    # caller asks for more than half the spectrum. For small k (the common
+    # case — ground-state init, topo subspace, spectral gap), always use
+    # sparse scipy eigsh regardless of the user's preferred numerical
+    # backend. Computing 32 GB of dense matrix to extract 1 eigenvector
+    # is never correct.
+    if k > self.N // 2:
         compute_laplacian_spectrum_weigV(
             self, backend_name, transpose, flip_to_pos, typf
         )
-    elif backend_name.startswith('scipy'):
-        mode = backend_name.split('_')
-        mode = mode[-1] if len(mode) > 1 else 'caley'
-        self.eigv, self.eigV = scsp_eigsh(
-            self.slp.astype(typf), k=k, which=which, mode=mode
-        )
+        return
 
-        # At this point eigV is column-major (N, k) from scipy
-        # Apply flip to positive majority if requested (on columns)
-        if flip_to_pos:
-            # Use axis=0 to flip each column independently
-            self.eigV = flip_to_positive_majority_adapted(self.eigV, axis=0)
+    if backend_name.startswith('scipy'):
+        mode_parts = backend_name.split('_')
+        mode = mode_parts[-1] if len(mode_parts) > 1 else 'caley'
+    else:
+        mode = 'caley'
+    self.eigv, self.eigV = scsp_eigsh(
+        self.slp.astype(typf), k=k, which=which, mode=mode
+    )
 
-        # Set transposed state and apply transpose if requested
-        self._eigV_is_transposed = False
-        if transpose:
-            make_eigV_transposed(self)
+    # At this point eigV is column-major (N, k) from scipy
+    # Apply flip to positive majority if requested (on columns)
+    if flip_to_pos:
+        self.eigV = flip_to_positive_majority_adapted(self.eigV, axis=0)
+
+    # Set transposed state and apply transpose if requested
+    self._eigV_is_transposed = False
+    if transpose:
+        make_eigV_transposed(self)
 
 
 def compute_k_adj_eigvV(

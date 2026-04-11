@@ -78,12 +78,22 @@ def get_all_sksph_energy_eigV(self, as_dict: bool = False, on_g=None, **kwargs):
 
 
 def compute_rbim_energy_eigV_all(self, on_g=None, **kwargs):
-    """Compute RBIM energy for all eigenvectors."""
+    """Compute RBIM energy for every eigenvector currently stored in ``self.eigV``.
+
+    Does NOT force a full-spectrum computation: it operates on whatever
+    eigenvectors are already cached (populated lazily by
+    ``compute_k_eigvV`` / ``get_eigV_check``). Callers that need more
+    modes must request them first via ``compute_k_eigvV(k=...)``.
+    """
     if not hasattr(self, "eigV") or self.eigV is None:
-        self.compute_laplacian_spectrum_weigV()
+        return
     if not hasattr(self, "energy_eigV_RBIM"):
         self.energy_eigV_RBIM = {}
-    n_eigv = self.eigV.shape[1] if self.eigV.ndim == 2 else len(self.eigV)
+    if self.eigV.ndim == 2:
+        transposed = getattr(self, "_eigV_is_transposed", False)
+        n_eigv = self.eigV.shape[0] if transposed else self.eigV.shape[1]
+    else:
+        n_eigv = len(self.eigV)
     for which in range(n_eigv):
         if which not in self.energy_eigV_RBIM:
             compute_rbim_energy_eigV(self, which, on_g=on_g)
