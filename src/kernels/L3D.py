@@ -111,7 +111,13 @@ def prepare_lattice(args: Any, **kwargs: Any) -> Any:
 
     # Determine whether eigenspace computation is needed
     ic = getattr(args, "init_cond", "rand")
-    needs_eigV = ic.startswith("ground_state") or ic.startswith("gs")
+    runlang = str(getattr(args, "runlang", "")).lower()
+    # topo_cem / topo_met / topo_fca build their own M-mode subspace inside
+    # IsingDynamics via sparse eigsh — the lattice's full spectrum is never
+    # read, so skip the O(N^3) precomputation even when init_cond requests a
+    # ground-state start (the topo backends override it anyway).
+    is_topo = "topo" in runlang
+    needs_eigV = (ic.startswith("ground_state") or ic.startswith("gs")) and not is_topo
 
     # Default NX path (preserves load_or_compute and cell_type logic)
     base_kwargs = initialize_l3d_dict_args(args)
