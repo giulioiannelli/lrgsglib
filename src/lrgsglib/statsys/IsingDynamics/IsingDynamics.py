@@ -1348,10 +1348,19 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         Forces the sparse ``eigsh`` solver (via ``backend='scipy'``) on
         large graphs (N > 500) where dense diagonalisation is impractical.
+        Recomputes the subspace when the currently cached eigV holds
+        fewer than ``n_modes`` rows — e.g. after ``BinDynSys.init_s``
+        populated only eigV[0] for a ``ground_state_0`` spin start.
         """
-        # If full spectrum already computed, nothing to do
-        if getattr(self.sg, "eigV", None) is not None:
-            return
+        cached = getattr(self.sg, "eigV", None)
+        if cached is not None:
+            if cached.ndim == 2:
+                transposed = getattr(self.sg, "_eigV_is_transposed", False)
+                n_cached = cached.shape[0] if transposed else cached.shape[1]
+            else:
+                n_cached = len(cached)
+            if n_cached >= n_modes:
+                return
         kwargs: dict = {"k": n_modes}
         # Force sparse solver for large graphs to avoid O(N^3) dense eigh
         if self.N > 500 and n_modes < self.N // 2:

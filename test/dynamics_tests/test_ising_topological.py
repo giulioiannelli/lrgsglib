@@ -600,3 +600,36 @@ class TestPybindTopoCEM:
         # Different RNGs → different exact energies, but same ballpark
         assert pb.topo_cem_best_energy <= py.topo_cem_best_energy * 0.9 or \
                pb.topo_cem_best_energy <= py.topo_cem_best_energy + 10.0
+
+    def test_ground_state_init_with_subspace_expansion(self, frustrated_lattice):
+        """Regression: ic='ground_state_0' populates eigV with 1 mode via
+        BinDynSys.init_s, then _run_pybind_topo_cem must *expand* the
+        subspace from 1 to topo_n_modes rather than shortcut on the
+        already-cached single eigenvector.
+
+        Before the fix, _ensure_spectral_subspace bailed out as soon as
+        ``self.sg.eigV is not None`` regardless of the row count, so the
+        first quench of any CLI run with the default init_cond died with
+        ``IndexError`` in _build_subspace_matrix on the cluster.
+        """
+        ising = IsingDynamics(
+            sg=frustrated_lattice, T=0.0, steps=10,
+            runlang="pb_topo_cem",
+            topo_n_modes=8, topo_polish=False,
+            cem_iter=3, cem_pop_size=16, cem_restarts=2,
+            cem_greedy=False, seed=42,
+            ic="ground_state_0",
+        )
+        ising.init_ising_dynamics()
+        # After init_s, eigV has exactly 1 row
+        assert ising.sg.eigV is not None
+        n_cached_before = (
+            ising.sg.eigV.shape[0]
+            if getattr(ising.sg, "_eigV_is_transposed", False)
+            else ising.sg.eigV.shape[1]
+        )
+        assert n_cached_before == 1
+        # CEM run must expand the subspace to topo_n_modes
+        ising.run(verbose=False, tqdm_on=False)
+        assert ising.topo_cem_best_coeffs.shape == (8,)
+        assert ising.topo_cem_best_spins.shape == (ising.N,)
