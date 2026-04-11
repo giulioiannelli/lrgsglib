@@ -169,8 +169,8 @@ def _build_passthrough_flags(args) -> list[str]:
             flags.append('--save-all')
 
     # Other Ising options
-    ic = getattr(args, "init_cond", "ground_state_0")
-    if ic != "ground_state_0":
+    ic = getattr(args, "init_cond", DEFAULT_INIT_COND)
+    if ic != DEFAULT_INIT_COND:
         flags.extend(["-ic", ic])
     freq = getattr(args, "freq", 2)
     if freq != 2:

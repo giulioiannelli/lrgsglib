@@ -12,7 +12,7 @@ description = f"""
 """
 # Default values for the optional parameters
 DEFAULT_CELL = 'rand'
-DEFAULT_INIT_COND = 'ground_state_0'
+DEFAULT_INIT_COND = 'rand'
 DEFAULT_INSFFX = ''
 DEFAULT_OUTSFFX = ''
 DEFAULT_RUNLANG = 'C0E'

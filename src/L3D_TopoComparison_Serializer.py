@@ -31,6 +31,7 @@ from kernels.Serializer import (
     format_slanzarv_command,
 )
 from lrgsglib import *
+from lrgsglib.config.progargs.defs.IsingDynamics import DEFAULT_INIT_COND
 from parsers.L3D_IsingDynamics import L3D_ISDYN_progname, L3D_ISDYN_progname_shrt
 from parsers.L3D_TopoComparison_Serializer import parser
 
@@ -116,8 +117,8 @@ def _build_method_flags(
             flags.extend(["--topo-field-strength", str(fstr)])
 
     # Other Ising options
-    ic = getattr(args, "init_cond", "rand")
-    if ic != "ground_state_0":
+    ic = getattr(args, "init_cond", DEFAULT_INIT_COND)
+    if ic != DEFAULT_INIT_COND:
         flags.extend(["-ic", ic])
     freq = getattr(args, "freq", 2)
     if freq != 2:

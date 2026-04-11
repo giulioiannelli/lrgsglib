@@ -1,6 +1,6 @@
 from numpy import linspace
 #
-DEFAULT_INIT_COND = 'ground_state_0'
+DEFAULT_INIT_COND = 'rand'
 DEFAULT_RUNLANG = 'C0E'
 DEFAULT_THRMSTEPS = 20
 DEFAULT_EQSTEP = 20
