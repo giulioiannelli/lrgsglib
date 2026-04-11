@@ -682,7 +682,7 @@ class SignedGraphNX:
         random.seed(self._seed)
         try:
             cp.random.seed(self._seed)
-        except (ImportError, ModuleNotFoundError, AttributeError):
+        except Exception:
             pass
         np.random.seed(self._seed)
         #
