@@ -1,8 +1,9 @@
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import networkx as nx
 import numpy as np
-from scipy.cluster.hierarchy import linkage
+from numpy.typing import NDArray
+from scipy.cluster.hierarchy import dendrogram, linkage
 
 from ...graphs.nx.funcs.spectral import signed_laplacian_matrix
 from .infocomm import lapl_dists
@@ -12,6 +13,8 @@ __all__ = [
     "compute_normalized_linkage",
     "compute_optimal_threshold",
     "circular_layout_by_cluster",
+    "log_dendrogram",
+    "dendrogram_leaf_node_colors",
 ]
 
 def MakeLinkageMatrix(G: nx.Graph, tau: float = 1e-2, is_signed: bool = False, method: str = "ward") -> Tuple[np.ndarray, np.ndarray]:
@@ -126,6 +129,208 @@ def compute_optimal_threshold(linkage_matrix: np.ndarray, scaling_factor: float 
     return FlatClusteringTh, optimal_threshold, stability_indices, optimal_branch_index
 
 
+
+
+def log_dendrogram(
+    Z: NDArray,
+    ax: Any = None,
+    color_threshold: Optional[float] = None,
+    above_threshold_color: str = "#888888",
+    ylim_rel_pad: float = 0.0,
+    normalize: bool = True,
+    draw_cut: bool = True,
+    cut_color: str = "r",
+    cut_linestyle: str = "--",
+    set_ylabel: bool = True,
+    no_labels: bool = True,
+    **kwargs: Any,
+) -> Tuple[dict, float, float, float]:
+    """Plot a hierarchical-clustering dendrogram with a log-scaled y-axis.
+
+    ``scipy.cluster.hierarchy.dendrogram`` draws leaf bars starting at
+    ``y = 0``, which becomes ``-inf`` on a log scale — producing very long
+    leaf lines and forcing the automatic y-limit to cover an empty range.
+    This helper:
+
+    1. Normalizes the linkage heights by ``D_max = max(Z[:, 2])`` so
+       the y-axis runs in ``(0, 1]`` (disable with ``normalize=False``).
+    2. Post-processes the line collections drawn by
+       ``scipy.cluster.hierarchy.dendrogram`` so that every segment whose
+       y-coordinate falls below the smallest positive merge height is
+       clamped to that value — eliminating the "long leaf line" artefact.
+    3. Switches the axis to log scale and sets a tight ``ylim`` derived
+       from the linkage matrix itself, padded by ``ylim_log_pad`` decades
+       on each side.
+    4. Optionally draws a horizontal cut line at ``color_threshold``
+       (translated to the normalized scale).
+
+    Parameters
+    ----------
+    Z : NDArray
+        Linkage matrix as returned by ``scipy.cluster.hierarchy.linkage``.
+    ax : matplotlib.axes.Axes, optional
+        Axis on which to draw. If ``None`` the current axis is used.
+    color_threshold : float, optional
+        Merge-height threshold (in the **raw** un-normalized scale of
+        ``Z``) at which to colour branches for cluster separation.
+    above_threshold_color : str, optional
+        Colour used for branches above the threshold (default grey
+        ``#888888``).
+    ylim_rel_pad : float, optional
+        Padding added above and below the linkage-height range,
+        expressed as a **fraction of the tree's log span**
+        (default ``0.08`` = 8 %). This keeps the empty margin tight
+        regardless of whether the merge heights span a fraction of a
+        decade (as in lattices) or several decades (as in hierarchical
+        networks).
+    normalize : bool, optional
+        If ``True`` (default) divide all merge heights and the
+        ``color_threshold`` by ``D_max = Z[:, 2].max()`` so the y-axis
+        runs in ``(0, 1]``.
+    draw_cut : bool, optional
+        If ``True`` (default) draw a horizontal line at the
+        ``color_threshold`` (normalized if applicable).
+    cut_color, cut_linestyle : str, optional
+        Style of the cut line.
+    set_ylabel : bool, optional
+        If ``True`` (default) label the y-axis as
+        :math:`\\mathcal D/\\mathcal D_{\\max}` (normalized case) or
+        :math:`\\mathcal D` (raw case).
+    no_labels : bool, optional
+        Whether to suppress the default leaf labels (default ``True``).
+    **kwargs : Any
+        Additional keyword arguments forwarded to
+        ``scipy.cluster.hierarchy.dendrogram``.
+
+    Returns
+    -------
+    ddata : dict
+        The dictionary returned by ``scipy.cluster.hierarchy.dendrogram``.
+    t_min : float
+        Smallest positive merge height used for the lower ``ylim``
+        (in normalized units if ``normalize=True``).
+    t_max : float
+        Largest merge height used for the upper ``ylim``
+        (``1.0`` if ``normalize=True``).
+    D_max : float
+        The original (un-normalized) maximum merge height
+        ``Z[:, 2].max()``.
+    """
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        ax = plt.gca()
+
+    raw_heights = np.asarray(Z[:, 2], dtype=float)
+    D_max = float(raw_heights.max())
+    if normalize and D_max <= 0:
+        raise ValueError("Cannot normalize a linkage with non-positive D_max.")
+
+    Z_plot = np.array(Z, dtype=float, copy=True)
+    if normalize:
+        Z_plot[:, 2] = Z_plot[:, 2] / D_max
+        color_threshold_plot = (
+            color_threshold / D_max if color_threshold is not None else None
+        )
+    else:
+        color_threshold_plot = color_threshold
+
+    heights_plot = Z_plot[:, 2]
+    positive_heights = heights_plot[heights_plot > 0]
+    if positive_heights.size == 0:
+        raise ValueError(
+            "Linkage matrix has no positive merge heights; cannot draw "
+            "a log-scaled dendrogram."
+        )
+    t_min = float(positive_heights.min())
+    t_max = float(heights_plot.max())
+
+    ddata = dendrogram(
+        Z_plot,
+        ax=ax,
+        color_threshold=color_threshold_plot,
+        above_threshold_color=above_threshold_color,
+        no_labels=no_labels,
+        **kwargs,
+    )
+
+    # Clamp any line-segment y-coordinate below ``t_min`` to ``t_min``.
+    for collection in ax.collections:
+        if not hasattr(collection, "get_segments"):
+            continue
+        segments = collection.get_segments()
+        new_segments = []
+        for seg in segments:
+            seg = np.array(seg, dtype=float)
+            seg[seg[:, 1] < t_min, 1] = t_min
+            new_segments.append(seg)
+        collection.set_segments(new_segments)
+
+    ax.set_yscale("log")
+    # Pad in log space by a fraction of the tree's own log span, so a
+    # compact tree (lattice) gets proportionally small padding and a
+    # wide tree (hierarchical) gets proportionally larger padding.
+    log_span = np.log10(t_max) - np.log10(t_min)
+    # Protect against degenerate (all-equal) trees.
+    log_span = max(log_span, 1e-12)
+    log_pad = ylim_rel_pad * log_span
+    lo = t_min * (10.0 ** (-log_pad))
+    hi = t_max * (10.0 ** (+log_pad))
+    ax.set_ylim(lo, hi)
+
+    if draw_cut and color_threshold_plot is not None:
+        ax.axhline(
+            color_threshold_plot,
+            color=cut_color,
+            linestyle=cut_linestyle,
+            linewidth=1.0,
+        )
+
+    if set_ylabel:
+        if normalize:
+            ax.set_ylabel(r"$\mathcal{D}/\mathcal{D}_{\max}$")
+        else:
+            ax.set_ylabel(r"$\mathcal{D}$")
+
+    return ddata, t_min, t_max, D_max
+
+
+def dendrogram_leaf_node_colors(
+    ddata: dict, n_nodes: int
+) -> Tuple[List[str], int]:
+    """Build per-node colours consistent with a scipy dendrogram.
+
+    Extracts the leaf colours assigned by ``scipy.cluster.hierarchy.dendrogram``
+    (via the ``color_threshold`` argument) and returns a list aligned with
+    the original node indices ``0..n_nodes - 1``. The colours returned are
+    exactly the ones used to paint the dendrogram leaves, so downstream
+    plots of the same graph will match the dendrogram visually.
+
+    Parameters
+    ----------
+    ddata : dict
+        Dictionary returned by ``scipy.cluster.hierarchy.dendrogram``
+        (or by :func:`log_dendrogram`).
+    n_nodes : int
+        Total number of nodes in the original data (typically ``G.number_of_nodes()``).
+
+    Returns
+    -------
+    node_colors : list of str
+        ``node_colors[i]`` is the dendrogram leaf colour of node ``i``.
+    n_clusters : int
+        Number of distinct leaf colours excluding the
+        ``above_threshold_color`` (default grey). This is the effective
+        number of clusters implied by the dendrogram's colour cut.
+    """
+    leaves = ddata["leaves"]
+    colors = ddata["leaves_color_list"]
+    mapping = {leaves[k]: colors[k] for k in range(len(leaves))}
+    node_colors = [mapping[i] for i in range(n_nodes)]
+    unique_cluster_colors = {
+        c for c in colors if not (c.startswith("#8") or c == "grey" or c == "gray")
+    }
+    return node_colors, len(unique_cluster_colors)
 
 
 def circular_layout_by_cluster(G: nx.Graph, cluster_assignment: Dict) -> Dict:

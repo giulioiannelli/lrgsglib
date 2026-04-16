@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import Union, Tuple
 from numpy import integer as np_int
 from numpy import pi as np_pi
+from dotenv import load_dotenv
+#
 from .lrgsg_env import *
 # types
 ColorType = Union[
@@ -22,6 +24,8 @@ PKL = ".pkl"
 TXT = ".txt"
 XML = ".xml"
 # paths
+load_dotenv()
+#
 PATHNLLIB: str = Path(LRGSG_LLIB).name
 #
 PATHDATA = Path(LRGSG_DATA)#
@@ -134,39 +138,49 @@ L2D_GEO_HEX = 'hexagonal'
 L2D_GEO_SQRSW = 'squared_sw'
 L2D_GEO_TRISW = 'triangular_sw'
 L2D_GEO_SQOCT = 'octagonal_sqr'
+L2D_GEO_KGM = 'kagome'
+L2D_GEO_TRIHEX = 'tri_hexagonal'
 L2D_GEO_TRI_SHRT = 'tri'
 L2D_GEO_SQR_SHRT = 'sqr'
 L2D_GEO_HEX_SHRT = 'hex'
 L2D_GEO_SQRSW_SHRT = 'sqr_sw'
 L2D_GEO_TRISW_SHRT = 'tri_sw'
 L2D_GEO_SQOCT_SHRT = 'oct_sqr'
+L2D_GEO_KGM_SHRT = 'kgm'
+L2D_GEO_TRIHEX_SHRT = 'tri_hex'
 L2D_P_C_LIST = [
-    0.146, 
-    0.103, 
-    0.065, 
-    float("nan"), 
-    float("nan"), 
-    float("nan")
+    0.146,
+    0.103,
+    0.065,
+    float("nan"),
+    float("nan"),
+    float("nan"),
+    0.095,
+    0.041,
 ] 
 L2D_WITH_POS = False
 # 
 L2D_GEO = L2D_GEO_SQR
 # 
 L2D_GEO_LIST = [
-    L2D_GEO_TRI, 
-    L2D_GEO_SQR, 
-    L2D_GEO_HEX, 
-    L2D_GEO_SQRSW, 
+    L2D_GEO_TRI,
+    L2D_GEO_SQR,
+    L2D_GEO_HEX,
+    L2D_GEO_SQRSW,
     L2D_GEO_TRISW,
-    L2D_GEO_SQOCT
+    L2D_GEO_SQOCT,
+    L2D_GEO_KGM,
+    L2D_GEO_TRIHEX,
 ]
 L2D_GEO_SHRT_LIST = [
-    L2D_GEO_TRI_SHRT, 
-    L2D_GEO_SQR_SHRT, 
-    L2D_GEO_HEX_SHRT, 
-    L2D_GEO_SQRSW_SHRT, 
+    L2D_GEO_TRI_SHRT,
+    L2D_GEO_SQR_SHRT,
+    L2D_GEO_HEX_SHRT,
+    L2D_GEO_SQRSW_SHRT,
     L2D_GEO_TRISW_SHRT,
-    L2D_GEO_SQOCT_SHRT
+    L2D_GEO_SQOCT_SHRT,
+    L2D_GEO_KGM_SHRT,
+    L2D_GEO_TRIHEX_SHRT,
 ]
 L2D_SINGLE_CELL_LIST = ['single', 'singleXERR', 'singleZERR']
 L2D_RAND_CELL_LIST = ['rand', 'randXERR', 'randZERR']

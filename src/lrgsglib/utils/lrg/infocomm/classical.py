@@ -17,7 +17,67 @@ from ._common import _normalize_entropy_profile
 __all__ = [
     "entropy",
     "compute_entropy_observables_from_eigenvalues",
+    "specific_heat_tau_window",
 ]
+
+
+def specific_heat_tau_window(
+    tau_grid: NDArray,
+    specific_heat: NDArray,
+    tau_mark: Optional[float] = None,
+    rel_threshold: float = 0.01,
+    log_pad: float = 0.5,
+) -> Tuple[float, float]:
+    """Return a (``tau_lo``, ``tau_hi``) window covering the meaningful range of
+    the LRG specific heat ``C(tau)``.
+
+    The window is the sub-range where ``C(tau) > rel_threshold * C(tau*)``
+    (with ``tau* = argmax C``), padded by ``log_pad`` decades on each side
+    and guaranteed to contain ``tau_mark`` when supplied. Intended for
+    trimming ``semilogx`` plots of LRG observables so the interesting
+    crossover region is shown without wasted empty space on either side.
+
+    Parameters
+    ----------
+    tau_grid : NDArray
+        Strictly monotonically increasing array of RG scales on which
+        ``specific_heat`` was evaluated.
+    specific_heat : NDArray
+        The specific-heat profile ``C(tau)``, same length as ``tau_grid``.
+    tau_mark : float, optional
+        A reference scale (e.g. ``1/lambda_max``) that must stay inside the
+        returned window. If ``None``, no such constraint is applied.
+    rel_threshold : float, optional
+        Fraction of the peak height used as the significance cut-off
+        (default ``0.01`` = 1 % of the peak).
+    log_pad : float, optional
+        Decades of padding added on each side in ``log10(tau)``
+        (default ``0.5``).
+
+    Returns
+    -------
+    Tuple[float, float]
+        ``(tau_lo, tau_hi)`` clamped to ``[tau_grid[0], tau_grid[-1]]``.
+    """
+    tau_grid = np.asarray(tau_grid, dtype=float)
+    C = np.asarray(specific_heat, dtype=float)
+    if tau_grid.shape != C.shape:
+        raise ValueError("tau_grid and specific_heat must have the same shape.")
+    if tau_grid.size == 0:
+        raise ValueError("tau_grid must be non-empty.")
+
+    peak = int(np.argmax(C))
+    mask = C > rel_threshold * C[peak]
+    if not mask.any():
+        return float(tau_grid[0]), float(tau_grid[-1])
+
+    idx = np.where(mask)[0]
+    lo = float(tau_grid[idx[0]]) * 10.0 ** (-log_pad)
+    hi = float(tau_grid[idx[-1]]) * 10.0 ** (+log_pad)
+    if tau_mark is not None:
+        lo = min(lo, float(tau_mark) * 10.0 ** (-log_pad))
+        hi = max(hi, float(tau_mark) * 10.0 ** (+log_pad))
+    return max(lo, float(tau_grid[0])), min(hi, float(tau_grid[-1]))
 
 
 def entropy(

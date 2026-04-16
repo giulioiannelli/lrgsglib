@@ -14,6 +14,7 @@ observables from graph Laplacian spectra:
 from .classical import (
     entropy,
     compute_entropy_observables_from_eigenvalues,
+    specific_heat_tau_window,
 )
 
 # Alternative computation methods
@@ -33,6 +34,7 @@ __all__ = [
     # Classical
     "entropy",
     "compute_entropy_observables_from_eigenvalues",
+    "specific_heat_tau_window",
     # SLQ
     "compute_entropy_observables_slq",
     # expm

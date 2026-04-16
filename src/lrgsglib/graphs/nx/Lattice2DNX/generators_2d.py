@@ -12,7 +12,9 @@ __all__ = [
     "hexagonal_lattice_graph_FastPatch",
     "squared_lattice_graph_FastPatch",
     "squared_lattice_SW_graph_FastPatch",
-    "rhomb_octagonal_graph_FastPatch"
+    "rhomb_octagonal_graph_FastPatch",
+    "kagome_lattice_graph",
+    "tri_hexagonal_lattice_graph",
 ]
 #
 def _dispatchable_safe(**kwargs):
@@ -641,6 +643,128 @@ def rhomb_octagonal_graph_FastPatch(
                 pos[base + 2] = (base_x + rhomb_size, base_y)
                 pos[base + 3] = (base_x, base_y + rhomb_size)
 
+        set_node_attributes(G, pos, "pos")
+
+    return G
+
+
+# ---- Kagome & tri-hexagonal generators ----
+
+import networkx as _nx
+
+
+def kagome_lattice_graph(
+    m: int,
+    n: int,
+    periodic: bool = False,
+    with_positions: bool = True,
+    bend_positions: bool = False,
+) -> Graph:
+    """Generate a kagome lattice (line graph of the hexagonal lattice).
+
+    The kagome lattice has coordination z=4 in the bulk.
+    It appears in Fujii & Tokunaga (2012) with BPT(primal)=0.524.
+
+    Parameters
+    ----------
+    m, n : int
+        Side parameters for the underlying hexagonal lattice.
+    periodic : bool
+        Periodic boundary conditions.
+    with_positions : bool
+        Store node positions.
+    bend_positions : bool
+        Ignored (kept for API compatibility).
+
+    Returns
+    -------
+    Graph
+        Kagome lattice with coordinate-tuple node labels.
+    """
+    hex_graph = _nx.hexagonal_lattice_graph(m, n, periodic=periodic)
+    G = _nx.line_graph(hex_graph)
+
+    if with_positions:
+        hex_pos = _nx.get_node_attributes(hex_graph, "pos")
+        pos = {}
+        for node in G.nodes():
+            u, v = node
+            if u in hex_pos and v in hex_pos:
+                xu, yu = hex_pos[u]
+                xv, yv = hex_pos[v]
+                pos[node] = ((xu + xv) / 2.0, (yu + yv) / 2.0)
+        set_node_attributes(G, pos, "pos")
+
+    return G
+
+
+def tri_hexagonal_lattice_graph(
+    m: int,
+    n: int,
+    periodic: bool = False,
+    with_positions: bool = True,
+    bend_positions: bool = False,
+) -> Graph:
+    r"""Generate a (3,12^2) tri-hexagonal lattice.
+
+    Constructed by truncating each vertex of the hexagonal lattice:
+    every vertex becomes a triangle, every hexagonal face becomes a
+    dodecagon.  Bulk coordination is z=3.  Appears in Fujii &
+    Tokunaga (2012) with BPT(primal)=0.740.
+
+    Parameters
+    ----------
+    m, n : int
+        Side parameters for the underlying hexagonal lattice.
+    periodic : bool
+        Periodic boundary conditions (not yet supported).
+    with_positions : bool
+        Store node positions.
+    bend_positions : bool
+        Ignored.
+
+    Returns
+    -------
+    Graph
+        Tri-hexagonal lattice with coordinate-tuple node labels.
+    """
+    if periodic:
+        raise NotImplementedError(
+            "PBC not yet implemented for tri-hexagonal lattice"
+        )
+
+    hex_graph = _nx.hexagonal_lattice_graph(m, n, periodic=False)
+    G = Graph()
+
+    for v in hex_graph.nodes():
+        nbrs = sorted(hex_graph.neighbors(v))
+        tri_nodes = [(v, nb) for nb in nbrs]
+        for tn in tri_nodes:
+            G.add_node(tn)
+        for i in range(len(tri_nodes)):
+            for j in range(i + 1, len(tri_nodes)):
+                G.add_edge(tri_nodes[i], tri_nodes[j])
+
+    for u, v in hex_graph.edges():
+        G.add_edge((u, v), (v, u))
+
+    if with_positions:
+        hex_pos = _nx.get_node_attributes(hex_graph, "pos")
+        pos = {}
+        shrink = 0.25
+        for v in hex_graph.nodes():
+            nbrs = sorted(hex_graph.neighbors(v))
+            if v not in hex_pos:
+                continue
+            xv, yv = hex_pos[v]
+            for nb in nbrs:
+                if nb not in hex_pos:
+                    continue
+                xn, yn = hex_pos[nb]
+                pos[(v, nb)] = (
+                    xv + shrink * (xn - xv),
+                    yv + shrink * (yn - yv),
+                )
         set_node_attributes(G, pos, "pos")
 
     return G

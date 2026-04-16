@@ -40,7 +40,7 @@ from pathlib import Path
 from operator import itemgetter
 from os.path import join as pth_join
 from scipy.cluster import hierarchy
-from scipy.cluster.hierarchy import fcluster, dendrogram, linkage
+from scipy.cluster.hierarchy import fcluster, dendrogram, linkage, cophenet
 from scipy.interpolate import griddata, pchip
 from scipy.io import loadmat
 from scipy.linalg import expm, fractional_matrix_power
@@ -88,4 +88,12 @@ __all__ = [
     "Fraction",
     "Decimal",
     "Number",
+    # Frequently used scipy.cluster / scipy.signal helpers
+    "linkage",
+    "dendrogram",
+    "fcluster",
+    "cophenet",
+    "squareform",
+    "find_peaks",
+    "expm",
 ]

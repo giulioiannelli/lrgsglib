@@ -4,7 +4,9 @@ import warnings
 from .shared import *
 from .core import *
 from .plotlib import *
-from .config.const import DEFAULT_RECURSION_LIMIT
+from .config.const import DEFAULT_RECURSION_LIMIT, PATHDATA
+from lrgsglib.config.funcs import move_to_rootf
+
 
 # Explicit public API: graph types
 from .graphs.nx import (

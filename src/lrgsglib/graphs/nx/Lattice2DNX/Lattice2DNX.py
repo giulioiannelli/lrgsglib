@@ -142,6 +142,8 @@ class Lattice2DNX(SignedGraphNX):
                 self.side1 = adjust_to_even(self.side1/np.sqrt(3))
                 if (self.side1 % 2 or self.side2 % 2) and self.pbc:
                     raise ValueError(L2D_ERRMSG_GEO)
+            elif self.geo in ('kagome', 'tri_hexagonal'):
+                self.side2 = self.side1
             else:
                 self.side2 = self.side1
             # if (self.side1 % 2 or self.side2 % 2) and self.pbc:
@@ -167,8 +169,11 @@ class Lattice2DNX(SignedGraphNX):
         else:
             self.syshape = (self.side1, self.side2)
         #
-        self.p_c = L2D_P_C_DICT[self.geo]
-        self.r_c = np.sqrt(self.eta_c/(np.pi*self.p_c))
+        self.p_c = L2D_P_C_DICT.get(self.geo, float('nan'))
+        if np.isfinite(self.p_c) and self.p_c > 0:
+            self.r_c = np.sqrt(self.eta_c/(np.pi*self.p_c))
+        else:
+            self.r_c = float('nan')
     #
     def __init_stdFname__(self, SFFX: str = "") -> None:
         self.std_fname = L2D_GEO_SHRT_DICT[self.geo] + SFFX
@@ -197,6 +202,12 @@ class Lattice2DNX(SignedGraphNX):
         elif self.geo.startswith(L2D_SHRT_GEO_DICT['oct_sqr']):
             self.z = 3
             nxfunc = rhomb_octagonal_graph_FastPatch
+        elif self.geo == L2D_SHRT_GEO_DICT['kgm']:
+            self.z = 4
+            nxfunc = kagome_lattice_graph
+        elif self.geo == L2D_SHRT_GEO_DICT['tri_hex']:
+            self.z = 3
+            nxfunc = tri_hexagonal_lattice_graph
 
         #
         self.H = nxfunc(
