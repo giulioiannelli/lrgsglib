@@ -12,6 +12,32 @@ phelp_runlang = (
 phelp_thrmsteps = "Number of thermalization steps"
 phelp_eqstep = "Number of equilibrium/optimization MC steps (1 step = N proposals)"
 phelp_randstr = "Random string for the output files"
+phelp_quench_id = (
+    "Run exactly one quench with this 1-indexed id (for SLURM array "
+    "dispatch). If -1 (default), loop 1..number_of_averages internally."
+)
+# Array-dispatch help text (serializer only)
+phelp_dispatch = (
+    "Dispatch mode: 'slanzarv' (default, 1 job per parameter point) or "
+    "'array' (SLURM --array with 1 task per quench realization)."
+)
+phelp_topo_n_modes_list = (
+    "Sweep topo_n_modes values; one submission per M. Overrides "
+    "--topo-n-modes when provided."
+)
+phelp_cem_iter_list = (
+    "Per-M cem_iter values; length must equal -mL length. Overrides "
+    "--cem-iter when provided."
+)
+phelp_array_concurrent = (
+    "SLURM --array concurrency throttle (the %%N in 'array=1-N%%M')."
+)
+phelp_array_partition = (
+    "#SBATCH --partition= value for array jobs. Blank uses cluster default."
+)
+phelp_array_time = (
+    "#SBATCH --time= value for array jobs (e.g. 08:00:00). Blank = default."
+)
 # Simulated Annealing help text
 phelp_sa_mode = "Enable simulated annealing mode"
 phelp_sa_T_init = "Initial temperature for SA"

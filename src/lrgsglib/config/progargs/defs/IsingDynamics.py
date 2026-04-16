@@ -41,6 +41,14 @@ DEFAULT_CEM_GREEDY = True
 DEFAULT_CEM_GREEDY_SWEEPS = 120
 # Thermal averaging default
 DEFAULT_N_THERMAL = 1
+# Quench-id sentinel: -1 disables single-task mode and uses the internal loop.
+DEFAULT_QUENCH_ID = -1
+# Array-dispatch defaults (used by the serializer only, not the main program)
+DISPATCH_CHOICES = ('slanzarv', 'array')
+DEFAULT_DISPATCH = 'slanzarv'
+DEFAULT_ARRAY_CONCURRENT = 1000
+DEFAULT_ARRAY_PARTITION = ''
+DEFAULT_ARRAY_TIME = ''
 # Result persistence
 DEFAULT_SAVE_RESULTS = False
 DEFAULT_SAVE_FREQUENCY = 0

@@ -59,6 +59,11 @@ IsDyn_opt_args = {
         'action': argparse.BooleanOptionalAction,
         'default': DEFAULT_randstr,
     },
+    tuple(['-qid', '--quench-id']): {
+        'help': phelp_quench_id,
+        'type': int,
+        'default': DEFAULT_QUENCH_ID,
+    },
     tuple(['--n_thermal']): {
         'help': phelp_n_thermal,
         'type': int,
@@ -304,6 +309,42 @@ IsDyn_srun_args = {
         'default': DEFAULT_SLANZARV_ID
     },
 }
+# Array-dispatch serializer arguments (SLURM --array mode; optional, opt-in)
+IsDyn_srun_array_args = {
+    tuple(['--dispatch']): {
+        'help': phelp_dispatch,
+        'type': str,
+        'choices': DISPATCH_CHOICES,
+        'default': DEFAULT_DISPATCH,
+    },
+    tuple(['-mL', '--topo-n-modes-list']): {
+        'help': phelp_topo_n_modes_list,
+        'type': int,
+        'nargs': '+',
+        'default': None,
+    },
+    tuple(['-cL', '--cem-iter-list']): {
+        'help': phelp_cem_iter_list,
+        'type': int,
+        'nargs': '+',
+        'default': None,
+    },
+    tuple(['-ac', '--array-concurrent']): {
+        'help': phelp_array_concurrent,
+        'type': int,
+        'default': DEFAULT_ARRAY_CONCURRENT,
+    },
+    tuple(['-ap', '--array-partition']): {
+        'help': phelp_array_partition,
+        'type': str,
+        'default': DEFAULT_ARRAY_PARTITION,
+    },
+    tuple(['-aT', '--array-time']): {
+        'help': phelp_array_time,
+        'type': str,
+        'default': DEFAULT_ARRAY_TIME,
+    },
+}
 # Lattice2D args
 ## names and descriptions
 L2D_ISDYN_progname = 'L2D_IsingDynamics'
@@ -324,7 +365,7 @@ L2D_ISDYN_action_args = {
     },
 }
 L2D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args, **IsDyn_cem_args}
-L2D_ISDYN_srun_opt_args = {**IsDyn_srun_list_args, **IsDyn_srun_args}
+L2D_ISDYN_srun_opt_args = {**IsDyn_srun_list_args, **IsDyn_srun_args, **IsDyn_srun_array_args}
 L2D_ISDYN_srun_action_args = {**srun_action_args}
 # Lattice3D args
 ## names and descriptions
@@ -346,7 +387,7 @@ L3D_ISDYN_action_args = {
     },
 }
 L3D_ISDYN_opt_args = {**IsDyn_opt_args, **IsDyn_sa_args, **IsDyn_pt_args, **IsDyn_topo_args, **IsDyn_cem_args}
-L3D_ISDYN_srun_opt_args = {**IsDyn_srun_list_args, **IsDyn_srun_args}
+L3D_ISDYN_srun_opt_args = {**IsDyn_srun_list_args, **IsDyn_srun_args, **IsDyn_srun_array_args}
 L3D_ISDYN_srun_action_args = {**srun_action_args}
 # ErdosRenyi args
 ## names and descriptions

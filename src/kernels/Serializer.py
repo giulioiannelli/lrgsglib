@@ -16,6 +16,7 @@ __all__ = [
     "_collect_values_typed",
     "format_slanzarv_command",
     "build_slanzarv_command",
+    "render_sbatch_array_script",
     "estimate_mcg_laplacian_memory_mb",
     "auto_select_gpu_type",
 ]
@@ -248,6 +249,79 @@ def format_slanzarv_command(
     python_line = "  " + " ".join(cmd)
 
     return f"{slanzarv_sbatch_line} \\\n{python_line}"
+
+
+def render_sbatch_array_script(
+    *,
+    jobname: str,
+    array_range: tuple[int, int],
+    concurrent: int,
+    mem_mb: int,
+    partition: str,
+    time: str,
+    exec_path: str,
+    L: int,
+    p: float,
+    passthrough: Sequence[str],
+) -> str:
+    """
+    Render a SLURM array-job script as a heredoc-style bash string.
+
+    One array-task = one quench realisation. Inside the script,
+    ``$SLURM_ARRAY_TASK_ID`` is forwarded to the python program as
+    ``-qid $QID``, so the program's internal quench loop runs exactly
+    once per task.
+
+    Parameters
+    ----------
+    jobname
+        SLURM ``#SBATCH --job-name`` value.
+    array_range
+        Inclusive ``(low, high)`` tuple for ``#SBATCH --array=low-high``.
+    concurrent
+        The ``%N`` throttle: maximum tasks running simultaneously.
+    mem_mb
+        Per-task memory limit in MiB.
+    partition, time
+        Optional ``#SBATCH`` flags; skipped when empty strings.
+    exec_path
+        Path (relative or absolute) to the target python program.
+    L, p
+        Positional lattice side and ``-p`` (pflip) values.
+    passthrough
+        Remaining CLI flags for the python program, pre-built by the
+        caller (already per-M / per-iter customised).
+
+    Returns
+    -------
+    str
+        A self-contained sbatch script, ready for
+        ``subprocess.run(['sbatch'], input=<this>, text=True)``.
+    """
+    lo, hi = array_range
+    lines = [
+        "#!/bin/bash",
+        f"#SBATCH --job-name={jobname}",
+        "#SBATCH --output=.log/%x_%A_%a.out",
+        "#SBATCH --error=.log/%x_%A_%a.err",
+        f"#SBATCH --array={lo}-{hi}%{concurrent}",
+        f"#SBATCH --mem={mem_mb}M",
+    ]
+    if partition:
+        lines.append(f"#SBATCH --partition={partition}")
+    if time:
+        lines.append(f"#SBATCH --time={time}")
+    python_cmd = (
+        f"python {exec_path} {L} -p {p:.3g} -qid \"$QID\" "
+        + " ".join(passthrough)
+    ).rstrip()
+    lines += [
+        "",
+        "QID=$SLURM_ARRAY_TASK_ID",
+        python_cmd,
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def estimate_mcg_laplacian_memory_mb(

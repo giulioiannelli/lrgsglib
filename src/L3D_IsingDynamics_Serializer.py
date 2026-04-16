@@ -15,6 +15,7 @@ from kernels.Serializer import (
     build_memory_function,
     build_slanzarv_command,
     format_slanzarv_command,
+    render_sbatch_array_script,
 )
 from lrgsglib import *
 from lrgsglib.config.progargs.defs.IsingDynamics import *
@@ -22,8 +23,40 @@ from parsers.L3D_IsingDynamics import L3D_ISDYN_progname, L3D_ISDYN_progname_shr
 from parsers.L3D_IsingDynamics_Serializer import parser
 
 
-def _build_passthrough_flags(args) -> list[str]:
-    """Build explicit CLI flags to forward to L3D_IsingDynamics.py."""
+def _apply_overrides(flags: list[str], overrides: dict[str, str] | None) -> list[str]:
+    """Replace or inject ``--flag value`` pairs from an overrides mapping.
+
+    Every key in ``overrides`` is a long flag string (e.g. ``"--topo-n-modes"``);
+    if present in ``flags`` its adjacent value is replaced in place, otherwise
+    the ``(flag, value)`` pair is appended.
+    """
+    if not overrides:
+        return flags
+    out = list(flags)
+    for key, value in overrides.items():
+        try:
+            idx = out.index(key)
+        except ValueError:
+            out.extend([key, str(value)])
+        else:
+            if idx + 1 < len(out):
+                out[idx + 1] = str(value)
+            else:
+                out.append(str(value))
+    return out
+
+
+def _build_passthrough_flags(
+    args,
+    *,
+    overrides: dict[str, str] | None = None,
+) -> list[str]:
+    """Build explicit CLI flags to forward to L3D_IsingDynamics.py.
+
+    ``overrides`` may supply replacements for per-sweep flags (e.g. one
+    ``--topo-n-modes`` or ``--cem-iter`` value per array submission); it
+    is applied after the args-derived flags are assembled.
+    """
     flags: list[str] = []
 
     # Graph engine
@@ -197,7 +230,37 @@ def _build_passthrough_flags(args) -> list[str]:
     if not getattr(args, "randstr", True):
         flags.append("--no-randstr")
 
-    return flags
+    return _apply_overrides(flags, overrides)
+
+
+def _resolve_sweep_lists(args) -> tuple[list[int | None], list[int | None]]:
+    """Return ``(M_list, cem_iter_list)`` aligned pairwise.
+
+    Falls back to the single ``--topo-n-modes`` / ``--cem-iter`` scalar
+    when the corresponding list flag is absent. Entries are ``None`` when
+    the underlying parameter should not override the scalar passthrough
+    (i.e. single-value historical behaviour).
+    """
+    M_list_raw = getattr(args, "topo_n_modes_list", None)
+    C_list_raw = getattr(args, "cem_iter_list", None)
+    if M_list_raw is not None:
+        M_list: list[int | None] = list(M_list_raw)
+    else:
+        M_list = [None]
+    if C_list_raw is not None:
+        if M_list_raw is None:
+            raise SystemExit(
+                "error: --cem-iter-list/-cL requires --topo-n-modes-list/-mL"
+            )
+        if len(C_list_raw) != len(M_list_raw):
+            raise SystemExit(
+                f"error: -cL length ({len(C_list_raw)}) must equal "
+                f"-mL length ({len(M_list_raw)})"
+            )
+        iter_list: list[int | None] = list(C_list_raw)
+    else:
+        iter_list = [None] * len(M_list)
+    return M_list, iter_list
 
 
 def main():
@@ -212,6 +275,7 @@ def main():
     side_list = list(args.side1_list)
     pflp_list = list(args.pflip_linsp)
     temp_list = list(args.Temp_linsp)
+    M_list, iter_list = _resolve_sweep_lists(args)
 
     memoryfunc = build_memory_function(
         args.slanzarv_minMB, args.slanzarv_maxMB, side_list
@@ -219,7 +283,6 @@ def main():
     # Use __file__ to locate sibling program (robust across machines)
     src_dir = Path(__file__).resolve().parent
     exec_path = src_dir.relative_to(Path.cwd()) / f"{progn}.py"
-    passthrough = _build_passthrough_flags(args)
 
     total_printed = total_executed = 0
 
@@ -230,16 +293,42 @@ def main():
     if use_sa or use_pt or use_cem:
         temp_list = [None]
 
-    def dispatch(L: int, p: float, T: float | None) -> None:
+    dispatch_mode = getattr(args, "dispatch", DEFAULT_DISPATCH)
+
+    def _overrides_for(M: int | None, n_iter: int | None) -> dict[str, str] | None:
+        ov: dict[str, str] = {}
+        if M is not None:
+            ov["--topo-n-modes"] = str(M)
+        if n_iter is not None:
+            ov["--cem-iter"] = str(n_iter)
+        return ov or None
+
+    def _topo_mode_for_jobname(M: int | None) -> int:
+        # Matches pre-existing behaviour: always display the active M in
+        # the jobname for topo runlangs, defaulting to the scalar flag.
+        if M is not None:
+            return M
+        return getattr(args, "topo_n_modes", DEFAULT_TOPO_N_MODES)
+
+    def dispatch_slanzarv(
+        L: int,
+        p: float,
+        T: float | None,
+        M: int | None,
+        n_iter: int | None,
+    ) -> None:
         nonlocal total_printed, total_executed
 
+        passthrough = _build_passthrough_flags(
+            args, overrides=_overrides_for(M, n_iter),
+        )
         prog_args = [str(L), "-p", f"{p:.3g}"]
         jobname_tokens = [str(L), f"{p:.3g}"]
         if T is not None:
             prog_args.extend(["-T", f"{T:.3g}"])
             jobname_tokens.append(f"{T:.3g}")
         if "topo" in getattr(args, "runlang", "").lower():
-            jobname_tokens.append(f"M{getattr(args, 'topo_n_modes', DEFAULT_TOPO_N_MODES)}")
+            jobname_tokens.append(f"M{_topo_mode_for_jobname(M)}")
 
         cmd = ["python", str(exec_path), *prog_args, *passthrough]
 
@@ -268,10 +357,64 @@ def main():
             subprocess.run(slanz_cmd)
             total_executed += 1
 
-    for L in side_list:
-        for p in pflp_list:
-            for T in temp_list:
-                dispatch(L, p, T)
+    def dispatch_array(
+        L: int,
+        p: float,
+        M: int | None,
+        n_iter: int | None,
+    ) -> None:
+        nonlocal total_printed, total_executed
+
+        passthrough = _build_passthrough_flags(
+            args, overrides=_overrides_for(M, n_iter),
+        )
+        n_quench = int(getattr(args, "number_of_averages", 1))
+        concurrent = int(min(getattr(args, "array_concurrent", DEFAULT_ARRAY_CONCURRENT),
+                             n_quench))
+        jobname_tokens = [str(L), f"{p:.3g}"]
+        if "topo" in getattr(args, "runlang", "").lower():
+            jobname_tokens.append(f"M{_topo_mode_for_jobname(M)}")
+        if n_iter is not None:
+            jobname_tokens.append(f"I{n_iter}")
+        jobname_tokens.append("arr")
+        jobname = build_jobname(
+            program_short=progn_shrt,
+            tokens=jobname_tokens,
+            job_id=getattr(args, "slanzarv_id", None) or None,
+            prefix_job_id=False,
+        )
+        script = render_sbatch_array_script(
+            jobname=jobname,
+            array_range=(1, n_quench),
+            concurrent=concurrent,
+            mem_mb=int(memoryfunc(L)),
+            partition=getattr(args, "array_partition", DEFAULT_ARRAY_PARTITION),
+            time=getattr(args, "array_time", DEFAULT_ARRAY_TIME),
+            exec_path=str(exec_path),
+            L=int(L),
+            p=float(p),
+            passthrough=passthrough,
+        )
+
+        if print_bool:
+            print(script)
+            print()
+            total_printed += 1
+        if exec_bool:
+            subprocess.run(["sbatch"], input=script, text=True, check=True)
+            total_executed += 1
+
+    if dispatch_mode == "array":
+        for L in side_list:
+            for M, n_iter in zip(M_list, iter_list):
+                for p in pflp_list:
+                    dispatch_array(L, p, M, n_iter)
+    else:
+        for L in side_list:
+            for M, n_iter in zip(M_list, iter_list):
+                for p in pflp_list:
+                    for T in temp_list:
+                        dispatch_slanzarv(L, p, T, M, n_iter)
 
     print(f"Total number of jobs executed: {total_executed}")
     print(f"Total number of jobs printed: {total_printed}")

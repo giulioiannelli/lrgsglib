@@ -61,9 +61,18 @@ def run_simulation(args: Any) -> None:
     save_flags = resolve_save_flags(args)
     any_save = any(save_flags.values())
 
+    # Single-quench array-task mode: if --quench-id >= 1, run only that
+    # quench (for SLURM --array dispatch, one task per realisation).
+    qid = getattr(args, "quench_id", -1)
+    single_task_mode = qid >= 1
+    if single_task_mode:
+        quench_indices = [qid]
+    else:
+        quench_indices = list(range(1, n_quench + 1))
+
     # ── Pre-scan for completed quenches ──────────────────────────
     completed_q: set[int] = set()
-    if any_save and n_quench > 1:
+    if any_save and n_quench > 1 and not single_task_mode:
         probe = prepare_lattice(args)
         # Stash topo_n_modes on lattice for stem builder
         rl = getattr(args, "runlang", "C1")
@@ -87,7 +96,7 @@ def run_simulation(args: Any) -> None:
             )
 
     # ── Quench loop ──────────────────────────────────────────────
-    for _q in range(1, n_quench + 1):
+    for _q in quench_indices:
         if _q in completed_q:
             continue
 
