@@ -8,7 +8,10 @@ frustration fractions, and temperatures. All parameters are explicit
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
+
+from tqdm import tqdm as _tqdm
 
 from kernels.Serializer import (
     build_jobname,
@@ -295,6 +298,36 @@ def main():
 
     dispatch_mode = getattr(args, "dispatch", DEFAULT_DISPATCH)
 
+    # Pre-compute total dispatch count for the progress bar.
+    if dispatch_mode == "array":
+        total_dispatch = (
+            len(side_list) * len(M_list) * len(pflp_list)
+        )
+    else:
+        total_dispatch = (
+            len(side_list) * len(M_list) * len(pflp_list) * len(temp_list)
+        )
+
+    # Progress bar: enabled whenever actually submitting (--exec). For
+    # --print we stay silent so the heredoc stream is clean for piping.
+    show_bar = bool(exec_bool) and total_dispatch > 1
+    bar = (
+        _tqdm(
+            total=total_dispatch,
+            desc=f"{dispatch_mode} submit",
+            unit="job",
+            file=sys.stderr,
+            leave=True,
+        )
+        if show_bar
+        else None
+    )
+
+    def _advance_bar(jobname: str) -> None:
+        if bar is not None:
+            bar.set_postfix_str(jobname, refresh=False)
+            bar.update(1)
+
     def _overrides_for(M: int | None, n_iter: int | None) -> dict[str, str] | None:
         ov: dict[str, str] = {}
         if M is not None:
@@ -356,6 +389,7 @@ def main():
         if exec_bool:
             subprocess.run(slanz_cmd)
             total_executed += 1
+            _advance_bar(jobname)
 
     def dispatch_array(
         L: int,
@@ -403,18 +437,23 @@ def main():
         if exec_bool:
             subprocess.run(["sbatch"], input=script, text=True, check=True)
             total_executed += 1
+            _advance_bar(jobname)
 
-    if dispatch_mode == "array":
-        for L in side_list:
-            for M, n_iter in zip(M_list, iter_list):
-                for p in pflp_list:
-                    dispatch_array(L, p, M, n_iter)
-    else:
-        for L in side_list:
-            for M, n_iter in zip(M_list, iter_list):
-                for p in pflp_list:
-                    for T in temp_list:
-                        dispatch_slanzarv(L, p, T, M, n_iter)
+    try:
+        if dispatch_mode == "array":
+            for L in side_list:
+                for M, n_iter in zip(M_list, iter_list):
+                    for p in pflp_list:
+                        dispatch_array(L, p, M, n_iter)
+        else:
+            for L in side_list:
+                for M, n_iter in zip(M_list, iter_list):
+                    for p in pflp_list:
+                        for T in temp_list:
+                            dispatch_slanzarv(L, p, T, M, n_iter)
+    finally:
+        if bar is not None:
+            bar.close()
 
     print(f"Total number of jobs executed: {total_executed}")
     print(f"Total number of jobs printed: {total_printed}")
