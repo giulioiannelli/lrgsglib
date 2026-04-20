@@ -43,10 +43,11 @@ PATHNPLOT = 'plot'
 PATHNSPEC = 'spect'
 PATHNVM = 'voter'
 PATHNCP = 'cntct'
+PATHNSRW = 'srw'
 # Graph-related paths (created by SignedGraph)
 PATHN_GRAPH_LIST = [PATHNGRPH, PATHNLRGS, PATHNPHTR, PATHNSPEC]
 # Dynamics-related paths (created by respective dynamics classes)
-PATHN_DYNAMICS_LIST = [PATHNISNG, PATHNVM, PATHNCP]
+PATHN_DYNAMICS_LIST = [PATHNISNG, PATHNVM, PATHNCP, PATHNSRW]
 # All paths (for backward compatibility)
 PATHN_LIST = PATHN_GRAPH_LIST + PATHN_DYNAMICS_LIST
 #
@@ -278,6 +279,19 @@ LRSG_ENTROPY_STEP = 1000
 DEFAULT_ENTROPY_LEXPONENT = -3
 DEFAULT_ENTROPY_HEXPONENT = 6
 DEFAULT_ISING_NOCLUST = 5
+
+# SignedRW walker defaults (see statsys/SignedRW/SignedWalker.py)
+DEFAULT_SRW_N_WALKERS = 200
+DEFAULT_SRW_SEED = 42
+DEFAULT_SRW_COVERAGE_FRAC = 0.20
+DEFAULT_SRW_MAX_N_CROSS = 14
+DEFAULT_SRW_RULE = 'absorb'
+DEFAULT_SRW_START = 'random'
+DEFAULT_SRW_X_NODE = 'reflect'
+SRW_RULES = ('absorb', 'kill', 'sticky')
+SRW_START_PROTOCOLS = ('random', 'fixed', 'center')
+SRW_X_NODE_BEHAVIORS = ('reflect', 'absorb')
+SRW_OVERLAP_KINDS = ('l2_raw', 'l2_norm', 'l2_rescaled', 'fidelity', 'tv', 'jaccard')
 
 DEFAULT_NUNMBER_AVERAGES = 100
 DEFAULT_SPIKE_THRESHOLD = 0.05
