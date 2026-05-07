@@ -7,6 +7,7 @@ import networkx as nx
 from networkx import convert_node_labels_to_integers, set_node_attributes, Graph
 
 from ....config.const import *
+from ....utils.basic.iterables import compose
 from ....utils.basic.numeric import is_positive_int
 from ....utils.basic.arithmetic import adjust_to_even
 from ..funcs import *

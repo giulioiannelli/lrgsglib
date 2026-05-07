@@ -28,6 +28,15 @@ DEFAULT_TOPO_POLISH = True
 DEFAULT_TOPO_POLISH_SWEEPS = 50
 DEFAULT_TOPO_TAU = 1.0
 DEFAULT_TOPO_FIELD_STRENGTH = 1.0
+# Strong-SA baseline defaults (multi-restart heavy schedule + final greedy)
+# Used by lrgsglib.notebooks.run_strong_sa as the "best-achievable" SA
+# reference for hyperparameter exploration of the spectral CEM optimizer.
+DEFAULT_SA_STRONG_T_INIT          = 3.0
+DEFAULT_SA_STRONG_T_FINAL         = 0.05
+DEFAULT_SA_STRONG_N_TEMPERATURES  = 140
+DEFAULT_SA_STRONG_STEPS_PER_T     = 10
+DEFAULT_SA_STRONG_N_RESTARTS      = 8
+DEFAULT_SA_STRONG_GREEDY_SWEEPS   = 180
 # Cross-Entropy Method (CEM) spectral optimizer defaults
 DEFAULT_CEM_ITER = 30
 DEFAULT_CEM_POP_SIZE = 128

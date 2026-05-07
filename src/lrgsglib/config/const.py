@@ -309,3 +309,31 @@ LOG_BACKUP_COUNT = 3
 DEFAULT_MAX_DIGITS_ROUND_SIGFIG = 18
 
 COUNT_XERR_PATTERNS = True
+
+# CHL-SF04 protein-TMD substrate defaults (see utils/recon/protein/substrate.py)
+DEFAULT_ER_DEGREE = 10
+DEFAULT_BA_M = 4
+DEFAULT_WS_K = 6
+DEFAULT_WS_P = 0.1
+DEFAULT_RGG_RADIUS_3D = 0.18
+DEFAULT_SBM_BLOCKS = 3
+DEFAULT_SBM_PIN = 0.05
+DEFAULT_SBM_POUT = 0.005
+
+# CHL-SF04 sweep grids
+PFLIP_SWEEP_GRID = (0.0, 0.05, 0.10, 0.20, 0.35, 0.50)
+K_FRAC_GALLERY = (0.05, 0.20, 0.50)
+K_FRAC_Q3 = (0.02, 0.05, 0.10, 0.20, 0.35, 0.50, 0.75)
+N_SEEDS_PFLIP = 5
+CHL_SF04_MASTER_SEED = 0xC4D14
+CHL_SF04_RES_MIN = 40
+CHL_SF04_RES_MAX = 200
+CHL_SF04_CORPUS_SIZE = 10
+Q3_EMERGENCE_THRESHOLD = 0.8
+# Fixed feature dimensionality for all substrates in CHL-SF04 — every protein's
+# coordinate vector is zero-padded to length N_FEATURES, every substrate is
+# sized so its node count is >= N_FEATURES. The choice mirrors the original
+# 32x32=1024 baseline (Iannelli & Villegas 2025 reproduces image recon at the
+# same dimensionality) and makes per-substrate bases directly comparable.
+CHL_SF04_N_FEATURES = 1024
+CHL_SF04_LOG_MSE_FLOOR = 1e-4
