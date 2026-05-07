@@ -295,19 +295,27 @@ class SignedWalker(DynSys):
         kill_flat = np.ascontiguousarray(kill_mask.ravel(), dtype=np.uint8)
         refl_flat = np.ascontiguousarray(reflect_mask.ravel(), dtype=np.uint8)
         start_positions = np.ascontiguousarray(self.s, dtype=np.int64)
-        visits_agg, unique_visits, stop_step, stop_reason, final_position = (
-            native.absorb_walker_sampling(
-                N,
-                neigh_indices,
-                neigh_ptr,
-                kill_flat,
-                refl_flat,
-                start_positions,
-                int(stop_thresh),
-                int(self.seed),
-            )
+        # walkers_per_trial=1 recovers a per-walker bitmap via the trial
+        # path; 0 disables the optional output entirely.
+        wpt = 1 if self.store_per_walker_visits else 0
+        (
+            visits_agg, unique_visits, stop_step, stop_reason,
+            final_position, trial_bubbles,
+        ) = native.absorb_walker_sampling(
+            N,
+            neigh_indices,
+            neigh_ptr,
+            kill_flat,
+            refl_flat,
+            start_positions,
+            int(stop_thresh),
+            int(self.seed),
+            wpt,
         )
         Ne = int(self.sg.Ne) if hasattr(self.sg, 'Ne') else int(self.sg.num_edges)
+        # trial_bubbles is (n_walkers, N) when walkers_per_trial=1, so it
+        # coincides with the per-walker visited bitmap.
+        vpw = trial_bubbles if self.store_per_walker_visits else None
         result = dict(
             unique_visits=unique_visits.astype(np.int64, copy=False),
             unique_frac=unique_visits / N,
@@ -315,7 +323,7 @@ class SignedWalker(DynSys):
             stop_reason=stop_reason.astype(np.int8, copy=False),
             final_position=final_position.astype(np.int64, copy=False),
             visits_agg=visits_agg.astype(np.int64, copy=False),
-            visits_per_walker=None,  # C kernel does not keep per-walker buckets
+            visits_per_walker=vpw,
             history=None,
             neg_frac=float(neg.sum()) / (2 * Ne),
             frust_frac=float(frust.sum()) / (2 * Ne),
