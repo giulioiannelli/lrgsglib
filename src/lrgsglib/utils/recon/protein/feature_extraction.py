@@ -27,7 +27,16 @@ __all__ = [
 
 
 def protein_to_distance_feature_vector(coords: np.ndarray, n_features: int = 784) -> np.ndarray:
-    """Convert coordinates to a fixed-size distance feature vector."""
+    """Convert coordinates to a fixed-size distance feature vector.
+
+    .. deprecated:: CHL-SF04
+        The pairwise-distance feature path is *not* mathematically reversible:
+        the inverse mapping in ``safe_reconstruct_coordinates_from_features``
+        treats the distance vector as a coordinate vector, which mangles the
+        3D reconstruction. Kept for backwards compatibility with the archived
+        ``CHL-SF04_tpr_proteins_01.ipynb``. Use
+        :func:`protein_to_coordinate_feature_vector` instead.
+    """
     if len(coords) == 0:
         return np.zeros(n_features)
     coords_centered = coords - coords.mean(axis=0)
@@ -51,7 +60,15 @@ def create_enhanced_feature_vector(
     secondary_structure: Optional[List[str]] = None,
     n_features: int = 1024,
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
-    """Create an enhanced feature vector including coordinates and biology."""
+    """Create an enhanced feature vector including coordinates and biology.
+
+    .. deprecated:: CHL-SF04
+        Mixes 0.75·N coordinate slots with 0.25·N biological-composition
+        slots. The mixed feature vector breaks the orthogonality assumption
+        of the spectral decomposition and is no longer used by CHL-SF04. Kept
+        for archived notebooks; new code should use
+        :func:`protein_to_coordinate_feature_vector`.
+    """
     coords_centered = coords - coords.mean(axis=0)
     coord_mean = coords.mean(axis=0)
     coord_feature_size = int(n_features * 0.75)
@@ -203,7 +220,13 @@ def create_comprehensive_feature_vector(
     secondary_structure: List[str],
     n_features: int,
 ) -> np.ndarray:
-    """Create a comprehensive feature vector from coordinates and metadata."""
+    """Create a comprehensive feature vector from coordinates and metadata.
+
+    .. deprecated:: CHL-SF04
+        Same caveat as :func:`create_enhanced_feature_vector`: mixed
+        coordinate + composition features are not invertible to a clean 3D
+        structure. Use :func:`protein_to_coordinate_feature_vector`.
+    """
     if len(coords) == 0:
         return np.zeros(n_features)
     coords_centered = coords - coords.mean(axis=0)
