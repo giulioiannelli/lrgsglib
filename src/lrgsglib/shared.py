@@ -37,10 +37,11 @@ from numbers import Number
 from numpy.typing import NDArray
 from networkx.drawing.layout import rescale_layout
 from pathlib import Path
+from PIL import Image
 from operator import itemgetter
 from os.path import join as pth_join
 from scipy.cluster import hierarchy
-from scipy.cluster.hierarchy import fcluster, dendrogram, linkage, cophenet
+from scipy.cluster.hierarchy import fcluster, dendrogram, linkage, cophenet, leaves_list
 from scipy.interpolate import griddata, pchip
 from scipy.io import loadmat
 from scipy.linalg import expm, fractional_matrix_power
@@ -53,47 +54,13 @@ from scipy.sparse import csr_array, spdiags, coo_matrix, csr_matrix, diags
 from scipy.sparse import identity as scsp_identity
 from scipy.sparse.linalg import eigsh as scsp_eigsh
 from scipy.sparse.linalg import expm as sparse_expm
-from scipy.spatial.distance import squareform
+from scipy.spatial.distance import squareform, pdist
 from scipy.stats import gaussian_kde
 from sklearn.datasets import fetch_openml
-from tqdm import tqdm
+from tqdm.auto import tqdm  # auto-detects Jupyter vs terminal for clean output
 from typing import Any, Optional, Union, List, Tuple, Dict, Set, Type, \
     Sequence, Optional, Callable
 
-__all__ = [
-    # Core libraries users expect at top level
-    "np",
-    "nx",
-    "plt",
-    "pd",
-    "cp",
-    "scipy",
-    # Standard library modules used by scripts/serializers
-    "subprocess",
-    "warnings",
-    "os",
-    "sys",
-    "re",
-    "copy",
-    "random",
-    "time",
-    "pk",
-    # Common types
-    "Graph",
-    "Path",
-    "NDArray",
-    "Iterable",
-    "tqdm",
-    # Commonly used constants
-    "Fraction",
-    "Decimal",
-    "Number",
-    # Frequently used scipy.cluster / scipy.signal helpers
-    "linkage",
-    "dendrogram",
-    "fcluster",
-    "cophenet",
-    "squareform",
-    "find_peaks",
-    "expm",
-]
+# No `__all__`: this module is the canonical kitchen-sink import for
+# notebooks/labs (`from lrgsglib.notebooks import *` chains through here).
+# Top-level package surface is curated explicitly in `lrgsglib/__init__.py`.
