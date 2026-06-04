@@ -1,3 +1,5 @@
+import os
+import numpy as np
 from parsers.L2D_SlaplSpect_Serializer import *
 #
 args = parser.parse_args()
