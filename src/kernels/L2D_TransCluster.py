@@ -10,6 +10,7 @@ from typing import Callable, Iterable
 import numpy as np
 
 from lrgsglib import Lattice2D
+from lrgsglib.config.const import SG_LAPL_DEFAULT_TYPE
 
 from .TransClusters import (
     build_geometry_selector,
@@ -34,15 +35,21 @@ def file_path_maker(
     cell: str,
     ext: str,
     prew: float,
+    laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
 ) -> str:
     """Compose the output file path following the legacy naming scheme."""
 
     prew_str = f"prew={prew:.3g}" if prew != 0.0 else ""
     navg_token = f"na={navg}" if navg not in {"", None} else ""
+    # 'signed' (default) adds no token -> existing filenames stay byte-identical.
+    # Placed right after the p-token (front) so the trailing na/prew/suffix
+    # tokens keep their positions for load_pcluster_state's resume parsing.
+    lap_token = f"lap={laplacian_type}" if laplacian_type != SG_LAPL_DEFAULT_TYPE else ""
     return compose_output_path(
         base_path,
         mode,
         f"p={p_value:.3g}",
+        lap_token,
         cell,
         navg_token,
         prew_str,
@@ -80,6 +87,7 @@ def run_pcluster_mode(
 ) -> None:
     """Execute the ``pCluster`` averaging routine."""
     engine = get_graph_engine(args)
+    lap_type = getattr(args, "laplacian_type", SG_LAPL_DEFAULT_TYPE)
 
     base_pattern = file_path_maker(
         base_path,
@@ -90,6 +98,7 @@ def run_pcluster_mode(
         cell=args.cell_type,
         ext="",
         prew=args.prew,
+        laplacian_type=lap_type,
     )
     merged_dict, n_avg_done, fname_old = load_pcluster_state(
         base_pattern, bool(args.out_suffix)
@@ -106,6 +115,7 @@ def run_pcluster_mode(
             cell=args.cell_type,
             ext=ext,
             prew=args.prew,
+            laplacian_type=lap_type,
         )
 
     averages_completed = n_avg_done
@@ -113,7 +123,7 @@ def run_pcluster_mode(
         lattice = _make_lattice(args, engine)
         if engine == "nx":
             lattice.flip_sel_edges(geometry_func(lattice))
-        lattice.compute_k_eigvV(typf=typf)
+        lattice.compute_k_eigvV(typf=typf, laplacian_type=lap_type)
         merged_dict += lattice.get_cluster_distribution()
 
         averages_completed += 1
@@ -133,6 +143,7 @@ def run_pcluster_mode(
             cell=args.cell_type,
             ext=ext,
             prew=args.prew,
+            laplacian_type=lap_type,
         )
         if fname_old and fname_old != fname_new:
             try:
@@ -154,6 +165,7 @@ def run_ordparam_mode(
 ) -> None:
     """Execute the ``ordParam`` averaging routine."""
     engine = get_graph_engine(args)
+    lap_type = getattr(args, "laplacian_type", SG_LAPL_DEFAULT_TYPE)
 
     pinf: list[float] = []
     pinf_sq: list[float] = []
@@ -178,6 +190,7 @@ def run_ordparam_mode(
             cell=args.cell_type,
             ext=ext,
             prew=args.prew,
+            laplacian_type=lap_type,
         )
         with open(filename, "wb") as handle:
             np.savetxt(handle, np.atleast_2d(data), fmt="%.7g")
@@ -197,7 +210,7 @@ def run_ordparam_mode(
                 sgpathn=args.workdir,
             )
             lattice.flip_sel_edges(geometry_func(lattice))
-        lattice.compute_k_eigvV(typf=typf)
+        lattice.compute_k_eigvV(typf=typf, laplacian_type=lap_type)
 
         neglinks += lattice.Ne_n
 
@@ -255,6 +268,7 @@ def run_transcluster(args) -> None:
         "ordParam": getattr(test_lattice, "path_phtra"),
     }[args.mode]
 
+    lap_type = getattr(args, "laplacian_type", SG_LAPL_DEFAULT_TYPE)
     filename = file_path_maker(
         base_path,
         mode=args.mode,
@@ -264,6 +278,7 @@ def run_transcluster(args) -> None:
         cell=args.cell_type,
         ext=ext,
         prew=args.prew,
+        laplacian_type=lap_type,
     )
     if os.path.exists(filename):
         raise SystemExit(f"File {os.path.split(filename)[1]} already exists.")

@@ -11,6 +11,7 @@ graph construction functions.
 """
 
 from lrgsglib import *
+from lrgsglib.config.const import SG_LAPL_DEFAULT_TYPE
 from lrgsglib.utils.basic.probability import create_symmetric_log_bins, linear_binning_hist
 from lrgsglib.config.funcs import bin_eigenvalues
 import numpy as np
@@ -129,7 +130,7 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
                       stochastic=False, periodic=False, variant='exp_clocks',
                       mode='all', pflip=0.0, backend='scipy', seed=None,
                       out_suffix='', keep_sparse=None, verbose=False,
-                      engine='nx'):
+                      engine='nx', laplacian_type=SG_LAPL_DEFAULT_TYPE):
     """
     Compute eigenvalues of signed Laplacian for MultiplicativeCascadeGraph.
 
@@ -250,10 +251,10 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
 
         try:
             if hasattr(G, 'compute_laplacian_spectrum'):
-                G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
+                G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose, laplacian_type=laplacian_type)
             else:
                 # GT graphs only have compute_laplacian_spectrum_weigV (no keep_sparse)
-                G.compute_laplacian_spectrum_weigV(backend=actual_backend)
+                G.compute_laplacian_spectrum_weigV(backend=actual_backend, laplacian_type=laplacian_type)
             eigvals = G.eigv  # Full spectrum
 
             if verbose:
@@ -282,16 +283,16 @@ def eigv_for_mc_graph(p1, p2, p3, p4, fraction, iterations,
                 backend_suffix = 'denseCPU_fallback'
                 G.out_suffix = f"{out_suffix}_{backend_suffix}" if out_suffix else backend_suffix
                 if hasattr(G, 'compute_laplacian_spectrum'):
-                    G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose)
+                    G.compute_laplacian_spectrum(backend=actual_backend, keep_sparse=actual_keep_sparse, verbose=verbose, laplacian_type=laplacian_type)
                 else:
-                    G.compute_laplacian_spectrum_weigV(backend=actual_backend)
+                    G.compute_laplacian_spectrum_weigV(backend=actual_backend, laplacian_type=laplacian_type)
                 eigvals = G.eigv
             else:
                 # Re-raise if not a recoverable GPU error
                 raise
     elif mode.startswith('some'):
         k = int(mode.split('_')[1])
-        G.compute_k_eigvV(k=k, backend=actual_backend)
+        G.compute_k_eigvV(k=k, backend=actual_backend, laplacian_type=laplacian_type)
         eigvals = G.eigv  # Partial spectrum (first k eigenvalues)
     else:
         raise ValueError(f"Unknown mode: {mode}", flush=True)
@@ -303,7 +304,7 @@ def eigV_for_mc_graph_ptch(p1, p2, p3, p4, fraction, iterations,
                             stochastic=False, periodic=False, variant='exp_clocks',
                             mode='smallest', howmany=5, pflip=0.0,
                             backend='scipy', seed=None, out_suffix='',
-                            engine='nx'):
+                            engine='nx', laplacian_type=SG_LAPL_DEFAULT_TYPE):
     """
     Compute eigenvectors of signed Laplacian for MultiplicativeCascadeGraph.
 
@@ -358,15 +359,15 @@ def eigV_for_mc_graph_ptch(p1, p2, p3, p4, fraction, iterations,
 
     # Compute eigenvectors with specified backend
     if mode == 'smallest':
-        G.compute_k_eigvV(backend=backend, k=howmany)
+        G.compute_k_eigvV(backend=backend, k=howmany, laplacian_type=laplacian_type)
         eigvecs = G.eigV[:howmany, :]  # First howmany eigenvectors
     elif mode == 'largest':
         # Compute all, then take last howmany
-        G.compute_laplacian_spectrum_weigV()
+        G.compute_laplacian_spectrum_weigV(laplacian_type=laplacian_type)
         eigvecs = G.eigV[-howmany:, :]
     elif mode == 'middle':
         # Compute all, then take middle howmany
-        G.compute_laplacian_spectrum_weigV()
+        G.compute_laplacian_spectrum_weigV(laplacian_type=laplacian_type)
         N = G.N
         mid = N // 2
         start = mid - howmany // 2
@@ -436,6 +437,9 @@ def perform_spectral_calculations(args):
     # Determine mode and process accordingly
     out_suffix = getattr(args, 'out_suffix', '')
     engine = get_graph_engine(args)
+    # Laplacian type selector ('signed' default keeps existing filenames byte-identical)
+    lap_type = getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE)
+    lap_suffix = '' if lap_type == SG_LAPL_DEFAULT_TYPE else f"_lap={lap_type}"
 
     if args.mode.endswith("dist"):
         if args.mode == "eigvec_dist":
@@ -452,6 +456,7 @@ def perform_spectral_calculations(args):
         # Append out_suffix to fname_base if provided
         if out_suffix:
             fname_base = f"{fname_base}_{out_suffix}"
+        fname_base = f"{fname_base}{lap_suffix}"
 
         # Process distribution using generic framework
         process_eigen_distribution(
@@ -480,9 +485,9 @@ def perform_spectral_calculations(args):
         # Build filename base (without na suffix)
         # Include out_suffix in filename if provided
         if out_suffix:
-            fname_base = f"mc_eigvals_{pflip_str}_{out_suffix}"
+            fname_base = f"mc_eigvals_{pflip_str}_{out_suffix}{lap_suffix}"
         else:
-            fname_base = f"mc_eigvals_{pflip_str}"
+            fname_base = f"mc_eigvals_{pflip_str}{lap_suffix}"
 
         # Get working path
         working_path = get_mc_spectrum_path(args)
@@ -532,6 +537,7 @@ def perform_spectral_calculations(args):
                 keep_sparse=getattr(args, 'keep_sparse', None),
                 verbose=(idx == start_idx and args.verbose),
                 engine=engine,
+                laplacian_type=lap_type,
             )
             eigvlist.append(eigv)
 
@@ -599,9 +605,9 @@ def perform_spectral_calculations(args):
 
         # Build filename base with out_suffix if provided
         if out_suffix:
-            fname_base = f"mc_entropy_{pflip_str}_{out_suffix}"
+            fname_base = f"mc_entropy_{pflip_str}_{out_suffix}{lap_suffix}"
         else:
-            fname_base = f"mc_entropy_{pflip_str}"
+            fname_base = f"mc_entropy_{pflip_str}{lap_suffix}"
 
         # Get entropy-specific parameters from args
         entropy_steps = getattr(args, 'entropy_steps', 600)
@@ -675,9 +681,9 @@ def perform_spectral_calculations(args):
 
             # Compute Laplacian spectrum
             if hasattr(G, 'compute_laplacian_spectrum'):
-                G.compute_laplacian_spectrum(backend=spectral_backend)
+                G.compute_laplacian_spectrum(backend=spectral_backend, laplacian_type=lap_type)
             else:
-                G.compute_laplacian_spectrum_weigV(backend=spectral_backend)
+                G.compute_laplacian_spectrum_weigV(backend=spectral_backend, laplacian_type=lap_type)
 
             if G.eigv is None:
                 raise ValueError(f"Eigenvalue computation failed for realization {idx}", flush=True)
@@ -783,6 +789,7 @@ def eigvec_initial_data(args):
         backend=args.backend,
         out_suffix=out_suffix,
         engine=engine,
+        laplacian_type=getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE),
     )
 
     if args.verbose:
@@ -822,6 +829,7 @@ def eigval_initial_data(args):
         out_suffix=out_suffix,
         verbose=args.verbose,
         engine=engine,
+        laplacian_type=getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE),
     )
 
     if args.verbose:
@@ -872,6 +880,7 @@ def eigvec_update_data(batch_size, bins, bin_centers, bin_counter, args):
             backend=args.backend,
             out_suffix=out_suffix,
             engine=engine,
+            laplacian_type=getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE),
         )
         for i in range(args.howmany):
             eig_values[i].append(eigV[i])
@@ -932,6 +941,7 @@ def eigval_update_data(batch_size, bins, bin_centers, bin_counter, args):
         out_suffix=out_suffix,
         verbose=(i == 0 and args.verbose),
         engine=engine,
+        laplacian_type=getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE),
     ) for i in range(batch_size)]
 
     eig_values = np.concatenate(eig_values)

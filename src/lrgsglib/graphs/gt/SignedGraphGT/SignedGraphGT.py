@@ -41,8 +41,34 @@ from .._converters import nx_to_gt, gt_to_nx, get_laplacian_matrix_gt
 from ....config.const import (
     BIN, PATHDATA,
     PATHN_GRAPH_LIST, PATHN_DYNAMICS_LIST,
+    SG_LAPL_SIGNED, SG_LAPL_RW, SG_LAPL_SYM,
+    SG_LAPL_TYPES, SG_LAPL_DEFAULT_TYPE, SG_LAPL_RW_IMAG_TOL,
 )
 from ....config.funcs import build_p_fname
+
+
+def _real_cast_sorted_gt(w, V=None):
+    """Sort a (possibly complex) spectrum ascending by real part and drop Im.
+
+    The random-walk Laplacian ``L_rw`` is non-symmetric but isospectral to the
+    symmetric PSD ``L_sym``, so its eigenvalues are real up to numerical noise.
+    Warns if ``max|Im(lambda)|`` exceeds ``SG_LAPL_RW_IMAG_TOL``.
+    """
+    imag = float(np.max(np.abs(np.imag(w)))) if np.iscomplexobj(w) else 0.0
+    if imag > SG_LAPL_RW_IMAG_TOL:
+        import warnings
+
+        warnings.warn(
+            f"Non-symmetric (rw) Laplacian eigenvalues have |Im|={imag:.2e} > "
+            f"{SG_LAPL_RW_IMAG_TOL:.1e}; casting to real.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    order = np.argsort(np.real(w))
+    w_real = np.ascontiguousarray(np.real(w)[order])
+    if V is None:
+        return w_real
+    return w_real, np.ascontiguousarray(np.real(V[:, order]))
 
 
 class SignedGraphGT:
@@ -570,6 +596,53 @@ class SignedGraphGT:
         degrees = np.sum(np.abs(A_signed), axis=1)
         return np.diag(degrees)
 
+    def get_signed_rw_laplacian(
+        self, sym: bool = True, format: str = "dense"
+    ) -> np.ndarray:
+        """
+        Random-walk normalized signed Laplacian (Kunegis 2010, §3.3/§3.4).
+
+        Parameters
+        ----------
+        sym : bool, default True
+            ``True``  -> ``L_sym = I - D_s^{-1/2} A D_s^{-1/2}`` (symmetric, PSD).
+            ``False`` -> ``L_rw  = I - D_s^{-1} A`` (random walk, NOT symmetric).
+        format : str, default 'dense'
+            Accepted for NX-API symmetry but ignored (GT is always dense).
+
+        Notes
+        -----
+        ``D_s[i,i] = sum_j |A_ij|`` is the signed degree. The two variants are
+        isospectral, with real eigenvalues in ``[0, 2]``. Isolated nodes get a
+        zero inverse (that row stays equal to the identity row, eigenvalue 1).
+        """
+        A = self.get_signed_adjacency()
+        deg = np.abs(A).sum(axis=1)
+        n = A.shape[0]
+        eye = np.eye(n)
+        if sym:
+            inv = np.where(deg > 0, 1.0 / np.sqrt(deg), 0.0)
+            return eye - (inv[:, None] * A) * inv[None, :]
+        inv = np.where(deg > 0, 1.0 / deg, 0.0)
+        return eye - inv[:, None] * A
+
+    def _laplacian_operator(self, laplacian_type: str = SG_LAPL_DEFAULT_TYPE):
+        """Resolve ``laplacian_type`` to ``(matrix, is_symmetric)``.
+
+        ``'signed'`` -> combinatorial ``D_s - A`` (symmetric, default).
+        ``'sym'``    -> symmetric normalized ``L_sym`` (symmetric).
+        ``'rw'``     -> random-walk ``L_rw`` (NOT symmetric; general solver).
+        """
+        if laplacian_type == SG_LAPL_SIGNED:
+            return self.get_signed_laplacian(), True
+        if laplacian_type == SG_LAPL_SYM:
+            return self.get_signed_rw_laplacian(sym=True), True
+        if laplacian_type == SG_LAPL_RW:
+            return self.get_signed_rw_laplacian(sym=False), False
+        raise ValueError(
+            f"laplacian_type must be one of {SG_LAPL_TYPES}, got {laplacian_type!r}"
+        )
+
     def get_nodes_list(self) -> List[int]:
         """
         Get list of node indices.
@@ -611,6 +684,7 @@ class SignedGraphGT:
         self,
         k: Optional[int] = None,
         backend: Literal["numpy", "scipy", "cupy"] = "numpy",
+        laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
     ) -> np.ndarray:
         """
         Compute Laplacian eigenvalues.
@@ -621,17 +695,28 @@ class SignedGraphGT:
             Number of eigenvalues to compute. If None, compute all.
         backend : str, default 'numpy'
             Computation backend ('numpy', 'scipy', 'cupy').
+        laplacian_type : str, default 'signed'
+            Which Laplacian to diagonalize ('signed', 'sym', 'rw').
 
         Returns
         -------
         np.ndarray
             Sorted eigenvalues.
         """
-        L = self.get_signed_laplacian()
+        L, is_sym = self._laplacian_operator(laplacian_type)
 
         if k is not None and k < self.N:
             L_sparse = csr_matrix(L)
-            eigenvalues, _ = eigsh(L_sparse, k=k, which="SM")
+            if is_sym:
+                eigenvalues, _ = eigsh(L_sparse, k=k, which="SM")
+            else:
+                from scipy.sparse.linalg import eigs
+                eigenvalues, _ = eigs(L_sparse, k=k, which="SR")
+                eigenvalues = _real_cast_sorted_gt(eigenvalues)
+        elif not is_sym:
+            # Full non-symmetric (rw) spectrum -> dense general solver
+            from scipy.linalg import eigvals as _sp_eigvals
+            eigenvalues = _real_cast_sorted_gt(_sp_eigvals(L))
         elif backend == "cupy":
             try:
                 import cupy as cp
@@ -649,6 +734,7 @@ class SignedGraphGT:
     def compute_laplacian_spectrum_weigV(
         self,
         backend: Literal["numpy", "scipy", "cupy"] = "numpy",
+        laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
     ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
         """
         Compute full eigendecomposition of the signed Laplacian.
@@ -659,6 +745,10 @@ class SignedGraphGT:
             Computation backend. 'numpy' uses np.linalg.eigh.
             'scipy' uses scipy.linalg.eigh.
             'cupy' uses GPU acceleration if available.
+        laplacian_type : str, default 'signed'
+            Which Laplacian to diagonalize ('signed', 'sym', 'rw'). For 'rw'
+            (non-symmetric) a general solver is used and eigenvectors are the
+            true (non-orthonormal) random-walk eigenvectors.
 
         Returns
         -------
@@ -671,7 +761,19 @@ class SignedGraphGT:
         -----
         Results are cached in self.eigv and self.eigV.
         """
-        L = self.get_signed_laplacian()
+        L, is_sym = self._laplacian_operator(laplacian_type)
+
+        if not is_sym:
+            # Non-symmetric (rw): general dense solver, real-cast & sorted.
+            # cupy lacks a general (non-Hermitian) eig, so fall back to numpy.
+            if backend == "scipy":
+                from scipy.linalg import eig as _sp_eig
+                eigenvalues, eigenvectors = _sp_eig(L)
+            else:
+                eigenvalues, eigenvectors = np.linalg.eig(L)
+            self.eigv, self.eigV = _real_cast_sorted_gt(eigenvalues, eigenvectors)
+            self._spectrum_laplacian_type = laplacian_type
+            return self.eigv, self.eigV
 
         if backend == "numpy":
             eigenvalues, eigenvectors = np.linalg.eigh(L)
@@ -697,6 +799,7 @@ class SignedGraphGT:
         idx = np.argsort(eigenvalues)
         self.eigv = eigenvalues[idx]
         self.eigV = eigenvectors[:, idx]
+        self._spectrum_laplacian_type = laplacian_type
 
         return self.eigv, self.eigV
 
@@ -704,6 +807,7 @@ class SignedGraphGT:
         self,
         k: int = 1,
         which: Literal["SM", "LM"] = "SM",
+        laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
         **kwargs: Any,
     ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
         """
@@ -717,6 +821,8 @@ class SignedGraphGT:
             Number of eigenvalues to compute.
         which : str, default 'SM'
             'SM' for smallest magnitude, 'LM' for largest magnitude.
+        laplacian_type : str, default 'signed'
+            Which Laplacian to diagonalize ('signed', 'sym', 'rw').
         **kwargs
             Ignored (accepted for NX API compatibility, e.g. ``typf``).
 
@@ -725,15 +831,24 @@ class SignedGraphGT:
         tuple[ndarray, ndarray]
             (eigenvalues, eigenvectors) with k values.
         """
-        L = self.get_signed_laplacian()
+        L, is_sym = self._laplacian_operator(laplacian_type)
         L_sparse = csr_matrix(L)
 
-        eigenvalues, eigenvectors = eigsh(L_sparse, k=k, which=which)
-
-        # Sort by eigenvalue
-        idx = np.argsort(eigenvalues) if which == "SM" else np.argsort(-eigenvalues)
-        self.eigv = eigenvalues[idx]
-        self.eigV = eigenvectors[:, idx]
+        if is_sym:
+            eigenvalues, eigenvectors = eigsh(L_sparse, k=k, which=which)
+            idx = np.argsort(eigenvalues) if which == "SM" else np.argsort(-eigenvalues)
+            self.eigv = eigenvalues[idx]
+            self.eigV = eigenvectors[:, idx]
+        else:
+            # Non-symmetric (rw): smallest/largest real part, real-cast & sorted
+            from scipy.sparse.linalg import eigs
+            which_ns = "SR" if which == "SM" else "LR"
+            w, V = eigs(L_sparse, k=k, which=which_ns)
+            self.eigv, self.eigV = _real_cast_sorted_gt(w, V)
+            if which != "SM":
+                self.eigv = self.eigv[::-1]
+                self.eigV = self.eigV[:, ::-1]
+        self._spectrum_laplacian_type = laplacian_type
         return self.eigv, self.eigV
 
     # ------------------------------------------------------------------
@@ -1034,6 +1149,7 @@ class SignedGraphGT:
         self._adj = None
         self._eigv = None
         self._eigV = None
+        self._spectrum_laplacian_type = None
         self._neighbor_cache = None
 
     def get_frustration_index(self) -> float:
@@ -1211,6 +1327,7 @@ class SignedGraphGT:
         backend: Optional[str] = None,
         keep_sparse: Optional[bool] = None,
         verbose: bool = False,
+        laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
     ) -> None:
         """Compute eigenvalues only (NX-compatible signature).
 
@@ -1229,9 +1346,15 @@ class SignedGraphGT:
             Ignored (GT always uses dense).
         verbose : bool
             Ignored.
+        laplacian_type : str, default 'signed'
+            Which Laplacian to diagonalize ('signed', 'sym', 'rw').
         """
         be = backend or "numpy"
-        self.eigv = self.get_laplacian_spectrum(backend=be)
+        cached = getattr(self, "_eigv", None)
+        if cached is not None and getattr(self, "_spectrum_laplacian_type", None) == laplacian_type:
+            return
+        self.eigv = self.get_laplacian_spectrum(backend=be, laplacian_type=laplacian_type)
+        self._spectrum_laplacian_type = laplacian_type
 
     def get_sgspect_basis(
         self,

@@ -1,6 +1,7 @@
 from typing import Any
 from numpy.typing import NDArray
 from lrgsglib import Lattice2D, load_or_compute_Lattice2D, flip_to_positive_majority
+from lrgsglib.config.const import SG_LAPL_DEFAULT_TYPE
 from parsers.shared import resolve_graph_class, get_graph_engine
 
 __all__ = [
@@ -98,9 +99,10 @@ def _make_lattice(side, engine='nx', **kwargs):
     return l
 
 
-def eigV_for_lattice2D(side, mode='scipy', howmany=1, engine='nx', **kwargs) -> NDArray:
+def eigV_for_lattice2D(side, mode='scipy', howmany=1, engine='nx',
+                       laplacian_type=SG_LAPL_DEFAULT_TYPE, **kwargs) -> NDArray:
     l = _make_lattice(side, engine=engine, **kwargs)
-    l.compute_k_eigvV(backend=mode, k=howmany)
+    l.compute_k_eigvV(backend=mode, k=howmany, laplacian_type=laplacian_type)
     return l.eigV
 
 def adjust_eigV_for_lattice2D(leigV: NDArray) -> NDArray:
@@ -111,16 +113,20 @@ def adjust_eigV_for_lattice2D(leigV: NDArray) -> NDArray:
 def eigV_for_lattice2D_ptch(**kwargs) -> NDArray:
     return adjust_eigV_for_lattice2D(eigV_for_lattice2D(**kwargs))
 
-def eigv_for_lattice2D(side, mode: str = "full", backend='scipy', keep_sparse=None, engine='nx', **kwargs) -> NDArray:
+def eigv_for_lattice2D(side, mode: str = "full", backend='scipy', keep_sparse=None,
+                       engine='nx', laplacian_type=SG_LAPL_DEFAULT_TYPE, **kwargs) -> NDArray:
     l = _make_lattice(side, engine=engine, **kwargs)
     match mode:
         case "full":
             if engine == 'gt':
-                l.compute_laplacian_spectrum_weigV(backend=backend)
+                l.compute_laplacian_spectrum_weigV(
+                    backend=backend, laplacian_type=laplacian_type)
             else:
-                l.compute_laplacian_spectrum_weigV(backend=backend, keep_sparse=keep_sparse)
+                l.compute_laplacian_spectrum_weigV(
+                    backend=backend, keep_sparse=keep_sparse,
+                    laplacian_type=laplacian_type)
         case _ if mode.startswith("some"):
             k = int(mode.split("_")[-1])
-            l.compute_k_eigvV(k=k, backend=backend)
+            l.compute_k_eigvV(k=k, backend=backend, laplacian_type=laplacian_type)
     return l.eigv
 

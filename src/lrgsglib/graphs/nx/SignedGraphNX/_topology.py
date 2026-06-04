@@ -1,9 +1,16 @@
 import networkx as nx
 import numpy as np
-from scipy.sparse import spdiags, identity as scsp_identity
+from scipy.sparse import spdiags, identity as scsp_identity, csr_array
 from typing import Any, TYPE_CHECKING
 
-from ....config.const import SG_REPR
+from ....config.const import (
+    SG_REPR,
+    SG_LAPL_SIGNED,
+    SG_LAPL_RW,
+    SG_LAPL_SYM,
+    SG_LAPL_TYPES,
+    SG_LAPL_DEFAULT_TYPE,
+)
 
 if TYPE_CHECKING:
     from .SignedGraphNX import SignedGraphNX
@@ -37,6 +44,65 @@ def get_laplacian(self: "SignedGraphNX"):
 
 def get_signed_laplacian(self: "SignedGraphNX"):
     return self.sdeg - self.adj
+
+
+def get_signed_rw_laplacian(
+    self: "SignedGraphNX", sym: bool = True, format: str = 'csr'
+):
+    """Random-walk normalized signed Laplacian (Kunegis 2010, §3.3/§3.4).
+
+    Parameters
+    ----------
+    sym : bool, default True
+        ``True``  -> ``L_sym = I - D_s^{-1/2} A D_s^{-1/2}`` (symmetric, PSD).
+        ``False`` -> ``L_rw  = I - D_s^{-1} A`` (random walk, NOT symmetric).
+    format : str, default 'csr'
+        Sparse format of the returned matrix.
+
+    Notes
+    -----
+    Built from the cached signed adjacency ``self.adj``; ``D_s`` is the signed
+    (absolute) degree matrix. The two variants are isospectral
+    (``L_rw = D_s^{-1/2} L_sym D_s^{1/2}``), so their eigenvalues coincide and
+    are real in ``[0, 2]``. Isolated nodes (zero signed degree) get a zero
+    inverse, leaving that row equal to the identity row (eigenvalue 1).
+    """
+    if self.adj is None:
+        self.upd_graph_matrices()
+    A = self.adj
+    n = A.shape[0]
+    deg = np.asarray(abs(A).sum(axis=1)).ravel()
+    nz = deg > 0
+    inv = np.zeros_like(deg, dtype=float)
+    if sym:
+        inv[nz] = 1.0 / np.sqrt(deg[nz])
+        D = csr_array(spdiags(inv, 0, n, n, format=format))
+        return csr_array(scsp_identity(n, format=format)) - D @ A @ D
+    inv[nz] = 1.0 / deg[nz]
+    D = csr_array(spdiags(inv, 0, n, n, format=format))
+    return csr_array(scsp_identity(n, format=format)) - D @ A
+
+
+def _laplacian_operator(
+    self: "SignedGraphNX", laplacian_type: str = SG_LAPL_DEFAULT_TYPE
+):
+    """Resolve ``laplacian_type`` to ``(matrix, is_symmetric)``.
+
+    ``'signed'`` -> combinatorial ``self.slp`` (symmetric, default behavior).
+    ``'sym'``    -> symmetric normalized ``L_sym`` (symmetric).
+    ``'rw'``     -> random-walk ``L_rw`` (NOT symmetric; needs a general solver).
+    """
+    if laplacian_type == SG_LAPL_SIGNED:
+        if self.slp is None:
+            self.upd_graph_matrices()
+        return self.slp, True
+    if laplacian_type == SG_LAPL_SYM:
+        return self.get_signed_rw_laplacian(sym=True), True
+    if laplacian_type == SG_LAPL_RW:
+        return self.get_signed_rw_laplacian(sym=False), False
+    raise ValueError(
+        f"laplacian_type must be one of {SG_LAPL_TYPES}, got {laplacian_type!r}"
+    )
 
 
 def get_signed_laplacian_embedding(self: "SignedGraphNX", k: int = 2):

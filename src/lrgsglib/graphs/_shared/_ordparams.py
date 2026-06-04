@@ -3,6 +3,8 @@
 import numpy as np
 from typing import Optional
 
+from ...config.const import SG_LAPL_DEFAULT_TYPE
+
 
 def compute_gap(
     self,
@@ -10,6 +12,7 @@ def compute_gap(
     typf: type = np.float64,
     transpose: bool = True,
     flip_to_pos: bool = True,
+    laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
 ) -> None:
     """Compute and cache the spectral gap (eigenvalue 1 - eigenvalue 0)."""
     compute_gap_between(
@@ -20,6 +23,7 @@ def compute_gap(
         typf=typf,
         transpose=transpose,
         flip_to_pos=flip_to_pos,
+        laplacian_type=laplacian_type,
     )
 
 
@@ -32,10 +36,23 @@ def compute_gap_between(
     transpose: bool = True,
     flip_to_pos: bool = True,
     rescale_by_sqrt: bool = True,
+    laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
 ) -> None:
-    """Compute gap between ``eigv[low]`` and ``eigv[high]``."""
-    if not hasattr(self, "eigv") or self.eigv is None or self.eigv.size != self.N:
-        kw = {"typf": typf, "transpose": transpose, "flip_to_pos": flip_to_pos}
+    """Compute gap between ``eigv[low]`` and ``eigv[high]`` of the requested
+    Laplacian (``laplacian_type`` in {'signed','sym','rw'})."""
+    need_compute = (
+        not hasattr(self, "eigv")
+        or self.eigv is None
+        or self.eigv.size != self.N
+        or getattr(self, "_spectrum_laplacian_type", None) != laplacian_type
+    )
+    if need_compute:
+        kw = {
+            "typf": typf,
+            "transpose": transpose,
+            "flip_to_pos": flip_to_pos,
+            "laplacian_type": laplacian_type,
+        }
         if backend is not None:
             kw["backend"] = backend
         # Filter kwargs to only pass what the method accepts
@@ -65,10 +82,15 @@ def compute_gap_between(
     if rescale_by_sqrt:
         gap *= np.sqrt(self.N)
     self.gap = gap
+    self._gap_laplacian_type = laplacian_type
 
 
-def get_gap(self) -> float:
-    """Return cached gap; compute it if missing."""
-    if not hasattr(self, "gap") or self.gap is None:
-        compute_gap(self)
+def get_gap(self, laplacian_type: str = SG_LAPL_DEFAULT_TYPE) -> float:
+    """Return cached gap for ``laplacian_type``; compute it if missing/stale."""
+    if (
+        not hasattr(self, "gap")
+        or self.gap is None
+        or getattr(self, "_gap_laplacian_type", None) != laplacian_type
+    ):
+        compute_gap(self, laplacian_type=laplacian_type)
     return self.gap

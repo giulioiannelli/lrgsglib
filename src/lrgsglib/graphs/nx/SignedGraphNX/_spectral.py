@@ -2,7 +2,7 @@ import numpy as np
 from typing import List, Union, Optional, TYPE_CHECKING
 from numpy.typing import NDArray
 from scipy.sparse import identity as scsp_identity
-from scipy.sparse.linalg import eigsh as scsp_eigsh
+from scipy.sparse.linalg import eigsh as scsp_eigsh, eigs as scsp_eigs
 
 from ....config.const import *
 from ....config.errwar import SignedGraphWarning
@@ -20,6 +20,38 @@ logger = get_logger(__name__)
 if TYPE_CHECKING:
     from .SignedGraphNX import SignedGraphNX
 #
+# General (non-symmetric) eigensolver helpers — used by the 'rw' laplacian_type.
+# The random-walk Laplacian L_rw = I - D_s^{-1} A is non-symmetric but isospectral
+# to the symmetric PSD L_sym, so its eigenvalues are real up to numerical noise.
+#
+def _real_cast_sorted(w, V=None):
+    """Sort a (possibly complex) spectrum ascending by real part and drop Im.
+
+    Warns if ``max|Im(lambda)|`` exceeds ``SG_LAPL_RW_IMAG_TOL``.
+    """
+    imag = float(np.max(np.abs(np.imag(w)))) if np.iscomplexobj(w) else 0.0
+    if imag > SG_LAPL_RW_IMAG_TOL:
+        logger.warning(
+            "Non-symmetric Laplacian eigenvalues have |Im|=%.2e > tol=%.1e; "
+            "casting to real.", imag, SG_LAPL_RW_IMAG_TOL,
+        )
+    order = np.argsort(np.real(w))
+    w_real = np.ascontiguousarray(np.real(w)[order])
+    if V is None:
+        return w_real
+    return w_real, np.ascontiguousarray(np.real(V[:, order]))
+
+
+def _general_eigvals(M):
+    """Eigenvalues of a dense non-symmetric matrix (real-cast, ascending)."""
+    return _real_cast_sorted(np.linalg.eigvals(M))
+
+
+def _general_eigh(M):
+    """Eigenpairs of a dense non-symmetric matrix (real-cast, ascending)."""
+    w, V = np.linalg.eig(M)
+    return _real_cast_sorted(w, V)
+#
 # computation methods
 #
 def compute_laplacian_spectrum(
@@ -28,6 +60,7 @@ def compute_laplacian_spectrum(
     backend: Optional[str] = None,
     keep_sparse: bool = None,
     verbose: bool = False,  # Deprecated: use enable_logging() instead
+    laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
 ):
     """
     Compute eigenvalues only of the signed Laplacian (no eigenvectors).
@@ -113,9 +146,14 @@ def compute_laplacian_spectrum(
     """
     from ._backend import BackendManager, Backend
 
-    # Check if we have a valid cached spectrum
+    # Check if we have a valid cached spectrum for THIS laplacian_type
     cached_eigv = getattr(self, "eigv", None)
-    has_cache = cached_eigv is not None and len(cached_eigv) >= self.N - 2
+    cache_type_ok = getattr(self, "_spectrum_laplacian_type", None) == laplacian_type
+    has_cache = (
+        cached_eigv is not None
+        and len(cached_eigv) >= self.N - 2
+        and cache_type_ok
+    )
 
     if has_cache and keep_sparse is None:
         # Auto-mode: accept cached spectrum (sparse or dense)
@@ -142,9 +180,9 @@ def compute_laplacian_spectrum(
     # Always go through BackendManager for consistent validation and fallback
     backend_obj = BackendManager.get_backend(backend, fallback=True)
 
-    # Ensure signed Laplacian matrix is computed
-    if self.slp is None:
-        self.upd_graph_matrices()
+    # Resolve which matrix to diagonalize (default: combinatorial signed slp).
+    # 'rw' returns a non-symmetric operator (is_sym=False).
+    lap, is_sym = self._laplacian_operator(laplacian_type)
 
     # Determine if we should use sparse methods
     if keep_sparse is None:
@@ -152,10 +190,10 @@ def compute_laplacian_spectrum(
         import scipy.sparse
 
         # Detect sparsity more robustly
-        if hasattr(self.slp, 'nnz'):
-            sparsity = self.slp.nnz / (self.N * self.N)
-        elif scipy.sparse.issparse(self.slp):
-            sparsity = self.slp.count_nonzero() / (self.N * self.N)
+        if hasattr(lap, 'nnz'):
+            sparsity = lap.nnz / (self.N * self.N)
+        elif scipy.sparse.issparse(lap):
+            sparsity = lap.count_nonzero() / (self.N * self.N)
         else:
             # Dense matrix
             sparsity = 1.0
@@ -165,6 +203,15 @@ def compute_laplacian_spectrum(
             keep_sparse = False
         else:
             keep_sparse = self.N > 5000 and sparsity < 0.3
+
+    # Symmetric ARPACK cannot diagonalize the non-symmetric rw Laplacian, and a
+    # *full* non-symmetric spectrum is unavailable from eigs -> force dense eig.
+    if not is_sym and keep_sparse:
+        logger.warning(
+            "Non-symmetric (rw) Laplacian: sparse ARPACK cannot return the full "
+            "spectrum; falling back to dense eig (N=%d).", self.N,
+        )
+        keep_sparse = False
 
     self._sparse_spectrum = keep_sparse
     self._last_spectrum_backend = backend_obj.name
@@ -183,9 +230,10 @@ def compute_laplacian_spectrum(
     )
 
     if keep_sparse:
-        # Use sparse methods - gets N-2 eigenvalues, discards eigenvectors
+        # Use sparse methods - gets N-2 eigenvalues, discards eigenvectors.
+        # Only reached for symmetric operators (is_sym True; see guard above).
         # Cast to correct dtype only if needed
-        laplacian = self.slp if self.slp.dtype == typf else self.slp.astype(typf)
+        laplacian = lap if lap.dtype == typf else lap.astype(typf)
         self.eigv, _ = backend_obj.eigh_sparse(
             laplacian,
             k=None,
@@ -198,37 +246,45 @@ def compute_laplacian_spectrum(
             "Converting sparse Laplacian to dense (%d x %d)", self.N, self.N
         )
 
-        if hasattr(self.slp, "toarray"):
+        if hasattr(lap, "toarray"):
             # Sparse matrix: check dtype before converting
-            if self.slp.dtype == typf:
+            if lap.dtype == typf:
                 # Already correct dtype: direct conversion
-                dense_laplacian = self.slp.toarray()
+                dense_laplacian = lap.toarray()
             else:
                 # Wrong dtype: must copy during conversion
                 # Cast sparse first (cheap), then convert to dense
-                dense_laplacian = self.slp.astype(typf).toarray()
+                dense_laplacian = lap.astype(typf).toarray()
 
             logger.debug("Dense conversion complete")
 
             # CRITICAL: Explicitly clear sparse Laplacian to free memory before eigval computation
-            # For very large matrices (N>100k), this can save 10-50GB of heap space
-            # The sparse matrix is no longer needed after dense conversion
-            sparse_key = self.on_g
-            if sparse_key in self.signed_laplacian_matrices:
-                del self.signed_laplacian_matrices[sparse_key]
-                logger.debug("Deleted sparse Laplacian from cache")
-            import gc
-            gc.collect()  # Force garbage collection to reclaim sparse matrix memory
+            # For very large matrices (N>100k), this can save 10-50GB of heap space.
+            # Only do this for the *signed* type, whose matrix is what we just
+            # converted; the rw/sym operators are transient (not in the cache).
+            if laplacian_type == SG_LAPL_SIGNED:
+                sparse_key = self.on_g
+                if sparse_key in self.signed_laplacian_matrices:
+                    del self.signed_laplacian_matrices[sparse_key]
+                    logger.debug("Deleted sparse Laplacian from cache")
+                import gc
+                gc.collect()  # Force garbage collection to reclaim sparse matrix memory
         else:
             # Already dense: just cast if needed
-            dense_laplacian = np.asarray(self.slp, dtype=typf)
+            dense_laplacian = np.asarray(lap, dtype=typf)
 
-        # Use eigvalsh (eigenvalues only, faster than eigh)
-        logger.debug("Computing eigenvalues with %s.eigvalsh", backend_obj.name)
-
-        self.eigv = backend_obj.eigvalsh(dense_laplacian)
+        if is_sym:
+            # Use eigvalsh (eigenvalues only, faster than eigh)
+            logger.debug("Computing eigenvalues with %s.eigvalsh", backend_obj.name)
+            self.eigv = backend_obj.eigvalsh(dense_laplacian)
+        else:
+            # Non-symmetric (rw): general solver, real-cast & sorted
+            logger.debug("Computing eigenvalues with general (non-symmetric) solver")
+            self.eigv = _general_eigvals(dense_laplacian)
 
         logger.debug("Eigenvalue computation complete: %d values", len(self.eigv))
+
+    self._spectrum_laplacian_type = laplacian_type
 #
 def compute_k_eigvV(
     self: "SignedGraphNX",
@@ -239,6 +295,7 @@ def compute_k_eigvV(
     typf: type = np.float64,
     which: str = 'SM',
     solver: str = 'eigsh',
+    laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
 ):
     """
     Compute k smallest eigenvectors of the signed Laplacian.
@@ -266,6 +323,14 @@ def compute_k_eigvV(
     solver = solver.lower()
     if solver not in {"eigsh", "lobpcg"}:
         raise ValueError("solver must be 'eigsh' or 'lobpcg'.")
+
+    # Resolve which matrix to diagonalize (default: combinatorial signed slp).
+    lap, is_sym = self._laplacian_operator(laplacian_type)
+    if not is_sym and solver == "lobpcg":
+        raise ValueError(
+            "lobpcg is symmetric-only and cannot diagonalize the non-symmetric "
+            "rw Laplacian; use solver='eigsh' (routes to scipy.sparse.linalg.eigs)."
+        )
 
     if solver == "lobpcg":
         import warnings
@@ -297,7 +362,7 @@ def compute_k_eigvV(
             import cupyx.scipy.sparse.linalg as cusp_linalg
             from scipy.sparse import issparse, csr_matrix
 
-            laplacian = self.slp.astype(typf)
+            laplacian = lap.astype(typf)
             if issparse(laplacian):
                 laplacian_gpu = cusp.csr_matrix(laplacian)
             else:
@@ -313,7 +378,7 @@ def compute_k_eigvV(
             import scipy.sparse as scsp
             from scipy.sparse.linalg import lobpcg
 
-            laplacian = self.slp.astype(typf)
+            laplacian = lap.astype(typf)
             if not scsp.issparse(laplacian):
                 laplacian = scsp.csr_matrix(laplacian)
 
@@ -333,6 +398,7 @@ def compute_k_eigvV(
 
         self.eigv, self.eigV = eigvals, eigvecs
         self._eigV_is_transposed = False
+        self._spectrum_laplacian_type = laplacian_type
         if transpose:
             make_eigV_transposed(self)
         return
@@ -345,7 +411,8 @@ def compute_k_eigvV(
     # is never correct.
     if k > self.N // 2:
         compute_laplacian_spectrum_weigV(
-            self, backend_name, transpose, flip_to_pos, typf
+            self, backend_name, transpose, flip_to_pos, typf,
+            laplacian_type=laplacian_type,
         )
         return
 
@@ -354,9 +421,14 @@ def compute_k_eigvV(
         mode = mode_parts[-1] if len(mode_parts) > 1 else 'caley'
     else:
         mode = 'caley'
-    self.eigv, self.eigV = scsp_eigsh(
-        self.slp.astype(typf), k=k, which=which, mode=mode
-    )
+    if is_sym:
+        self.eigv, self.eigV = scsp_eigsh(
+            lap.astype(typf), k=k, which=which, mode=mode
+        )
+    else:
+        # Non-symmetric (rw): k smallest-real-part eigenpairs, real-cast & sorted
+        w, V = scsp_eigs(lap.astype(typf), k=k, which='SR')
+        self.eigv, self.eigV = _real_cast_sorted(w, V)
 
     # At this point eigV is column-major (N, k) from scipy
     # Apply flip to positive majority if requested (on columns)
@@ -365,6 +437,7 @@ def compute_k_eigvV(
 
     # Set transposed state and apply transpose if requested
     self._eigV_is_transposed = False
+    self._spectrum_laplacian_type = laplacian_type
     if transpose:
         make_eigV_transposed(self)
 
@@ -436,6 +509,7 @@ def compute_laplacian_spectrum_weigV(
     flip_to_pos: bool = True,
     typf: type = np.float64,
     keep_sparse: bool = None,
+    laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
 ):
     """
     Compute full eigendecomposition of the signed Laplacian.
@@ -560,8 +634,9 @@ def compute_laplacian_spectrum_weigV(
         and len(cached_eigv) >= self.N - 2  # Accept N or N-2
         and cached_eigV.shape[0] >= self.N - 2
         and cached_eigV.shape[1] == self.N
+        and getattr(self, "_spectrum_laplacian_type", None) == laplacian_type
     )
-    
+
     if cached_ready:
         logger.debug("Using cached signed Laplacian spectrum.")
         eigv_transposed = getattr(self, "_eigV_is_transposed", False)
@@ -580,20 +655,29 @@ def compute_laplacian_spectrum_weigV(
         from ._backend import BackendManager
         backend_obj = BackendManager.get_backend(backend, fallback=True)
 
-    # Ensure signed Laplacian matrix is computed
-    if self.slp is None:
-        self.upd_graph_matrices()
+    # Resolve which matrix to diagonalize (default: combinatorial signed slp).
+    # 'rw' returns a non-symmetric operator (is_sym=False).
+    lap, is_sym = self._laplacian_operator(laplacian_type)
 
     # Determine if we should use sparse methods
     if keep_sparse is None:
         # Auto-decide based on size and sparsity
-        sparsity = self.slp.nnz / (self.N * self.N) if hasattr(self.slp, 'nnz') else 1.0
+        sparsity = lap.nnz / (self.N * self.N) if hasattr(lap, 'nnz') else 1.0
         # For CuPy backend, always use dense (full spectrum needed for entropy)
         if backend_obj.name == 'cupy':
             keep_sparse = False
         else:
             keep_sparse = self.N > 5000 and sparsity < 0.3
-    
+
+    # Symmetric ARPACK cannot diagonalize the non-symmetric rw Laplacian, and a
+    # *full* non-symmetric spectrum is unavailable from eigs -> force dense eig.
+    if not is_sym and keep_sparse:
+        logger.warning(
+            "Non-symmetric (rw) Laplacian: sparse ARPACK cannot return the full "
+            "spectrum; falling back to dense eig (N=%d).", self.N,
+        )
+        keep_sparse = False
+
     self._sparse_spectrum = keep_sparse
     self._last_spectrum_backend = backend_obj.name
     self._last_spectrum_request = backend_requested
@@ -612,14 +696,21 @@ def compute_laplacian_spectrum_weigV(
                 f"CuPy with sparse mode for N={self.N}. Consider using dense "
                 "(keep_sparse=False) or scipy backend for better performance."
             )
-        laplacian = self.slp.astype(typf)
+        # Only reached for symmetric operators (is_sym True; see guard above).
+        laplacian = lap.astype(typf)
         self.eigv, self.eigV = backend_obj.eigh_sparse(laplacian, k=None)
     else:
         # Convert sparse matrix to dense array for eigendecomposition
-        slp = self.slp.astype(typf).toarray()
-        
+        lap_dense = lap.astype(typf).toarray() if hasattr(lap, "toarray") else np.asarray(lap, dtype=typf)
+
         # Compute eigenvalues and eigenvectors using backend
-        self.eigv, self.eigV = backend_obj.eigh(slp)
+        if is_sym:
+            self.eigv, self.eigV = backend_obj.eigh(lap_dense)
+        else:
+            # Non-symmetric (rw): general solver, real-cast & sorted
+            self.eigv, self.eigV = _general_eigh(lap_dense)
+
+    self._spectrum_laplacian_type = laplacian_type
 
     if flip_to_pos:
         self.eigV = flip_to_positive_majority_adapted(self.eigV, axis=0)

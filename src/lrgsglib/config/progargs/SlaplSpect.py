@@ -45,6 +45,12 @@ SlaplSpect_common_optional_args_dict = {
         'type': lambda x: None if x.lower() == 'none' else x.lower() == 'true',
         'default': DEFAULT_KEEP_SPARSE,
         'metavar': 'BOOL|none'
+    },
+    tuple(['-lt', '--laplacian-type']): {
+        'help': phelp_laplacian_type,
+        'type': str,
+        'default': DEFAULT_LAPLACIAN_TYPE,
+        'choices': LAPLACIAN_TYPE_CHOICES
     }
 }
 

@@ -18,3 +18,8 @@ DEFAULT_NUM_SAMPLES = 30
 DEFAULT_ENTROPY_SEED = None
 DEFAULT_ENTROPY_NORM = "complement"
 DEFAULT_SPECIFIC_HEAT_SCALE = "logN"
+
+# Laplacian type selector (canonical source of truth: config/const.py)
+from ...const import SG_LAPL_DEFAULT_TYPE, SG_LAPL_TYPES
+DEFAULT_LAPLACIAN_TYPE = SG_LAPL_DEFAULT_TYPE
+LAPLACIAN_TYPE_CHOICES = list(SG_LAPL_TYPES)

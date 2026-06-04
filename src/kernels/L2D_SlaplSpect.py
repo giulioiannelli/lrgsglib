@@ -11,6 +11,7 @@ graph construction functions.
 """
 
 from lrgsglib import *
+from lrgsglib.config.const import SG_LAPL_DEFAULT_TYPE
 from .L2D import *
 from .SlaplSpect import (
     process_eigen_distribution,
@@ -62,18 +63,22 @@ def perform_spectral_calculations(args):
     None
         Results saved to disk.
     """
+    # Laplacian type selector ('signed' default keeps existing filenames byte-identical)
+    lap_type = getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE)
+    lap_suffix = '' if lap_type == SG_LAPL_DEFAULT_TYPE else f"_lap={lap_type}"
+
     # Determine the filename base and processing functions based on the mode
     if args.mode.endswith("dist"):
         if args.mode == "eigvec_dist":
             fname_base = build_eigvec_fname_base(
                 "", args.howmany, args.p, args.eigen_mode
-            )
+            ) + lap_suffix
             initial_fn = eigvec_initial_data
             update_fn = eigvec_update_data
         elif args.mode == "eigval_dist":
             fname_base = build_eigval_fname_base(
                 "", args.p, args.cell_type
-            )
+            ) + lap_suffix
             initial_fn = eigval_initial_data
             update_fn = eigval_update_data
 
@@ -89,7 +94,7 @@ def perform_spectral_calculations(args):
 
     elif args.mode == "eigvals":
         # Raw eigenvalue storage mode
-        fname_base = f"eigvals_{args.p:.3g}_{args.cell_type}"
+        fname_base = f"eigvals_{args.p:.3g}_{args.cell_type}{lap_suffix}"
 
         engine = get_graph_engine(args)
         eigvlist = []
@@ -103,6 +108,7 @@ def perform_spectral_calculations(args):
                 backend=args.backend,
                 keep_sparse=getattr(args, 'keep_sparse', None),
                 engine=engine,
+                laplacian_type=lap_type,
             )
             eigvlist.append(eigv)
 
@@ -147,6 +153,7 @@ def eigvec_initial_data(args):
         mode=args.eigen_mode,
         howmany=args.howmany,
         engine=engine,
+        laplacian_type=getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE),
     ))
     if args.verbose:
         print(f"Computed initial eigenvector data of size {result.shape}")
@@ -175,6 +182,7 @@ def eigval_initial_data(args):
         pflip=args.p,
         geo=args.geometry,
         engine=engine,
+        laplacian_type=getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE),
     )
     if args.verbose:
         print(f"Computed initial eigenvalue data of size {result.shape}")
@@ -216,6 +224,7 @@ def eigvec_update_data(batch_size, bins, bin_centers, bin_counter, args):
             mode=args.eigen_mode,
             howmany=args.howmany,
             engine=engine,
+            laplacian_type=getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE),
         )
         for i in range(args.howmany):
             eig_values[i].append(eigV[i])
@@ -264,7 +273,8 @@ def eigval_update_data(batch_size, bins, bin_centers, bin_counter, args):
     engine = get_graph_engine(args)
     eig_values = [
         eigv_for_lattice2D(side=args.L, pflip=args.p, geo=args.geometry,
-                           engine=engine)
+                           engine=engine,
+                           laplacian_type=getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE))
         for _ in range(batch_size)
     ]
     eig_values = np.concatenate(eig_values)

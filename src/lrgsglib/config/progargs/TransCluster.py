@@ -4,6 +4,11 @@ from .Lattice2D import *
 from .Lattice3D import *
 from .SCSNN import *
 
+# Laplacian type selector (canonical source: config/const.py; help string reused
+# from the SlaplSpect program so the wording stays in one place).
+from ..const import SG_LAPL_DEFAULT_TYPE, SG_LAPL_TYPES
+from .phelp.SlaplSpect import phelp_laplacian_type
+
 def _transcluster_common_optional_args(
     *,
     mode_default,
@@ -54,6 +59,12 @@ L2D_TransCluster_optional_args_dict = {
         float_type_default=DEFAULT_L2D_TRANSCLUSTER_FLOAT_TYPE,
         save_frequency_help=phelp_data_save_freq,
     ),
+    tuple(["-lt", "--laplacian-type"]): {
+        "help": phelp_laplacian_type,
+        "type": str,
+        "default": SG_LAPL_DEFAULT_TYPE,
+        "choices": list(SG_LAPL_TYPES),
+    },
 }
 L2D_TransCluster_action_args_dict = {**action_args_dict}
 

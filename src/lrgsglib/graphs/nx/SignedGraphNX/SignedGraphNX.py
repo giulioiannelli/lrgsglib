@@ -1046,6 +1046,8 @@ class SignedGraphNX:
     #
     from ._topology import get_laplacian
     from ._topology import get_signed_laplacian
+    from ._topology import get_signed_rw_laplacian
+    from ._topology import _laplacian_operator
     from ._topology import get_signed_laplacian_embedding
     from ._topology import make_rescaled_signed_laplacian
     from ._topology import nodes_in

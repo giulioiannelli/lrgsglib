@@ -8,6 +8,15 @@ from scipy.linalg import fractional_matrix_power
 from scipy.linalg import expm
 from scipy.sparse import diags
 #
+from ...config.const import (
+    SG_LAPL_SIGNED,
+    SG_LAPL_RW,
+    SG_LAPL_SYM,
+    SG_LAPL_TYPES,
+    SG_LAPL_DEFAULT_TYPE,
+    SG_LAPL_RW_IMAG_TOL,
+)
+#
 __all__ = [
     "get_graph_lspectrum",
     "get_graph_lspectrum_rw",
@@ -19,6 +28,7 @@ def get_graph_lspectrum(
     G: nx.Graph,
     library: str = "numpy",
     signed: bool = False,
+    laplacian_type: str = SG_LAPL_DEFAULT_TYPE,
 ) -> tuple[NDArray, NDArray]:
     """
     Compute the Laplacian matrix and its spectrum for a given graph.
@@ -36,6 +46,13 @@ def get_graph_lspectrum(
         degrees and A preserves edge signs). This is appropriate for graphs with
         negative edge weights representing antiferromagnetic/repulsive interactions.
         If False (default), uses NetworkX's standard unsigned Laplacian.
+        Only consulted when ``laplacian_type == 'signed'``.
+    laplacian_type : str, optional
+        Which signed Laplacian to build (Kunegis 2010):
+        ``'signed'`` (default) -> combinatorial (honours the ``signed`` flag);
+        ``'sym'`` -> symmetric normalized ``L_sym = I - D_s^-1/2 A D_s^-1/2``;
+        ``'rw'`` -> random-walk ``L_rw = I - D_s^-1 A`` (non-symmetric; its
+        eigenvalues are real and equal those of ``'sym'``).
 
     Returns
     -------
@@ -79,6 +96,48 @@ def get_graph_lspectrum(
     >>> G.add_edge(1, 2, weight=1)
     >>> L, w = get_graph_lspectrum(G, library='numpy', signed=True)
     """
+    if laplacian_type in (SG_LAPL_SYM, SG_LAPL_RW):
+        from lrgsglib.graphs.nx.funcs.spectral import (
+            signed_sym_laplacian_matrix,
+            signed_rw_laplacian_matrix,
+        )
+
+        is_sym = laplacian_type == SG_LAPL_SYM
+        builder = signed_sym_laplacian_matrix if is_sym else signed_rw_laplacian_matrix
+        L = builder(G).toarray()
+        match library:
+            case "scipy" | "sp":
+                from scipy.linalg import eigvalsh as _eigvalsh, eigvals as _eigvals
+                w = _eigvalsh(L) if is_sym else _eigvals(L)
+            case "cupy" | "cp":
+                import cupy as cp
+
+                Lg = cp.asarray(L)
+                w = (cp.linalg.eigvalsh(Lg) if is_sym else cp.linalg.eigvals(Lg)).get()
+            case _:
+                # numpy / networkx / default: nx has no normalized signed
+                # spectrum, so compute directly from L.
+                w = np.linalg.eigvalsh(L) if is_sym else np.linalg.eigvals(L)
+        if not is_sym:
+            # L_rw is isospectral to the symmetric L_sym -> eigenvalues are real
+            imag = float(np.max(np.abs(np.imag(w)))) if np.iscomplexobj(w) else 0.0
+            if imag > SG_LAPL_RW_IMAG_TOL:
+                import warnings
+
+                warnings.warn(
+                    f"rw Laplacian eigenvalues have |Im|={imag:.2e} > "
+                    f"{SG_LAPL_RW_IMAG_TOL:.1e}; casting to real.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+            w = np.real(w)
+        return L, w
+
+    if laplacian_type != SG_LAPL_SIGNED:
+        raise ValueError(
+            f"laplacian_type must be one of {SG_LAPL_TYPES}, got {laplacian_type!r}"
+        )
+
     if signed:
         # Import signed Laplacian from canonical location
         from lrgsglib.graphs.nx.funcs.spectral import signed_laplacian_matrix
@@ -125,36 +184,22 @@ def get_graph_lspectrum_rw(
     is_signed: bool = False,
 ) -> tuple[NDArray, NDArray]:
     """
-    Compute the random-walk normalized Laplacian and its spectrum.
+    Symmetric normalized signed Laplacian and its spectrum (thin alias).
 
-    Parameters
-    ----------
-    G : nx.Graph
-        The input graph.
-    is_signed : bool, default False
-        If True, use the signed adjacency to build the normalized Laplacian
-        and compute eigenvalues directly from it.
+    .. deprecated::
+        Prefer :func:`get_graph_lspectrum` with ``laplacian_type='sym'`` (this
+        matrix) or ``laplacian_type='rw'`` (the true non-symmetric random-walk
+        operator). Retained for backward compatibility.
 
-    Returns
-    -------
-    tuple[NDArray, NDArray]
-        A tuple containing the normalized Laplacian and its eigenvalues.
-
-    Notes
-    -----
-    When ``is_signed=False``, eigenvalues are computed with
-    ``networkx.laplacian_spectrum`` (combinatorial Laplacian), which may not
-    match the normalized Laplacian returned as ``L``.
+    Returns ``L_sym = I - D_s^{-1/2} A D_s^{-1/2}`` (Kunegis 2010, §3.4) with the
+    signed degree ``D_s`` and its real eigenvalues. The ``is_signed`` flag is
+    accepted for signature compatibility but no longer changes the result: the
+    spectrum is always computed from the returned (signed-degree) matrix.
     """
-    A = nx.adjacency_matrix(G).toarray()
-    D = np.diag(np.abs(A).sum(axis=1))
-    L = np.eye(D.shape[0]) - fractional_matrix_power(
-        D, -0.5
-    ) @ A @ fractional_matrix_power(D, -0.5)
-    if is_signed:
-        w = np.linalg.eigvals(L)
-    else:
-        w = nx.laplacian_spectrum(G)
+    from lrgsglib.graphs.nx.funcs.spectral import signed_sym_laplacian_matrix
+
+    L = signed_sym_laplacian_matrix(G).toarray()
+    w = np.linalg.eigvalsh(L)
     return L, w
 
 

@@ -30,3 +30,10 @@ phelp_keep_sparse = """Sparse eigendecomposition strategy for full spectrum:
     - True: Force sparse methods (computes N-2 eigenpairs, saves memory)
     - False: Force dense methods (computes all N eigenpairs)
     Default: None (auto-select)"""
+
+phelp_laplacian_type = """Which signed Laplacian to diagonalize (Kunegis 2010):
+    - 'signed': combinatorial L = D_s - A (symmetric)            [default]
+    - 'sym':    symmetric normalized L_sym = I - D_s^-1/2 A D_s^-1/2
+    - 'rw':     random-walk L_rw = I - D_s^-1 A (non-symmetric; isospectral
+                to 'sym' but with the true random-walk eigenvectors)
+    D_s is the signed (absolute) degree matrix. Default: 'signed'."""

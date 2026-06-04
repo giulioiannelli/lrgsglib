@@ -6,14 +6,29 @@ import numpy as np
 from networkx import Graph, NetworkXError, to_numpy_array, to_scipy_sparse_array
 from networkx.drawing.layout import _process_params, rescale_layout
 from networkx.utils.backends import _dispatchable, _registered_algorithms
-from scipy.sparse import csr_array, spdiags
+from scipy.sparse import csr_array, spdiags, identity as sp_identity
 from scipy.sparse.linalg import eigsh
 from typing import List
 
 __all__ = [
     "signed_laplacian_matrix",
+    "signed_sym_laplacian_matrix",
+    "signed_rw_laplacian_matrix",
     "signed_spectral_layout",
 ]
+
+
+def _signed_adj_and_absdeg(G, nodelist=None, weight="weight"):
+    """Signed adjacency ``A`` (CSR) and absolute-degree vector ``D_s[i,i]``.
+
+    ``D_s[i] = sum_j |A_ij|`` is the signed degree of Kunegis 2010 (Eq. 3.8),
+    shared by the combinatorial, symmetric-normalized and random-walk signed
+    Laplacians.
+    """
+    nodelist = nodelist or list(G)
+    adj = to_scipy_sparse_array(G, nodelist=nodelist, weight=weight, format="csr")
+    deg = np.asarray(abs(adj).sum(axis=1)).ravel()
+    return adj, deg
 
 if "signed_laplacian_matrix" in _registered_algorithms:
     def _dispatchable_signed(func):
@@ -31,6 +46,45 @@ def signed_laplacian_matrix(
     adj = to_scipy_sparse_array(G, nodelist=nodelist, weight=weight, format="csr")
     deg = csr_array(spdiags(abs(adj).sum(axis=1), 0, *adj.shape, format="csr"))
     return deg - adj
+
+
+def signed_sym_laplacian_matrix(
+    G: Graph, nodelist: List | None = None, weight: str = "weight"
+) -> csr_array:
+    """Return the symmetric normalized signed Laplacian of ``G``.
+
+    ``L_sym = I - D_s^{-1/2} A D_s^{-1/2}`` (Kunegis 2010, §3.4). Symmetric and
+    positive-semidefinite, spectrum in ``[0, 2]``. Isolated nodes (zero signed
+    degree) get a zero inverse, leaving that row equal to the identity row
+    (eigenvalue 1).
+    """
+    adj, deg = _signed_adj_and_absdeg(G, nodelist=nodelist, weight=weight)
+    n = adj.shape[0]
+    inv_sqrt = np.zeros_like(deg, dtype=float)
+    nz = deg > 0
+    inv_sqrt[nz] = 1.0 / np.sqrt(deg[nz])
+    dinv_sqrt = csr_array(spdiags(inv_sqrt, 0, n, n, format="csr"))
+    return csr_array(sp_identity(n, format="csr")) - dinv_sqrt @ adj @ dinv_sqrt
+
+
+def signed_rw_laplacian_matrix(
+    G: Graph, nodelist: List | None = None, weight: str = "weight"
+) -> csr_array:
+    """Return the random-walk normalized signed Laplacian of ``G``.
+
+    ``L_rw = I - D_s^{-1} A`` (Kunegis 2010, §3.3). This matrix is NOT symmetric
+    (use a general eigensolver), but it is similar to ``L_sym`` via
+    ``L_rw = D_s^{-1/2} L_sym D_s^{1/2}`` and hence isospectral: its eigenvalues
+    are real and lie in ``[0, 2]``. Isolated nodes (zero signed degree) get a
+    zero inverse, leaving that row equal to the identity row (eigenvalue 1).
+    """
+    adj, deg = _signed_adj_and_absdeg(G, nodelist=nodelist, weight=weight)
+    n = adj.shape[0]
+    inv = np.zeros_like(deg, dtype=float)
+    nz = deg > 0
+    inv[nz] = 1.0 / deg[nz]
+    dinv = csr_array(spdiags(inv, 0, n, n, format="csr"))
+    return csr_array(sp_identity(n, format="csr")) - dinv @ adj
 
 
 def signed_spectral_layout(

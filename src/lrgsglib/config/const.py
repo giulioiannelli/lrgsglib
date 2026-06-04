@@ -293,6 +293,22 @@ SRW_START_PROTOCOLS = ('random', 'fixed', 'center')
 SRW_X_NODE_BEHAVIORS = ('reflect', 'absorb')
 SRW_OVERLAP_KINDS = ('l2_raw', 'l2_norm', 'l2_rescaled', 'fidelity', 'tv', 'jaccard')
 
+# Signed Laplacian type selector (see graphs/.../_topology.py, _spectral.py).
+# Three genuinely distinct matrices (Kunegis 2010, kunegis2010spectral.pdf):
+#   'signed' -> L = D_s - A                  (combinatorial, symmetric)   [default]
+#   'sym'    -> L_sym = I - D_s^-1/2 A D_s^-1/2 (symmetric normalized)    §3.4
+#   'rw'     -> L_rw  = I - D_s^-1 A           (random walk, NON-symmetric) §3.3
+# D_s is the signed (absolute) degree matrix, D_s[i,i] = sum_j |A_ij|.
+SG_LAPL_SIGNED = 'signed'
+SG_LAPL_RW = 'rw'
+SG_LAPL_SYM = 'sym'
+SG_LAPL_TYPES = (SG_LAPL_SIGNED, SG_LAPL_RW, SG_LAPL_SYM)
+SG_LAPL_DEFAULT_TYPE = SG_LAPL_SIGNED
+# Max |Im(lambda)| tolerated from the non-symmetric (rw) eigensolver before the
+# eigenvalues are cast to real. L_rw is isospectral to the symmetric L_sym, so
+# its spectrum is real up to numerical noise.
+SG_LAPL_RW_IMAG_TOL = 1e-9
+
 DEFAULT_NUNMBER_AVERAGES = 100
 DEFAULT_SPIKE_THRESHOLD = 0.05
 DEFAULT_MAX_THRESHOLD = 2 * DEFAULT_SPIKE_THRESHOLD
