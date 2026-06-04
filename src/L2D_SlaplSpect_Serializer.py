@@ -1,93 +1,119 @@
-import os
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
 import numpy as np
-from parsers.L2D_SlaplSpect_Serializer import *
-#
-args = parser.parse_args()
-#
-geo = args.geometry
-cell = args.cell_type
-mode = args.mode
-eigmode = args.eigen_mode
-navg = args.number_of_averages
-T = args.save_frequency
-bins_count = args.bins_count
-howmany = args.howmany
-#
-progName = L2D_SlaplSpect_progName
-progNameShrt = L2D_SlaplSpect_progNameShrt
-progMode = '_'.join(args.mode.split('_')[1:])
-execBool = args.exec
-printBool = args.print
-#
-if mode.endswith("eigvec_dist"):
-    List = 2 ** np.arange(4, 10)
-    plist = np.linspace(0.06, 0.115, num=10)
-if mode.endswith("eigval_dist"):
-    List = [16, 32, 48, 64, 96, 128]
-    plist = [0.01, 0.025, 0.05, 0.075, 0.08, 0.09, 0.1, 0.11, 0.125, 0.15, 0.25, 0.5, 0.75]
-if mode.endswith("eigvals"):
-    List = [16, 32, 64, 128]
-    plist = np.linspace(0.0, 0.3, 100)
-if mode.startswith("slanzarv"):
-    if args.slanzarv_minMB == args.slanzarv_maxMB:
 
-        def memoryfunc(*_):
-            return args.slanzarv_minMB
+from kernels.Serializer import (
+    build_jobname,
+    build_memory_function,
+    resolve_slanzarv_mode,
+    _collect_values,
+    _collect_values_typed,
+)
+from parsers.L2D_SlaplSpect_Serializer import (
+    parser,
+    L2D_SlaplSpect_progName,
+    L2D_SlaplSpect_progNameShrt,
+)
+from lrgsglib.config.progargs import (
+    DEFAULT_L2D_SLAPLSPECT_SRUN_L_LIST,
+    DEFAULT_L2D_SLAPLSPECT_SRUN_P_LIST,
+)
 
-    else:
 
-        def memoryfunc(x):
-            return int(
-                np.interp(
-                    x,
-                    [min(List), max(List)],
-                    [args.slanzarv_minMB, args.slanzarv_maxMB],
-                )
+# Per-mode default sweeps preserve the legacy serializer behaviour for
+# `eigval_dist` and `eigvec_dist`. CLI lists (`--L-list`, `--L-linsp`,
+# `--p-list`, `--p-linsp`) override these on a per-axis basis.
+_DEFAULT_L_BY_MODE = {
+    "eigvec_dist": [2 ** i for i in range(4, 10)],
+    "eigval_dist": [16, 32, 48, 64, 96, 128],
+}
+_DEFAULT_P_BY_MODE = {
+    "eigvec_dist": list(np.linspace(0.06, 0.115, 10)),
+    "eigval_dist": [
+        0.01, 0.025, 0.05, 0.075, 0.08, 0.09, 0.1, 0.11,
+        0.125, 0.15, 0.25, 0.5, 0.75,
+    ],
+}
+
+
+def main() -> None:
+    args, unknown = parser.parse_known_args()
+    if not (args.exec or args.print):
+        return
+
+    use_slanzarv, actual_mode = resolve_slanzarv_mode(
+        getattr(args, "mode", None),
+        default_use_slanzarv=False,
+    )
+    if not actual_mode:
+        parser.error(
+            "--mode is required (e.g. 'eigvals', 'eigval_dist', "
+            "or prefixed with 'slanzarv_')"
+        )
+
+    default_L = _DEFAULT_L_BY_MODE.get(actual_mode, DEFAULT_L2D_SLAPLSPECT_SRUN_L_LIST)
+    default_p = _DEFAULT_P_BY_MODE.get(actual_mode, DEFAULT_L2D_SLAPLSPECT_SRUN_P_LIST)
+
+    L_values = _collect_values_typed(args.L_list, args.L_linsp, default_L, int)
+    p_values = _collect_values(args.p_list, args.p_linsp, default_p)
+
+    memoryfunc = build_memory_function(
+        args.slanzarv_minMB, args.slanzarv_maxMB, L_values
+    )
+    script_path = Path("src") / f"{L2D_SlaplSpect_progName}.py"
+
+    total_printed = total_executed = 0
+
+    def dispatch(L: int, p: float) -> None:
+        nonlocal total_printed, total_executed
+
+        probability_str = f"{p:.3g}"
+        prog_args = [
+            str(L),
+            "-p", probability_str,
+            "--mode", actual_mode,
+        ]
+        cmd = ["python", str(script_path), *prog_args, *unknown]
+
+        if use_slanzarv:
+            slanz_opts = ["-m", str(memoryfunc(L))]
+            if args.nomail:
+                slanz_opts.append("--nomail")
+            if args.short:
+                slanz_opts.append("--short")
+            if getattr(args, "moretime", 0):
+                slanz_opts.extend(["--time", str(args.moretime)])
+
+            jobname = build_jobname(
+                program_short=L2D_SlaplSpect_progNameShrt,
+                tokens=[actual_mode, f"L{L}", f"p{probability_str}"],
+                job_id=getattr(args, "slanzarv_id", None) or None,
             )
+            slanz_opts.extend(["--jobname", jobname])
 
-    def slanzarv_str(mode, L, p, geo, c):
-        slanzarvopt = "--nomail --jobname "
-        slanzarvstr = f"slanzarv -m {memoryfunc(L)} {slanzarvopt}"
-        argstr = f"{progNameShrt}{mode}_{L}_{p:.3g}_{geo[:3]}_{c[3:]}"
-        return slanzarvstr + argstr
+            final_cmd = ["slanzarv", *slanz_opts, *cmd]
+        else:
+            final_cmd = cmd
 
-else:
+        if args.print:
+            print(" ".join(final_cmd))
+            total_printed += 1
+        if args.exec:
+            subprocess.run(final_cmd, check=True)
+            total_executed += 1
 
-    def slanzarv_str(*_):
-        return ""
+    for L in L_values:
+        for p in p_values:
+            dispatch(L, p)
+
+    if args.exec:
+        print(f"Total number of jobs executed: {total_executed}")
+    if args.print:
+        print(f"Total number of jobs described: {total_printed}")
 
 
-#
-if execBool or printBool:
-    if execBool and printBool:
-
-        def operate(s, count):
-            print(s)
-            os.system(s)
-            count += 1
-
-    elif execBool:
-
-        def operate(s, count):
-            os.system(s)
-            count += 1
-
-    elif printBool:
-
-        def operate(s, *args):
-            print(s)
-
-    def exec_str(L, p, geo, cell, navg, mode, eigmode, T, bins_count, howmany):
-        lnchStr = f"python src/{progName}.py"
-        argstr = f"""{L} -p {p:.3g} -g {geo} -c {cell} -n {navg} --mode={mode} --eigen_mode={eigmode} --save_frequency={T} --bins_count={bins_count} --howmany={howmany}"""
-        return f"{slanzarv_str(mode, L, p, geo, cell)} {lnchStr} {argstr}"
-
-else:
-    exit(0)
-
-count = 0
-for L in List:
-    for p in plist:
-        estring = exec_str(L, p, geo, cell, navg, progMode, eigmode, T, 
-                            bins_count, howmany)
-        operate(estring, count)
+if __name__ == "__main__":
+    main()

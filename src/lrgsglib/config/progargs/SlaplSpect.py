@@ -69,6 +69,52 @@ L2D_SlaplSpect_optional_args_dict = {
 }
 L2D_SlaplSpect_action_args_dict = {}
 
+# Serializer-specific configuration (L3D-style: only sweep + slurm flags here;
+# everything else passes through to L2D_SlaplSpect.py via `parse_known_args`)
+L2D_SlaplSpect_srun_description = (
+    f"Serializer for {L2D_SlaplSpect_progName}.py"
+)
+
+DEFAULT_L2D_SLAPLSPECT_SRUN_L_LIST = [16, 32, 64, 128]
+DEFAULT_L2D_SLAPLSPECT_SRUN_P_LIST = list(np.linspace(0.0, 0.3, 100))
+
+L2D_SlaplSpect_srun_optional_args_dict = {
+    tuple(['-m', '--mode']): {
+        'help': (
+            "Execution mode (e.g. 'eigvals', 'eigval_dist', 'eigvec_dist'); "
+            "prefix with 'slanzarv_' to submit each child via slanzarv."
+        ),
+        'type': str,
+        'default': f"slanzarv_{DEFAULT_L2DSSPECT_MODE}",
+    },
+    tuple(['--L-list']): {
+        'help': (
+            "Explicit lattice sizes "
+            f"(default per-mode; falls back to {DEFAULT_L2D_SLAPLSPECT_SRUN_L_LIST})"
+        ),
+        'type': int,
+        'nargs': '+',
+        'default': None,
+    },
+    tuple(['--L-linsp']): {
+        'help': "Semicolon-separated linspace tuples for lattice sizes",
+        'type': parse_multiple_linspace,
+        'default': None,
+    },
+    tuple(['--p-list']): {
+        'help': "Explicit probabilities for flipped edges",
+        'type': float,
+        'nargs': '+',
+        'default': None,
+    },
+    tuple(['--p-linsp']): {
+        'help': "Semicolon-separated linspace tuples for flipped-edge probabilities",
+        'type': parse_multiple_linspace,
+        'default': None,
+    },
+    **srun_opt_args,
+}
+
 #
 # MCG_SlaplSpect (MultiplicativeCascade spectral analysis)
 #

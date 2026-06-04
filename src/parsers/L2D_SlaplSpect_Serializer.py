@@ -1,141 +1,49 @@
-import argparse
-from lrgsglib.core import *
-#
-description = """
-    Serializer for Lattice2D_SlaplSpect.py
-"""
-L2D_SlaplSpect_progName = "L2D_SlaplSpect"
-L2D_SlaplSpect_progNameShrt = "L2DSS"
-# Default values for the optional parameters
-DEFAULT_BINSC = 500
-DEFAULT_EIGMODE = 'scipy'
-DEFAULT_NAVG = 10**4
-DEFAULT_SAVE_FREQUENCY = DEFAULT_NAVG//20
-DEFAULT_WORKDIR = ''
-DEFAULT_HOWMANY = 1
-DEFAULT_GEO = 'squared'
-DEFAULT_CELL = 'rand'
-DEFAULT_MODE = 'slanzarv_eigvec_dist'
-#
-DEFAULT_PRINT = False
-DEFAULT_EXEC = False
-DEFAULT_mMB = 2**10
-DEFAULT_MMB = 2**14
-# Helpers for argparse descriptions
-phelp_print = f"""
-    Option to print the output of the Serializer. 
-"""
-phelp_exc = f"""
-    Option to exec the output of the Serializer.
-"""
-phelp_mMB = f"""
-    Minimum MB quantity to be allocated for the single process 
-"""
-phelp_MMB = f"""
-    Maximum MB quantity to be allocated for the single process 
-"""
-phelp_binsc = f"""
-    Number of bins for the distribution sampling 
-"""
-phelp_cell = f"""
-    Topological defect class: 'rand', 'randXERR', 'randZERR', 'ball_<R>' 
-    with type(<R>)=int. 
-"""
-phelp_eigMode = f"""
-    Spectral computations (numpy/scipy) 
-"""
-phelp_geo = f"""
-    Geometry of the lattice. 
-"""
-phelp_howmany = f"""
-    Number of eigenvalues to compute 
-"""
-phelp_mode = f"""
-    Mode, (eigDistr, slanzarv_eigDistr) 
-"""
-phelp_navg = f"""
-    Number of averages to compute 
-"""
-phelp_save_frequency = f"""
-    Save frequency for the data 
-"""
-phelp_workDir = f"""
-    Working directory 
-"""
-#
-parDO = {'mode': {'names': ['-m', '--mode'], 
-                'help': phelp_mode, 
-                'type': str, 
-                'default': DEFAULT_MODE},
-        'eigmode': {'names': ['-em', '--eigen_mode'], 
-                'help': phelp_eigMode, 
-                'type': str, 
-                'default': DEFAULT_EIGMODE},
-        'geo': {'names': ['-g', '--geometry'],
-                'help': phelp_geo,
-                'type': str,
-                'default': DEFAULT_GEO} ,
-        'cell': {'names': ['-c', '--cell_type'],
-                'help': phelp_cell,
-                'type': str,
-                'default': DEFAULT_CELL},
-        'navg': {'names': ['-n', '--number_of_averages'],
-                'help': phelp_navg,
-                'type': int,
-                'default': DEFAULT_NAVG},
-        'save_frequency': {'names': ['-sf', '--save_frequency'],
-                'help': phelp_save_frequency,
-                'type': int,
-                'default': DEFAULT_SAVE_FREQUENCY},
-        'bins_count': {'names': ['-bc', '--bins_count'],
-                'help': phelp_binsc,
-                'type': int,
-                'default': DEFAULT_BINSC},
-        'howmany': {'names': ['-hm', '--howmany'],
-                'help': phelp_howmany,
-                'type': int,
-                'default': DEFAULT_HOWMANY},
-        'workDir': {'names': ['-wd', '--workDir'],
-                'help': phelp_workDir,
-                'type': str,
-                'default': DEFAULT_WORKDIR},
-        'mMB': {'names': ['-mMB', '--slanzarv_minMB'],               
-                'help': phelp_mMB,
-                'type': int,
-                'default': DEFAULT_mMB},
-        'MMB': {'names': ['-MMB', '--slanzarv_maxMB'],
-                'help': phelp_MMB,
-                'type': int,
-                'default': DEFAULT_MMB}
-}
-parDA = {'exec': {'names': ['-e', '--exec'],
-                        'help': phelp_exc,
-                        'action': argparse.BooleanOptionalAction,
-                        'default': DEFAULT_EXEC},
-                'print': {'names': ['-p', '--print'],                 
-                        'help': phelp_print,
-                        'action': argparse.BooleanOptionalAction,
-                        'default': DEFAULT_PRINT}
-                        }
+from __future__ import annotations
 
-# Setup the argument parser
-parser = argparse.ArgumentParser(description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-# Optional parameters
-def parsDict_get(var, key):
-    return parDO[var].get(key, None)
-for ov in parDO.keys():
-    parser.add_argument(*parsDict_get(ov, 'names'),
-        default=parsDict_get(ov, 'default'),
-        help=parsDict_get(ov, 'help')+\
-            f"(default: {parsDict_get(ov, 'default')})",
-        type=parsDict_get(ov, 'type'),
-    )
-# Optional parameters
-def parsDict_get(var, key):
-    return parDA[var].get(key, None)
-for ov in parDA.keys():
-    parser.add_argument(*parsDict_get(ov, 'names'),
-        default=parsDict_get(ov, 'default'),
-        help=parsDict_get(ov, 'help'),
-        action=parsDict_get(ov, 'action')
-    )
+import argparse
+
+from lrgsglib.config.progargs import (
+    L2D_SlaplSpect_progName,
+    L2D_SlaplSpect_progNameShrt,
+    L2D_SlaplSpect_srun_description,
+    L2D_SlaplSpect_srun_optional_args_dict,
+    L2D_SlaplSpect_args,
+    L2D_SlaplSpect_optional_args_dict,
+    L2D_SlaplSpect_action_args_dict,
+    srun_action_args,
+)
+from parsers.shared import CustomHelpAction
+
+
+inner_optional_args = {
+    **L2D_SlaplSpect_optional_args_dict,
+    **L2D_SlaplSpect_action_args_dict,
+}
+
+parser = argparse.ArgumentParser(
+    description=L2D_SlaplSpect_srun_description,
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    allow_abbrev=False,
+    add_help=False,
+)
+
+parser.add_argument(
+    '-h', '--help',
+    action=CustomHelpAction,
+    inner_prog_name=L2D_SlaplSpect_progName,
+    inner_positional_args=L2D_SlaplSpect_args,
+    inner_optional_args=inner_optional_args,
+    help='show this help message and exit',
+)
+
+# Only sweep + slurm flags are added here; everything else passes through to
+# L2D_SlaplSpect.py via *unknown args in the runner.
+for key, opts in {**L2D_SlaplSpect_srun_optional_args_dict, **srun_action_args}.items():
+    parser.add_argument(*key, **opts)
+
+
+__all__ = [
+    "parser",
+    "L2D_SlaplSpect_progName",
+    "L2D_SlaplSpect_progNameShrt",
+]
