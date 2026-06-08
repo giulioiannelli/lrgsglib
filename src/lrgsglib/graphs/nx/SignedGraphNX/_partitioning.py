@@ -236,17 +236,16 @@ def make_clustersYN(
     # Normalize val to ConditionalPartitioning
     val = _normalize_conditional_partitioning(val)
     
-    try:
-        graphY, graphN = self.graph_clustering_utility[k][val.key][on_g]
-    except Exception as e:
-        logger.error(
-            f"""
-                Error occurred while accessing graph clustering utility: {e}
-                Recomputing Y/N graphs for k={k}, val={val.key}, on_g={on_g}.
-            """
-        )
+    # The Y/N partition is cached per (k, val, on_g). For a fresh graph the
+    # cache is empty on first touch (NestedDict autovivifies to {}), which is
+    # normal control flow -- not an error -- so build it quietly. Only a
+    # genuinely malformed entry (not a 2-tuple) falls through to the unpack
+    # below, where it raises a real, visible error instead of being swallowed.
+    cached = self.graph_clustering_utility[k][val.key][on_g]
+    if not (isinstance(cached, (tuple, list)) and len(cached) == 2):
         make_graphYN(self, k, val, on_g)
-        graphY, graphN = self.graph_clustering_utility[k][val.key][on_g]
+        cached = self.graph_clustering_utility[k][val.key][on_g]
+    graphY, graphN = cached
 
     backend = backend.lower()
     use_gpu = backend == 'cupy'
