@@ -91,6 +91,10 @@ def main() -> None:
         mu_str = ""
         sigma_str = ""
         if use_normal_weights:
+            # NOTE: normal/Gaussian-weight mode (--mu/--sigma/--edge_weight) is
+            # inherited from the L3D serializer; L2D_TransCluster.py does not
+            # implement it (no --mu/--sigma/--edge_weight args). Flip mode below
+            # is the only L2D-supported path.
             mu_str = _format_value_consistently(mu, mu_precision)
             sigma_str = _format_value_consistently(sigma, sigma_precision)
             prog_args.extend([
@@ -99,7 +103,9 @@ def main() -> None:
                 "--edge_weight", "normal"
             ])
         else:
-            prog_args.extend(["--edge_weight", "flip"])
+            # Flip mode is implicit in L2D_TransCluster.py (pflip via -p); the L2D
+            # child has no --edge_weight argument, so emit no extra flag here.
+            pass
 
         # Add the actual mode if specified (without slanzarv_ prefix)
         if actual_mode:
