@@ -93,12 +93,34 @@ def perform_spectral_calculations(args):
         )
 
     elif args.mode == "eigvals":
-        # Raw eigenvalue storage mode
-        fname_base = f"eigvals_{args.p:.3g}_{args.cell_type}{lap_suffix}"
+        # Raw eigenvalue storage mode. The filename records k (the number of
+        # eigenvalues requested) only when a partial spectrum is asked for;
+        # full-spectrum runs omit the k token for backward-compatible names.
+        k_token = f"k={args.howmany}_" if args.howmany > 0 else ""
+        fname_base = f"eigvals_{k_token}{args.p:.3g}_{args.cell_type}{lap_suffix}"
 
         engine = get_graph_engine(args)
         eigvlist = []
         eig_mode = 'full' if args.howmany <= 0 else '_'.join(["some", str(args.howmany)])
+
+        # Resolve the (pure) output directory once before the loop.
+        path_fname_base = get_lattice2d_path(args)
+
+        # Crash-safe checkpoint writer: dump eigvlist to {fname_base}_{tag}.pkl,
+        # then remove the previous saved file (write-new-then-delete-old keeps a
+        # valid checkpoint on disk at all times). Suffix `tag` is the realization
+        # count, so the file name always reports how many values it holds.
+        prev_path = None
+
+        def _save(tag):
+            nonlocal prev_path
+            path_fname = path_fname_base / Path(f"{fname_base}_{tag}.pkl")
+            with open(path_fname, "wb") as f:
+                pk.dump(eigvlist, f)
+            if prev_path is not None and prev_path != path_fname and os.path.exists(prev_path):
+                os.remove(prev_path)
+            prev_path = path_fname
+
         for idx in range(args.number_of_averages):
             eigv = eigv_for_lattice2D(
                 side=args.L,
@@ -112,21 +134,14 @@ def perform_spectral_calculations(args):
             )
             eigvlist.append(eigv)
 
-            # Periodic saving with checkpoint management
+            # Periodic checkpoint for crash recovery during the run.
             if idx % args.save_frequency == 0:
-                path_fname_base = get_lattice2d_path(args)
-                path_fname = path_fname_base / Path(f"{fname_base}_{idx}.pkl")
+                _save(str(idx))
 
-                # Remove previous checkpoint
-                if idx > 0:
-                    path_fname_prev = path_fname_base / Path(
-                        f"{fname_base}_{idx - args.save_frequency}.pkl"
-                    )
-                    if os.path.exists(path_fname_prev):
-                        os.remove(path_fname_prev)
-
-                with open(path_fname, "wb") as f:
-                    pk.dump(eigvlist, f)
+        # Final consolidated save: persist every realization and report the true
+        # count in the suffix, then drop the last periodic checkpoint so exactly
+        # one file remains per (p, cell, k).
+        _save(str(args.number_of_averages))
 
 
 def eigvec_initial_data(args):
