@@ -499,9 +499,10 @@ class SignedGraphNX:
         Returns
         -------
         int
-            Count of edges with negative weights.
+            Count of edges with negative weight, read directly from the
+            graph (see :meth:`count_negative_edges`).
         """
-        return len(self.fleset[self.on_g])
+        return self.count_negative_edges()
 
     @property
     def pflip(self) -> float:
@@ -522,14 +523,24 @@ class SignedGraphNX:
         self._seed = value
 
     def count_negative_edges(self) -> int:
-        """Count number of negative edges (GT compatibility).
+        """Count the actual number of negative-weight edges in the graph.
+
+        Reads edge signs directly from ``self.gr[self.on_g]``; this is the
+        ground truth and never exceeds ``Ne``. The previous implementation
+        returned ``len(fleset)`` -- but ``fleset`` is the request-time
+        flipped-edge *selection* and can over-count when an edge is toggled
+        more than once (e.g. under plaquette/structured flips such as
+        ``randXERR``/``randZERR``, where the same edge may be flipped by both
+        the construction-time sample and the pattern). ``pflip`` remains the
+        requested flip fraction; this counts the realised negative edges.
 
         Returns
         -------
         int
             Number of edges with negative weight.
         """
-        return len(self.fleset[self.on_g])
+        graph = self.gr[self.on_g]
+        return sum(1 for _, _, w in graph.edges(data="weight", default=1) if w < 0)
 
     def count_positive_edges(self) -> int:
         """Count number of positive edges (GT compatibility).
