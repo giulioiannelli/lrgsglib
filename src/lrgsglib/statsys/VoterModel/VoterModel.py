@@ -16,6 +16,7 @@ import numpy as np
 import tqdm
 
 from .._c_backend import CBackendMixin
+from .._csr import build_graph_csr
 from ..BinDynSys import BinDynSys
 from ...utils.tools.chronometer import time_function_accumulate
 
@@ -292,6 +293,40 @@ class VoterModel(CBackendMixin, BinDynSys):
         ]
 
     # ------------------------------------------------------------------
+    # Pybind11 backend (in-process, GT-compatible, seed-reproducible)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _load_native_module():
+        """Import the compiled ``_voter_native`` pybind11 module."""
+        try:
+            from .ccore import _voter_native  # type: ignore[import-untyped]
+            return _voter_native
+        except ImportError as exc:
+            raise RuntimeError(
+                "Pybind11 voter backend not available. Build the C extensions "
+                "with `pip install -e .` or `make all` first."
+            ) from exc
+
+    def _run_pybind(self) -> None:
+        """Run voter dynamics via the in-process pybind11 kernel.
+
+        Reuses the same ``voter_model_Nstep`` C kernel as the subprocess
+        backend (identical update logic) but passes the graph as numpy CSR
+        arrays, so there is no file I/O and GT graphs are supported.
+        """
+        mod = self._load_native_module()
+        ni, nw, nptr = build_graph_csr(self.sg, self.N)
+        s_out, magn = mod.voter_sampling(
+            self.s.astype(np.int8),
+            ni, nw, nptr,
+            int(self.steps),
+            int(self.seed),
+            bool(self.save_magnetization),
+        )
+        self.s = np.asarray(s_out, dtype=np.int8)
+        self.magn = magn.tolist()
+
+    # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
     @time_function_accumulate(auto_log=False)
@@ -329,5 +364,7 @@ class VoterModel(CBackendMixin, BinDynSys):
             if clean_export:
                 self.remove_run_c_files()
                 self.sg.remove_exported_files()
+        elif self.runlang.lower().startswith("pb"):
+            self._run_pybind()
         else:
             self.voter_sampling(tqdm_on)

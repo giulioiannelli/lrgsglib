@@ -28,6 +28,7 @@ LRGSG_PATHS := \
 	STATSYS_CP_BIN:bin:STATSYS_CP \
 	STATSYS_VM:VoterModel/ccore:LIB_STATSYS \
 	STATSYS_VM_BIN:bin:STATSYS_VM \
+	VM_NATIVE:native:STATSYS_VM \
 	STATSYS_SRW:SignedRW/ccore:LIB_STATSYS \
 	STATSYS_KUR:KuramotoModel/ccore:LIB_STATSYS \
 	STATSYS_KUR_BIN:bin:STATSYS_KUR \
@@ -84,6 +85,7 @@ LRGSG_OBJ_DIRS := $(LRGSG_GRAPHS_GT_L2D_CPP) \
            $(LRGSG_RBIM_BASE) \
            $(LRGSG_RBIM_STORE) \
            $(LRGSG_RBIM_NATIVE) \
+           $(LRGSG_VM_NATIVE) \
            $(LRGSG_GRAPHS_GT_BA_CPP) \
            $(LRGSG_GRAPHS_GT_EBA_CPP) \
            $(LRGSG_GRAPHS_GT_DBA_CPP) \

@@ -416,6 +416,20 @@ target_include_directories(_ising_native PRIVATE
 target_compile_options(_ising_native PRIVATE -O3)
 install(TARGETS _ising_native DESTINATION lrgsglib/statsys/IsingDynamics/ccore)
 
+# Voter native kernels - pybind11 binding (in-process voter dynamics via numpy)
+pybind11_add_module(_voter_native
+    ${VM_DIR}/voter_native.cpp
+    ${SRC_VM}
+    ${COMMON_SOURCES}
+)
+target_include_directories(_voter_native PRIVATE
+    ${COMMON_INCLUDES}
+    ${VM_DIR}
+    ${Python_NumPy_INCLUDE_DIRS}
+)
+target_compile_options(_voter_native PRIVATE -O3)
+install(TARGETS _voter_native DESTINATION lrgsglib/statsys/VoterModel/ccore)
+
 # Random walker on lattices - pybind11 binding
 pybind11_add_module(random_walker
     ${SRW_LATT}/random_walker.cpp
