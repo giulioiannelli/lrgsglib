@@ -104,7 +104,9 @@ class BinDynSys(DynSys):
         return 1
 
     def _coerce_custom_state(self, custom: Any) -> np.ndarray:
-        arr = np.asarray(custom, dtype=np.int8)
+        # np.array (not asarray) so the state never aliases the caller's
+        # array: in-place sweeps would otherwise corrupt the supplied IC.
+        arr = np.array(custom, dtype=np.int8)
         if arr.shape != (self.sg.N,):
             raise ValueError("Custom state must match the number of nodes in the graph.")
         valid_values = {self.inactive_state, self.active_state}

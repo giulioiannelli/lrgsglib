@@ -11,6 +11,7 @@ uint32_t *seed_rand;
  */
 void voter_model_1step(size_t nd, spin_tp s, size_tp nlen, NodesEdges node_edges) {
     size_t degree = *(nlen + nd);
+    if (degree == 0) return;  /* isolated node: no neighbour to copy (matches Python ds1step) */
     size_t sel = (size_t)(RNG_u64() % degree);
     size_t neighbour = node_edges[nd].neighbors[sel];
     double weight = node_edges[nd].weights[sel];

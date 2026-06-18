@@ -32,6 +32,12 @@ _VOTER_DEPRECATED: dict[str, tuple[str, bool]] = {
     "C1": ("C0S", True),
 }
 
+# Update schedules. Phase 1 implements only asynchronous random-sequential
+# updating; synchronous/link/gillespie are reserved for later phases and
+# raise NotImplementedError so the API never silently lies about the schedule.
+_VOTER_MODES_IMPLEMENTED: frozenset[str] = frozenset({"asynchronous"})
+_VOTER_MODES_PLANNED: frozenset[str] = frozenset({"synchronous", "link", "gillespie"})
+
 
 class VoterModel(CBackendMixin, BinDynSys):
     """Binary voter dynamics with optional C backend.
@@ -51,9 +57,12 @@ class VoterModel(CBackendMixin, BinDynSys):
     eqSTEP : int, optional
         Legacy alias for steps.
     save_magnetization : bool, optional
-        If True, record magnetization at each step.
+        If True, record the magnetization series ``magn`` at each sweep.
+        Honoured identically by the Python and C backends.
     upd_mode : str, optional
-        Update mode ('asynchronous' or 'synchronous').
+        Update schedule. Currently only ``'asynchronous'`` (random
+        sequential) is implemented; ``'synchronous'``/``'link'``/
+        ``'gillespie'`` are reserved and raise ``NotImplementedError``.
     freq : int, optional
         Recording frequency.
     nSampleLog : int, optional
@@ -98,7 +107,7 @@ class VoterModel(CBackendMixin, BinDynSys):
         resolved_steps = steps if steps is not None else eqSTEP
         super().__init__(sg, dynpath=dynpath, steps=resolved_steps, simref=simref, **kwargs)
         self.save_magnetization = save_magnetization
-        self.upd_mode = upd_mode
+        self.upd_mode = self._validate_upd_mode(upd_mode)
         self.freq = freq
         self.nSampleLog = nSampleLog
         self.reset_observables()
@@ -114,6 +123,21 @@ class VoterModel(CBackendMixin, BinDynSys):
     @eqSTEP.setter
     def eqSTEP(self, value: int) -> None:
         self._set_time_controls(steps=value)
+
+    @staticmethod
+    def _validate_upd_mode(upd_mode: str) -> str:
+        """Validate the requested update schedule (see ``upd_mode``)."""
+        if upd_mode in _VOTER_MODES_IMPLEMENTED:
+            return upd_mode
+        if upd_mode in _VOTER_MODES_PLANNED:
+            raise NotImplementedError(
+                f"upd_mode='{upd_mode}' is planned but not yet implemented; "
+                f"use 'asynchronous'."
+            )
+        raise ValueError(
+            f"Unknown upd_mode='{upd_mode}'. "
+            f"Valid: {sorted(_VOTER_MODES_IMPLEMENTED)}."
+        )
 
     # ------------------------------------------------------------------
     # Utility helpers
@@ -254,8 +278,9 @@ class VoterModel(CBackendMixin, BinDynSys):
         """Execute C backend and read magnetization output."""
         # Call parent implementation for subprocess execution
         super().run_cprogram(verbose)
-        # Read magnetization file if it exists
-        if self.magn_path and self.magn_path.exists():
+        # Read magnetization file only when requested, so save_magnetization
+        # is honoured identically by the Python and C backends.
+        if self.save_magnetization and self.magn_path and self.magn_path.exists():
             self.magn = np.fromfile(self.magn_path, dtype=np.float64).tolist()
 
     def _get_cleanup_paths(self) -> list[Path | None]:
