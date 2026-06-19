@@ -77,8 +77,8 @@ DEFAULT_NONLIN_ALPHA: float = 1.0   # nonlinearity exponent (alpha=1 -> linear v
 #                exactly when R=0 (no frustrated edge = absorbing). Statistically
 #                equivalent to the asynchronous linear voter, with a large speedup
 #                near consensus. Intrinsically a copy rule, so rule='linear' only.
-#                NOTE: Python backend only for now; the native (C/pybind) shared
-#                _ccore CTMC kernel is pending -- native backends refuse it.
+#                Implemented on all backends (Python, C subprocess, pybind) via
+#                the shared _ccore CTMC kernel (LRGSG_ctmc.{c,h}).
 VOTER_UPD_MODES: tuple[str, ...] = (
     "asynchronous", "synchronous", "link", "gillespie",
 )
@@ -91,7 +91,8 @@ GILLESPIE_RULES: frozenset[str] = frozenset({"linear"})
 
 # Update schedules implemented in the Python backend but NOT yet in the native
 # (C subprocess / pybind) backends -- those raise rather than silently lie.
-PY_ONLY_UPD_MODES: frozenset[str] = frozenset({"gillespie"})
+# (Empty now that gillespie has a native CTMC kernel; kept for future modes.)
+PY_ONLY_UPD_MODES: frozenset[str] = frozenset()
 
 # ---------------------------------------------------------------------------
 # Integer codes shared with the C / pybind backends.
@@ -108,6 +109,7 @@ UPD_MODE_CODE: dict[str, int] = {
     "asynchronous": 0,
     "synchronous": 1,
     "link": 2,
+    "gillespie": 3,
 }
 
 # ---------------------------------------------------------------------------

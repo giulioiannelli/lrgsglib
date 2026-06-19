@@ -78,8 +78,8 @@ class VoterModel(CBackendMixin, BinDynSys):
     upd_mode : str, optional
         Update schedule (Axis B): ``'asynchronous'`` (random sequential),
         ``'synchronous'`` (double-buffer), ``'link'`` (edge-update, linear
-        only), or ``'gillespie'`` (rejection-free CTMC, linear only, Python
-        backend only for now -- native backends raise ``NotImplementedError``).
+        only), or ``'gillespie'`` (rejection-free CTMC, linear only). All
+        schedules are available on every backend (Python, C subprocess, pybind).
     freq : int, optional
         Recording frequency.
     nSampleLog : int, optional
@@ -514,14 +514,12 @@ class VoterModel(CBackendMixin, BinDynSys):
     # Native-backend capability guard
     # ------------------------------------------------------------------
     def _assert_native_supports_config(self, backend: str) -> None:
-        """Native backends implement the full rule family + sampler axis +
+        """Native backends implement the full rule family + sampler axis
+        (including the ``gillespie`` CTMC, via the shared ``_ccore`` kernel) +
         absorbing early-stop, but capture only the final state and the
         magnetization series -- not the per-sweep ``savedyn`` trajectory.
-        Refuse rather than silently return an empty ``s_t``.
-
-        The ``gillespie`` rejection-free CTMC is, for now, Python-only (its
-        shared ``_ccore`` kernel is pending); native backends refuse it rather
-        than fall back to the asynchronous schedule.
+        Refuse rather than silently return an empty ``s_t``. ``PY_ONLY_UPD_MODES``
+        (currently empty) lists any schedule that is still Python-only.
         """
         if self.savedyn:
             raise NotImplementedError(

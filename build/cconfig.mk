@@ -32,6 +32,7 @@ OBJ_VM         := $(OBJ_DIR)/LRGSG_vm.o
 OBJ_CP         := $(OBJ_DIR)/LRGSG_cp.o
 OBJ_CONTDYNSYS := $(OBJ_DIR)/LRGSG_contdynsys.o
 OBJ_VECDYNSYS  := $(OBJ_DIR)/LRGSG_vecdynsys.o
+OBJ_CTMC       := $(OBJ_DIR)/LRGSG_ctmc.o
 OBJ_KURAMOTO   := $(OBJ_DIR)/LRGSG_kuramoto.o
 OBJ_RD         := $(OBJ_DIR)/LRGSG_rd.o
 OBJ_CODE       := $(OBJ_DIR)/LRGSG_code.o
@@ -43,7 +44,7 @@ OBJ_MSPEC      := $(OBJ_DIR)/LRGSG_multispec.o
 OBJS_ISING     := $(OBJS_CORE) $(OBJ_RBIM)
 OBJS_ISING_SA  := $(OBJS_ISING) $(OBJ_SA)
 OBJS_ISING_PT  := $(OBJS_ISING) $(OBJ_PT)
-OBJS_VM        := $(OBJS_CORE) $(OBJ_VM)
+OBJS_VM        := $(OBJS_CORE) $(OBJ_VM) $(OBJ_CTMC)
 OBJS_CP        := $(OBJS_CORE) $(OBJ_CP)
 OBJS_KUR       := $(OBJS_CORE) $(OBJ_CONTDYNSYS) $(OBJ_KURAMOTO)
 OBJS_RD        := $(OBJS_CORE) $(OBJ_CONTDYNSYS) $(OBJ_RD)
@@ -83,6 +84,8 @@ $(OBJ_CP): $(LRGSG_STATSYS_CP)/LRGSG_cp.c | $(OBJ_DIR)
 $(OBJ_CONTDYNSYS): $(LRGSG_STATSYS_CCORE)/LRGSG_contdynsys.c | $(OBJ_DIR)
 	@$(GCC) $(ALLFLAGS) $(INC_PATHS) -c $< -o $@
 $(OBJ_VECDYNSYS): $(LRGSG_STATSYS_CCORE)/LRGSG_vecdynsys.c | $(OBJ_DIR)
+	@$(GCC) $(ALLFLAGS) $(INC_PATHS) -c $< -o $@
+$(OBJ_CTMC): $(LRGSG_STATSYS_CCORE)/LRGSG_ctmc.c | $(OBJ_DIR)
 	@$(GCC) $(ALLFLAGS) $(INC_PATHS) -c $< -o $@
 # Per-model objects
 $(OBJ_KURAMOTO): $(LRGSG_STATSYS_KUR)/LRGSG_kuramoto.c | $(OBJ_DIR)

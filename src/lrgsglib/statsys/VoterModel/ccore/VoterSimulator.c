@@ -7,15 +7,16 @@
  *   [nSampleLog]
  *
  *   rule     : 0 linear | 1 majority | 2 qvoter | 3 nonlinear (voter_rule_t)
- *   upd_mode : 0 async   | 1 sync     | 2 link              (voter_upd_t)
+ *   upd_mode : 0 async | 1 sync | 2 link | 3 gillespie       (voter_upd_t)
  *   absorbing: 0/1 -- stop early at a zero-frustration configuration
- *   nSampleLog (optional, 14th arg) -> snapshot mode
+ *   nSampleLog (optional, 14th arg) -> snapshot mode (not produced for gillespie)
  *
  * Output: magnetization series (length = sweeps actually run) to the magn file,
  * final state to stdout, periodic snapshots to file in snapshot mode.
  */
 
 #include "LRGSG_vm.h"
+#include "LRGSG_ctmc.h"
 #include "LRGSG_utils.h"
 #include "sfmtrng.h"
 
@@ -91,22 +92,30 @@ int main(int argc, char *argv[]) {
     double *magn = __chMalloc(eqSTEP * sizeof(*magn));
     size_t t_run = eqSTEP;
 
-    for (size_t t = 0; t < eqSTEP; ++t) {
-        if (snapshot_mode && t % freq == 0)
-            fwrite(s, sizeof(*s), N, f_sout);
-        magn[t] = calc_magn(N, s);
-        if (absorbing &&
-            voter_count_frustrated(N, s, neigh_len, node_edges) == 0) {
-            t_run = t + 1;            /* recorded through sweep t, then stop */
-            break;
-        }
-        if (mode == VOTER_UPD_SYNC) {
-            voter_sync_step(N, s, s_new, neigh_len, node_edges, vp);
-            spin_tp tmp = s; s = s_new; s_new = tmp;   /* swap buffers */
-        } else if (mode == VOTER_UPD_LINK) {
-            voter_link_step(N, s, neigh_len, node_edges, cdeg, total);
-        } else {
-            voter_model_Nstep(N, s, neigh_len, node_edges, vp);
+    if (mode == VOTER_UPD_GILLESPIE) {
+        /* Rejection-free CTMC: event-driven, so no per-sweep snapshots. magn is
+         * sampled at integer sweep times; t_run shortens if it freezes. */
+        long absorbed_at;
+        t_run = voter_ctmc_run(N, s, neigh_len, node_edges, eqSTEP,
+                               1, magn, absorbing, &absorbed_at);
+    } else {
+        for (size_t t = 0; t < eqSTEP; ++t) {
+            if (snapshot_mode && t % freq == 0)
+                fwrite(s, sizeof(*s), N, f_sout);
+            magn[t] = calc_magn(N, s);
+            if (absorbing &&
+                voter_count_frustrated(N, s, neigh_len, node_edges) == 0) {
+                t_run = t + 1;            /* recorded through sweep t, then stop */
+                break;
+            }
+            if (mode == VOTER_UPD_SYNC) {
+                voter_sync_step(N, s, s_new, neigh_len, node_edges, vp);
+                spin_tp tmp = s; s = s_new; s_new = tmp;   /* swap buffers */
+            } else if (mode == VOTER_UPD_LINK) {
+                voter_link_step(N, s, neigh_len, node_edges, cdeg, total);
+            } else {
+                voter_model_Nstep(N, s, neigh_len, node_edges, vp);
+            }
         }
     }
 

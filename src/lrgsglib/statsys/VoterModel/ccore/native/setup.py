@@ -38,6 +38,7 @@ ext_modules = [
         sources=[
             str(CCORE_DIR / "voter_native.cpp"),
             str(CCORE_DIR / "LRGSG_vm.c"),
+            str(SHARED_CCORE / "LRGSG_ctmc.c"),
             str(SHARED_CCORE / "LRGSG_utils.c"),
             str(SHARED_CCORE / "sfmtrng.c"),
             str(SFMT_DIR / "SFMT.c"),

@@ -178,7 +178,3 @@ def test_voter_upd_mode_validation(tmp_path):
     with pytest.raises(ValueError):
         VoterModel(sg=lat, steps=5, runlang="py", upd_mode="gillespie",
                    rule="majority")
-    # gillespie has no native kernel yet -> native backends refuse it at run().
-    with pytest.raises(NotImplementedError):
-        VoterModel(sg=lat, steps=5, runlang="C0",
-                   upd_mode="gillespie").run(tqdm_on=False)

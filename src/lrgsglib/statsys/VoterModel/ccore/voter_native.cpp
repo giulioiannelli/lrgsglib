@@ -25,6 +25,7 @@
 /* ------------------------------------------------------------------ */
 extern "C" {
 #include "LRGSG_customs.h"
+#include "LRGSG_ctmc.h"
 #include "LRGSG_utils.h"
 #include "LRGSG_vm.h"
 #include "sfmtrng.h"
@@ -145,19 +146,32 @@ static py::tuple voter_sampling(
         }
         spin_tp sbuf = snew.empty() ? nullptr : snew.data();
 
-        for (size_t step = 0; step < n_sweeps; ++step) {
-            if (save_magnetization) magn_out.push_back(calc_magn(N, s));
-            if (absorbing && voter_count_frustrated(N, s, nlen_ptr, ne) == 0) {
-                absorbed_at = static_cast<long>(step);
-                break;
-            }
-            if (mode == VOTER_UPD_SYNC) {
-                voter_sync_step(N, s, sbuf, nlen_ptr, ne, vp);
-                spin_tp tmp = s; s = sbuf; sbuf = tmp;   /* swap */
-            } else if (mode == VOTER_UPD_LINK) {
-                voter_link_step(N, s, nlen_ptr, ne, cdeg.data(), total);
-            } else {
-                voter_model_Nstep(N, s, nlen_ptr, ne, vp);
+        if (mode == VOTER_UPD_GILLESPIE) {
+            /* Rejection-free CTMC (shared _ccore kernel); magn sampled at integer
+             * sweep times, t_run shortens if it freezes (absorbing). */
+            std::vector<double> magn_buf(save_magnetization ? n_sweeps : 0);
+            double *magn_ptr = save_magnetization ? magn_buf.data() : nullptr;
+            size_t t_run = voter_ctmc_run(
+                N, s, nlen_ptr, ne, n_sweeps,
+                save_magnetization ? 1 : 0, magn_ptr,
+                absorbing ? 1 : 0, &absorbed_at);
+            if (save_magnetization)
+                magn_out.assign(magn_buf.begin(), magn_buf.begin() + t_run);
+        } else {
+            for (size_t step = 0; step < n_sweeps; ++step) {
+                if (save_magnetization) magn_out.push_back(calc_magn(N, s));
+                if (absorbing && voter_count_frustrated(N, s, nlen_ptr, ne) == 0) {
+                    absorbed_at = static_cast<long>(step);
+                    break;
+                }
+                if (mode == VOTER_UPD_SYNC) {
+                    voter_sync_step(N, s, sbuf, nlen_ptr, ne, vp);
+                    spin_tp tmp = s; s = sbuf; sbuf = tmp;   /* swap */
+                } else if (mode == VOTER_UPD_LINK) {
+                    voter_link_step(N, s, nlen_ptr, ne, cdeg.data(), total);
+                } else {
+                    voter_model_Nstep(N, s, nlen_ptr, ne, vp);
+                }
             }
         }
         /* `s` may point at `snew`'s storage after an odd number of sync swaps;
@@ -191,7 +205,7 @@ spins, neigh_indices, neigh_weights, neigh_ptr : ndarray
 n_sweeps, seed, save_magnetization : run controls.
 rule : 0 linear | 1 majority | 2 qvoter | 3 nonlinear.
 q, eps, alpha : q-voter / nonlinear parameters.
-upd_mode : 0 async | 1 sync | 2 link.
+upd_mode : 0 async | 1 sync | 2 link | 3 gillespie (rejection-free CTMC, linear).
 absorbing : stop at the first zero-frustration configuration.
 
 Returns

@@ -19,9 +19,10 @@ typedef enum {
 
 /* Update schedule (Axis B). Keep in sync with VoterModel/defaults.py UPD_MODE_CODE. */
 typedef enum {
-    VOTER_UPD_ASYNC = 0,  /* N single-node updates, nodes drawn with replacement */
-    VOTER_UPD_SYNC  = 1,  /* all nodes updated from a frozen snapshot            */
-    VOTER_UPD_LINK  = 2   /* edge-update (rule='linear' only)                    */
+    VOTER_UPD_ASYNC     = 0,  /* N single-node updates, nodes drawn w/ replacement */
+    VOTER_UPD_SYNC      = 1,  /* all nodes updated from a frozen snapshot          */
+    VOTER_UPD_LINK      = 2,  /* edge-update (rule='linear' only)                  */
+    VOTER_UPD_GILLESPIE = 3   /* rejection-free CTMC (linear only); LRGSG_ctmc    */
 } voter_upd_t;
 
 /* Rule parameters (q-voter / nonlinear). */

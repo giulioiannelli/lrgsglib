@@ -246,15 +246,41 @@ def test_gillespie_requires_linear_rule(tmp_path):
                        upd_mode="gillespie", rule=rule)
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("runlang", ["pb_voter", "C0"])
-def test_gillespie_native_refused(tmp_path, runlang):
-    """Native backends have no CTMC kernel yet -> refuse rather than fall back."""
+def test_gillespie_native_runs(tmp_path, runlang):
+    """The native (shared _ccore) CTMC kernel runs and yields a valid config."""
     from lrgsglib.statsys import VoterModel
     _skip_if_unavailable(runlang)
-    v = VoterModel(sg=_lat(tmp_path, side=6), steps=10, runlang=runlang,
-                   seed=1, upd_mode="gillespie")
-    with pytest.raises(NotImplementedError):
+    v = VoterModel(sg=_lat(tmp_path, side=8, pflip=0.1, seed=1), steps=30,
+                   runlang=runlang, seed=1, upd_mode="gillespie",
+                   save_magnetization=True)
+    v.sg.flip_random_fract_edges()
+    v.run(tqdm_on=False)
+    assert v.s.size == v.N and np.all(np.isin(v.s, (-1, 1)))
+    assert len(v.magn) <= 30
+
+
+@pytest.mark.physical
+@pytest.mark.integration
+@pytest.mark.parametrize("runlang", ["py", "pb_voter", "C0"])
+def test_gillespie_absorbing_parity_across_backends(tmp_path, runlang):
+    """gillespie freezes at consensus on a balanced graph in every backend."""
+    from lrgsglib.graphs.nx import FullyConnectedNX
+    from lrgsglib.statsys import VoterModel
+    if runlang != "py":
+        _skip_if_unavailable(runlang)
+    g = FullyConnectedNX(N=12, pflip=0.0, seed=1,
+                         path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False)
+    hit = 0
+    for r in range(5):
+        v = VoterModel(sg=g, steps=50000, runlang=runlang, seed=r,
+                       upd_mode="gillespie", absorbing_check=True)
         v.run(tqdm_on=False)
+        if v.absorbed_at is not None:
+            hit += 1
+            assert abs(float(v.s.mean())) == 1.0
+    assert hit >= 4, f"{runlang}: only {hit}/5 gillespie runs reached consensus"
 
 
 @pytest.mark.physical
