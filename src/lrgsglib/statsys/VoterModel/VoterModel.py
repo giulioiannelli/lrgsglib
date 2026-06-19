@@ -674,6 +674,62 @@ class VoterModel(CBackendMixin, BinDynSys):
         self.absorbed_at = None if int(absorbed_at) < 0 else int(absorbed_at)
 
     # ------------------------------------------------------------------
+    # Vectorized backends (NumPy `np_voter` / CuPy `cu_voter`)
+    # ------------------------------------------------------------------
+    def _assert_vectorized_supports_config(self, backend: str) -> None:
+        """The vectorized backends implement the **synchronous linear** voter
+        only -- a single CSR gather per sweep. They do not consult ``upd_mode``
+        (always synchronous), and reject the rule family / savedyn / the
+        intrinsically-sequential schedules rather than silently mislabel a run.
+        """
+        if self.rule != "linear":
+            raise NotImplementedError(
+                f"runlang='{self.runlang}' ({backend}) implements the vectorized "
+                f"synchronous LINEAR voter only; rule='{self.rule}' is "
+                f"unsupported -- use runlang in (py, C0*, pb_voter)."
+            )
+        if self.savedyn:
+            raise NotImplementedError(
+                f"runlang='{self.runlang}' ({backend}) does not record the "
+                f"per-sweep savedyn trajectory; use runlang='py'."
+            )
+        if self.upd_mode in ("link", "gillespie"):
+            raise NotImplementedError(
+                f"runlang='{self.runlang}' ({backend}) is the synchronous "
+                f"vectorized voter; upd_mode='{self.upd_mode}' is a different "
+                f"schedule -- use runlang='py' or 'pb_voter'."
+            )
+
+    def _run_vectorized(self, gpu: bool) -> None:
+        """Run the vectorized synchronous linear voter (NumPy or CuPy).
+
+        Every node copies a uniformly chosen signed neighbour from a frozen
+        snapshot via one CSR gather per sweep (the schedule is synchronous;
+        ``upd_mode`` is not consulted). Graph is passed as CSR arrays, so there
+        is no file I/O and GT graphs are supported.
+        """
+        from ._vectorized_voter import run_vectorized_sync, CUPY_AVAILABLE
+        if gpu:
+            if not CUPY_AVAILABLE:
+                raise RuntimeError(
+                    f"CuPy backend requested (runlang='{self.runlang}') but cupy "
+                    f"is not available; install cupy or use runlang='np_voter'."
+                )
+            import cupy as xp
+        else:
+            xp = np
+        ni, nw, nptr = build_graph_csr(self.sg, self.N)
+        s_out, magn, absorbed_at = run_vectorized_sync(
+            xp, self.s.astype(np.int8), ni, nw, nptr,
+            int(self.steps), int(self.seed),
+            bool(self.save_magnetization),
+            bool(self.absorbing_check), int(self.absorbing_every),
+        )
+        self.s = np.asarray(s_out, dtype=np.int8)
+        self.magn = magn
+        self.absorbed_at = absorbed_at
+
+    # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
     @time_function_accumulate(auto_log=False)
@@ -705,10 +761,14 @@ class VoterModel(CBackendMixin, BinDynSys):
         """
         is_c = self.runlang.startswith("C")
         is_pb = self.runlang.lower().startswith("pb")
+        is_np = self.runlang.lower().startswith("np")
+        is_cu = self.runlang.lower().startswith("cu")
         if is_c or is_pb:
             # Guard before any file export / kernel call so the native backends
             # never silently ignore rule / upd_mode / absorbing_check.
             self._assert_native_supports_config("C subprocess" if is_c else "pybind")
+        if is_np or is_cu:
+            self._assert_vectorized_supports_config("CuPy" if is_cu else "NumPy vectorized")
         self.check_attribute()
         self.initialize_run_parameters(steps=steps, simref=simref, eqSTEP=eqSTEP)
         if is_c:
@@ -719,5 +779,9 @@ class VoterModel(CBackendMixin, BinDynSys):
                 self.sg.remove_exported_files()
         elif is_pb:
             self._run_pybind()
+        elif is_np:
+            self._run_vectorized(gpu=False)
+        elif is_cu:
+            self._run_vectorized(gpu=True)
         else:
             self.voter_sampling(tqdm_on)

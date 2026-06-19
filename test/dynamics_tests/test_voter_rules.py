@@ -369,3 +369,70 @@ def test_absorbing_parity_across_backends(tmp_path, runlang):
             hit += 1
             assert abs(float(v.s.mean())) == 1.0
     assert hit >= 4, f"{runlang}: only {hit}/5 reached an absorbing consensus"
+
+
+# ===================================================================
+# Vectorized backends (np_voter / cu_voter) — Phase 5
+# Synchronous linear voter via a single CSR gather per sweep.
+# ===================================================================
+
+
+def _cu_unavailable() -> bool:
+    try:
+        import cupy
+        cupy.zeros(1)          # force a context (catches no-GPU / driver issues)
+        return False
+    except Exception:
+        return True
+
+
+@pytest.mark.physical
+@pytest.mark.parametrize("runlang", ["np_voter", "cu_voter"])
+def test_vectorized_runs(tmp_path, runlang):
+    """The vectorized synchronous linear voter runs and yields a valid config."""
+    from lrgsglib.statsys import VoterModel
+    if runlang == "cu_voter" and _cu_unavailable():
+        pytest.skip("cupy / GPU not available")
+    lat = _lat(tmp_path, side=16, pflip=0.1, seed=1)
+    lat.flip_random_fract_edges()
+    v = VoterModel(sg=lat, steps=40, runlang=runlang, seed=1,
+                   save_magnetization=True)
+    v.run(tqdm_on=False)
+    assert v.s.size == v.N and np.all(np.isin(v.s, (-1, 1)))
+    assert len(v.magn) <= 40
+
+
+@pytest.mark.parametrize("runlang", ["np_voter", "cu_voter"])
+def test_vectorized_guards(tmp_path, runlang):
+    """Vectorized backends are synchronous-linear only: reject rule family,
+    savedyn, and the intrinsically-sequential schedules."""
+    from lrgsglib.statsys import VoterModel
+    if runlang == "cu_voter" and _cu_unavailable():
+        pytest.skip("cupy / GPU not available")
+    for kw in (dict(rule="majority"), dict(savedyn=True),
+               dict(upd_mode="gillespie"), dict(upd_mode="link")):
+        with pytest.raises(NotImplementedError):
+            VoterModel(sg=_lat(tmp_path, side=6), steps=5, runlang=runlang,
+                       seed=1, **kw).run(tqdm_on=False)
+
+
+@pytest.mark.physical
+@pytest.mark.parametrize("runlang", ["np_voter", "cu_voter"])
+def test_vectorized_absorbs_on_balanced(tmp_path, runlang):
+    """On a balanced graph the synchronous voter freezes at consensus."""
+    from lrgsglib.graphs.nx import FullyConnectedNX
+    from lrgsglib.statsys import VoterModel
+    if runlang == "cu_voter" and _cu_unavailable():
+        pytest.skip("cupy / GPU not available")
+    g = FullyConnectedNX(N=24, pflip=0.0, seed=1,
+                         path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False)
+    hit = 0
+    for r in range(5):
+        v = VoterModel(sg=g, steps=20000, runlang=runlang, seed=r,
+                       absorbing_check=True, save_magnetization=True)
+        v.run(tqdm_on=False)
+        if v.absorbed_at is not None:
+            hit += 1
+            assert abs(float(v.s.mean())) == 1.0
+            assert len(v.magn) == v.absorbed_at + 1
+    assert hit >= 4, f"{runlang}: only {hit}/5 reached consensus"
