@@ -68,13 +68,30 @@ DEFAULT_NONLIN_ALPHA: float = 1.0   # nonlinearity exponent (alpha=1 -> linear v
 # link         : edge-update (ref [1] Sec. III.B.3 p. 601, Suchecki 2005a) -- a
 #                random edge is picked and one randomly chosen endpoint copies
 #                the other; intrinsically a copy, so defined for rule='linear'.
-# gillespie    : rejection-free CTMC, reserved for Phase 4.
-VOTER_UPD_MODES: tuple[str, ...] = ("asynchronous", "synchronous", "link")
-VOTER_UPD_MODES_PLANNED: tuple[str, ...] = ("gillespie",)
+# gillespie    : rejection-free continuous-time MC (BKL/kinetic MC). Each node
+#                attempts at rate 1 (so t=1 is one sweep = N attempts) and, given
+#                an attempt, copies a random signed neighbour -- so its node-flip
+#                rate is r_i = f_i / deg_i with f_i the number of frustrated edges
+#                incident to i. Flips are sampled directly (node i w.p. r_i/R,
+#                dt ~ Exp(R), R = sum_i r_i), skipping null events; the run freezes
+#                exactly when R=0 (no frustrated edge = absorbing). Statistically
+#                equivalent to the asynchronous linear voter, with a large speedup
+#                near consensus. Intrinsically a copy rule, so rule='linear' only.
+#                NOTE: Python backend only for now; the native (C/pybind) shared
+#                _ccore CTMC kernel is pending -- native backends refuse it.
+VOTER_UPD_MODES: tuple[str, ...] = (
+    "asynchronous", "synchronous", "link", "gillespie",
+)
+VOTER_UPD_MODES_PLANNED: tuple[str, ...] = ()
 DEFAULT_UPD_MODE: str = "asynchronous"
 
 # Update schedules that only make sense for a copy rule.
 LINK_ONLY_RULES: frozenset[str] = frozenset({"linear"})
+GILLESPIE_RULES: frozenset[str] = frozenset({"linear"})
+
+# Update schedules implemented in the Python backend but NOT yet in the native
+# (C subprocess / pybind) backends -- those raise rather than silently lie.
+PY_ONLY_UPD_MODES: frozenset[str] = frozenset({"gillespie"})
 
 # ---------------------------------------------------------------------------
 # Integer codes shared with the C / pybind backends.

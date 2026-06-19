@@ -217,6 +217,113 @@ def test_native_refuses_savedyn(tmp_path, runlang):
         v.run(tqdm_on=False)
 
 
+# ===================================================================
+# Gillespie rejection-free CTMC (Axis B, Phase 4 — Python reference)
+# ===================================================================
+
+
+@pytest.mark.physical
+def test_gillespie_runs(tmp_path):
+    """The rejection-free CTMC runs and yields a valid binary configuration."""
+    from lrgsglib.statsys import VoterModel
+
+    v = VoterModel(sg=_lat(tmp_path, side=10, pflip=0.1, seed=4), steps=40,
+                   runlang="py", seed=4, upd_mode="gillespie",
+                   save_magnetization=True)
+    v.sg.flip_random_fract_edges()
+    v.run(tqdm_on=False)
+    assert v.s.size == v.N and np.all(np.isin(v.s, (-1, 1)))
+    assert len(v.magn) <= 40
+
+
+def test_gillespie_requires_linear_rule(tmp_path):
+    """Rejection-free CTMC is a copy operation -> only the linear voter."""
+    from lrgsglib.statsys import VoterModel
+
+    for rule in ("majority", "qvoter", "nonlinear"):
+        with pytest.raises(ValueError):
+            VoterModel(sg=_lat(tmp_path, side=4), steps=5, runlang="py",
+                       upd_mode="gillespie", rule=rule)
+
+
+@pytest.mark.parametrize("runlang", ["pb_voter", "C0"])
+def test_gillespie_native_refused(tmp_path, runlang):
+    """Native backends have no CTMC kernel yet -> refuse rather than fall back."""
+    from lrgsglib.statsys import VoterModel
+    _skip_if_unavailable(runlang)
+    v = VoterModel(sg=_lat(tmp_path, side=6), steps=10, runlang=runlang,
+                   seed=1, upd_mode="gillespie")
+    with pytest.raises(NotImplementedError):
+        v.run(tqdm_on=False)
+
+
+@pytest.mark.physical
+def test_gillespie_absorbs_on_balanced(tmp_path):
+    """On a balanced (unsigned) graph the CTMC freezes at consensus."""
+    from lrgsglib.graphs.nx import FullyConnectedNX
+    from lrgsglib.statsys import VoterModel
+
+    g = FullyConnectedNX(N=12, pflip=0.0, seed=1,
+                         path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False)
+    hit = 0
+    for r in range(8):
+        v = VoterModel(sg=g, steps=50000, runlang="py", seed=r,
+                       upd_mode="gillespie", absorbing_check=True,
+                       save_magnetization=True)
+        v.run(tqdm_on=False)
+        if v.absorbed_at is not None:
+            hit += 1
+            assert abs(float(v.s.mean())) == 1.0
+            assert v.count_frustrated_edges() == 0
+            assert len(v.magn) == v.absorbed_at + 1
+    assert hit >= 7, f"only {hit}/8 CTMC runs reached consensus"
+
+
+@pytest.mark.physical
+def test_gillespie_never_freezes_on_frustrated(tmp_path):
+    """On a frustrated signed graph the CTMC never reaches an absorbing state."""
+    from lrgsglib.statsys import VoterModel
+
+    lf = _lat(tmp_path, side=10, pflip=0.3, seed=2)
+    lf.flip_random_fract_edges()
+    lf.compute_laplacian_spectrum_weigV()
+    if float(lf.eigv[0]) <= 1e-10:
+        pytest.skip("random signing happened to be balanced")
+    v = VoterModel(sg=lf, steps=80, runlang="py", seed=2,
+                   upd_mode="gillespie", absorbing_check=True)
+    v.run(tqdm_on=False)
+    assert v.absorbed_at is None
+    assert v.count_frustrated_edges() > 0
+
+
+@pytest.mark.physical
+def test_gillespie_exit_probability(tmp_path):
+    """Voter exit probability: on a regular graph P(+1 consensus) = up-fraction.
+
+    The linear voter magnetization is conserved in expectation on a regular
+    graph (complete graph), so starting from 7 up / 3 down spins the CTMC must
+    reach the +1 consensus with probability ~0.7 (ref [1] Sec. II.A).
+    """
+    from lrgsglib.graphs.nx import FullyConnectedNX
+    from lrgsglib.statsys import VoterModel
+
+    g = FullyConnectedNX(N=10, pflip=0.0, seed=1,
+                         path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False)
+    ic = np.array([1] * 7 + [-1] * 3, dtype=np.int8)
+    R, plus = 200, 0
+    for r in range(R):
+        v = VoterModel(sg=g, steps=50000, runlang="py", seed=r,
+                       upd_mode="gillespie", absorbing_check=True)
+        v.init_voter_dynamics()
+        v.s = ic.copy()
+        v.run(tqdm_on=False)
+        assert v.absorbed_at is not None, "CTMC failed to absorb on complete graph"
+        if float(v.s.mean()) == 1.0:
+            plus += 1
+    frac = plus / R
+    assert abs(frac - 0.7) < 0.12, f"P(+1 consensus)={frac:.3f}, expected ~0.7"
+
+
 @pytest.mark.physical
 @pytest.mark.integration
 @pytest.mark.parametrize("runlang", ["py", "pb_voter", "C0"])

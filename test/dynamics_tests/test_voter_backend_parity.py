@@ -165,15 +165,20 @@ def test_voter_upd_mode_validation(tmp_path):
         path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
     )
 
-    # Phase 3: asynchronous / synchronous / link are implemented; gillespie
-    # is reserved (NotImplementedError); anything else is a ValueError.
-    for mode in ("asynchronous", "synchronous", "link"):
+    # Phase 3/4: asynchronous / synchronous / link / gillespie are implemented
+    # in the Python backend; anything else is a ValueError.
+    for mode in ("asynchronous", "synchronous", "link", "gillespie"):
         v = VoterModel(sg=lat, steps=5, runlang="py", upd_mode=mode)
         assert v.upd_mode == mode
-    with pytest.raises(NotImplementedError):
-        VoterModel(sg=lat, steps=5, runlang="py", upd_mode="gillespie")
     with pytest.raises(ValueError):
         VoterModel(sg=lat, steps=5, runlang="py", upd_mode="bogus")
-    # link is a copy operation -> only defined for the linear rule.
+    # link / gillespie are copy operations -> only defined for the linear rule.
     with pytest.raises(ValueError):
         VoterModel(sg=lat, steps=5, runlang="py", upd_mode="link", rule="majority")
+    with pytest.raises(ValueError):
+        VoterModel(sg=lat, steps=5, runlang="py", upd_mode="gillespie",
+                   rule="majority")
+    # gillespie has no native kernel yet -> native backends refuse it at run().
+    with pytest.raises(NotImplementedError):
+        VoterModel(sg=lat, steps=5, runlang="C0",
+                   upd_mode="gillespie").run(tqdm_on=False)

@@ -25,7 +25,9 @@ from .defaults import (
     DEFAULT_QVOTER_Q,
     DEFAULT_RULE,
     DEFAULT_UPD_MODE,
+    GILLESPIE_RULES,
     LINK_ONLY_RULES,
+    PY_ONLY_UPD_MODES,
     RULE_CODE,
     UPD_MODE_CODE,
     VOTER_RULES,
@@ -74,9 +76,10 @@ class VoterModel(CBackendMixin, BinDynSys):
         If True, record the magnetization series ``magn`` at each sweep.
         Honoured identically by the Python and C backends.
     upd_mode : str, optional
-        Update schedule. Currently only ``'asynchronous'`` (random
-        sequential) is implemented; ``'synchronous'``/``'link'``/
-        ``'gillespie'`` are reserved and raise ``NotImplementedError``.
+        Update schedule (Axis B): ``'asynchronous'`` (random sequential),
+        ``'synchronous'`` (double-buffer), ``'link'`` (edge-update, linear
+        only), or ``'gillespie'`` (rejection-free CTMC, linear only, Python
+        backend only for now -- native backends raise ``NotImplementedError``).
     freq : int, optional
         Recording frequency.
     nSampleLog : int, optional
@@ -193,14 +196,21 @@ class VoterModel(CBackendMixin, BinDynSys):
     def _validate_rule_mode(rule: str, upd_mode: str) -> None:
         """Reject (rule, upd_mode) combinations that are ill-defined.
 
-        ``link`` (edge-update) is intrinsically a copy operation, so it is only
-        meaningful for the linear voter rule (ref [1] Sec. III.B.3, p. 601).
+        ``link`` (edge-update) and ``gillespie`` (rejection-free CTMC) are both
+        intrinsically copy operations, so each is only meaningful for the linear
+        voter rule (ref [1] Sec. III.B.3, p. 601).
         """
         if upd_mode == "link" and rule not in LINK_ONLY_RULES:
             raise ValueError(
                 f"upd_mode='link' is defined only for rule in "
                 f"{sorted(LINK_ONLY_RULES)} (edge-update is a copy operation); "
                 f"got rule='{rule}'."
+            )
+        if upd_mode == "gillespie" and rule not in GILLESPIE_RULES:
+            raise ValueError(
+                f"upd_mode='gillespie' is defined only for rule in "
+                f"{sorted(GILLESPIE_RULES)} (the rejection-free CTMC is a copy "
+                f"operation); got rule='{rule}'."
             )
 
     # ------------------------------------------------------------------
@@ -383,6 +393,96 @@ class VoterModel(CBackendMixin, BinDynSys):
             else:
                 self.s[v] = np.int8(sign * int(self.s[u]))
 
+    # -- rejection-free CTMC sampler (Axis B: gillespie) --------------
+    def _gillespie_neighbors(self) -> tuple[list[np.ndarray], list[np.ndarray]]:
+        """Per-node neighbour indices and edge signs (ragged, signed substrate).
+
+        ``signs[i][k] = sign(w_{i,nbr})`` so the effective neighbour opinion is
+        ``signs[i][k] * s[idx[i][k]]`` -- a negative edge is an anti-copy, the
+        same convention used by ``_apply_rule``.
+        """
+        idx: list[np.ndarray] = []
+        signs: list[np.ndarray] = []
+        for nd in range(self.N):
+            js: list[int] = []
+            sg: list[int] = []
+            for j, w in self.sg.get_neighbors_with_weights(nd):
+                js.append(j)
+                sg.append(-1 if w < 0 else 1)
+            idx.append(np.asarray(js, dtype=np.int64))
+            signs.append(np.asarray(sg, dtype=np.int8))
+        return idx, signs
+
+    def _run_gillespie(self, tqdm_on: bool) -> None:
+        """Rejection-free continuous-time linear voter on the signed substrate.
+
+        Each node attempts at rate 1 (so unit continuous time == one sweep ==
+        ``N`` attempts); given an attempt it copies a uniform signed neighbour,
+        which actually flips it iff the chosen edge is frustrated. Hence node
+        ``i`` flips as a Poisson process of rate ``r_i = f_i / deg_i`` where
+        ``f_i`` is the number of frustrated edges incident to ``i``. Flips are
+        sampled directly (node ``i`` w.p. ``r_i / R``, ``dt ~ Exp(R)``,
+        ``R = sum_i r_i``), skipping the null events of the rejection method.
+
+        Magnetization / snapshots are recorded at the integer sweep times
+        ``0, 1, ..., steps-1`` (the state is piecewise-constant between flips), so
+        the ``magn`` series is directly comparable to the per-sweep samplers. The
+        process freezes exactly when ``R = 0`` (no frustrated edge), i.e. at an
+        absorbing configuration; with ``absorbing_check`` that stops the run and
+        records ``absorbed_at``.
+        """
+        N = self.N
+        s = self.s  # int8, mutated in place so _record() / self.s stay in sync
+        idx, signs = self._gillespie_neighbors()
+        deg = np.array([a.size for a in idx], dtype=np.int64)
+        # f_i = number of frustrated edges incident to i (signs[i]*s[nbr] != s[i]).
+        f = np.zeros(N, dtype=np.int64)
+        for i in range(N):
+            if deg[i]:
+                f[i] = int(np.count_nonzero(signs[i] * s[idx[i]] != s[i]))
+        rate = np.where(deg > 0, f / np.maximum(deg, 1), 0.0)
+
+        self.absorbed_at = None
+        t = 0.0          # continuous time, in sweep units
+        recorded = 0     # next integer sweep-time still to record
+        steps = self.steps
+        while recorded < steps:
+            R = float(rate.sum())
+            if R <= 0.0:
+                # Frozen: no flippable node => absorbing configuration.
+                if self.absorbing_check:
+                    self._record()
+                    self.absorbed_at = recorded
+                    recorded += 1
+                else:
+                    while recorded < steps:   # pad the frozen tail
+                        self._record()
+                        recorded += 1
+                break
+            dt = -np.log(np.random.random()) / R
+            t_next = t + dt
+            # State is constant on [t, t_next): emit any integer times in between.
+            while recorded < steps and recorded < t_next:
+                self._record()
+                recorded += 1
+            if recorded >= steps:
+                break
+            # Pick the flipping node i with probability r_i / R, then flip it.
+            i = int(np.searchsorted(np.cumsum(rate), np.random.random() * R,
+                                    side="right"))
+            if i >= N:
+                i = N - 1
+            s[i] = np.int8(-int(s[i]))
+            # All edges at i toggle frustration; update i and its neighbours.
+            f[i] = deg[i] - f[i]
+            rate[i] = f[i] / deg[i] if deg[i] else 0.0
+            js = idx[i]
+            if js.size:
+                now_frustrated = signs[i] * s[js] != s[i]
+                f[js] += np.where(now_frustrated, 1, -1).astype(np.int64)
+                rate[js] = f[js] / deg[js]
+            t = t_next
+
     def voter_sampling(self, tqdm_on: bool) -> None:
         """Run ``self.steps`` sweeps under the configured rule and schedule.
 
@@ -391,12 +491,15 @@ class VoterModel(CBackendMixin, BinDynSys):
         (zero-frustration) configuration is reached, recording the sweep index
         in ``self.absorbed_at``.
         """
+        self.absorbed_at = None
+        if self.upd_mode == "gillespie":
+            self._run_gillespie(tqdm_on)
+            return
         sweep_fn = {
             "asynchronous": self._sweep_async,
             "synchronous": self._sweep_sync,
             "link": self._sweep_link,
         }[self.upd_mode]
-        self.absorbed_at = None
         iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
         for t in iterator:
             self._record()
@@ -415,12 +518,22 @@ class VoterModel(CBackendMixin, BinDynSys):
         absorbing early-stop, but capture only the final state and the
         magnetization series -- not the per-sweep ``savedyn`` trajectory.
         Refuse rather than silently return an empty ``s_t``.
+
+        The ``gillespie`` rejection-free CTMC is, for now, Python-only (its
+        shared ``_ccore`` kernel is pending); native backends refuse it rather
+        than fall back to the asynchronous schedule.
         """
         if self.savedyn:
             raise NotImplementedError(
                 f"runlang='{self.runlang}' ({backend}) does not record the "
                 f"per-sweep savedyn trajectory; use runlang='py' (full per-sweep "
                 f"s_t) or 'C0S' (nSampleLog file snapshots)."
+            )
+        if self.upd_mode in PY_ONLY_UPD_MODES:
+            raise NotImplementedError(
+                f"runlang='{self.runlang}' ({backend}) does not implement "
+                f"upd_mode='{self.upd_mode}' yet (native CTMC kernel pending); "
+                f"use runlang='py'."
             )
 
     # ------------------------------------------------------------------
