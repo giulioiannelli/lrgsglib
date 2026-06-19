@@ -165,10 +165,15 @@ def test_voter_upd_mode_validation(tmp_path):
         path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
     )
 
+    # Phase 3: asynchronous / synchronous / link are implemented; gillespie
+    # is reserved (NotImplementedError); anything else is a ValueError.
+    for mode in ("asynchronous", "synchronous", "link"):
+        v = VoterModel(sg=lat, steps=5, runlang="py", upd_mode=mode)
+        assert v.upd_mode == mode
     with pytest.raises(NotImplementedError):
-        VoterModel(sg=lat, steps=5, runlang="py", upd_mode="synchronous")
+        VoterModel(sg=lat, steps=5, runlang="py", upd_mode="gillespie")
     with pytest.raises(ValueError):
         VoterModel(sg=lat, steps=5, runlang="py", upd_mode="bogus")
-
-    v = VoterModel(sg=lat, steps=5, runlang="py", upd_mode="asynchronous")
-    assert v.upd_mode == "asynchronous"
+    # link is a copy operation -> only defined for the linear rule.
+    with pytest.raises(ValueError):
+        VoterModel(sg=lat, steps=5, runlang="py", upd_mode="link", rule="majority")
