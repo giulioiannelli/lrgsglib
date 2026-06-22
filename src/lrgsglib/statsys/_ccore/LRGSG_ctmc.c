@@ -116,7 +116,6 @@ static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
         size_t i = fen_find(bit, N, RNG_dbl() * R);
         if (i >= N) i = N - 1;
         size_t deg = nlen[i];
-        if (track) clusters_flip(cctx, i);         /* pre-flip bookkeeping */
         s[i] = (int8_t)(-(int)s[i]);
 
         /* All edges at i toggle: new f_i = deg - old f_i. */

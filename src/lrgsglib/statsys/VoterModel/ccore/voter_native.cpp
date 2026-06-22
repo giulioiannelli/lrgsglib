@@ -108,7 +108,7 @@ static py::tuple voter_sampling(
     bool save_magnetization,
     int rule, size_t q, double eps, double alpha,
     int upd_mode, bool absorbing,
-    bool track_clusters, int cluster_mode, size_t split_cap
+    bool track_clusters, int cluster_mode
 ) {
     auto s_buf = spins_in.request();
     size_t N = static_cast<size_t>(s_buf.size);
@@ -157,10 +157,9 @@ static py::tuple voter_sampling(
              * sweep times, t_run shortens if it freezes (absorbing). */
             std::vector<double> magn_buf(save_magnetization ? n_sweeps : 0);
             double *magn_ptr = save_magnetization ? magn_buf.data() : nullptr;
-            /* optional cluster tracker (NULL => the kernel skips it entirely) */
+            /* optional cluster recompute (NULL => the kernel skips it entirely) */
             ClusterCtx *cctx = track_clusters
-                ? clusters_create(N, s, nlen_ptr, ne, cluster_mode == 1 ? 1 : 0,
-                                  split_cap)
+                ? clusters_create(N, s, nlen_ptr, ne, cluster_mode == 1 ? 1 : 0)
                 : nullptr;
             size_t t_run = voter_ctmc_run(
                 N, s, nlen_ptr, ne, n_sweeps,
@@ -239,9 +238,9 @@ rule : 0 linear | 1 majority | 2 qvoter | 3 nonlinear.
 q, eps, alpha : q-voter / nonlinear parameters.
 upd_mode : 0 async | 1 sync | 2 link | 3 gillespie (rejection-free CTMC, linear).
 absorbing : stop at the first zero-frustration configuration.
-track_clusters : record the cluster-size distribution per sweep (gillespie only).
+track_clusters : record the cluster-size distribution per sweep (gillespie only;
+    full connected-components recompute over active edges at each record).
 cluster_mode : 0 satisfied (signed domains) | 1 rawspin (edge sign ignored).
-split_cap : bounded-scan node cap before an exact split recompute.
 
 Returns
 -------
@@ -257,6 +256,5 @@ tuple[ndarray, ndarray, int, list]
         py::arg("rule") = 0, py::arg("q") = 2, py::arg("eps") = 0.0,
         py::arg("alpha") = 1.0, py::arg("upd_mode") = 0,
         py::arg("absorbing") = false,
-        py::arg("track_clusters") = false, py::arg("cluster_mode") = 0,
-        py::arg("split_cap") = 256);
+        py::arg("track_clusters") = false, py::arg("cluster_mode") = 0);
 }
