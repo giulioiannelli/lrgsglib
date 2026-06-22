@@ -1,4 +1,5 @@
 #include "LRGSG_binsys.h"
+#include "LRGSG_clusters.h"
 
 #ifndef __LRGSGCTMCLIB_H_INC__
 #define __LRGSGCTMCLIB_H_INC__
@@ -32,9 +33,14 @@
  * *absorbed_at receives the recorded sweep index of the frozen configuration;
  * otherwise *absorbed_at is left at -1 and the frozen tail is padded out to
  * n_sweeps. `magn` may be NULL when `save_magn` is 0.
+ *
+ * `cctx` is an OPTIONAL cluster-size-distribution tracker: when non-NULL the
+ * kernel records the current distribution at every integer sweep time and feeds
+ * each flip to it; when NULL the cluster machinery is skipped entirely (zero
+ * overhead -- tracking happens only when requested).
  */
 size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
                       size_t n_sweeps, int save_magn, double *magn,
-                      int absorbing, long *absorbed_at);
+                      int absorbing, long *absorbed_at, ClusterCtx *cctx);
 
 #endif /* __LRGSGCTMCLIB_H_INC__ */

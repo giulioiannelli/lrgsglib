@@ -19,7 +19,11 @@ from .._csr import build_graph_csr
 from ..BinDynSys import BinDynSys
 from ...utils.tools.chronometer import time_function_accumulate
 from .defaults import (
+    CLUSTER_MODE_CODE,
+    CLUSTER_MODES,
+    CLUSTER_SPLIT_SCAN_CAP,
     DEFAULT_ABSORBING_EVERY,
+    DEFAULT_CLUSTER_MODE,
     DEFAULT_NOISE_EPS,
     DEFAULT_NONLIN_ALPHA,
     DEFAULT_QVOTER_Q,
@@ -34,6 +38,10 @@ from .defaults import (
     VOTER_UPD_MODES,
     VOTER_UPD_MODES_PLANNED,
 )
+
+# Update schedules for which the per-flip cluster-size-distribution tracker is
+# wired today (single-spin engines). synchronous / link / vectorized are LATER.
+_CLUSTER_UPD_MODES: frozenset[str] = frozenset({"asynchronous", "gillespie"})
 
 # Voter save-mode letters
 _VOTER_SAVE_LETTERS: dict[str, str] = {
@@ -122,6 +130,8 @@ class VoterModel(CBackendMixin, BinDynSys):
         upd_mode: str = DEFAULT_UPD_MODE,
         absorbing_check: bool = False,
         absorbing_every: int = DEFAULT_ABSORBING_EVERY,
+        track_clusters: bool = False,
+        cluster_mode: str = DEFAULT_CLUSTER_MODE,
         freq: int = 10,
         nSampleLog: int = 100,
         **kwargs: Any,
@@ -137,6 +147,9 @@ class VoterModel(CBackendMixin, BinDynSys):
         self.absorbing_check = bool(absorbing_check)
         self.absorbing_every = max(1, int(absorbing_every))
         self.absorbed_at: int | None = None
+        self.track_clusters = bool(track_clusters)
+        self.cluster_mode = self._validate_cluster_mode(cluster_mode)
+        self._tracker = None
         self.freq = freq
         self.nSampleLog = nSampleLog
         self.reset_observables()
@@ -176,6 +189,15 @@ class VoterModel(CBackendMixin, BinDynSys):
             return rule
         raise ValueError(
             f"Unknown rule='{rule}'. Valid: {list(VOTER_RULES)}."
+        )
+
+    @staticmethod
+    def _validate_cluster_mode(cluster_mode: str) -> str:
+        """Validate the cluster-distribution edge-activation mode."""
+        if cluster_mode in CLUSTER_MODES:
+            return cluster_mode
+        raise ValueError(
+            f"Unknown cluster_mode='{cluster_mode}'. Valid: {list(CLUSTER_MODES)}."
         )
 
     @staticmethod
@@ -220,6 +242,7 @@ class VoterModel(CBackendMixin, BinDynSys):
         """Reset cached observables collected during a run."""
         self.magn = []
         self.s_t = []
+        self.cluster_dist: list[dict[int, int]] = []
         self.absorbed_at = None
 
     def init_voter_dynamics(self, custom: Any = None, exName: str = "") -> None:
@@ -355,6 +378,8 @@ class VoterModel(CBackendMixin, BinDynSys):
             self.magn.append(float(np.sum(self.s)) / float(self.N))
         if self.savedyn:
             self.s_t.append(self.s.copy())
+        if self.track_clusters and self._tracker is not None:
+            self.cluster_dist.append(self._tracker.size_distribution())
 
     def _should_stop(self, sweep: int) -> bool:
         if not self.absorbing_check or sweep % self.absorbing_every != 0:
@@ -367,9 +392,20 @@ class VoterModel(CBackendMixin, BinDynSys):
     def _sweep_async(self) -> None:
         """N single-node updates, nodes drawn WITH replacement (unified w/ C)."""
         s, N = self.s, self.N
-        for _ in range(N):
-            nd = int(np.random.randint(N))
-            s[nd] = self._apply_rule(nd, s)
+        tr = self._tracker
+        if tr is None:
+            for _ in range(N):
+                nd = int(np.random.randint(N))
+                s[nd] = self._apply_rule(nd, s)
+        else:
+            # Cluster tracking: feed every genuine sign flip to the tracker
+            # (a non-flipping update leaves the partition untouched).
+            for _ in range(N):
+                nd = int(np.random.randint(N))
+                new = self._apply_rule(nd, s)
+                if new != s[nd]:
+                    tr.flip(nd)        # pre-flip bookkeeping
+                    s[nd] = new
 
     def _sweep_sync(self) -> None:
         """Every node updated simultaneously from a frozen snapshot."""
@@ -392,6 +428,28 @@ class VoterModel(CBackendMixin, BinDynSys):
                 self.s[u] = np.int8(sign * int(self.s[v]))
             else:
                 self.s[v] = np.int8(sign * int(self.s[u]))
+
+    # -- cluster-size-distribution tracker (single-spin engines) ------
+    def _setup_cluster_tracker(self) -> None:
+        """Build the incremental cluster tracker for the Python single-spin
+        schedules (asynchronous / gillespie), or clear it when not tracking.
+
+        synchronous / link (and the vectorized backends) are not wired yet and
+        raise rather than silently dropping the observable.
+        """
+        if not self.track_clusters:
+            self._tracker = None
+            return
+        if self.upd_mode not in _CLUSTER_UPD_MODES:
+            raise NotImplementedError(
+                f"track_clusters is wired only for upd_mode in "
+                f"{sorted(_CLUSTER_UPD_MODES)} (single-spin engines); "
+                f"got upd_mode='{self.upd_mode}'."
+            )
+        from ._cluster_tracker import ClusterTracker, edge_sign_arrays
+        idx, signs = self._gillespie_neighbors()
+        b = edge_sign_arrays(signs, self.cluster_mode)
+        self._tracker = ClusterTracker(self.s, idx, b)
 
     # -- rejection-free CTMC sampler (Axis B: gillespie) --------------
     def _gillespie_neighbors(self) -> tuple[list[np.ndarray], list[np.ndarray]]:
@@ -472,6 +530,8 @@ class VoterModel(CBackendMixin, BinDynSys):
                                     side="right"))
             if i >= N:
                 i = N - 1
+            if self._tracker is not None:
+                self._tracker.flip(i)        # pre-flip bookkeeping
             s[i] = np.int8(-int(s[i]))
             # All edges at i toggle frustration; update i and its neighbours.
             f[i] = deg[i] - f[i]
@@ -492,6 +552,7 @@ class VoterModel(CBackendMixin, BinDynSys):
         in ``self.absorbed_at``.
         """
         self.absorbed_at = None
+        self._setup_cluster_tracker()
         if self.upd_mode == "gillespie":
             self._run_gillespie(tqdm_on)
             return
@@ -532,6 +593,16 @@ class VoterModel(CBackendMixin, BinDynSys):
                 f"runlang='{self.runlang}' ({backend}) does not implement "
                 f"upd_mode='{self.upd_mode}' yet (native CTMC kernel pending); "
                 f"use runlang='py'."
+            )
+        if self.track_clusters and not (
+            backend == "pybind" and self.upd_mode == "gillespie"
+        ):
+            # Native cluster tracking is wired for pybind + gillespie (the shared
+            # _ccore CTMC kernel); the C subprocess does not emit it yet.
+            raise NotImplementedError(
+                f"runlang='{self.runlang}' ({backend}) emits the cluster-size "
+                f"distribution only via runlang='pb_voter' with "
+                f"upd_mode='gillespie'; use runlang='py' otherwise."
             )
 
     # ------------------------------------------------------------------
@@ -656,7 +727,7 @@ class VoterModel(CBackendMixin, BinDynSys):
         """
         mod = self._load_native_module()
         ni, nw, nptr = build_graph_csr(self.sg, self.N)
-        s_out, magn, absorbed_at = mod.voter_sampling(
+        s_out, magn, absorbed_at, cluster_dist = mod.voter_sampling(
             self.s.astype(np.int8),
             ni, nw, nptr,
             int(self.steps),
@@ -668,10 +739,15 @@ class VoterModel(CBackendMixin, BinDynSys):
             float(self.alpha),
             int(UPD_MODE_CODE[self.upd_mode]),
             bool(self.absorbing_check),
+            bool(self.track_clusters),
+            int(CLUSTER_MODE_CODE[self.cluster_mode]),
+            int(CLUSTER_SPLIT_SCAN_CAP),
         )
         self.s = np.asarray(s_out, dtype=np.int8)
         self.magn = magn.tolist()
         self.absorbed_at = None if int(absorbed_at) < 0 else int(absorbed_at)
+        if self.track_clusters:
+            self.cluster_dist = list(cluster_dist)
 
     # ------------------------------------------------------------------
     # Vectorized backends (NumPy `np_voter` / CuPy `cu_voter`)
@@ -698,6 +774,12 @@ class VoterModel(CBackendMixin, BinDynSys):
                 f"runlang='{self.runlang}' ({backend}) is the synchronous "
                 f"vectorized voter; upd_mode='{self.upd_mode}' is a different "
                 f"schedule -- use runlang='py' or 'pb_voter'."
+            )
+        if self.track_clusters:
+            raise NotImplementedError(
+                f"runlang='{self.runlang}' ({backend}) does not emit the "
+                f"cluster-size distribution (synchronous vectorized; tracker is "
+                f"single-spin) -- use runlang='py'."
             )
 
     def _run_vectorized(self, gpu: bool) -> None:

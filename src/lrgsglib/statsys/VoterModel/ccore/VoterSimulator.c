@@ -96,8 +96,11 @@ int main(int argc, char *argv[]) {
         /* Rejection-free CTMC: event-driven, so no per-sweep snapshots. magn is
          * sampled at integer sweep times; t_run shortens if it freezes. */
         long absorbed_at;
+        /* NULL cluster context: the C-subprocess does not emit the cluster-size
+         * distribution yet (the shared tracker is wired here via pybind; the
+         * subprocess file format is a follow-up -- see the cluster-tracking TODO). */
         t_run = voter_ctmc_run(N, s, neigh_len, node_edges, eqSTEP,
-                               1, magn, absorbing, &absorbed_at);
+                               1, magn, absorbing, &absorbed_at, NULL);
     } else {
         for (size_t t = 0; t < eqSTEP; ++t) {
             if (snapshot_mode && t % freq == 0)

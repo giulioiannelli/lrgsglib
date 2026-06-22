@@ -123,3 +123,34 @@ UPD_MODE_CODE: dict[str, int] = {
 # state exists and the dynamics never freezes.
 DEFAULT_ABSORBING_EVERY: int = 1     # check every N sweeps (1 = each sweep)
 FRUSTRATION_EIG_TOL: float = 1e-10   # lambda_min(SL) above this => frustrated
+
+# ---------------------------------------------------------------------------
+# Cluster-size distribution observable (domains of aligned signed opinion)
+# ---------------------------------------------------------------------------
+# A *cluster* is a connected component of the subgraph of *active* edges. The
+# activation predicate depends on ``cluster_mode``:
+#   satisfied : edge (i,j) active iff sign(w_ij) * s_i * s_j = +1 -- a domain on
+#               the SIGNED substrate (a negative edge "agrees" when the spins are
+#               opposite). Reduces to same-opinion domains on an unsigned graph.
+#   rawspin   : edge (i,j) active iff s_i == s_j (edge sign ignored) -- domains of
+#               equal raw spin value.
+# Both predicates are b_ij * s_i * s_j > 0 with b_ij = sign(w_ij) ('satisfied')
+# or b_ij = +1 ('rawspin'); one DSU engine serves both (the tracker only swaps
+# the per-edge sign array it is handed). A single spin flip toggles the active
+# state of EVERY incident edge, so the partition is maintained incrementally:
+# union-find merges with the now-agreeing (formerly frustrated) neighbours in
+# O(1), and a flip can only *split* the node's old domain when it had >= 2
+# agreeing neighbours -- the only case that triggers a (bounded) local rescan.
+CLUSTER_MODES: tuple[str, ...] = ("satisfied", "rawspin")
+DEFAULT_CLUSTER_MODE: str = "satisfied"
+
+# Integer codes shared with the native cluster tracker (LRGSG_clusters.c
+# `rawspin` flag): 0 = satisfied (signed), 1 = rawspin (edge sign ignored).
+CLUSTER_MODE_CODE: dict[str, int] = {"satisfied": 0, "rawspin": 1}
+
+# On a potential split (>= 2 agreeing neighbours leave a domain) the tracker
+# runs a bounded breadth-first scan from one departing neighbour: if it re-reaches
+# all the others within CLUSTER_SPLIT_SCAN_CAP nodes the domain is intact (no
+# split, O(cap)); otherwise it falls back to an exact recompute of just that one
+# affected component (correctness guaranteed, O(component) only on a real split).
+CLUSTER_SPLIT_SCAN_CAP: int = 256

@@ -51,12 +51,18 @@ static size_t node_frustration(size_t nd, const spin_tp s, size_t deg,
     return fi;
 }
 
-size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
-                      size_t n_sweeps, int save_magn, double *magn,
-                      int absorbing, long *absorbed_at) {
-    *absorbed_at = -1;
-    if (n_sweeps == 0) return 0;
-
+/*
+ * Implementation core. `track` is a COMPILE-TIME literal (0 or 1) supplied by the
+ * two call sites in voter_ctmc_run; being `static inline`, the compiler emits a
+ * specialised copy per call site and constant-folds every `if (track)` away. So
+ * the cluster branch is decided ONCE at dispatch -- there is no per-iteration
+ * test in the no-tracking path (`cctx` is NULL there anyway).
+ */
+static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
+                                   NodesEdges node_edges, size_t n_sweeps,
+                                   int save_magn, double *magn, int absorbing,
+                                   long *absorbed_at, const int track,
+                                   ClusterCtx *cctx) {
     size_tp f    = __chMalloc(N * sizeof(*f));        /* frustrated edges/node */
     double *rate = __chMalloc(N * sizeof(*rate));     /* r_i = f_i / deg_i     */
     double *bit  = calloc(N + 1, sizeof(*bit));       /* Fenwick (zeroed)      */
@@ -80,12 +86,14 @@ size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
         if (total_f == 0) {                       /* frozen => absorbing */
             if (absorbing) {
                 if (save_magn) magn[recorded] = calc_magn(N, s);
+                if (track) clusters_record(cctx);
                 *absorbed_at = (long)recorded;
                 recorded++;
             } else {
                 double m = save_magn ? calc_magn(N, s) : 0.0;
                 while (recorded < n_sweeps) {      /* pad the frozen tail */
                     if (save_magn) magn[recorded] = m;
+                    if (track) clusters_record(cctx);   /* distribution frozen too */
                     recorded++;
                 }
             }
@@ -99,6 +107,7 @@ size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
         /* State is constant on [t, t_next): emit any integer times in between. */
         while (recorded < n_sweeps && (double)recorded < t_next) {
             if (save_magn) magn[recorded] = calc_magn(N, s);
+            if (track) clusters_record(cctx);
             recorded++;
         }
         if (recorded >= n_sweeps) break;
@@ -107,6 +116,7 @@ size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
         size_t i = fen_find(bit, N, RNG_dbl() * R);
         if (i >= N) i = N - 1;
         size_t deg = nlen[i];
+        if (track) clusters_flip(cctx, i);         /* pre-flip bookkeeping */
         s[i] = (int8_t)(-(int)s[i]);
 
         /* All edges at i toggle: new f_i = deg - old f_i. */
@@ -138,4 +148,19 @@ size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
     free(rate);
     free(bit);
     return recorded;
+}
+
+size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
+                      size_t n_sweeps, int save_magn, double *magn,
+                      int absorbing, long *absorbed_at, ClusterCtx *cctx) {
+    *absorbed_at = -1;
+    if (n_sweeps == 0) return 0;
+    /* Single runtime branch: pick the cluster-tracking or the plain loop ONCE.
+     * Each ctm_run_impl instantiation has `track` as a literal, so its inner
+     * `if (track)` checks compile away -- no per-iteration test either way. */
+    if (cctx)
+        return ctmc_run_impl(N, s, nlen, node_edges, n_sweeps, save_magn, magn,
+                             absorbing, absorbed_at, 1, cctx);
+    return ctmc_run_impl(N, s, nlen, node_edges, n_sweeps, save_magn, magn,
+                         absorbing, absorbed_at, 0, NULL);
 }
