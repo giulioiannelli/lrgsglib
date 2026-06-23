@@ -32,6 +32,12 @@ from ...utils.statsys import (
     largest_fraction,
 )
 from . import _voter_io
+from .._observables import (
+    HistogramSeries,
+    ObservableSet,
+    RowTrajectory,
+    ScalarSeries,
+)
 from .defaults import (
     CLUSTER_MODE_CODE,
     CLUSTER_MODES,
@@ -50,6 +56,9 @@ from .defaults import (
     UPD_MODE_CODE,
     VOTER_CLDIST_FBASE,
     VOTER_MAGN_FBASE,
+    VOTER_OBS_CLDIST,
+    VOTER_OBS_MAGN,
+    VOTER_OBS_SOUT,
     VOTER_RULES,
     VOTER_SOLVER_NAME,
     VOTER_SOUT_FBASE,
@@ -244,6 +253,19 @@ class VoterModel(CBackendMixin, BinDynSys):
     ) -> None:
         dynpath = getattr(sg, 'path_voter', None)
         resolved_steps = steps if steps is not None else eqSTEP
+        # Build the observable set BEFORE super().__init__: BinDynSys.__init__
+        # assigns ``self.magn = []``, which routes through this class's ``magn``
+        # property setter and therefore needs ``self.observables`` to exist. The
+        # three voter observables, behind the reusable ObservableSet: a
+        # magnetization series (m_*.bin), the spin trajectory (sout_*.bin), and
+        # the cluster-size-distribution series (cldist_*.npz). The objects own
+        # the codec/lazy-load/streaming mechanics; this class owns the policy
+        # (gating flags, sout subsampling, the C/pybind-specific persistence).
+        self.observables = ObservableSet([
+            ScalarSeries(VOTER_OBS_MAGN, dtype=np.float64),
+            RowTrajectory(VOTER_OBS_SOUT, ncols=sg.N, dtype=np.int8),
+            HistogramSeries(VOTER_OBS_CLDIST),
+        ])
         super().__init__(sg, dynpath=dynpath, steps=resolved_steps, simref=simref, **kwargs)
         # savemagn is inherited from BinDynSys (shared binary option).
         self.rule = self._validate_rule(rule)
@@ -359,21 +381,13 @@ class VoterModel(CBackendMixin, BinDynSys):
     # ------------------------------------------------------------------
     def reset_observables(self) -> None:
         """Reset the in-RAM observable buffers and all disk-backing state."""
-        # In-RAM buffers / caches. ``_s_t_cache`` holds the trajectory only when
-        # NOT streaming to disk (savedisk=False, or pre-dump); it is set to None
-        # once ``sout`` lives on disk so ``s_t`` lazily memmaps the file instead.
-        self._magn: list[float] = []
-        self._cluster_dist: list[dict[int, int]] = []
-        self._s_t_cache: list[np.ndarray] | None = []
+        # Each Observable clears its RAM buffer/cache, disk path, and (for sout)
+        # any open stream + recorded-row count; ``s_t`` then lazily memmaps the
+        # file once ``sout`` lives on disk and the RAM cache is dropped.
+        self.observables.reset()
         self.absorbed_at = None
-        # Disk artifacts (None => not on disk); set by _begin/_persist_observables.
-        self._magn_path: Path | None = None
-        self._sout_path: Path | None = None
-        self._cldist_path: Path | None = None
-        # Active sout stream (Python loop only); see _begin/_persist_observables.
-        self._sout_fh = None
-        self._sout_tmp: Path | None = None
-        self._sout_nrec: int = 0
+        # VoterModel-local subsample counter for the streamed sout (this is run
+        # policy, not observable state); see _record / _begin_outputs.
         self._sout_seen: int = 0
 
     # ------------------------------------------------------------------
@@ -382,28 +396,20 @@ class VoterModel(CBackendMixin, BinDynSys):
     @property
     def magn(self) -> list[float]:
         """Per-spin magnetization series (loaded from ``m_*.bin`` on demand)."""
-        if self._magn:
-            return self._magn
-        if self._magn_path is not None and Path(self._magn_path).exists():
-            self._magn = _voter_io.load_magn(self._magn_path).tolist()
-        return self._magn
+        return self.observables[VOTER_OBS_MAGN].data
 
     @magn.setter
     def magn(self, value) -> None:
-        self._magn = list(value) if value is not None else []
+        self.observables[VOTER_OBS_MAGN].set_values(value)
 
     @property
     def cluster_dist(self) -> list[dict[int, int]]:
         """Per-sweep cluster-size histograms (loaded from ``cldist_*.npz``)."""
-        if self._cluster_dist:
-            return self._cluster_dist
-        if self._cldist_path is not None and Path(self._cldist_path).exists():
-            self._cluster_dist = _voter_io.load_cldist(self._cldist_path)
-        return self._cluster_dist
+        return self.observables[VOTER_OBS_CLDIST].data
 
     @cluster_dist.setter
     def cluster_dist(self, value) -> None:
-        self._cluster_dist = list(value) if value is not None else []
+        self.observables[VOTER_OBS_CLDIST].set_values(value)
 
     @property
     def s_t(self):
@@ -413,15 +419,16 @@ class VoterModel(CBackendMixin, BinDynSys):
         memmap of ``sout_*.bin`` (never a full-RAM copy). Iterating yields
         per-sweep configurations either way.
         """
-        if self._s_t_cache is not None:
-            return self._s_t_cache
-        if self._sout_path is not None and Path(self._sout_path).exists():
-            return _voter_io.load_sout(self._sout_path, self.N, mmap=True)
-        return []
+        return self.observables[VOTER_OBS_SOUT].data
 
     @s_t.setter
     def s_t(self, value) -> None:
-        self._s_t_cache = value
+        self.observables[VOTER_OBS_SOUT].set_rows(value)
+
+    @property
+    def _sout_nrec(self) -> int:
+        """Rows actually written to ``sout_*.bin`` (back-compat accessor)."""
+        return self.observables[VOTER_OBS_SOUT].nrec
 
     def init_voter_dynamics(self, custom: Any = None, exName: str = "") -> None:
         """Initialise the spin configuration and export data if required."""
@@ -600,20 +607,20 @@ class VoterModel(CBackendMixin, BinDynSys):
     # -- per-sweep samplers (Axis B) ----------------------------------
     def _record(self) -> None:
         if self.savemagn:
-            self._magn.append(self.magnetization())
+            self.observables[VOTER_OBS_MAGN].append(self.magnetization())
         if self.savedyn:
-            if self._sout_fh is not None:
+            sout = self.observables[VOTER_OBS_SOUT]
+            if sout.streaming:
                 # Streaming to disk (Python loop + savedisk): keep every
                 # ``sout_every``-th recorded sweep, full trajectory off-RAM.
                 if self._sout_seen % self.sout_every == 0:
-                    _voter_io.write_sout_row(self._sout_fh, self.s)
-                    self._sout_nrec += 1
+                    sout.stream_row(self.s)
                 self._sout_seen += 1
             else:
                 # In-RAM trajectory (savedisk=False).
-                self._s_t_cache.append(self.s.copy())
+                sout.append_row(self.s.copy())
         if self.track_clusters and self._cl_idx is not None:
-            self._cluster_dist.append(
+            self.observables[VOTER_OBS_CLDIST].append(
                 dict(cluster_size_distribution(self.s, self._cl_idx, self._cl_b))
             )
 
@@ -911,7 +918,7 @@ class VoterModel(CBackendMixin, BinDynSys):
                 self.absorbed_at = int(magn.size) - 1
             # savemagn gates exposure (parity with py/pybind).
             if self.savemagn:
-                self._magn = magn.tolist()
+                self.observables[VOTER_OBS_MAGN].set_values(magn.tolist())
 
     def _get_cleanup_paths(self) -> list[Path | None]:
         """Return paths to clean up after a C run.
@@ -967,15 +974,16 @@ class VoterModel(CBackendMixin, BinDynSys):
             bool(self.savedyn),
         )
         self.s = np.asarray(s_out, dtype=np.int8)
-        self._magn = magn.tolist()
+        self.observables[VOTER_OBS_MAGN].set_values(magn.tolist())
         self.absorbed_at = None if int(absorbed_at) < 0 else int(absorbed_at)
         if self.track_clusters:
-            self._cluster_dist = list(cluster_dist)
+            self.observables[VOTER_OBS_CLDIST].set_values(list(cluster_dist))
         if self.savedyn:
             # (n_recorded, N) int8 -> list of per-sweep 1-D arrays (matches py).
             # _persist_observables dumps this to sout_*.bin and drops the RAM
             # copy when savedisk=True (s_t then memmaps the file).
-            self._s_t_cache = [row.copy() for row in np.asarray(s_t, dtype=np.int8)]
+            self.observables[VOTER_OBS_SOUT].set_rows(
+                [row.copy() for row in np.asarray(s_t, dtype=np.int8)])
 
     # ------------------------------------------------------------------
     # Vectorized backends (NumPy `np` / CuPy `cu`)
@@ -1036,7 +1044,7 @@ class VoterModel(CBackendMixin, BinDynSys):
             bool(self.absorbing_check), int(self.absorbing_every),
         )
         self.s = np.asarray(s_out, dtype=np.int8)
-        self._magn = list(magn)
+        self.observables[VOTER_OBS_MAGN].set_values(list(magn))
         self.absorbed_at = absorbed_at
 
     # ------------------------------------------------------------------
@@ -1067,72 +1075,64 @@ class VoterModel(CBackendMixin, BinDynSys):
         stable ``out_suffix`` so the C backend's own ``m_*``/``sout_*`` outputs and
         the in-process dumps land on the same, loadable, names.
         """
+        sout = self.observables[VOTER_OBS_SOUT]
         # Always start from a clean streaming state.
-        self._sout_fh = None
-        self._sout_tmp = None
-        self._sout_nrec = 0
+        sout.reset_stream()
         self._sout_seen = 0
         if not self.savedisk:
             return
         suf = self.out_suffix
         if self.savemagn:
-            self._magn_path = self.dynpath / self.sg.get_p_fname(
-                VOTER_MAGN_FBASE, suf, ext=BIN)
+            self.observables[VOTER_OBS_MAGN].set_path(
+                self.dynpath / self.sg.get_p_fname(VOTER_MAGN_FBASE, suf, ext=BIN))
         if self.track_clusters:
-            self._cldist_path = self.dynpath / self.sg.get_p_fname(
-                VOTER_CLDIST_FBASE, suf, ext=NPZ)
+            self.observables[VOTER_OBS_CLDIST].set_path(
+                self.dynpath / self.sg.get_p_fname(VOTER_CLDIST_FBASE, suf, ext=NPZ))
         if self.savedyn:
-            self._sout_path = self.dynpath / self.sg.get_p_fname(
-                VOTER_SOUT_FBASE, suf, ext=BIN)
+            sout.set_path(
+                self.dynpath / self.sg.get_p_fname(VOTER_SOUT_FBASE, suf, ext=BIN))
             if not self.runlang.startswith("C"):
                 # The C subprocess streams its own snapshots (sampled by
                 # nSampleLog); guard only the in-process backends.
                 self._guard_sout_size()
             if self._is_py_runlang():
-                self._sout_fh, self._sout_tmp = _voter_io.open_sout_stream(
-                    self._sout_path)
+                sout.open_stream()
 
     def _persist_observables(self) -> None:
         """Finalize disk artifacts and switch attributes to disk-backed views."""
         if not self.savedisk:
             return
-        # Close a streamed sout (Python loop) -> finalize sout_*.bin.
-        if self._sout_fh is not None:
-            _voter_io.close_sout_stream(
-                self._sout_fh, self._sout_tmp, self._sout_path)
-            self._sout_fh = None
-            self._sout_tmp = None
+        magn = self.observables[VOTER_OBS_MAGN]
+        sout = self.observables[VOTER_OBS_SOUT]
+        cldist = self.observables[VOTER_OBS_CLDIST]
+        # Close a streamed sout (Python loop) -> finalize sout_*.bin (no-op if the
+        # stream was never opened, e.g. the pybind / C backends).
+        sout.close_stream()
         if self.runlang.startswith("C"):
             # The C binary already wrote m_*/sout_* under the stable names; just
             # point the lazy views at them (cleanup is suppressed via
             # _get_cleanup_paths). C does not emit cldist.
             if self.savemagn:
-                self._magn_path = self.magn_path
+                magn.set_path(self.magn_path)
             sout_p = getattr(self, "sout_path", None)   # set in C0S snapshot mode
             if sout_p is not None and Path(sout_p).exists():
-                self._sout_path = Path(sout_p)
-                self._s_t_cache = None
+                sout.set_path(sout_p)
+                sout.mark_on_disk()
             return
-        # In-process backends: dump the RAM buffers.
-        if self.savedyn and self._sout_path is not None:
-            if self._s_t_cache:   # pybind returned the whole (n_rec, N) array
-                arr = np.asarray(self._s_t_cache, dtype=np.int8)
-                if self.sout_every > 1:
-                    arr = arr[::self.sout_every]
-                _voter_io.save_sout(self._sout_path, arr)
-                self._sout_nrec = int(arr.shape[0])
-            # (the Python loop already streamed the rows above)
-            if Path(self._sout_path).exists():
-                self._s_t_cache = None   # s_t now memmaps the file
-        if self.savemagn and self._magn_path is not None and self._magn:
-            _voter_io.save_magn(self._magn_path, self._magn)
-        if (self.track_clusters and self._cldist_path is not None
-                and self._cluster_dist):
-            _voter_io.save_cldist(self._cldist_path, self._cluster_dist)
+        # In-process backends: dump the RAM buffers. For pybind the whole
+        # (n_rec, N) array is cached (dumped, subsampled, then the RAM copy
+        # dropped); the Python loop already streamed its rows (cache empty ->
+        # finalize_batch only drops it once the file exists).
+        if self.savedyn and sout.path is not None:
+            sout.finalize_batch(subsample=self.sout_every)
+        if self.savemagn:
+            magn.persist()
+        if self.track_clusters:
+            cldist.persist()
 
     # -- public loaders / introspection (read big output only when needed) --
-    def _require_output(self, attr: str, what: str) -> Path:
-        path = getattr(self, attr, None)
+    def _require_output(self, name: str, what: str) -> Path:
+        path = self.observables[name].path
         if path is None or not Path(path).exists():
             raise FileNotFoundError(
                 f"No {what} file on disk. Run with savedisk=True and the matching "
@@ -1142,7 +1142,7 @@ class VoterModel(CBackendMixin, BinDynSys):
 
     def load_magn(self) -> np.ndarray:
         """Load the persisted magnetization series (``float64`` array)."""
-        return _voter_io.load_magn(self._require_output("_magn_path", "magnetization"))
+        return _voter_io.load_magn(self._require_output(VOTER_OBS_MAGN, "magnetization"))
 
     def load_sout(self, mmap: bool = False) -> np.ndarray:
         """Load the persisted spin trajectory as ``(n_rec, N)`` int8.
@@ -1150,22 +1150,20 @@ class VoterModel(CBackendMixin, BinDynSys):
         ``mmap=True`` returns a read-only memmap (no full-RAM copy).
         """
         return _voter_io.load_sout(
-            self._require_output("_sout_path", "sout trajectory"), self.N, mmap=mmap)
+            self._require_output(VOTER_OBS_SOUT, "sout trajectory"), self.N, mmap=mmap)
 
     def load_clusters(self) -> list[dict[int, int]]:
         """Load the persisted cluster-size-distribution time series."""
         return _voter_io.load_cldist(
-            self._require_output("_cldist_path", "cluster-size distribution"))
+            self._require_output(VOTER_OBS_CLDIST, "cluster-size distribution"))
 
     def output_sizes(self) -> dict[str, int]:
         """Bytes on disk for each persisted observable (0 if not written)."""
         sizes: dict[str, int] = {}
-        for key, attr in (("magn", "_magn_path"),
-                          ("sout", "_sout_path"),
-                          ("cldist", "_cldist_path")):
-            path = getattr(self, attr, None)
-            sizes[key] = (Path(path).stat().st_size
-                          if path is not None and Path(path).exists() else 0)
+        for name in (VOTER_OBS_MAGN, VOTER_OBS_SOUT, VOTER_OBS_CLDIST):
+            path = self.observables[name].path
+            sizes[name] = (Path(path).stat().st_size
+                           if path is not None and Path(path).exists() else 0)
         return sizes
 
     # ------------------------------------------------------------------

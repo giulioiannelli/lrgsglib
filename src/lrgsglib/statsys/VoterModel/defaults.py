@@ -159,6 +159,12 @@ CLUSTER_MODE_CODE: dict[str, int] = {"satisfied": 0, "rawspin": 1}
 VOTER_MAGN_FBASE: str = "m"         # per-spin magnetization series (float64 .bin)
 VOTER_SOUT_FBASE: str = "sout"      # spin-configuration trajectory (int8 .bin, (n_rec, N))
 VOTER_CLDIST_FBASE: str = "cldist"  # cluster-size-distribution time series (.npz)
+# Logical names of the three observables in VoterModel.observables (the keys for
+# ``observables[...]`` and ``output_sizes()``; the magn name is "magn", NOT the
+# "m" file base above).
+VOTER_OBS_MAGN: str = "magn"
+VOTER_OBS_SOUT: str = "sout"
+VOTER_OBS_CLDIST: str = "cldist"
 # NOTE: ``cldist`` is DISTINCT from Ising's ``outcl{i}`` (time-averaged
 # magnetization moments of pre-defined eigenvector clusters); the voter artifact
 # is a per-sweep histogram {component_size: count} of emergent active-edge

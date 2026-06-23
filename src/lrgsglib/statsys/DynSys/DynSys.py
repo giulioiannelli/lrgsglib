@@ -31,6 +31,7 @@ from ...utils.basic.strings import generate_random_id, join_non_empty
 
 if TYPE_CHECKING:
     from ...graphs.protocols import SignedGraphProtocol as SignedGraph
+    from .._observables import ObservableSet
 
 ZERO_FIELD = lambda N: np.zeros(N, dtype=np.float64)
 
@@ -85,6 +86,14 @@ class DynSys(ABC):
     s_t: list[np.ndarray] = []
     dynpath: Path | str = ""
     run_id: str = ""
+
+    # Disk-backed observables. A model that persists time series populates this
+    # with an ``ObservableSet`` in ``__init__`` (see VoterModel); it stays
+    # ``None`` for models that keep observables in plain RAM lists. The reusable
+    # accumulate/persist/lazy-load mechanics live in ``statsys._observables`` and
+    # the codecs in ``statsys._io``; this slot gives consumers (a batch loader,
+    # the live-view GUI) one uniform surface to enumerate and read a run's series.
+    observables: "ObservableSet | None" = None
 
     def __init__(
         self,
