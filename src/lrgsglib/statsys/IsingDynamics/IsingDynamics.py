@@ -9,7 +9,10 @@ import numpy as np
 import tqdm
 
 from .._c_backend import CBackendMixin
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
 from ..BinDynSys import BinDynSys
+from .defaults import ISING_SOLVER_NAME
 from ...config.const import BIN, SG_REPR
 from ...config.funcs import build_pT_fname
 from ...utils.lrg.ising import compute_ising_pairwise_energy
@@ -1971,82 +1974,38 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.check_attribute()
         self.initialize_run_parameters(T_ising, steps=steps, simref=simref, eqSTEP=eqSTEP)
 
-        # Resolve naming convention
+        # Resolve naming convention (same predicates the old if/elif chain used).
         rl = _resolve_runlang(self.runlang)
 
-        # Determine mode
-        use_sa = sa_mode or self.sa_enabled
-        use_pt = pt_mode or self.pt_enabled
-
-        # ---- Pybind11 backend ----
-        if rl.startswith("pb_"):
-            if "topo_cem" in rl:
-                self._run_pybind_topo_cem()
-            elif "topo_met" in rl:
-                self._run_pybind_topo_met()
-            elif "topo_fca" in rl:
-                self._run_pybind_topo_fca()
-            elif "wolff" in rl:
-                self._run_pybind_wolff()
-            elif "sw" in rl:
-                self._run_pybind_sw()
-            elif use_pt or rl.endswith("_pt") or "pt" in rl:
-                self._run_pybind_pt()
-            elif use_sa or rl.endswith("_sa") or "sa" in rl:
-                self._run_pybind_sa()
-            else:
-                self._run_pybind_met()
-
-        # ---- CuPy (GPU) backend ----
-        elif rl.startswith("cu_"):
-            if "topo_cem" in rl:
-                self.cem_spectral_sampling(tqdm_on)
-            elif "topo_met" in rl:
-                # CuPy topological not yet implemented — fall back to Python
-                self.topological_metropolis_sampling(tqdm_on)
-            elif "topo_fca" in rl:
-                self.topological_fca_sampling(tqdm_on)
-            elif "wolff" in rl:
-                self._run_cupy_wolff()
-            elif "sw" in rl:
-                self._run_cupy_sw()
-            elif use_pt or rl.endswith("_pt") or "pt" in rl:
-                self._run_cupy_pt()
-            elif use_sa or rl.endswith("_sa") or "sa" in rl:
-                self._run_cupy_sa()
-            else:
-                self._run_cupy_met()
-
-        # ---- C subprocess backend ----
-        elif rl.startswith("c_") or (
+        # Resolve the solver family from the runlang code, preserving the exact
+        # precedence of the old if/elif chain: pybind > CuPy > C subprocess >
+        # Python. The per-algorithm sub-dispatch lives inside each solver's
+        # execute(), so dispatching through the registry is behavior-preserving.
+        is_c = rl.startswith("c_") or (
             self.runlang.upper().startswith("C")
             and len(self.runlang) >= 2
             and self.runlang[1].isdigit()
-        ):
-            self.build_cprogram_command()
-            self.run_cprogram(verbose)
-            if clean_export:
+        )
+        if rl.startswith("pb_"):
+            backend = SolverBackend.PB
+        elif rl.startswith("cu_"):
+            backend = SolverBackend.CU
+        elif is_c:
+            backend = SolverBackend.C
+        else:
+            backend = SolverBackend.PY
+
+        solver = get_solver(ISING_SOLVER_NAME, backend)
+        solver.supports(self)
+        try:
+            solver.execute(
+                self, tqdm_on=tqdm_on, verbose=verbose,
+                sa_mode=sa_mode, pt_mode=pt_mode,
+            )
+        finally:
+            if backend is SolverBackend.C and clean_export:
                 self.remove_run_c_files()
                 self.sg.remove_exported_files()
-
-        # ---- Python backend ----
-        else:
-            if "topo_cem" in rl:
-                self.cem_spectral_sampling(tqdm_on)
-            elif "topo_met" in rl:
-                self.topological_metropolis_sampling(tqdm_on)
-            elif "topo_fca" in rl:
-                self.topological_fca_sampling(tqdm_on)
-            elif "wolff" in rl:
-                self.wolff_sampling(tqdm_on)
-            elif "sw" in rl:
-                self.swendsen_wang_sampling(tqdm_on)
-            elif use_pt:
-                self.parallel_tempering_sampling(tqdm_on)
-            elif use_sa:
-                self.simulated_annealing_sampling(tqdm_on)
-            else:
-                self.metropolis_sampling(tqdm_on)
 
     #
     def find_ising_clusters(self, import_cl: bool = False):
@@ -2137,4 +2096,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             row, col = divmod(i, self.sg.side1)
             result_array[row, col] = sublist[1]
         self.mapping = result_array
+
+
+# Register IsingDynamics' solver backends (py/pb/cu/C) in the shared solver
+# registry. Imported after the class so that importing IsingDynamics wires up
+# dispatch; no circular import (``_solvers`` imports IsingDynamics lazily inside
+# its mode-resolution helper).
+from . import _solvers  # noqa: E402,F401
 
