@@ -31,7 +31,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .._c_backend import CBackendMixin
+from .._csr import build_graph_csr
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
 from ..ContDynSys import ContDynSys
+from .defaults import CODE_SOLVER_NAME
 from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
@@ -219,6 +223,43 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
         return [getattr(self, 'sfout', None)]
 
     # ------------------------------------------------------------------
+    # Native (pybind11) backend
+    # ------------------------------------------------------------------
+    def _run_pybind(self) -> None:
+        """Integrate via the in-process ``_code_native`` RK4 kernel.
+
+        Marshals the graph into the engine-agnostic CSR triple (NX + GT) and runs
+        the same ``code_rhs`` / ``rk4_step`` kernel the C subprocess uses.
+        Deterministic, so it matches the Python integrator numerically. Mirrors
+        ``KuramotoModel._run_pybind``. Callable coupling/local functions are
+        not supported by the native kernel (string types only).
+        """
+        from .ccore import _code_native
+
+        if callable(self.coupling_type) or callable(self.local_type):
+            raise TypeError(
+                "_code_native supports only string coupling/local types; "
+                "use runlang='py' for callable functions."
+            )
+
+        ni, nw, nptr = build_graph_csr(self.sg, self.N)
+        x0 = np.ascontiguousarray(self.s, dtype=np.float64)
+        # Local-function parameters: defaults mirror the C kernel hardcoded
+        # values, overridable via ``local_params`` (matching ``_f_local``).
+        a = float(self.local_params.get("a", 1.0))
+        r = float(self.local_params.get("r", 1.0))
+        K = float(self.local_params.get("K", 1.0))
+        x = _code_native.code_sampling(
+            x0, ni, nw, nptr,
+            float(self.coupling_strength),
+            str(self.coupling_type),
+            str(self.local_type),
+            a, r, K,
+            float(self.dt), int(self.steps),
+        )
+        self.s = x
+
+    # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
     @time_function_accumulate(auto_log=False)
@@ -229,11 +270,23 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
         **kw: Any,
     ) -> None:
         self.check_attribute()
+        # Resolve the solver family from the runlang code (C check is
+        # case-sensitive on a leading "C" to avoid catching native prefixes).
         if self.runlang.startswith("C"):
-            self.build_cprogram_command()
-            self.run_cprogram(verbose)
-            if clean_export:
+            backend = SolverBackend.C
+        elif self.runlang.lower().startswith("pb"):
+            backend = SolverBackend.PB
+        else:
+            backend = SolverBackend.PY
+        solver = get_solver(CODE_SOLVER_NAME, backend)
+        solver.supports(self)
+        try:
+            solver.execute(self, verbose=verbose)
+        finally:
+            if backend is SolverBackend.C and clean_export:
                 self.remove_run_c_files()
                 self.sg.remove_exported_files()
-        else:
-            self.run_py(verbose=verbose)
+
+
+# Register CoupledODEModel's solver backends (py/pb/C) in the shared registry.
+from . import _solvers  # noqa: E402,F401

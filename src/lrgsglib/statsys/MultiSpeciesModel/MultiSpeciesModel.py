@@ -20,7 +20,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .._c_backend import CBackendMixin
+from .._csr import build_graph_csr
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
 from ..VecDynSys import VecDynSys
+from .defaults import MULTISPEC_SOLVER_NAME
 from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
@@ -237,6 +241,33 @@ class MultiSpeciesModel(CBackendMixin, VecDynSys):
                 self.s_t.append(self.s.copy())
 
     # ------------------------------------------------------------------
+    # Native (pybind11) backend
+    # ------------------------------------------------------------------
+    def _run_pybind(self) -> None:
+        """Run Metropolis via the in-process ``_multispec_native`` kernel.
+
+        Marshals the graph into the engine-agnostic CSR triple (works for NX
+        and GT) and runs the same ``multispec_metropolis_sweep`` kernel the C
+        subprocess uses (identity interaction, uniform q); seed-reproducible.
+        State is flattened to row-major ``(N, k)`` int32 -- exactly the layout
+        the C kernel indexes as ``s[nd*k + comp]``. Mirrors
+        ``PottsModel._run_pybind``.
+        """
+        from .ccore import _multispec_native
+
+        ni, nw, nptr = build_graph_csr(self.sg, self.N)
+        s0 = np.ascontiguousarray(self.s, dtype=np.int32).reshape(-1)
+        s, ene = _multispec_native.multispec_sampling(
+            s0, ni, nw, nptr,
+            int(self.N), int(self.species), int(self.q), float(self.T),
+            int(self.steps), int(self.seed),
+            bool(self.save_observables),
+        )
+        self.s = np.asarray(s, dtype=np.int32).reshape(self.N, self.species)
+        if self.save_observables:
+            self.ene = ene.tolist()
+
+    # ------------------------------------------------------------------
     # C backend
     # ------------------------------------------------------------------
     def _build_c_arglist(self) -> list[str]:
@@ -270,11 +301,26 @@ class MultiSpeciesModel(CBackendMixin, VecDynSys):
         **kw: Any,
     ) -> None:
         self.check_attribute()
+        # Resolve the solver family from the runlang code (same precedence the
+        # old if/elif chain used; the C check is case-sensitive on a leading "C"
+        # to avoid catching "cu"/native prefixes).
         if self.runlang.startswith("C"):
-            self.build_cprogram_command()
-            self.run_cprogram(verbose)
-            if clean_export:
+            backend = SolverBackend.C
+        elif self.runlang.lower().startswith("pb"):
+            backend = SolverBackend.PB
+        else:
+            backend = SolverBackend.PY
+        solver = get_solver(MULTISPEC_SOLVER_NAME, backend)
+        solver.supports(self)
+        try:
+            solver.execute(self, verbose=verbose)
+        finally:
+            if backend is SolverBackend.C and clean_export:
                 self.remove_run_c_files()
                 self.sg.remove_exported_files()
-        else:
-            self.run_py(verbose=verbose)
+
+
+# Register MultiSpeciesModel's solver backends (py/pb/C) in the shared solver
+# registry. Imported after the class so importing MultiSpeciesModel wires up
+# dispatch; no circular import (``_solvers`` does not import this class).
+from . import _solvers  # noqa: E402,F401
