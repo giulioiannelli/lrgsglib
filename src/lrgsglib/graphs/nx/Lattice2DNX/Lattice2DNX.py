@@ -13,6 +13,7 @@ from ....utils.basic.arithmetic import adjust_to_even
 from ..funcs import *
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 from .generators_2d import *
+from ..._shared._draw import draw as _draw_lattice2d
 #
 class Lattice2DNX(SignedGraphNX):
     """
@@ -28,8 +29,13 @@ class Lattice2DNX(SignedGraphNX):
         Primary side length. If ``side2`` is provided, the larger of the two
         becomes ``side1``.
     geo : str, default L2D_GEO
-        Lattice geometry. Common values: ``"sqr"``, ``"tri"``, ``"hex"``,
-        ``"sqr_sw"``, ``"tri_sw"``, ``"oct_sqr"``.
+        Lattice geometry. Accepts either a short alias or its full name
+        (``L2D_GEO_SHRT_LIST`` / ``L2D_GEO_LIST``): ``"sqr"`` (squared, z=4),
+        ``"tri"`` (triangular, z=6), ``"hex"`` (hexagonal, z=3),
+        ``"oct_sqr"`` (octagonal_sqr / rhomb-octagonal, z=3),
+        ``"kgm"`` (kagome, z=4), ``"tri_hex"`` (tri_hexagonal, z=3). The
+        small-world variants ``"sqr_sw"`` / ``"tri_sw"`` are selected
+        automatically when ``prew > 0``.
     side2 : int, default L2D_SIDE2
         Secondary side length. If omitted, a square lattice is used.
     pbc : bool, default L2D_PBC
@@ -395,6 +401,10 @@ class Lattice2DNX(SignedGraphNX):
                      for neighbor in graph.neighbors(node)}
             return links
     #     # #
+    # Engine-agnostic 2D lattice drawing (shared with Lattice2DGT).
+    # See lrgsglib.graphs._shared._draw.draw for the full signature.
+    draw = _draw_lattice2d
+
     def make_animation(
         self,
         fig,
@@ -423,6 +433,117 @@ class Lattice2DNX(SignedGraphNX):
             vmin=vmin,
             vmax=vmax,
             blit=blit,
+        )
+
+    def animate_states(
+        self,
+        states,
+        *,
+        n_frames: int | None = None,
+        fps: int = 12,
+        cmap: str = "coolwarm",
+        vmin: float | None = -1.0,
+        vmax: float | None = 1.0,
+        add_colorbar: bool = False,
+        figsize: tuple[float, float] = (4.0, 4.0),
+        save=None,
+        dpi: int = 150,
+        writer: str | None = None,
+    ):
+        """Inline (HTML) animation of state configurations on this lattice.
+
+        ``states`` is a sequence of 1D state vectors (length ``N``) or 2D arrays
+        (``syshape``); with ``n_frames`` the sequence is evenly subsampled to
+        that many frames. Returns an ``IPython.display.HTML`` JS animation; pass
+        ``save="movie.gif"`` / ``"movie.mp4"`` to also write a file.
+        """
+        import matplotlib.pyplot as plt
+
+        from ....utils.basic import subsample
+        from ._animations import _render_inline_html, make_lattice2d_animation
+
+        frames = subsample(list(states), n_frames) if n_frames else list(states)
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.axis("off")
+        result = make_lattice2d_animation(
+            self,
+            fig,
+            ax,
+            frames,
+            interval_ms=max(1, round(1000 / fps)),
+            cmap=cmap,
+            add_colorbar=add_colorbar,
+            vmin=vmin,
+            vmax=vmax,
+        )
+        return _render_inline_html(
+            result, fig, fps=fps, save=save, dpi=dpi, writer=writer
+        )
+
+    def animate_largest_cluster(
+        self,
+        states,
+        *,
+        cluster_mode: str = "rawspin",
+        n_frames: int | None = None,
+        fps: int = 12,
+        figsize: tuple[float, float] = (4.0, 4.0),
+        save=None,
+        dpi: int = 150,
+        writer: str | None = None,
+        pos_color: tuple[float, float, float] = (0.84, 0.19, 0.15),
+        neg_color: tuple[float, float, float] = (0.13, 0.40, 0.74),
+        bg_color: tuple[float, float, float] = (0.82, 0.82, 0.82),
+    ):
+        """Inline (HTML) animation of the largest same-sign/satisfied cluster.
+
+        Colours the largest active-edge cluster (see
+        :func:`lrgsglib.utils.statsys.cluster_components`) by its spin and greys
+        the rest. The active-edge convention is read from this lattice's own
+        signed adjacency: ``cluster_mode='rawspin'`` (equal spins) or
+        ``'satisfied'`` (``sign(w)``-aligned). ``n_frames`` subsamples the
+        trajectory; ``save=`` writes a ``.gif`` / ``.mp4``.
+        """
+        import matplotlib.pyplot as plt
+
+        from ....utils.basic import subsample
+        from ....utils.statsys import edge_sign_arrays
+        from ._animations import (
+            _render_inline_html,
+            make_lattice2d_cluster_animation,
+        )
+
+        # Ragged signed neighbour arrays from this lattice's own adjacency
+        # (same convention as VoterModel._gillespie_neighbors).
+        idx: list[np.ndarray] = []
+        signs: list[np.ndarray] = []
+        for nd in range(self.N):
+            js: list[int] = []
+            sg: list[int] = []
+            for j, w in self.get_neighbors_with_weights(nd):
+                js.append(j)
+                sg.append(-1 if w < 0 else 1)
+            idx.append(np.asarray(js, dtype=np.int64))
+            signs.append(np.asarray(sg, dtype=np.int8))
+        b = edge_sign_arrays(signs, cluster_mode)
+
+        frames = subsample(list(states), n_frames) if n_frames else list(states)
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.axis("off")
+        result = make_lattice2d_cluster_animation(
+            self,
+            fig,
+            ax,
+            frames,
+            idx,
+            b,
+            interval_ms=max(1, round(1000 / fps)),
+            pos_color=pos_color,
+            neg_color=neg_color,
+            bg_color=bg_color,
+        )
+        return _render_inline_html(
+            result, fig, fps=fps, save=save, dpi=dpi, writer=writer
         )
 
     #     cv0 = frames[0].reshape(self.syshape)

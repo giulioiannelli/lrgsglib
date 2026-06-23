@@ -18,12 +18,14 @@ Example
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union, overload
 
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .protocols import SignedGraphProtocol
+    from .gt.Lattice2DGT import Lattice2DGT
+    from .nx.Lattice2DNX import Lattice2DNX
+    from .protocols import LatticeGraphProtocol
 
 
 # === Lazy imports to avoid circular dependencies ===
@@ -60,14 +62,16 @@ _PARAM_MAPPING_GT_TO_NX = {
     "periodic": "pbc",
 }
 
-# Parameters specific to each engine (not passed to the other)
+# Parameters specific to each engine (not passed to the other).
+# NOTE: ``with_positions`` and ``prew`` are intentionally NOT here -- both are
+# supported by both engines (NX stores a 'pos' node attribute, GT registers a
+# 'pos' vertex property; both build the small-world variant from ``prew``), so
+# they must pass through to whichever implementation is chosen.
 _NX_SPECIFIC_PARAMS = {
     "fbc_val",
     "stdFnameSFFX",
     "sgpathn",
-    "with_positions",
     "bend_positions",
-    "prew",
     "only_const_mode",
 }
 
@@ -83,13 +87,21 @@ class Lattice2D:
         Size in first dimension.
     side2 : int, optional
         Size in second dimension. If None, uses side1 (square lattice).
-    geo : {'sqr', 'tri', 'hex'}
-        Lattice geometry ('sqr': 4 neighbors, 'tri': 6, 'hex': 3).
+    geo : {'sqr', 'tri', 'hex', 'oct_sqr', 'kgm', 'tri_hex'}
+        Lattice geometry (short alias or full name): 'sqr' (square, z=4),
+        'tri' (triangular, z=6), 'hex' (hexagonal, z=3), 'oct_sqr'
+        (rhomb-octagonal, z=3), 'kgm' (kagome, z=4), 'tri_hex'
+        (tri-hexagonal, z=3).
     pflip : float, default 0.0
         Fraction of edges to mark for sign flipping (0.0 to 1.0).
     periodic, pbc : bool, optional
         Whether to use periodic boundary conditions.
         If both are specified, `periodic` takes precedence.
+        When neither is given both engines fall back to the same default
+        (``L2D_PBC``), so results are engine-independent.
+    prew : float, default 0.0
+        Small-world rewiring probability; ``prew > 0`` yields the ``*_sw``
+        variant. Supported by both engines.
     seed : int, optional
         Random seed for reproducibility.
     engine : str or GraphEngine, optional
@@ -110,18 +122,51 @@ class Lattice2D:
     lrgsglib.graphs.gt.lattice.Lattice2DGT : graph-tool implementation
     """
 
+    # --- Static typing: resolve the concrete engine class for the IDE. ---
+    # These overloads let editors (Pylance/mypy) autocomplete the *concrete*
+    # backend's full method set based on the ``engine`` literal, instead of
+    # the empty factory class. They are erased at runtime.
+    @overload
+    def __new__(
+        cls,
+        side1: int = ...,
+        side2: Optional[int] = ...,
+        geo: str = ...,
+        pflip: float = ...,
+        periodic: Optional[bool] = ...,
+        pbc: Optional[bool] = ...,
+        seed: Optional[int] = ...,
+        *,
+        engine: Literal["gt", GraphEngine.GRAPHTOOL],
+        **kwargs: Any,
+    ) -> "Lattice2DGT": ...
+
+    @overload
+    def __new__(
+        cls,
+        side1: int = ...,
+        side2: Optional[int] = ...,
+        geo: str = ...,
+        pflip: float = ...,
+        periodic: Optional[bool] = ...,
+        pbc: Optional[bool] = ...,
+        seed: Optional[int] = ...,
+        engine: Optional[Union[Literal["nx"], GraphEngine]] = ...,
+        **kwargs: Any,
+    ) -> "Lattice2DNX": ...
+
     def __new__(
         cls,
         side1: int,
         side2: Optional[int] = None,
-        geo: Literal["sqr", "tri", "hex"] = "sqr",
+        geo: str = "sqr",
         pflip: float = 0.0,
         periodic: Optional[bool] = None,
         pbc: Optional[bool] = None,
         seed: Optional[int] = None,
         engine: Optional[Union[str, GraphEngine]] = None,
         **kwargs: Any,
-    ):
+    ) -> "LatticeGraphProtocol":
         # Resolve engine
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
@@ -131,8 +176,7 @@ class Lattice2D:
 
         # Resolve periodic/pbc (periodic takes precedence)
         if periodic is None and pbc is None:
-            # Default based on engine
-            # NX defaults to True (L2D_PBC), GT defaults to False
+            # Both engines default to L2D_PBC, so deferring to either is safe
             use_periodic = None  # Let implementation use its default
         elif periodic is not None:
             use_periodic = periodic

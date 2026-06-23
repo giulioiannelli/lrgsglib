@@ -9,17 +9,34 @@ from typing import Literal, Optional, Tuple, Union
 import numpy as np
 
 import graph_tool.all as gt
-import graph_tool.generation as gen
 
+from ....config.const import (
+    L2D_PBC,
+    L2D_WITH_POS,
+    L2D_GEO_SHRT_LIST,
+    L2D_SHRT_GEO_DICT,
+    L2D_GEO_SHRT_DICT,
+    L2D_ERRMSG_GEO,
+)
+from ....utils.basic.arithmetic import adjust_to_even
 from ..SignedGraphGT import SignedGraphGT
+from ..._shared._draw import draw as _draw_lattice2d
+from . import _generators as _gen2d
 
 
-# Try to import C++ triangular lattice extension
-try:
-    from .cpp.lattice_generators import create_triangular_lattice as _cpp_triangular
-    _CPP_TRIANGULAR_AVAILABLE = True
-except ImportError:
-    _CPP_TRIANGULAR_AVAILABLE = False
+_SW_SUFFIX = "_sw"  # small-world variant marker (mirrors Lattice2DNX)
+
+# All geometries are built through the same native-generator path so the GT and
+# NX engines are interchangeable. Maps a base geo to its `_generators` builder;
+# the lambda adapts to each generator's ``(side1, side2)`` / ``(n, m)`` order.
+_GENERATORS = {
+    'sqr': lambda s1, s2, per: _gen2d.squared(s1, s2, per),
+    'tri': lambda s1, s2, per: _gen2d.triangular(s1, s2, per),
+    'hex': lambda s1, s2, per: _gen2d.hexagonal(s1, s2, per),
+    'oct_sqr': lambda s1, s2, per: _gen2d.rhomb_octagonal(s1, s2, per),
+    'kgm': lambda s1, s2, per: _gen2d.kagome(s1, s2, per),
+    'tri_hex': lambda s1, s2, per: _gen2d.tri_hexagonal(s1, s2, per),
+}
 
 
 class Lattice2DGT(SignedGraphGT):
@@ -35,11 +52,18 @@ class Lattice2DGT(SignedGraphGT):
     side2 : int, optional
         Size in second dimension. If None, uses side1 (square lattice).
     geo : str
-        Lattice geometry: 'sqr' (square), 'tri' (triangular), 'hex' (hexagonal).
+        Lattice geometry, as a short alias or its full name (mirrors
+        Lattice2DNX): ``'sqr'`` (square, z=4), ``'tri'`` (triangular, z=6),
+        ``'hex'`` (hexagonal, z=3), ``'oct_sqr'`` (rhomb-octagonal, z=3),
+        ``'kgm'`` (kagome, z=4), ``'tri_hex'`` (tri-hexagonal, z=3).
     pflip : float
         Fraction of edges to flip to negative (0.0 to 1.0).
-    periodic : bool
-        Whether to use periodic boundary conditions.
+    periodic : bool, default L2D_PBC
+        Whether to use periodic boundary conditions. Defaults to the same
+        value as Lattice2DNX (``L2D_PBC``) so both engines agree.
+    prew : float
+        Small-world rewiring probability (0.0 to 1.0). When ``prew > 0`` a
+        fraction of edges is rewired, yielding the ``*_sw`` variant.
     seed : int, optional
         Random seed for reproducibility.
 
@@ -49,222 +73,187 @@ class Lattice2DGT(SignedGraphGT):
     >>> lat.flip_random_fract_edges()
     >>> print(f"Nodes: {lat.N}, Edges: {lat.num_edges}")
 
-    >>> # Triangular lattice (fast C++ backend)
-    >>> lat_tri = Lattice2DGT(side1=100, geo='tri')
+    >>> # Kagome lattice, identical topology to engine='nx'
+    >>> lat_kgm = Lattice2DGT(side1=20, geo='kgm')
+
+    Notes
+    -----
+    Every geometry is built by the NetworkX-free generators in
+    ``_generators.py`` and matches the topology of the corresponding
+    Lattice2DNX lattice exactly (verified by adjacency spectrum), so the two
+    engines are interchangeable through the Lattice2D factory. The ``hex``
+    geometry rescales the sides exactly as Lattice2DNX does (see
+    ``_resolve_sides``).
     """
 
-    # Supported geometries
-    GEOMETRIES = {'sqr', 'tri', 'hex'}
+    # Supported base geometries (short aliases). The '_sw' small-world variants
+    # are selected via ``prew > 0`` rather than passed directly.
+    GEOMETRIES = frozenset(
+        s for s in L2D_GEO_SHRT_LIST if not s.endswith(_SW_SUFFIX)
+    )
 
     def __init__(
         self,
         side1: int,
         side2: Optional[int] = None,
-        geo: Literal['sqr', 'tri', 'hex'] = 'sqr',
+        geo: str = 'sqr',
         pflip: float = 0.0,
-        periodic: bool = False,
+        periodic: bool = L2D_PBC,
+        prew: float = 0.0,
         seed: Optional[int] = None,
+        with_positions: bool = L2D_WITH_POS,
     ):
-        # Validate inputs
-        if geo not in self.GEOMETRIES:
-            raise ValueError(f"geo must be one of {self.GEOMETRIES}, got '{geo}'")
+        # Normalise geo (accept short alias or full name) to a canonical base
+        base, geo_label = self._normalise_geo(geo, prew)
         if not 0.0 <= pflip <= 1.0:
             raise ValueError(f"pflip must be in [0, 1], got {pflip}")
+        if not 0.0 <= prew <= 1.0:
+            raise ValueError(f"prew must be in [0, 1], got {prew}")
 
-        self.side1 = side1
-        self.side2 = side2 if side2 is not None else side1
-        self.geo = geo
+        self.geo = base
         self.periodic = periodic
+        self.prew = prew
+        self.with_positions = with_positions
+        # Resolve side lengths exactly as Lattice2DNX does (swap + hex rescale)
+        self.side1, self.side2 = self._resolve_sides(
+            side1, side2, base, periodic)
 
-        # Set seed
+        # Set seed (np.random drives the small-world rewiring, matching NX)
         if seed is not None:
             np.random.seed(seed)
             gt.seed_rng(seed)
 
-        # Create the graph based on geometry
-        if geo == 'sqr':
-            G, pos = self._create_square_lattice()
-        elif geo == 'tri':
-            G, pos = self._create_triangular_lattice()
-        elif geo == 'hex':
-            G, pos = self._create_hexagonal_lattice()
+        # Build the base graph through the shared native-generator path
+        G, pos = self._assemble(
+            *_GENERATORS[base](self.side1, self.side2, self.periodic))
 
-        # Store position property
+        # Optional small-world rewiring (mirrors nx rewire_edges_optimized)
+        if prew > 0.0:
+            self._apply_small_world(G)
+
+        # (Re)assign an all-positive sign property over every current edge
+        G.edge_properties["sign"] = G.new_edge_property("int", val=1)
+
+        # Store position property (always available for .draw()); also
+        # register it as a graph vertex property so get_node_attributes('pos')
+        # returns it, mirroring Lattice2DNX's with_positions semantics.
         self._pos = pos
+        if with_positions:
+            G.vertex_properties["pos"] = pos
 
         # Set syshapePth before super().__init__ so lazy path init uses it
         self._syshapePth = f"N={G.num_vertices()}"
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed,
-                         sgpathn=f"l2d_{geo}_gt")
+                         sgpathn=f"l2d_{geo_label}_gt")
 
-    def _create_square_lattice(self) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
-        """Create square lattice using GT's native function."""
-        G = gen.lattice([self.side1, self.side2], periodic=self.periodic)
+    @classmethod
+    def _normalise_geo(cls, geo: str, prew: float) -> Tuple[str, str]:
+        """Map a short alias or full name to ``(base_geo, path_label)``.
 
-        # Create position property map
-        pos = G.new_vertex_property("vector<double>")
-        for v in G.vertices():
-            idx = int(v)
-            x = idx % self.side1
-            y = idx // self.side1
-            pos[v] = [float(x), float(y)]
-
-        # Add sign property (all positive initially)
-        sign = G.new_edge_property("int")
-        for e in G.edges():
-            sign[e] = 1
-        G.edge_properties["sign"] = sign
-
-        return G, pos
-
-    def _create_triangular_lattice(self) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
-        """Create triangular lattice using C++ extension or fallback."""
-        if _CPP_TRIANGULAR_AVAILABLE:
-            # Fast C++ path
-            G = _cpp_triangular(self.side1, self.side2)
+        Accepts e.g. ``'sqr'`` / ``'squared'`` / ``'sqr_sw'`` / ``'squared_sw'``.
+        An explicit ``_sw`` suffix or ``prew > 0`` flags the small-world variant
+        used only for the on-disk path label.
+        """
+        if geo in L2D_SHRT_GEO_DICT:        # already a short alias
+            short = geo
+        elif geo in L2D_GEO_SHRT_DICT:      # full name -> short alias
+            short = L2D_GEO_SHRT_DICT[geo]
         else:
-            # Fallback: create points and triangulate
-            G = self._triangular_lattice_fallback()
+            raise ValueError(
+                f"geo must be one of {sorted(cls.GEOMETRIES)} (short alias) "
+                f"or a full name in {L2D_GEO_SHRT_LIST}, got '{geo}'"
+            )
+        is_sw = short.endswith(_SW_SUFFIX)
+        base = short[: -len(_SW_SUFFIX)] if is_sw else short
+        if base not in cls.GEOMETRIES:
+            raise ValueError(
+                f"geo must be one of {sorted(cls.GEOMETRIES)}, got '{geo}'"
+            )
+        label = f"{base}{_SW_SUFFIX}" if (is_sw or prew > 0.0) else base
+        return base, label
 
-        # Create position property map (triangular grid)
-        pos = G.new_vertex_property("vector<double>")
-        for v in G.vertices():
-            idx = int(v)
-            x = idx % self.side1
-            y = idx // self.side1
-            # Offset odd rows for triangular geometry
-            x_offset = 0.5 if y % 2 == 1 else 0.0
-            pos[v] = [float(x) + x_offset, float(y) * np.sqrt(3) / 2]
+    def _resolve_sides(
+        self, side1: int, side2: Optional[int], base: str, periodic: bool
+    ) -> Tuple[int, int]:
+        """Resolve ``(side1, side2)`` exactly as ``Lattice2DNX`` does.
 
-        # Add sign property
-        sign = G.new_edge_property("int")
-        for e in G.edges():
-            sign[e] = 1
-        G.edge_properties["sign"] = sign
+        - if ``side2`` is given, the larger value becomes ``side1`` (a swap);
+        - otherwise ``side2 = side1`` for every geometry except ``hex``, which
+          rescales ``side1 -> adjust_to_even(side1 / sqrt(3))`` so the honeycomb
+          is roughly isotropic. Periodic ``hex`` then requires even sides.
+        """
+        if side2 is not None:
+            return (side2, side1) if side2 > side1 else (side1, side2)
+        if base == 'hex':
+            s2 = side1
+            s1 = adjust_to_even(side1 / np.sqrt(3))
+            if (s1 % 2 or s2 % 2) and periodic:
+                raise ValueError(L2D_ERRMSG_GEO)
+            return s1, s2
+        return side1, side1
 
-        return G, pos
+    def _assemble(
+        self, n_nodes: int, edges, pos_array
+    ) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
+        """Build a GT graph from an integer edge list and a position array.
 
-    def _triangular_lattice_fallback(self) -> gt.Graph:
-        """Create triangular lattice without C++ extension."""
-        # Create regular grid points
-        points = []
-        for y in range(self.side2):
-            for x in range(self.side1):
-                x_offset = 0.5 if y % 2 == 1 else 0.0
-                points.append([x + x_offset, y * np.sqrt(3) / 2])
-
-        points = np.array(points)
-        G, _ = gen.triangulation(points, type='delaunay')
-        return G
-
-    def _create_hexagonal_lattice(self) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
-        """Create hexagonal (honeycomb) lattice."""
-        # Hexagonal lattice: create triangular and remove every third vertex
-        # Or build directly from hex grid coordinates
-
+        Used by the native exotic generators (oct_sqr, kgm, tri_hex). The sign
+        property is (re)assigned by ``__init__`` after any rewiring.
+        """
         G = gt.Graph(directed=False)
+        G.add_vertex(n_nodes)
+        G.add_edge_list([(int(u), int(v)) for u, v in edges])
         pos = G.new_vertex_property("vector<double>")
-
-        # Create vertices in honeycomb pattern
-        # Each unit cell has 2 vertices (A and B sublattice)
-        vertex_map = {}  # (i, j, sublattice) -> vertex
-
-        for j in range(self.side2):
-            for i in range(self.side1):
-                # A sublattice
-                v_a = G.add_vertex()
-                x_a = i * 1.5
-                y_a = j * np.sqrt(3) + (0 if i % 2 == 0 else np.sqrt(3) / 2)
-                pos[v_a] = [x_a, y_a]
-                vertex_map[(i, j, 'A')] = v_a
-
-                # B sublattice (offset)
-                v_b = G.add_vertex()
-                x_b = x_a + 0.5
-                y_b = y_a + np.sqrt(3) / 2 if i % 2 == 0 else y_a - np.sqrt(3) / 2
-                pos[v_b] = [x_b, y_b]
-                vertex_map[(i, j, 'B')] = v_b
-
-                # Connect A-B within cell
-                G.add_edge(v_a, v_b)
-
-        # Connect between cells
-        for j in range(self.side2):
-            for i in range(self.side1):
-                v_a = vertex_map[(i, j, 'A')]
-                v_b = vertex_map[(i, j, 'B')]
-
-                # Horizontal connections
-                if i < self.side1 - 1:
-                    v_a_next = vertex_map[(i + 1, j, 'A')]
-                    G.add_edge(v_b, v_a_next)
-                elif self.periodic:
-                    v_a_next = vertex_map[(0, j, 'A')]
-                    G.add_edge(v_b, v_a_next)
-
-                # Vertical connections
-                if j < self.side2 - 1:
-                    if i % 2 == 0:
-                        v_b_up = vertex_map[(i, j + 1, 'B')]
-                        G.add_edge(v_a, v_b_up)
-                    else:
-                        v_a_up = vertex_map[(i, j + 1, 'A')]
-                        G.add_edge(v_b, v_a_up)
-
-        # Add sign property
-        sign = G.new_edge_property("int")
-        for e in G.edges():
-            sign[e] = 1
-        G.edge_properties["sign"] = sign
-
+        for i in range(n_nodes):
+            pos[G.vertex(i)] = [float(pos_array[i, 0]), float(pos_array[i, 1])]
         return G, pos
+
+    def _apply_small_world(self, G: gt.Graph) -> None:
+        """Rewire a fraction ``self.prew`` of edges in place (Watts-Strogatz).
+
+        Mirrors ``lrgsglib.graphs.nx.funcs.rewire_edges_optimized``: one endpoint
+        of each selected edge is reconnected to a random non-adjacent vertex,
+        avoiding self-loops and duplicates. Driven by ``np.random`` so a set
+        ``seed`` is reproducible.
+        """
+        n_v = G.num_vertices()
+        base_edges = [(int(e.source()), int(e.target())) for e in G.edges()]
+        existing = set()
+        for u, v in base_edges:
+            existing.add((u, v))
+            existing.add((v, u))
+        flags = np.random.rand(len(base_edges)) < self.prew
+        for i, (u, v) in enumerate(base_edges):
+            if not flags[i]:
+                continue
+            e = G.edge(u, v)
+            if e is None:
+                continue
+            G.remove_edge(e)
+            existing.discard((u, v))
+            existing.discard((v, u))
+            w = int(np.random.randint(0, n_v))
+            attempts = 0
+            while w == u or w == v or (u, w) in existing:
+                w = int(np.random.randint(0, n_v))
+                attempts += 1
+                if attempts > n_v:
+                    break
+            if w != u and G.edge(u, w) is None:
+                G.add_edge(u, w)
+                existing.add((u, w))
+                existing.add((w, u))
 
     @property
     def pos(self) -> gt.VertexPropertyMap:
         """Vertex position property map for visualization."""
         return self._pos
 
-    def draw(self, ax=None, **kwargs):
-        """
-        Draw the lattice with edge colors based on sign.
+    # Engine-agnostic 2D lattice drawing (shared with Lattice2DNX).
+    # See lrgsglib.graphs._shared._draw.draw for the full signature.
+    draw = _draw_lattice2d
 
-        Parameters
-        ----------
-        ax : matplotlib.axes.Axes, optional
-            Axes to draw on. If None, creates new figure.
-        **kwargs : dict
-            Additional arguments passed to gt.graph_draw.
-        """
-        import matplotlib.pyplot as plt
-
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 8))
-
-        # Color edges by sign
-        edge_color = self.G.new_edge_property("vector<double>")
-        sign = self.G.edge_properties.get("sign")
-
-        for e in self.G.edges():
-            if sign is not None and sign[e] == -1:
-                edge_color[e] = [0.8, 0.2, 0.2, 0.8]  # red for negative
-            else:
-                edge_color[e] = [0.2, 0.6, 0.2, 0.8]  # green for positive
-
-        # Default drawing options
-        draw_opts = {
-            'pos': self._pos,
-            'edge_color': edge_color,
-            'vertex_size': 4,
-            'edge_pen_width': 1.0,
-            'mplfig': ax,
-        }
-        draw_opts.update(kwargs)
-
-        gt.graph_draw(self.G, **draw_opts)
-        ax.set_aspect('equal')
-
-        return ax
 
 __all__ = ["Lattice2DGT"]
