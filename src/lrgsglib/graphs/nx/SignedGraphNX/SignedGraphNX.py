@@ -6,7 +6,10 @@ import struct
 import time
 import warnings
 
-import cupy as cp
+try:  # cupy is GPU-optional: importing the library must not require CUDA.
+    import cupy as cp
+except Exception:  # ImportError, or CUDA/driver errors raised at import time
+    cp = None
 import networkx as nx
 import numpy as np
 import pickle as pk
