@@ -171,7 +171,7 @@ def test_ising_c_backend_runs(tmp_path):
     )
     ising = IsingDynamics(
         sg=lat, T=2.0, steps=5, runlang="C0E",
-        seed=42, save_magnetization=True,
+        seed=42, savemagn=True,
     )
     ising.init_ising_dynamics()
     ising.run(tqdm_on=False, verbose=False)

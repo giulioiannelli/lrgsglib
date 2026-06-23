@@ -206,6 +206,23 @@ class SignedGraphProtocol(Protocol):
         """
         ...
 
+    @property
+    def gr(self) -> dict:
+        """Engine-agnostic graph-representation dict (``gr['G']`` / ``gr['H']``)."""
+        ...
+
+    def get_node_attributes(self, attr: str = "pos", on_g: Optional[str] = None) -> dict:
+        """Return a ``{node: value}`` dict for vertex attribute *attr*.
+
+        Parameters
+        ----------
+        attr : str
+            Node attribute / vertex-property name (default ``'pos'``).
+        on_g : str, optional
+            Graph representation; ignored on single-representation engines.
+        """
+        ...
+
 
 @runtime_checkable
 class DynamicsGraphProtocol(SignedGraphProtocol, Protocol):
@@ -329,6 +346,16 @@ class LatticeGraphProtocol(SignedGraphProtocol, Protocol):
     @property
     def periodic(self) -> bool:
         """Whether periodic boundary conditions are used."""
+        ...
+
+    def draw(self, ax: Optional[Any] = None, **kwargs: Any) -> Any:
+        """Draw the lattice using its stored node positions.
+
+        Engine-agnostic: identical signature and result on the NetworkX and
+        graph-tool backends. Requires the lattice to have been built with
+        ``with_positions=True``. See
+        :func:`lrgsglib.graphs._shared._draw.draw` for the full signature.
+        """
         ...
 
 

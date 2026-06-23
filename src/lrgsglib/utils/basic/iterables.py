@@ -14,6 +14,7 @@ __all__ = [
     'flatten',
     'inf_array_regularization',
     'sort_array_by_column',
+    'subsample',
     'sum_tuples',
     'uniques',
     'unzip_dict_items',
@@ -334,6 +335,32 @@ def sort_array_by_column(arr: NDArray, column_index: int) -> NDArray:
         The sorted array.
     """
     return arr[arr[:, column_index].argsort()]
+#
+def subsample(seq, k: int) -> list:
+    """
+    Return ``k`` evenly-spaced items from a sequence.
+
+    Picks ``k`` indices linearly spaced over ``[0, len(seq) - 1]`` (rounded to
+    int), so the first and last items are always included. If ``seq`` has at most
+    ``k`` items it is returned unchanged (as a list). Handy for decimating a long
+    trajectory down to a fixed number of frames/samples.
+
+    Parameters
+    ----------
+    seq : Sequence
+        Any indexable, ``len``-able sequence (list, tuple, ndarray, ...).
+    k : int
+        Target number of items to keep.
+
+    Returns
+    -------
+    list
+        The ``min(k, len(seq))`` selected items, in order.
+    """
+    n = len(seq)
+    if n <= k:
+        return list(seq)
+    return [seq[i] for i in np.linspace(0, n - 1, k).astype(int)]
 #
 def sum_tuples(tuple1: tuple, tuple2: tuple) -> tuple:
     """

@@ -267,7 +267,6 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         simref: float | None = None,
         nstepsIsing: int | None = None,
         save: str | None = None,
-        save_magnetization: bool = False,
         upd_mode: str = "asynchronous",
         # Simulated Annealing parameters
         sa_enabled: bool = False,
@@ -320,7 +319,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.T = T
         self.thrmSTEP = thrmSTEP
         self.freq = freq
-        self.save_magnetization = save_magnetization
+        # savemagn is inherited from BinDynSys (shared binary option).
         self.save = save  # output mode for unified C binaries
         self.NoClust = NoClust
         self.NeigV = -1
@@ -712,7 +711,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     #
     def metropolis_sampling(self, tqdm_on):
         metropolis_1step = np.vectorize(self.metropolis, excluded="self")
-        if self.save_magnetization:
+        if self.savemagn:
             def save_magn_array():
                 self.s_t.append(self.s)
         else:

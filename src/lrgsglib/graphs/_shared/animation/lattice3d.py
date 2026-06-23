@@ -24,7 +24,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from ....plotlib.animation.raster import figure_to_image, frames_to_gif_html
+from ....plotlib.animation.raster import figure_to_image, frames_to_player_html
 from ....plotlib.voxels import VOX_ALPHA, draw_voxels, explode
 from ._accessor import _Accessor, frames_and_model
 from ._common import resolve_plot_path
@@ -168,7 +168,7 @@ def _voxel_movie(lattice, frames, color_of, *, fps, figsize, save,
         rgba_cubes, syshape, recolor_edges=recolor_edges, figsize=figsize,
         elev=elev, azim=azim, n_jobs=n_jobs,
     )
-    return frames_to_gif_html(images, fps=fps, save=save)
+    return frames_to_player_html(images, fps=fps, save=save)
 
 
 def animate_voxels(lattice, states, *, n_frames=VOX_FRAMES, fps=12, cmap="hot",

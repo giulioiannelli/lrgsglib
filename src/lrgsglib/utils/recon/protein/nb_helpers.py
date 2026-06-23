@@ -167,7 +167,7 @@ def reconstruct_protein(
     protein: Dict[str, Any],
     spec: SubstrateSpec,
     k_frac: float,
-    spectrum_backend: str = "scipy",
+    spectrum_backend: str = "cupy",
     n_features: int = CHL_SF04_N_FEATURES,
 ) -> Tuple[np.ndarray, float]:
     """Rebuild basis on-the-fly, project, truncate to ``k_frac`` modes, return (coords, RMSD).
@@ -198,7 +198,7 @@ def q3_curve_per_substrate(
     bundles: Sequence[Dict[str, Any]],
     label: str,
     k_frac_grid: Sequence[float],
-    spectrum_backend: str = "scipy",
+    spectrum_backend: str = "cupy",
     n_features: int = CHL_SF04_N_FEATURES,
 ) -> np.ndarray:
     """Q3 vs ``k/N`` for one substrate, averaged later by the caller."""
@@ -236,7 +236,7 @@ def q3_emergence_per_substrate(
     label: str,
     k_frac_grid: Sequence[float],
     threshold: float,
-    spectrum_backend: str = "scipy",
+    spectrum_backend: str = "cupy",
 ) -> float:
     """Mean (over corpus) of the smallest ``k/N`` whose Q3 ≥ ``threshold``."""
     curve = q3_curve_per_substrate(
@@ -281,7 +281,7 @@ def render_substrate_panel(
     spec: SubstrateSpec,
     n_target: int,
     title: str,
-    spectrum_backend: str = "scipy",
+    spectrum_backend: str = "cupy",
 ) -> None:
     """Render one panel of the substrate-zoo figure (Fig. 1).
 

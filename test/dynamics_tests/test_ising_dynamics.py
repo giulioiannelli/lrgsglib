@@ -151,7 +151,7 @@ class TestIsingDynamics(unittest.TestCase):
             T=2.0,
             steps=10,
             runlang="py",
-            save_magnetization=True,
+            savemagn=True,
             seed=42,
         )
         ising.init_ising_dynamics()
@@ -168,7 +168,7 @@ class TestIsingDynamics(unittest.TestCase):
             T=2.0,
             steps=5,
             runlang="py",
-            save_magnetization=True,
+            savemagn=True,
             seed=42,
         )
         ising.init_ising_dynamics()
@@ -191,7 +191,7 @@ class TestIsingDynamics(unittest.TestCase):
             T=2.0,
             steps=5,
             runlang="py",
-            save_magnetization=True,
+            savemagn=True,
             seed=42,
         )
         ising.init_ising_dynamics()

@@ -7,7 +7,7 @@ under :mod:`lrgsglib.graphs` (structural) and dynamics frame collection under
 """
 from ._core import LatticeAnimationResult, render_animation, save_animation
 from .frames import make_animation_fromFrames
-from .raster import figure_to_image, frames_to_gif_html
+from .raster import autocrop_frames, figure_to_image, frames_to_player_html
 
 __all__ = [
     "LatticeAnimationResult",
@@ -15,5 +15,6 @@ __all__ = [
     "render_animation",
     "make_animation_fromFrames",
     "figure_to_image",
-    "frames_to_gif_html",
+    "autocrop_frames",
+    "frames_to_player_html",
 ]

@@ -1,11 +1,13 @@
 from lrgsglib.config.funcs import move_to_rootf
 from IPython.display import clear_output, display, HTML
 import py3Dmol
+import plotly.graph_objects as go
 
 
 from .shared import *
 from .core import *
 from .plotlib import *
+from .utils import *
 from .utils.ipy import *
 
 # Engine-agnostic graph factories (preferred interface in notebooks).

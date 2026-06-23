@@ -277,7 +277,7 @@ def test_ising_critical_temperature_visual(tmp_path, output_dir, save_figure, sy
     )
     ising = IsingDynamics(
         sg=lat, T=T_c, steps=1000, runlang="py", seed=42,
-        save_magnetization=True,
+        savemagn=True,
     )
     ising.init_ising_dynamics()
     ising.run(tqdm_on=False)
@@ -317,7 +317,7 @@ def test_ising_frustrated_dynamics_visual(tmp_path, output_dir, save_figure, sys
 
     ising = IsingDynamics(
         sg=lat, T=0.5, steps=n_steps, runlang="py", seed=42,
-        save_magnetization=True,
+        savemagn=True,
     )
     ising.init_ising_dynamics()
     ising.run(tqdm_on=False)

@@ -42,6 +42,7 @@ __all__ = [
     "is_int",
     "is_positive_int",
     "sort_array_by_column",
+    "subsample",
     "sum_tuples",
     "uniques",
     "unzip_dict_items",
