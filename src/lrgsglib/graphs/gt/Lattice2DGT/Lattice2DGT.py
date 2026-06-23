@@ -25,6 +25,7 @@ from ..SignedGraphGT import SignedGraphGT
 from ..._shared._draw import draw as _draw_lattice2d
 from . import _generators as _gen2d
 from ._nw_container import Lattice2DGTnwContainer
+from ..._shared._nw_container import geometric_central_edge
 
 
 _SW_SUFFIX = "_sw"  # small-world variant marker (mirrors Lattice2DNX)
@@ -262,30 +263,11 @@ class Lattice2DGT(SignedGraphGT):
     def get_central_edge(self, on_g: str = L2D_ONREP) -> Tuple[int, int]:
         """Return a bulk edge nearest the geometric centre of the lattice.
 
-        Mirrors the intent of ``Lattice2DNX.get_central_edge`` (a single
-        central defect edge) but operates in GT's integer node space using the
-        stored ``pos`` property. The chosen edge is the incident edge of the
-        centroid-nearest vertex whose midpoint lies closest to the centroid, so
-        the result is deterministic and translation-stable. ``on_g`` is accepted
-        for API parity with the NX engine (GT has a single representation).
+        Mirrors the intent of ``Lattice2DNX.get_central_edge`` (a single central
+        defect edge) in GT's integer node space. See
+        ``graphs._shared._nw_container.geometric_central_edge``.
         """
-        pos = np.array(
-            [list(self._pos[self.G.vertex(i)]) for i in range(self.N)]
-        )
-        centroid = pos.mean(axis=0)
-        central = int(np.argmin(((pos - centroid) ** 2).sum(axis=1)))
-        nbrs = self.get_graph_neighbors(central)
-        if not nbrs:
-            raise ValueError(
-                "central node has no neighbours; cannot pick a central edge"
-            )
-        nb = min(
-            nbrs,
-            key=lambda j: (
-                (0.5 * (pos[central] + pos[j]) - centroid) ** 2
-            ).sum(),
-        )
-        return (central, nb)
+        return geometric_central_edge(self, on_g)
 
     # Engine-agnostic 2D lattice drawing (shared with Lattice2DNX).
     # See lrgsglib.graphs._shared._draw.draw for the full signature.

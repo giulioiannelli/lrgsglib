@@ -12,7 +12,10 @@ import numpy as np
 import graph_tool.all as gt
 import graph_tool.generation as gen
 
+from ....config.const import L3D_ONREP, SG_INIT_NW_DICT
 from ..SignedGraphGT import SignedGraphGT
+from ..._shared._nw_container import geometric_central_edge
+from ._nw_container import Lattice3DGTnwContainer
 
 
 class Lattice3DGT(SignedGraphGT):
@@ -51,6 +54,9 @@ class Lattice3DGT(SignedGraphGT):
     # Node multiplier per unit cell
     NODE_MULTIPLIERS = {"sc": 1, "bcc": 2, "fcc": 4}
 
+    # Geometry-specific negative-link (nwDict) pattern container.
+    nwContainer = Lattice3DGTnwContainer
+
     def __init__(
         self,
         dim: Union[int, Tuple[int, int, int]] = 10,
@@ -58,6 +64,7 @@ class Lattice3DGT(SignedGraphGT):
         pflip: float = 0.0,
         periodic: bool = False,
         seed: Optional[int] = None,
+        init_nw_dict: bool = SG_INIT_NW_DICT,
     ):
         # Validate inputs
         if geo not in self.GEOMETRIES:
@@ -103,7 +110,17 @@ class Lattice3DGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed,
-                         sgpathn=f"l3d_{geo}_gt")
+                         sgpathn=f"l3d_{geo}_gt",
+                         init_nw_dict=init_nw_dict)
+
+    def get_central_edge(self, on_g: str = L3D_ONREP) -> Tuple[int, int]:
+        """Return a bulk edge nearest the geometric centre of the lattice.
+
+        Mirrors the intent of ``Lattice3DNX.get_central_edge`` in GT's integer
+        node space. See
+        ``graphs._shared._nw_container.geometric_central_edge``.
+        """
+        return geometric_central_edge(self, on_g)
 
     def _create_simple_cubic(self) -> Tuple[gt.Graph, gt.VertexPropertyMap]:
         """Create simple cubic lattice using GT's native function."""

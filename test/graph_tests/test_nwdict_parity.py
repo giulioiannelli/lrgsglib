@@ -19,6 +19,8 @@ import pytest
 
 from lrgsglib.graphs.nx.Lattice2DNX import Lattice2DNX
 from lrgsglib.graphs.gt.Lattice2DGT.Lattice2DGT import Lattice2DGT
+from lrgsglib.graphs.gt.Lattice3DGT.Lattice3DGT import Lattice3DGT
+from lrgsglib.graphs.gt.ErdosRenyiGT.ErdosRenyiGT import ErdosRenyiGT
 from lrgsglib.graphs.gt.SignedGraphGT import SignedGraphGT
 from lrgsglib.graphs.gt._converters import nx_to_gt
 
@@ -161,3 +163,40 @@ def test_rand_pattern_identical_labels(geo):
     nx_neg = _as_edge_set(nx_lat.fleset["G"])
     gt_neg = _as_edge_set(gt_lat.fleset["G"])
     assert nx_neg == gt_neg, f"{geo}: negative-edge sets differ across engines"
+
+
+# ------------------------------------------------------------- Lattice3DGT
+
+@pytest.mark.parametrize("geo", ["sc", "bcc", "fcc"])
+def test_lattice3dgt_keys_and_shapes(geo):
+    lat = Lattice3DGT(dim=4, geo=geo, pflip=0.25, seed=SEED, init_nw_dict=True)
+    # 3D mirrors Lattice3DNX: central single + random XERR, no ZERR.
+    assert set(lat.nwDict) == {"single", "singleXERR", "rand", "randXERR"}
+    u, v = lat.nwDict["single"]["G"][0]
+    assert lat.G.edge(u, v) is not None
+    center = lat.nwDict["single"]["G"][0][0]
+    star = lat.nwDict["singleXERR"]["G"]
+    assert _as_edge_set(star) == _as_edge_set(
+        (center, nb) for nb in lat.get_graph_neighbors(center)
+    )
+
+
+@pytest.mark.parametrize("geo", ["sc", "bcc", "fcc"])
+def test_lattice3dgt_rand_matches_negatives(geo):
+    lat = Lattice3DGT(dim=4, geo=geo, pflip=0.25, seed=SEED, init_nw_dict=True)
+    lat.flip_random_fract_edges()
+    lat.build_nw_dict()
+    assert _as_edge_set(lat.nwDict["rand"]["G"]) == _as_edge_set(lat.fleset["G"])
+
+
+# ------------------------------------------------------------- ErdosRenyiGT
+
+def test_erdosrenyigt_keys_and_rand():
+    er = ErdosRenyiGT(n=120, p=0.06, pflip=0.25, seed=SEED, init_nw_dict=True)
+    # ErdosRenyi has no central edge -> only random patterns (mirrors NX).
+    assert set(er.nwDict) == {"rand", "randXERR"}
+    er.flip_random_fract_edges()
+    er.build_nw_dict()
+    assert _as_edge_set(er.nwDict["rand"]["G"]) == _as_edge_set(er.fleset["G"])
+    all_edges = _as_edge_set(er.get_edges_list())
+    assert _as_edge_set(er.nwDict["randXERR"]["G"]) <= all_edges

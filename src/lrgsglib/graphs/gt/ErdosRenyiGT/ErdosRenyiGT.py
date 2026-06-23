@@ -13,7 +13,9 @@ import graph_tool.all as gt
 import graph_tool.generation as gen
 import graph_tool.topology as topo
 
+from ....config.const import SG_INIT_NW_DICT
 from ..SignedGraphGT import SignedGraphGT
+from ..._shared._nw_container import GTnwContainer
 
 
 class ErdosRenyiGT(SignedGraphGT):
@@ -59,6 +61,10 @@ class ErdosRenyiGT(SignedGraphGT):
     is retained.
     """
 
+    # Negative-link (nwDict) pattern container: ErdosRenyi has no central edge,
+    # so only the random patterns are built (rand / randXERR), mirroring NX.
+    nwContainer = GTnwContainer
+
     def __init__(
         self,
         n: int,
@@ -66,6 +72,7 @@ class ErdosRenyiGT(SignedGraphGT):
         pflip: float = 0.0,
         extract_giant_component: bool = True,
         seed: Optional[int] = None,
+        init_nw_dict: bool = SG_INIT_NW_DICT,
     ):
         # Validate inputs
         if not 0.0 <= p <= 1.0:
@@ -96,7 +103,8 @@ class ErdosRenyiGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed,
-                         sgpathn="erdos_renyi_gt")
+                         sgpathn="erdos_renyi_gt",
+                         init_nw_dict=init_nw_dict)
 
     def _generate_graph(self) -> gt.Graph:
         """Generate Erdos-Renyi random graph using graph-tool."""
