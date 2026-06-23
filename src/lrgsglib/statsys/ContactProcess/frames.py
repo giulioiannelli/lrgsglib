@@ -1,29 +1,35 @@
 from __future__ import annotations
 
-"""Animate ContactProcess dynamics on Lattice2D.
+"""ContactProcess frame collection (state snapshots of a running model).
+
+Steps a ``ContactProcess`` and snapshots its ``+/-1`` configuration at sweep
+boundaries. This is a *dynamics* facility -- it produces the state vectors and is
+graph-agnostic (works on any graph the process runs on), so it lives with the
+model, not with any graph type. Rendering those frames is a separate, structural
+concern: hand them to the lattice's own animation methods (bound from
+:mod:`lrgsglib.graphs._shared.animation`).
 
 Typical usage from a notebook:
 
     from lrgsglib.graphs.nx import Lattice2D
     from lrgsglib.statsys.ContactProcess import ContactProcessEI
-    from lrgsglib.animations import collect_contact_process_frames, animate_contact_process_on_lattice2d
+    from lrgsglib.statsys.ContactProcess.frames import collect_contact_process_frames
 
     lattice = Lattice2D(side1=64, geo="squared", pbc=True, init_nw_dict=False)
     cp = ContactProcessEI(lattice, gamma=1.2, runlang="py", ic="delta", state_type="binary", seed=0)
     cp.init_contact_dynamics()
     frames = collect_contact_process_frames(cp, steps=200, snapshot_every=1, backend="py").frames
-    anim = animate_contact_process_on_lattice2d(lattice, frames, out_path="cp.gif", fps=20)
+    anim = lattice.animate.states(frames, model=cp, save="cp.gif")  # structural render
 """
 
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable, Literal, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
 
-from ..statsys.ContactProcess import ContactProcessBase, ContactProcessEI
+from . import ContactProcessBase, ContactProcessEI
 
 
 Frame = NDArray[np.int8]
@@ -187,45 +193,3 @@ def collect_contact_process_frames(
         )
     )
     return ContactFrames(frames=frames, contact_process=cp)
-
-
-def animate_contact_process_on_lattice2d(
-    lattice: object,
-    frames: Sequence[Frame],
-    *,
-    interval_ms: int = 50,
-    cmap: str = "viridis",
-    add_colorbar: bool = True,
-    autoscale: bool = False,
-    vmin: float | None = None,
-    vmax: float | None = None,
-    blit: bool = False,
-    out_path: str | Path | None = None,
-    fps: int = 20,
-    dpi: int = 150,
-    writer: str | None = None,
-) -> object:
-    """Create (and optionally save) an animation of frames on a Lattice2D."""
-
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots()
-    result = lattice.make_animation(
-        fig,
-        ax,
-        frames,
-        interval_ms=interval_ms,
-        cmap=cmap,
-        add_colorbar=add_colorbar,
-        autoscale=autoscale,
-        vmin=vmin,
-        vmax=vmax,
-        blit=blit,
-    )
-
-    if out_path is not None:
-        from ..graphs.nx.Lattice2DNX._animations import save_animation
-
-        save_animation(result.animation, out_path, fps=fps, dpi=dpi, writer=writer)
-
-    return result.animation

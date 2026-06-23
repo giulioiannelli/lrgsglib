@@ -456,17 +456,19 @@ For time-evolving visualizations, create animations:
 High-Level Animation API
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-For convenience, lrgsglib provides a high-level animation API in
-``lrgsglib.graphs.nx.Lattice2D._animations``:
+For convenience, lrgsglib provides a high-level animation API. The simplest
+entry points are bound directly on the lattice (engine-agnostic) --
+``lat.animate_states(states)`` and ``lat.animate_largest_cluster(states)``. The
+underlying builders live in the structural, graph-type module
+:mod:`lrgsglib.graphs._shared.animation` and the generic codec primitives in
+:mod:`lrgsglib.plotlib.animation`:
 
 .. code-block:: python
 
    import matplotlib.pyplot as plt
-   from lrgsglib.graphs.Lattice2D import Lattice2D
-   from lrgsglib.graphs.Lattice2D._animations import (
-       make_lattice2d_animation,
-       save_animation,
-   )
+   from lrgsglib.graphs import Lattice2D
+   from lrgsglib.graphs._shared.animation import make_lattice2d_animation
+   from lrgsglib.plotlib.animation import save_animation
 
    # Create lattice
    lattice = Lattice2D(side1=32, geo='sqr', seed=42)

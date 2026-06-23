@@ -10,6 +10,7 @@ __all__ = [
     "find_largest_cluster_circle2D",
     "correlated_binary_sequence_vectorized",
     "edge_sign_arrays",
+    "signed_neighbor_arrays",
     "cluster_components",
     "cluster_size_distribution",
     "largest_fraction",
@@ -148,6 +149,40 @@ def edge_sign_arrays(signs, cluster_mode: str):
     if cluster_mode == "rawspin":
         return [np.ones(len(sg), dtype=np.int8) for sg in signs]
     raise ValueError(f"unknown cluster_mode={cluster_mode!r}")
+
+def signed_neighbor_arrays(sg, cluster_mode: str = "rawspin"):
+    """
+    Ragged signed-adjacency arrays for cluster analysis, from a signed graph.
+
+    Builds, straight from ``sg``'s own adjacency, the ``(idx, b)`` pair that
+    :func:`cluster_components` consumes: ``idx[i]`` holds node ``i``'s neighbour
+    indices and ``b[i]`` the matching per-edge signs for ``cluster_mode`` (see
+    :func:`edge_sign_arrays`). Engine-agnostic -- needs only ``sg.N`` and
+    ``sg.get_neighbors_with_weights`` -- and matches the convention of
+    ``VoterModel._gillespie_neighbors`` and the 2D/3D lattice cluster animations.
+
+    Parameters
+    ----------
+    sg
+        A signed graph exposing ``N`` and ``get_neighbors_with_weights(node)``.
+    cluster_mode : str
+        ``"rawspin"`` or ``"satisfied"`` (see :func:`edge_sign_arrays`).
+
+    Returns
+    -------
+    (list of NDArray, list of NDArray)
+        ``idx`` (``int64`` neighbour indices) and ``b`` (``int8`` edge signs),
+        each ragged per node and aligned for :func:`cluster_components`.
+    """
+    idx, signs = [], []
+    for nd in range(sg.N):
+        js, sgn = [], []
+        for j, w in sg.get_neighbors_with_weights(nd):
+            js.append(j)
+            sgn.append(-1 if w < 0 else 1)
+        idx.append(np.asarray(js, dtype=np.int64))
+        signs.append(np.asarray(sgn, dtype=np.int8))
+    return idx, edge_sign_arrays(signs, cluster_mode)
 
 def cluster_components(s, idx, b) -> np.ndarray:
     """

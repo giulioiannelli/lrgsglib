@@ -23,6 +23,7 @@ from ....config.const import (
 from ....utils.basic.arithmetic import adjust_to_even
 from ..SignedGraphGT import SignedGraphGT
 from ..._shared._draw import draw as _draw_lattice2d
+from ..._shared.animation.lattice2d import _Lattice2DAnimate, _Lattice2DPlot
 from . import _generators as _gen2d
 from ._nw_container import Lattice2DGTnwContainer
 from ..._shared._nw_container import geometric_central_edge
@@ -260,6 +261,24 @@ class Lattice2DGT(SignedGraphGT):
         """Vertex position property map for visualization."""
         return self._pos
 
+    @property
+    def syshape(self) -> Tuple[int, int]:
+        """Row-major image shape used to reshape a length-``N`` state vector
+        into a 2D array for ``imshow``-based animations.
+
+        Mirrors ``Lattice2DNX.syshape``. The native generators index nodes by
+        sorted ``(row, col)`` coordinates (see ``_generators._finalize``), so a
+        plain ``state.reshape(syshape)`` is row-major faithful. Each rhomb of an
+        octagonal lattice contributes four nodes, doubling both sides; the
+        multiplier is read from the realised node count so it stays correct
+        whatever ``self.geo`` convention the engine uses.
+        """
+        cells = self.side1 * self.side2
+        node_multiplier = self.N // cells if cells else 1
+        if node_multiplier == 4:
+            return (2 * self.side1, 2 * self.side2)
+        return (self.side1, self.side2)
+
     def get_central_edge(self, on_g: str = L2D_ONREP) -> Tuple[int, int]:
         """Return a bulk edge nearest the geometric centre of the lattice.
 
@@ -272,6 +291,12 @@ class Lattice2DGT(SignedGraphGT):
     # Engine-agnostic 2D lattice drawing (shared with Lattice2DNX).
     # See lrgsglib.graphs._shared._draw.draw for the full signature.
     draw = _draw_lattice2d
+
+    # Plotting / animation namespaces (shared with Lattice2DNX): see
+    # lrgsglib.graphs._shared.animation.lattice2d. Use lat.plot.draw(...),
+    # lat.animate.states(...) / .largest_cluster(...) / .make(...).
+    plot = property(lambda self: _Lattice2DPlot(self))
+    animate = property(lambda self: _Lattice2DAnimate(self))
 
 
 __all__ = ["Lattice2DGT"]

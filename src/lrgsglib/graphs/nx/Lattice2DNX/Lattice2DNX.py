@@ -1,12 +1,14 @@
 from os.path import join as pth_join
 from typing import Any
 import random
+import warnings
 
 import numpy as np
 import networkx as nx
 from networkx import convert_node_labels_to_integers, set_node_attributes, Graph
 
 from ....config.const import *
+from ....config.errwar import Lattice2DWarning
 from ....utils.basic.iterables import compose
 from ....utils.basic.numeric import is_positive_int
 from ....utils.basic.arithmetic import adjust_to_even
@@ -14,6 +16,7 @@ from ..funcs import *
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 from .generators_2d import *
 from ..._shared._draw import draw as _draw_lattice2d
+from ..._shared.animation.lattice2d import _Lattice2DAnimate, _Lattice2DPlot
 #
 class Lattice2DNX(SignedGraphNX):
     """
@@ -405,160 +408,9 @@ class Lattice2DNX(SignedGraphNX):
     # See lrgsglib.graphs._shared._draw.draw for the full signature.
     draw = _draw_lattice2d
 
-    def make_animation(
-        self,
-        fig,
-        ax,
-        frames,
-        *,
-        interval_ms: int = 50,
-        cmap: str = "viridis",
-        add_colorbar: bool = True,
-        autoscale: bool = False,
-        vmin: float | None = None,
-        vmax: float | None = None,
-        blit: bool = False,
-    ):
-        from ._animations import make_lattice2d_animation
-
-        return make_lattice2d_animation(
-            self,
-            fig,
-            ax,
-            frames,
-            interval_ms=interval_ms,
-            cmap=cmap,
-            add_colorbar=add_colorbar,
-            autoscale=autoscale,
-            vmin=vmin,
-            vmax=vmax,
-            blit=blit,
-        )
-
-    def animate_states(
-        self,
-        states,
-        *,
-        n_frames: int | None = None,
-        fps: int = 12,
-        cmap: str = "coolwarm",
-        vmin: float | None = -1.0,
-        vmax: float | None = 1.0,
-        add_colorbar: bool = False,
-        figsize: tuple[float, float] = (4.0, 4.0),
-        save=None,
-        dpi: int = 150,
-        writer: str | None = None,
-    ):
-        """Inline (HTML) animation of state configurations on this lattice.
-
-        ``states`` is a sequence of 1D state vectors (length ``N``) or 2D arrays
-        (``syshape``); with ``n_frames`` the sequence is evenly subsampled to
-        that many frames. Returns an ``IPython.display.HTML`` JS animation; pass
-        ``save="movie.gif"`` / ``"movie.mp4"`` to also write a file.
-        """
-        import matplotlib.pyplot as plt
-
-        from ....utils.basic import subsample
-        from ._animations import _render_inline_html, make_lattice2d_animation
-
-        frames = subsample(list(states), n_frames) if n_frames else list(states)
-        fig, ax = plt.subplots(figsize=figsize)
-        ax.axis("off")
-        result = make_lattice2d_animation(
-            self,
-            fig,
-            ax,
-            frames,
-            interval_ms=max(1, round(1000 / fps)),
-            cmap=cmap,
-            add_colorbar=add_colorbar,
-            vmin=vmin,
-            vmax=vmax,
-        )
-        return _render_inline_html(
-            result, fig, fps=fps, save=save, dpi=dpi, writer=writer
-        )
-
-    def animate_largest_cluster(
-        self,
-        states,
-        *,
-        cluster_mode: str = "rawspin",
-        n_frames: int | None = None,
-        fps: int = 12,
-        figsize: tuple[float, float] = (4.0, 4.0),
-        save=None,
-        dpi: int = 150,
-        writer: str | None = None,
-        pos_color: tuple[float, float, float] = (0.84, 0.19, 0.15),
-        neg_color: tuple[float, float, float] = (0.13, 0.40, 0.74),
-        bg_color: tuple[float, float, float] = (0.82, 0.82, 0.82),
-    ):
-        """Inline (HTML) animation of the largest same-sign/satisfied cluster.
-
-        Colours the largest active-edge cluster (see
-        :func:`lrgsglib.utils.statsys.cluster_components`) by its spin and greys
-        the rest. The active-edge convention is read from this lattice's own
-        signed adjacency: ``cluster_mode='rawspin'`` (equal spins) or
-        ``'satisfied'`` (``sign(w)``-aligned). ``n_frames`` subsamples the
-        trajectory; ``save=`` writes a ``.gif`` / ``.mp4``.
-        """
-        import matplotlib.pyplot as plt
-
-        from ....utils.basic import subsample
-        from ....utils.statsys import edge_sign_arrays
-        from ._animations import (
-            _render_inline_html,
-            make_lattice2d_cluster_animation,
-        )
-
-        # Ragged signed neighbour arrays from this lattice's own adjacency
-        # (same convention as VoterModel._gillespie_neighbors).
-        idx: list[np.ndarray] = []
-        signs: list[np.ndarray] = []
-        for nd in range(self.N):
-            js: list[int] = []
-            sg: list[int] = []
-            for j, w in self.get_neighbors_with_weights(nd):
-                js.append(j)
-                sg.append(-1 if w < 0 else 1)
-            idx.append(np.asarray(js, dtype=np.int64))
-            signs.append(np.asarray(sg, dtype=np.int8))
-        b = edge_sign_arrays(signs, cluster_mode)
-
-        frames = subsample(list(states), n_frames) if n_frames else list(states)
-        fig, ax = plt.subplots(figsize=figsize)
-        ax.axis("off")
-        result = make_lattice2d_cluster_animation(
-            self,
-            fig,
-            ax,
-            frames,
-            idx,
-            b,
-            interval_ms=max(1, round(1000 / fps)),
-            pos_color=pos_color,
-            neg_color=neg_color,
-            bg_color=bg_color,
-        )
-        return _render_inline_html(
-            result, fig, fps=fps, save=save, dpi=dpi, writer=writer
-        )
-
-    #     cv0 = frames[0].reshape(self.syshape)
-    #     im = ax.imshow(cv0)  # Here make an AxesImage rather than contour
-    #     _, _, cbar = imshow_colorbar_caxdivider(im, ax)
-    #     # tx = ax.set_title('Frame 0')
-
-    #     def animate(i):
-    #         arr = frames[i].reshape(self.syshape)
-    #         vmax = np.max(arr)
-    #         vmin = np.min(arr)
-    #         im.set_data(arr)
-    #         cbar.mappable.set_clim(vmin, vmax)
-    #         # tx.set_text('Frame {0}'.format(i))
-    #         # In this version you don't have to do anything to the colorbar,
-    #         # it updates itself when the mappable it watches (im) changes
-
-    #     return animate
+    # Plotting / animation namespaces (shared with Lattice2DGT): the methods
+    # live on accessors, so `lat.plot.draw(...)`, `lat.animate.states(...)`,
+    # `lat.animate.largest_cluster(...)`, `lat.animate.make(...)`. See
+    # lrgsglib.graphs._shared.animation.lattice2d for full signatures.
+    plot = property(lambda self: _Lattice2DPlot(self))
+    animate = property(lambda self: _Lattice2DAnimate(self))

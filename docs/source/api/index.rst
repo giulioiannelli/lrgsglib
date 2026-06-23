@@ -10,7 +10,6 @@ This section contains the detailed API documentation for all modules, classes, a
    utils
    statsys
    plotlib
-   animations
    bindings
    config
 
@@ -28,10 +27,12 @@ Module Overview
    Statistical physics simulation systems (Ising, contact process, voter models)
 
 **plotlib**
-   Plotting and visualization functions specialized for signed graphs and lattices
-
-**animations**
-   Animation tools for visualizing dynamics on graphs
+   Plotting and visualization functions specialized for signed graphs and
+   lattices, including the engine- and graph-agnostic animation primitives
+   (``plotlib.animation``). Structural, graph-type animation renderers live
+   under ``graphs._shared.animation`` (bound as methods on the graph classes)
+   and dynamics frame collection under ``statsys`` (e.g.
+   ``statsys.ContactProcess.frames``).
 
 **bindings**
    Native language bindings for performance-critical operations

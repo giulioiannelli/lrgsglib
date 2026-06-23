@@ -14,6 +14,7 @@ import graph_tool.generation as gen
 
 from ....config.const import L3D_ONREP, SG_INIT_NW_DICT
 from ..SignedGraphGT import SignedGraphGT
+from ..._shared.animation.lattice3d import _Lattice3DAnimate, _Lattice3DPlot
 from ..._shared._nw_container import geometric_central_edge
 from ._nw_container import Lattice3DGTnwContainer
 
@@ -83,6 +84,9 @@ class Lattice3DGT(SignedGraphGT):
         self.geo = geo
         self.periodic = periodic
         self.node_multiplier = self.NODE_MULTIPLIERS[geo]
+        # Mirror Lattice3DNX: the cube shape used to reshape a length-N state
+        # vector for voxel animations (graphs/_shared/animation/lattice3d.py).
+        self.syshape = self.dim
 
         # Set seed
         if seed is not None:
@@ -368,5 +372,12 @@ class Lattice3DGT(SignedGraphGT):
             f"Lattice3DGT(dim={self.dim}, geo='{self.geo}', "
             f"N={self.N}, edges={self.num_edges}, negative={neg})"
         )
+
+    # Plotting / animation namespaces (shared with Lattice3DNX): see
+    # lrgsglib.graphs._shared.animation.lattice3d. Use lat.plot.voxel(state)
+    # (static), lat.animate.voxel(states) / .voxel_cluster(states).
+    plot = property(lambda self: _Lattice3DPlot(self))
+    animate = property(lambda self: _Lattice3DAnimate(self))
+
 
 __all__ = ["Lattice3DGT"]

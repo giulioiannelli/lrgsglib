@@ -16,6 +16,7 @@ from ....utils.basic.iterables import compose
 from ..funcs import LatticeND_graph_FastPatch, remove_edges
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 from .generators_3d import *
+from ..._shared.animation.lattice3d import _Lattice3DAnimate, _Lattice3DPlot
 
 class Lattice3DNX(SignedGraphNX):
     """
@@ -254,4 +255,11 @@ class Lattice3DNX(SignedGraphNX):
                                 patternList.extend([k for k in glXERR])
                                 _ += 1
             return list(set(patternList))
+
+    # Plotting / animation namespaces (shared with Lattice3DGT): the voxel
+    # methods live on accessors -- `lat.plot.voxel(state)` (static),
+    # `lat.animate.voxel(states)` / `lat.animate.voxel_cluster(states)`. See
+    # lrgsglib.graphs._shared.animation.lattice3d for full signatures.
+    plot = property(lambda self: _Lattice3DPlot(self))
+    animate = property(lambda self: _Lattice3DAnimate(self))
         

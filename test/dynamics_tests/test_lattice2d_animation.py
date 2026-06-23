@@ -24,7 +24,7 @@ def test_collect_frames_and_make_animation(tmp_path):
     env_module.LRGSG_LOG = log_dir
     sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
-    from lrgsglib.animations import collect_contact_process_frames
+    from lrgsglib.statsys.ContactProcess.frames import collect_contact_process_frames
     from lrgsglib.graphs.nx import Lattice2DNX as Lattice2D
     from lrgsglib.statsys.ContactProcess import ContactProcessSIR
 
@@ -56,6 +56,6 @@ def test_collect_frames_and_make_animation(tmp_path):
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots()
-    result = lattice.make_animation(fig, ax, out.frames, add_colorbar=False)
+    result = lattice.animate.make(fig, ax, out.frames, add_colorbar=False)
     assert hasattr(result.animation, "save")
     plt.close(fig)

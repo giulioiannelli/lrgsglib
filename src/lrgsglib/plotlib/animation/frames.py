@@ -1,9 +1,19 @@
+"""Legacy frame-sequence movie helper.
+
+.. deprecated::
+    Superseded by the primitives in :mod:`lrgsglib.plotlib.animation._core`
+    (:func:`save_animation` / :func:`render_animation`) and the structural
+    renderers in :mod:`lrgsglib.graphs._shared.animation`. Kept only for
+    backward compatibility; prefer ``lattice.animate.states(...)`` or building a
+    ``FuncAnimation`` and calling :func:`save_animation`.
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 __all__ = ["make_animation_fromFrames"]
+
 
 def make_animation_fromFrames(frames, savename="output.mp4", fps=10, dpi=200):
     fig = plt.figure()
