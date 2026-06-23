@@ -21,7 +21,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .._c_backend import CBackendMixin
+from .._csr import build_graph_csr
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
 from ..ContDynSys import ContDynSys
+from .defaults import KURAMOTO_SOLVER_NAME
 from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
@@ -192,6 +196,31 @@ class KuramotoModel(CBackendMixin, ContDynSys):
         self.s = s
 
     # ------------------------------------------------------------------
+    # Native (pybind11) backend
+    # ------------------------------------------------------------------
+    def _run_pybind(self) -> None:
+        """Integrate via the in-process ``_kuramoto_native`` RK4 kernel.
+
+        Marshals the graph into the engine-agnostic CSR triple (NX + GT) and runs
+        the same ``kuramoto_step_rk4`` kernel the C subprocess uses. Deterministic,
+        so it matches the Python integrator numerically. Mirrors
+        ``VoterModel._run_pybind``.
+        """
+        from .ccore import _kuramoto_native
+
+        ni, nw, nptr = build_graph_csr(self.sg, self.N)
+        theta0 = np.ascontiguousarray(self.s, dtype=np.float64)
+        omega = np.ascontiguousarray(self._omega, dtype=np.float64)
+        theta, order = _kuramoto_native.kuramoto_sampling(
+            theta0, ni, nw, nptr, omega,
+            float(self.coupling), float(self.dt),
+            int(self.steps), bool(self.save_order_param),
+        )
+        self.s = theta
+        if self.save_order_param:
+            self.order_params = order.tolist()
+
+    # ------------------------------------------------------------------
     # C backend integration
     # ------------------------------------------------------------------
     def _build_c_arglist(self) -> list[str]:
@@ -250,11 +279,23 @@ class KuramotoModel(CBackendMixin, ContDynSys):
             Remove exported files after C run.
         """
         self.check_attribute()
+        # Resolve the solver family from the runlang code (C check is
+        # case-sensitive on a leading "C" to avoid catching native prefixes).
         if self.runlang.startswith("C"):
-            self.build_cprogram_command()
-            self.run_cprogram(verbose)
-            if clean_export:
+            backend = SolverBackend.C
+        elif self.runlang.lower().startswith("pb"):
+            backend = SolverBackend.PB
+        else:
+            backend = SolverBackend.PY
+        solver = get_solver(KURAMOTO_SOLVER_NAME, backend)
+        solver.supports(self)
+        try:
+            solver.execute(self, verbose=verbose)
+        finally:
+            if backend is SolverBackend.C and clean_export:
                 self.remove_run_c_files()
                 self.sg.remove_exported_files()
-        else:
-            self.run_py(verbose=verbose)
+
+
+# Register KuramotoModel's solver backends (py/pb/C) in the shared registry.
+from . import _solvers  # noqa: E402,F401
