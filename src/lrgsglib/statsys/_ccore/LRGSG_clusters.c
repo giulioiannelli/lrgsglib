@@ -113,6 +113,10 @@ ClusterCtx *clusters_create(size_t N, const spin_tp s, size_tp nlen,
     return c;
 }
 
+void clusters_set_state(ClusterCtx *c, const spin_tp s) {
+    *(spin_tp *)&c->s = s;   /* update the const reference (cast as in create) */
+}
+
 size_t        clusters_num_records(const ClusterCtx *c) { return c->n_rec; }
 const size_t *clusters_offsets(const ClusterCtx *c)     { return c->rec_off; }
 const size_t *clusters_sizes(const ClusterCtx *c)       { return c->rec_size; }

@@ -34,13 +34,20 @@
  * otherwise *absorbed_at is left at -1 and the frozen tail is padded out to
  * n_sweeps. `magn` may be NULL when `save_magn` is 0.
  *
+ * `snap_out` is an OPTIONAL full-trajectory sink: when non-NULL the kernel
+ * allocates a buffer holding exactly the recorded configurations (row-major
+ * (n_recorded, N) int8), grown on demand so an early-absorbing run never
+ * allocates the full n_sweeps*N, and stores it in *snap_out; the CALLER owns it
+ * and must free() it. The row count equals the return value. NULL skips it.
+ *
  * `cctx` is an OPTIONAL cluster-size-distribution tracker: when non-NULL the
- * kernel records the current distribution at every integer sweep time and feeds
- * each flip to it; when NULL the cluster machinery is skipped entirely (zero
- * overhead -- tracking happens only when requested).
+ * kernel records the current distribution at every integer sweep time; when NULL
+ * the cluster machinery is skipped entirely (zero overhead -- only when
+ * requested).
  */
 size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
                       size_t n_sweeps, int save_magn, double *magn,
+                      spin_tp *snap_out,
                       int absorbing, long *absorbed_at, ClusterCtx *cctx);
 
 #endif /* __LRGSGCTMCLIB_H_INC__ */

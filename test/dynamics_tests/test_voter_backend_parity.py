@@ -2,7 +2,7 @@
 
 Covers:
   * the degree-0 SIGFPE regression in the C kernel,
-  * the ``save_magnetization`` contract being honoured identically by py and C,
+  * the ``savemagn`` contract being honoured identically by py and C,
   * the unsigned linear-voter magnetization martingale + Python<->C agreement,
   * ``upd_mode`` validation (no silently-ignored update schedules).
 
@@ -51,13 +51,17 @@ def test_voter_c_isolated_node_no_sigfpe(tmp_path):
 
 
 # ===================================================================
-# save_magnetization is honoured identically by both backends
+# savemagn is honoured identically by both backends
 # ===================================================================
 
 
 def _run_collect_magn(VoterModel, sg, steps, runlang, save):
     v = VoterModel(
-        sg=sg, steps=steps, runlang=runlang, seed=1, save_magnetization=save,
+        sg=sg, steps=steps, runlang=runlang, seed=1, savemagn=save,
+        # Isolate the savemagn contract from early-stop: a balanced graph
+        # otherwise absorbs at consensus before ``steps`` sweeps, making the
+        # recorded length backend-RNG-dependent rather than exactly ``steps``.
+        absorbing_check=False,
     )
     v.init_voter_dynamics()
     v.run(tqdm_on=False)
@@ -65,7 +69,7 @@ def _run_collect_magn(VoterModel, sg, steps, runlang, save):
 
 
 @pytest.mark.physical
-def test_voter_save_magnetization_contract_py(tmp_path):
+def test_voter_savemagn_contract_py(tmp_path):
     from lrgsglib.graphs.nx import Lattice2DNX
     from lrgsglib.statsys import VoterModel
 
@@ -83,7 +87,7 @@ def test_voter_save_magnetization_contract_py(tmp_path):
 
 @pytest.mark.physical
 @pytest.mark.integration
-def test_voter_save_magnetization_contract_c(tmp_path):
+def test_voter_savemagn_contract_c(tmp_path):
     if _voter_c_binary_missing():
         pytest.skip("VoterSimulator binary not built")
     from lrgsglib.graphs.nx import Lattice2DNX

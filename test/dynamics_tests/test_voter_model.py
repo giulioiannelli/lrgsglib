@@ -60,7 +60,7 @@ class TestVoterModel(unittest.TestCase):
             sg,
             runlang="py",
             savedyn=True,
-            save_magnetization=True,
+            savemagn=True,
             eqSTEP=5,
             seed=123,
         )

@@ -3,6 +3,7 @@
 #include "sfmtrng.h"
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* ------------------------------------------------------------------ *
  * Fenwick (binary-indexed) tree over node flip-rates, 1-indexed:
@@ -51,18 +52,40 @@ static size_t node_frustration(size_t nd, const spin_tp s, size_t deg,
     return fi;
 }
 
+/* Append the current configuration as record `row` into a snapshot buffer that
+ * grows on demand (capacity doubling) so an early-absorbing run allocates only
+ * ~its record count, not the full n_sweeps*N. The caller frees *psnap. */
+static inline void snap_record(spin_tp *psnap, size_t *pcap_rows, size_t row,
+                               const spin_tp s, size_t N) {
+    if (row + 1 > *pcap_rows) {
+        size_t cap = *pcap_rows ? *pcap_rows : 64;
+        while (cap < row + 1) cap <<= 1;
+        spin_tp p = realloc(*psnap, cap * N * sizeof(*p));
+        if (!p) { perror("realloc"); exit(EXIT_FAILURE); }
+        *psnap = p;
+        *pcap_rows = cap;
+    }
+    memcpy(*psnap + (size_t)row * N, s, N * sizeof(*s));
+}
+
 /*
  * Implementation core. `track` is a COMPILE-TIME literal (0 or 1) supplied by the
  * two call sites in voter_ctmc_run; being `static inline`, the compiler emits a
  * specialised copy per call site and constant-folds every `if (track)` away. So
  * the cluster branch is decided ONCE at dispatch -- there is no per-iteration
  * test in the no-tracking path (`cctx` is NULL there anyway).
+ *
+ * `snap_out` is an OPTIONAL full-trajectory sink: when non-NULL the kernel grows
+ * a buffer on demand and copies the configuration at every recorded sweep time,
+ * handing the buffer back via *snap_out (caller frees it). On-demand growth means
+ * an early-absorbing run never allocates the full n_sweeps*N. Recording happens
+ * only at the integer sweep times (O(records) memcpy), not per flip; NULL skips.
  */
 static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
                                    NodesEdges node_edges, size_t n_sweeps,
-                                   int save_magn, double *magn, int absorbing,
-                                   long *absorbed_at, const int track,
-                                   ClusterCtx *cctx) {
+                                   int save_magn, double *magn, spin_tp *snap_out,
+                                   int absorbing, long *absorbed_at,
+                                   const int track, ClusterCtx *cctx) {
     size_tp f    = __chMalloc(N * sizeof(*f));        /* frustrated edges/node */
     double *rate = __chMalloc(N * sizeof(*rate));     /* r_i = f_i / deg_i     */
     double *bit  = calloc(N + 1, sizeof(*bit));       /* Fenwick (zeroed)      */
@@ -82,10 +105,13 @@ static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
 
     double t = 0.0;          /* continuous time, in sweep units */
     size_t recorded = 0;     /* next integer sweep-time to record */
+    spin_tp snap = NULL;     /* grown on demand, only when snap_out != NULL */
+    size_t snap_cap_rows = 0;
     while (recorded < n_sweeps) {
         if (total_f == 0) {                       /* frozen => absorbing */
             if (absorbing) {
                 if (save_magn) magn[recorded] = calc_magn(N, s);
+                if (snap_out) snap_record(&snap, &snap_cap_rows, recorded, s, N);
                 if (track) clusters_record(cctx);
                 *absorbed_at = (long)recorded;
                 recorded++;
@@ -93,6 +119,7 @@ static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
                 double m = save_magn ? calc_magn(N, s) : 0.0;
                 while (recorded < n_sweeps) {      /* pad the frozen tail */
                     if (save_magn) magn[recorded] = m;
+                    if (snap_out) snap_record(&snap, &snap_cap_rows, recorded, s, N);
                     if (track) clusters_record(cctx);   /* distribution frozen too */
                     recorded++;
                 }
@@ -107,6 +134,7 @@ static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
         /* State is constant on [t, t_next): emit any integer times in between. */
         while (recorded < n_sweeps && (double)recorded < t_next) {
             if (save_magn) magn[recorded] = calc_magn(N, s);
+            if (snap_out) snap_record(&snap, &snap_cap_rows, recorded, s, N);
             if (track) clusters_record(cctx);
             recorded++;
         }
@@ -146,20 +174,23 @@ static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
     free(f);
     free(rate);
     free(bit);
+    if (snap_out) *snap_out = snap;
     return recorded;
 }
 
 size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
                       size_t n_sweeps, int save_magn, double *magn,
+                      spin_tp *snap_out,
                       int absorbing, long *absorbed_at, ClusterCtx *cctx) {
     *absorbed_at = -1;
+    if (snap_out) *snap_out = NULL;
     if (n_sweeps == 0) return 0;
     /* Single runtime branch: pick the cluster-tracking or the plain loop ONCE.
      * Each ctm_run_impl instantiation has `track` as a literal, so its inner
      * `if (track)` checks compile away -- no per-iteration test either way. */
     if (cctx)
         return ctmc_run_impl(N, s, nlen, node_edges, n_sweeps, save_magn, magn,
-                             absorbing, absorbed_at, 1, cctx);
+                             snap_out, absorbing, absorbed_at, 1, cctx);
     return ctmc_run_impl(N, s, nlen, node_edges, n_sweeps, save_magn, magn,
-                         absorbing, absorbed_at, 0, NULL);
+                         snap_out, absorbing, absorbed_at, 0, NULL);
 }

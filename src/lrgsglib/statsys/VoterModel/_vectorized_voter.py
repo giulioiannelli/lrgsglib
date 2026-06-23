@@ -4,8 +4,8 @@ The **synchronous** linear voter is embarrassingly parallel: every node copies a
 uniformly chosen signed neighbour from the *same* frozen snapshot, so a whole
 sweep is a single CSR gather with no inter-node dependence (unlike the
 asynchronous schedule, and unlike Ising which needs graph-colouring). One array
-routine therefore serves both backends -- pass ``xp=numpy`` (``np_voter``) or
-``xp=cupy`` (``cu_voter``).
+routine therefore serves both backends -- pass ``xp=numpy`` (``np``) or
+``xp=cupy`` (``cu``).
 
 Signed substrate: the effective neighbour opinion is ``sign(w_ij) * s_j`` (a
 negative edge is an anti-copy), matching the other VoterModel backends.
@@ -31,7 +31,7 @@ def run_vectorized_sync(
     ptr: np.ndarray,
     n_sweeps: int,
     seed: int,
-    save_magnetization: bool,
+    savemagn: bool,
     absorbing_check: bool,
     absorbing_every: int,
 ):
@@ -42,7 +42,7 @@ def run_vectorized_sync(
 
     Returns ``(final_spins, magn, absorbed_at)`` with ``final_spins`` an
     ``int8`` host ``ndarray``, ``magn`` a Python list (empty unless
-    ``save_magnetization``), and ``absorbed_at`` the sweep index of the first
+    ``savemagn``), and ``absorbed_at`` the sweep index of the first
     zero-frustration configuration or ``None``.
     """
     s = xp.asarray(s0, dtype=xp.int8)
@@ -64,12 +64,12 @@ def run_vectorized_sync(
         src = xp.asarray(np.repeat(np.arange(N, dtype=np.int64), deg_host))
 
     rng = xp.random.default_rng(seed)
-    magn_dev = xp.empty(n_sweeps, dtype=xp.float64) if save_magnetization else None
+    magn_dev = xp.empty(n_sweeps, dtype=xp.float64) if savemagn else None
     nrec = 0
     absorbed_at = None
 
     for t in range(n_sweeps):
-        if save_magnetization:
+        if savemagn:
             magn_dev[t] = s.mean()       # stays on device (no per-sweep sync)
             nrec = t + 1
         if absorbing_check and (t % absorbing_every == 0):
@@ -85,7 +85,7 @@ def run_vectorized_sync(
         s = xp.where(has, s_new, s)        # isolated nodes unchanged
 
     magn: list[float] = []
-    if save_magnetization:
+    if savemagn:
         md = magn_dev[:nrec]
         magn = (_cp.asnumpy(md) if xp is not np else md).tolist()
 

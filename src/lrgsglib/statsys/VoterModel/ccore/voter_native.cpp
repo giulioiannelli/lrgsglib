@@ -17,6 +17,7 @@
 #include <pybind11/stl.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -105,10 +106,10 @@ static py::tuple voter_sampling(
     const py::array_t<int64_t>& neigh_ptr,
     size_t n_sweeps,
     uint64_t seed_val,
-    bool save_magnetization,
+    bool savemagn,
     int rule, size_t q, double eps, double alpha,
     int upd_mode, bool absorbing,
-    bool track_clusters, int cluster_mode
+    bool track_clusters, int cluster_mode, bool savedyn
 ) {
     auto s_buf = spins_in.request();
     size_t N = static_cast<size_t>(s_buf.size);
@@ -126,7 +127,7 @@ static py::tuple voter_sampling(
     voter_upd_t mode = static_cast<voter_upd_t>(upd_mode);
 
     std::vector<double> magn_out;
-    if (save_magnetization) magn_out.reserve(n_sweeps);
+    if (savemagn) magn_out.reserve(n_sweeps);
     long absorbed_at = -1;
 
     std::vector<int8_t> snew(mode == VOTER_UPD_SYNC ? N : 0);
@@ -137,6 +138,10 @@ static py::tuple voter_sampling(
      * with the GIL held). Only populated when track_clusters is requested. */
     std::vector<size_t> cl_off, cl_size, cl_cnt;
     size_t cl_nrec = 0;
+
+    /* Optional full per-sweep trajectory (savedyn): row-major (n_rec, N) int8. */
+    std::vector<int8_t> snap_buf;
+    size_t snap_nrec = 0;
 
     {
         py::gil_scoped_release release;
@@ -152,35 +157,39 @@ static py::tuple voter_sampling(
         }
         spin_tp sbuf = snew.empty() ? nullptr : snew.data();
 
+        /* optional cluster recompute, shared by every schedule (NULL => skipped).
+         * Created with s = spins.data(); the non-gillespie loop re-points it at the
+         * live buffer each record via clusters_set_state (sync swaps s). */
+        ClusterCtx *cctx = track_clusters
+            ? clusters_create(N, s, nlen_ptr, ne, cluster_mode == 1 ? 1 : 0)
+            : nullptr;
+
         if (mode == VOTER_UPD_GILLESPIE) {
             /* Rejection-free CTMC (shared _ccore kernel); magn sampled at integer
              * sweep times, t_run shortens if it freezes (absorbing). */
-            std::vector<double> magn_buf(save_magnetization ? n_sweeps : 0);
-            double *magn_ptr = save_magnetization ? magn_buf.data() : nullptr;
-            /* optional cluster recompute (NULL => the kernel skips it entirely) */
-            ClusterCtx *cctx = track_clusters
-                ? clusters_create(N, s, nlen_ptr, ne, cluster_mode == 1 ? 1 : 0)
-                : nullptr;
+            std::vector<double> magn_buf(savemagn ? n_sweeps : 0);
+            double *magn_ptr = savemagn ? magn_buf.data() : nullptr;
+            /* optional full trajectory (savedyn): the kernel grows a buffer to the
+             * ACTUAL recorded-sweep count (never the full n_sweeps*N) and hands it
+             * back here for us to copy out and free. */
+            spin_tp snap_raw = nullptr;
+            spin_tp *snap_out = savedyn ? &snap_raw : nullptr;
             size_t t_run = voter_ctmc_run(
                 N, s, nlen_ptr, ne, n_sweeps,
-                save_magnetization ? 1 : 0, magn_ptr,
+                savemagn ? 1 : 0, magn_ptr, snap_out,
                 absorbing ? 1 : 0, &absorbed_at, cctx);
-            if (save_magnetization)
+            if (savemagn)
                 magn_out.assign(magn_buf.begin(), magn_buf.begin() + t_run);
-            if (cctx) {                       /* copy out raw records, then free */
-                cl_nrec = clusters_num_records(cctx);
-                const size_t *off = clusters_offsets(cctx);
-                const size_t *sz  = clusters_sizes(cctx);
-                const size_t *ct  = clusters_counts(cctx);
-                size_t nent = off[cl_nrec];
-                cl_off.assign(off, off + cl_nrec + 1);
-                cl_size.assign(sz, sz + nent);
-                cl_cnt.assign(ct, ct + nent);
-                clusters_free(cctx);
+            if (savedyn && snap_raw) {
+                snap_nrec = t_run;
+                snap_buf.assign(snap_raw, snap_raw + (size_t)t_run * N);
+                free(snap_raw);
             }
         } else {
             for (size_t step = 0; step < n_sweeps; ++step) {
-                if (save_magnetization) magn_out.push_back(calc_magn(N, s));
+                if (savemagn) magn_out.push_back(calc_magn(N, s));
+                if (savedyn) { snap_buf.insert(snap_buf.end(), s, s + N); ++snap_nrec; }
+                if (cctx) { clusters_set_state(cctx, s); clusters_record(cctx); }
                 if (absorbing && voter_count_frustrated(N, s, nlen_ptr, ne) == 0) {
                     absorbed_at = static_cast<long>(step);
                     break;
@@ -194,6 +203,17 @@ static py::tuple voter_sampling(
                     voter_model_Nstep(N, s, nlen_ptr, ne, vp);
                 }
             }
+        }
+        if (cctx) {                       /* copy out raw cluster records, then free */
+            cl_nrec = clusters_num_records(cctx);
+            const size_t *off = clusters_offsets(cctx);
+            const size_t *sz  = clusters_sizes(cctx);
+            const size_t *ct  = clusters_counts(cctx);
+            size_t nent = off[cl_nrec];
+            cl_off.assign(off, off + cl_nrec + 1);
+            cl_size.assign(sz, sz + nent);
+            cl_cnt.assign(ct, ct + nent);
+            clusters_free(cctx);
         }
         /* `s` may point at `snew`'s storage after an odd number of sync swaps;
          * copy the live state back into `spins` for the return value. */
@@ -219,7 +239,14 @@ static py::tuple voter_sampling(
         cluster_dist.append(d);
     }
 
-    return py::make_tuple(out_spins, out_magn, absorbed_at, cluster_dist);
+    /* full per-sweep trajectory (savedyn): (n_rec, N) int8 array, empty if off */
+    std::vector<py::ssize_t> s_t_shape{(py::ssize_t)snap_nrec, (py::ssize_t)N};
+    py::array_t<int8_t> out_s_t(s_t_shape);
+    if (snap_nrec)
+        std::memcpy(out_s_t.mutable_data(), snap_buf.data(),
+                    (size_t)snap_nrec * N * sizeof(int8_t));
+
+    return py::make_tuple(out_spins, out_magn, absorbed_at, cluster_dist, out_s_t);
 }
 
 PYBIND11_MODULE(_voter_native, m) {
@@ -233,28 +260,31 @@ Parameters
 ----------
 spins, neigh_indices, neigh_weights, neigh_ptr : ndarray
     Initial int8 state and the CSR adjacency (symmetric, signed weights).
-n_sweeps, seed, save_magnetization : run controls.
+n_sweeps, seed, savemagn : run controls.
 rule : 0 linear | 1 majority | 2 qvoter | 3 nonlinear.
 q, eps, alpha : q-voter / nonlinear parameters.
 upd_mode : 0 async | 1 sync | 2 link | 3 gillespie (rejection-free CTMC, linear).
 absorbing : stop at the first zero-frustration configuration.
-track_clusters : record the cluster-size distribution per sweep (gillespie only;
+track_clusters : record the cluster-size distribution per sweep (any schedule;
     full connected-components recompute over active edges at each record).
 cluster_mode : 0 satisfied (signed domains) | 1 rawspin (edge sign ignored).
+savedyn : record the full per-sweep spin trajectory (returned as the 5th element).
 
 Returns
 -------
-tuple[ndarray, ndarray, int, list]
+tuple[ndarray, ndarray, int, list, ndarray]
     (final_spins[int8], magnetization[float64] of length = sweeps run,
-     absorbed_at, cluster_dist) where absorbed_at = -1 if it never froze and
+     absorbed_at, cluster_dist, s_t) where absorbed_at = -1 if it never froze,
      cluster_dist is a list (one {size: count} dict per recorded sweep; empty
-     unless track_clusters).
+     unless track_clusters), and s_t is an (n_recorded, N) int8 array of the
+     per-sweep configurations (shape (0, N) unless savedyn).
         )pbdoc",
         py::arg("spins"), py::arg("neigh_indices"), py::arg("neigh_weights"),
         py::arg("neigh_ptr"), py::arg("n_sweeps"), py::arg("seed"),
-        py::arg("save_magnetization") = true,
+        py::arg("savemagn") = true,
         py::arg("rule") = 0, py::arg("q") = 2, py::arg("eps") = 0.0,
         py::arg("alpha") = 1.0, py::arg("upd_mode") = 0,
         py::arg("absorbing") = false,
-        py::arg("track_clusters") = false, py::arg("cluster_mode") = 0);
+        py::arg("track_clusters") = false, py::arg("cluster_mode") = 0,
+        py::arg("savedyn") = false);
 }

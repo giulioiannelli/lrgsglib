@@ -5,6 +5,16 @@ pattern.  Each model lives in its own subdirectory with optional ``ccore/``
 subfolder for C backend source and binaries.
 """
 
+# Solver-backend registry (engine-style dispatch for dynamics)
+from ._solver import Solver, SolverBackend
+from ._solver_engine import (
+    get_solver,
+    is_backend_available,
+    list_solver_models,
+    list_solvers_for_model,
+    register_solver,
+)
+
 # Base classes
 from .DynSys import DynSys
 from .BinDynSys import BinDynSys
@@ -34,6 +44,14 @@ from .HeisenbergModel import HeisenbergModel
 from .MultiSpeciesModel import MultiSpeciesModel
 
 __all__ = [
+    # Solver registry
+    "Solver",
+    "SolverBackend",
+    "get_solver",
+    "register_solver",
+    "list_solvers_for_model",
+    "list_solver_models",
+    "is_backend_available",
     # Base classes
     "DynSys",
     "BinDynSys",

@@ -6,7 +6,7 @@
 /*
  * Cluster-size-distribution observable for spin dynamics on a signed graph
  * (shared _ccore; mirrors the Python reference
- * statsys/VoterModel/_cluster_tracker.py and is validated against it).
+ * utils/statsys.py and is validated against it).
  *
  * A *cluster* is a connected component of the subgraph of ACTIVE edges. The
  * activation predicate is selected by `rawspin`:
@@ -32,6 +32,11 @@ typedef struct ClusterCtx ClusterCtx;
  * `rawspin` selects the activation predicate (see above). */
 ClusterCtx *clusters_create(size_t N, const spin_tp s, size_tp nlen,
                             NodesEdges node_edges, int rawspin);
+
+/* Re-point the context at state buffer `s`, for owners that double-buffer and
+ * swap `s` between sweeps (e.g. the synchronous voter). The next
+ * clusters_record() reads from this buffer. */
+void clusters_set_state(ClusterCtx *ctx, const spin_tp s);
 
 /* Recompute the active-edge connected components under the CURRENT `s` and
  * append the resulting cluster-size distribution as one record. */

@@ -5,7 +5,7 @@ Three studies, all on signed 2D lattices (and Erdos-Renyi) via the
 ``lrgsglib.graphs`` factories:
 
 1. **Backend scaling** -- synchronous *linear* voter across all backends
-   (``py``, ``C0``, ``pb_voter``, ``np_voter``, ``cu_voter``) at several system
+   (``py``, ``C0``, ``pb``, ``np``, ``cu``) at several system
    sizes; speedup vs pure Python. This is the apples-to-apples comparison
    because every backend implements the synchronous linear voter.
 2. **Sampler study** -- rejection-free ``gillespie`` CTMC vs ``asynchronous``
@@ -62,9 +62,9 @@ SCALING_CONFIGS = [
 SCALING_BACKENDS = [
     ("py", "Python", True),          # (runlang, label, needs_py_ok)
     ("C0", "C subproc", False),
-    ("pb_voter", "pybind11", False),
-    ("np_voter", "NumPy vec", False),
-    ("cu_voter", "CuPy GPU", False),
+    ("pb", "pybind11", False),
+    ("np", "NumPy vec", False),
+    ("cu", "CuPy GPU", False),
 ]
 
 # --- Study 2: sampler study (gillespie vs asynchronous, absorbing) ---
@@ -72,19 +72,19 @@ SAMPLER_STEPS = 4000            # generous cap; absorbing_check stops early
 SAMPLER_CONFIGS = [16, 32, 48, 64]
 SAMPLER_BACKENDS = [
     ("py", "Python"),
-    ("pb_voter", "pybind11"),
+    ("pb", "pybind11"),
     ("C0", "C subproc"),
 ]
 
 # --- Study 3: rule overhead (asynchronous, fixed size/backend) ---
 RULE_STUDY_SIDE = 48
 RULE_STUDY_STEPS = 300
-RULE_STUDY_BACKEND = "pb_voter"
+RULE_STUDY_BACKEND = "pb"
 RULE_STUDY_RULES = ["linear", "majority", "qvoter", "nonlinear"]
 
 # --- Study 4: cluster-tracking overhead (gillespie, balanced lattice) ---
 # Cost of track_clusters=True vs False on the single-spin gillespie path.
-CLUSTER_STUDY_BACKENDS = ["py", "pb_voter"]
+CLUSTER_STUDY_BACKENDS = ["py", "pb"]
 CLUSTER_STUDY_SIDES = [24, 32, 48]
 CLUSTER_STUDY_STEPS = 1500
 
@@ -206,7 +206,7 @@ def run_backend_scaling(
             for runlang, label, needs_py_ok in SCALING_BACKENDS:
                 if needs_py_ok and not cfg["py_ok"]:
                     continue
-                if runlang == "cu_voter" and not has_cupy:
+                if runlang == "cu" and not has_cupy:
                     continue
                 try:
                     r = bench_voter(

@@ -110,7 +110,7 @@ def test_voter_magnetization_visual(tmp_path, output_dir, save_figure, system_si
     )
     voter1 = VoterModel(
         sg=g_complete, steps=n_steps, runlang="py", seed=42,
-        save_magnetization=True,
+        savemagn=True,
     )
     voter1.init_voter_dynamics()
     voter1.run(tqdm_on=False)
@@ -131,7 +131,7 @@ def test_voter_magnetization_visual(tmp_path, output_dir, save_figure, system_si
     )
     voter2 = VoterModel(
         sg=lat, steps=n_steps, runlang="py", seed=42,
-        save_magnetization=True,
+        savemagn=True,
     )
     voter2.init_voter_dynamics()
     voter2.run(tqdm_on=False)

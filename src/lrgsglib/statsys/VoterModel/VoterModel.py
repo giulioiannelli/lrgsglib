@@ -1,8 +1,13 @@
 """Voter-model dynamics on signed graphs.
 
-Runlang convention: ``C<digit><letters>``
-  - digit 0 = voter dynamics (single algorithm)
-  - letters: S = snapshots (bare digit = final state only)
+Runlang convention (the ``runlang=`` backend selector; short codes mirror
+``py`` / ``C<digit>``):
+  - ``py`` : pure-Python reference implementation (full rule family).
+  - ``pb`` : in-process pybind11 kernel (full rule family, GT-compatible).
+  - ``np`` : vectorized NumPy synchronous linear voter.
+  - ``cu`` : vectorized CuPy (GPU) synchronous linear voter.
+  - ``C<digit><letters>`` : compiled C subprocess; digit 0 = voter dynamics,
+    letter ``S`` = file snapshots (a bare ``C0`` writes the final state only).
 """
 
 from __future__ import annotations
@@ -16,9 +21,17 @@ import tqdm
 
 from .._c_backend import CBackendMixin
 from .._csr import build_graph_csr
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
 from ..BinDynSys import BinDynSys
+from ...config.const import BIN, NPZ
 from ...utils.tools.chronometer import time_function_accumulate
-from ._cluster_tracker import cluster_size_distribution, edge_sign_arrays
+from ...utils.statsys import (
+    cluster_size_distribution,
+    edge_sign_arrays,
+    largest_fraction,
+)
+from . import _voter_io
 from .defaults import (
     CLUSTER_MODE_CODE,
     CLUSTER_MODES,
@@ -28,13 +41,19 @@ from .defaults import (
     DEFAULT_NONLIN_ALPHA,
     DEFAULT_QVOTER_Q,
     DEFAULT_RULE,
+    DEFAULT_SOUT_EVERY,
     DEFAULT_UPD_MODE,
     GILLESPIE_RULES,
     LINK_ONLY_RULES,
     PY_ONLY_UPD_MODES,
     RULE_CODE,
     UPD_MODE_CODE,
+    VOTER_CLDIST_FBASE,
+    VOTER_MAGN_FBASE,
     VOTER_RULES,
+    VOTER_SOLVER_NAME,
+    VOTER_SOUT_FBASE,
+    VOTER_SOUT_MAX_BYTES,
     VOTER_UPD_MODES,
     VOTER_UPD_MODES_PLANNED,
 )
@@ -76,20 +95,111 @@ class VoterModel(CBackendMixin, BinDynSys):
         Size-normalized time (steps = simref * N).
     eqSTEP : int, optional
         Legacy alias for steps.
-    save_magnetization : bool, optional
-        If True, record the magnetization series ``magn`` at each sweep.
-        Honoured identically by the Python and C backends.
+    savemagn : bool, optional
+        Inherited from :class:`~lrgsglib.statsys.BinDynSys.BinDynSys`. If True,
+        record the per-spin magnetization series ``magn`` (= ``mean(s)``) at
+        each sweep; honoured identically across every backend.
+    rule : str, optional
+        Local update rule (Axis A); default ``'linear'``. One of:
+
+        - ``'linear'`` -- copy ``sign(w_ij) * s_j`` of one uniformly chosen
+          neighbour (classic voter).
+        - ``'majority'`` -- adopt ``sign(sum_j w_ij s_j)`` with a random
+          tie-break (local majority-vote).
+        - ``'qvoter'`` -- sample ``q`` neighbours with replacement; copy them
+          if their signed opinions are unanimous, else flip with probability
+          ``eps`` (non-linear q-voter).
+        - ``'nonlinear'`` -- reinforcement voter: adopt signed opinion
+          ``sigma`` with probability ``f_sigma**alpha / (f_+**alpha +
+          f_-**alpha)``, where ``f_sigma`` is the fraction of neighbours
+          holding ``sigma``. Project-chosen form (no exact primary source;
+          citation pending -- see ``defaults.py``).
+    q : int, optional
+        Number of neighbours sampled with replacement for the ``'qvoter'``
+        rule (must be >= 1); default 2. Ignored by the other rules.
+    eps : float, optional
+        Flip probability applied when a ``'qvoter'`` sample is not unanimous
+        (must be in ``[0, 1]``); default 0.0. Ignored by the other rules.
+    alpha : float, optional
+        Nonlinearity exponent for the ``'nonlinear'`` rule (must be >= 0);
+        default 1.0. ``alpha=1`` recovers the linear voter, ``alpha>1``
+        reinforces the local majority. Ignored by the other rules.
     upd_mode : str, optional
-        Update schedule (Axis B): ``'asynchronous'`` (random sequential),
-        ``'synchronous'`` (double-buffer), ``'link'`` (edge-update, linear
-        only), or ``'gillespie'`` (rejection-free CTMC, linear only). All
-        schedules are available on every backend (Python, C subprocess, pybind).
+        Update schedule (Axis B); default ``'asynchronous'``. One of
+        ``'asynchronous'`` (random-sequential, ``N`` single-node updates per
+        sweep), ``'synchronous'`` (double-buffer, all nodes from a frozen
+        snapshot), ``'link'`` (edge-update; ``rule='linear'`` only), or
+        ``'gillespie'`` (rejection-free continuous-time MC; ``rule='linear'``
+        only). All schedules run on every backend (Python, C subprocess,
+        pybind).
+    absorbing_check : bool or None, optional
+        Detect and early-stop at an absorbing (zero-frustration)
+        configuration, recording the stopping sweep in ``self.absorbed_at``.
+        ``None`` (default) auto-selects from the substrate: ``True`` for an
+        unsigned graph (it freezes at consensus), ``False`` for a signed graph
+        (frustration lets it fluctuate indefinitely). An explicit bool
+        overrides.
+    absorbing_every : int, optional
+        Test the absorbing condition every this many sweeps when
+        ``absorbing_check`` is active (clamped to >= 1); default 1.
+    track_clusters : bool, optional
+        If True, record at each sampled sweep the connected-component
+        (cluster) size distribution of the active-edge subgraph, accumulated
+        in ``self.cluster_dist``; default False.
+    cluster_mode : str, optional
+        Edge-activation predicate for the cluster distribution, used only when
+        ``track_clusters=True``; default ``'satisfied'``. ``'satisfied'``
+        activates edge ``(i, j)`` when ``sign(w_ij) * s_i * s_j = +1``
+        (signed-substrate domains); ``'rawspin'`` when ``s_i == s_j`` (edge
+        sign ignored).
     freq : int, optional
         Recording frequency.
     nSampleLog : int, optional
         Number of log-spaced samples (for C backend).
+    sout_every : int, optional
+        Subsampling stride for the ``savedyn`` spin trajectory: keep every
+        ``sout_every``-th recorded sweep (clamped to >= 1); default 1 (full
+        trajectory). Bounds the trajectory's on-disk/-RAM footprint.
+    savedisk : bool, optional
+        Persist *enabled* observables to disk under ``dynpath`` and expose them
+        as lazy, disk-backed attributes (default True; inherited from
+        ``BinDynSys``). Set False for pure in-RAM behaviour (no files).
     **kwargs
-        Additional arguments passed to BinDynSys.
+        Additional arguments passed to BinDynSys (e.g. ``savemagn``, ``ic``,
+        ``out_suffix``, ``rndStr``).
+
+    Attributes
+    ----------
+    magn, s_t, cluster_dist
+        Lazy, disk-backed observable views (see Notes). ``magn`` is the
+        per-spin magnetization series; ``s_t`` the spin-configuration
+        trajectory (a read-only ``(n_rec, N)`` memmap when on disk); and
+        ``cluster_dist`` the per-sweep cluster-size histograms.
+
+    Notes
+    -----
+    **Persistence (``savedisk=True``, the default).** Each enabled observable is
+    written under ``dynpath`` (``data/<lattice>/voter/N=<n>/``) when a save flag
+    is set -- ``savemagn`` -> ``m_*.bin`` (float64), ``savedyn`` -> ``sout_*.bin``
+    (int8 ``(n_rec, N)``), ``track_clusters`` -> ``cldist_*.npz`` -- and the
+    matching attribute becomes lazy: ``magn``/``cluster_dist`` cache the small
+    series; ``s_t`` memory-maps the big trajectory (never a full-RAM copy). The
+    trajectory streams to disk during the Python loop and is subsampled by
+    ``sout_every``; its precomputed size is capped by ``VOTER_SOUT_MAX_BYTES``
+    (defaults.py) so extensive runs cannot silently spill terabytes. Writes are
+    atomic (temp file + ``os.replace``). Load explicitly with ``load_magn`` /
+    ``load_sout(mmap=...)`` / ``load_clusters``, and inspect on-disk bytes with
+    ``output_sizes``. The ``cldist`` artifact (per-sweep emergent domain-size
+    histograms) is DISTINCT from Ising's ``outcl`` (time-averaged moments of
+    fixed eigenvector clusters).
+
+    The rule family (Axis A), update schedules (Axis B), absorbing-state
+    detection, and cluster-mode semantics -- with their primary-source
+    citations (Castellano 2009 social & non-linear q-voter; Iannelli 2026
+    signed Laplacian / frustration) -- are documented in
+    :mod:`lrgsglib.statsys.VoterModel.defaults`. The signed-substrate
+    generalisation (``sigma_j = sign(w_ij) * s_j``) is a project extension,
+    not attributable to those papers.
 
     Examples
     --------
@@ -106,9 +216,9 @@ class VoterModel(CBackendMixin, BinDynSys):
     # Validation handled by suffix method
     _allowed_c_keys: tuple[str, ...] = ()
 
-    # Class-level observable defaults (will be overwritten per instance)
-    magn: list[float] = []
-    s_t: list[np.ndarray] = []
+    # ``magn`` / ``s_t`` / ``cluster_dist`` are lazy, disk-backed properties
+    # (see the "Disk-backed observables" section below); their backing fields
+    # are initialised in ``reset_observables``.
     _voter_snapshot_mode: bool = False
 
     def __init__(
@@ -118,29 +228,36 @@ class VoterModel(CBackendMixin, BinDynSys):
         steps: int | None = None,
         simref: float | None = None,
         eqSTEP: int | None = None,
-        save_magnetization: bool = False,
         rule: str = DEFAULT_RULE,
         q: int = DEFAULT_QVOTER_Q,
         eps: float = DEFAULT_NOISE_EPS,
         alpha: float = DEFAULT_NONLIN_ALPHA,
         upd_mode: str = DEFAULT_UPD_MODE,
-        absorbing_check: bool = False,
+        absorbing_check: bool | None = None,
         absorbing_every: int = DEFAULT_ABSORBING_EVERY,
         track_clusters: bool = False,
         cluster_mode: str = DEFAULT_CLUSTER_MODE,
         freq: int = 10,
         nSampleLog: int = 100,
+        sout_every: int = DEFAULT_SOUT_EVERY,
         **kwargs: Any,
     ) -> None:
         dynpath = getattr(sg, 'path_voter', None)
         resolved_steps = steps if steps is not None else eqSTEP
         super().__init__(sg, dynpath=dynpath, steps=resolved_steps, simref=simref, **kwargs)
-        self.save_magnetization = save_magnetization
+        # savemagn is inherited from BinDynSys (shared binary option).
         self.rule = self._validate_rule(rule)
         self.q, self.eps, self.alpha = self._validate_rule_params(q, eps, alpha)
         self.upd_mode = self._validate_upd_mode(upd_mode)
         self._validate_rule_mode(self.rule, self.upd_mode)
-        self.absorbing_check = bool(absorbing_check)
+        # absorbing_check=None auto-selects from the substrate: an UNSIGNED graph
+        # (no negative links) reaches a frozen consensus, so early-stop is on; a
+        # SIGNED graph can fluctuate forever (frustration), so it is off. An
+        # explicit True/False always overrides.
+        self.absorbing_check = (
+            (self.sg.count_negative_edges() == 0)
+            if absorbing_check is None else bool(absorbing_check)
+        )
         self.absorbing_every = max(1, int(absorbing_every))
         self.absorbed_at: int | None = None
         self.track_clusters = bool(track_clusters)
@@ -151,6 +268,9 @@ class VoterModel(CBackendMixin, BinDynSys):
         self._cl_b: list[np.ndarray] | None = None
         self.freq = freq
         self.nSampleLog = nSampleLog
+        # sout (savedyn) subsampling stride: keep every ``sout_every``-th recorded
+        # sweep so the trajectory's on-disk/-RAM footprint stays bounded.
+        self.sout_every = max(1, int(sout_every))
         self.reset_observables()
         self.sini: np.ndarray | None = None
         self.out_id: str = self.out_suffix
@@ -238,11 +358,70 @@ class VoterModel(CBackendMixin, BinDynSys):
     # Utility helpers
     # ------------------------------------------------------------------
     def reset_observables(self) -> None:
-        """Reset cached observables collected during a run."""
-        self.magn = []
-        self.s_t = []
-        self.cluster_dist: list[dict[int, int]] = []
+        """Reset the in-RAM observable buffers and all disk-backing state."""
+        # In-RAM buffers / caches. ``_s_t_cache`` holds the trajectory only when
+        # NOT streaming to disk (savedisk=False, or pre-dump); it is set to None
+        # once ``sout`` lives on disk so ``s_t`` lazily memmaps the file instead.
+        self._magn: list[float] = []
+        self._cluster_dist: list[dict[int, int]] = []
+        self._s_t_cache: list[np.ndarray] | None = []
         self.absorbed_at = None
+        # Disk artifacts (None => not on disk); set by _begin/_persist_observables.
+        self._magn_path: Path | None = None
+        self._sout_path: Path | None = None
+        self._cldist_path: Path | None = None
+        # Active sout stream (Python loop only); see _begin/_persist_observables.
+        self._sout_fh = None
+        self._sout_tmp: Path | None = None
+        self._sout_nrec: int = 0
+        self._sout_seen: int = 0
+
+    # ------------------------------------------------------------------
+    # Disk-backed observables (lazy; see the "Flags save by default" contract)
+    # ------------------------------------------------------------------
+    @property
+    def magn(self) -> list[float]:
+        """Per-spin magnetization series (loaded from ``m_*.bin`` on demand)."""
+        if self._magn:
+            return self._magn
+        if self._magn_path is not None and Path(self._magn_path).exists():
+            self._magn = _voter_io.load_magn(self._magn_path).tolist()
+        return self._magn
+
+    @magn.setter
+    def magn(self, value) -> None:
+        self._magn = list(value) if value is not None else []
+
+    @property
+    def cluster_dist(self) -> list[dict[int, int]]:
+        """Per-sweep cluster-size histograms (loaded from ``cldist_*.npz``)."""
+        if self._cluster_dist:
+            return self._cluster_dist
+        if self._cldist_path is not None and Path(self._cldist_path).exists():
+            self._cluster_dist = _voter_io.load_cldist(self._cldist_path)
+        return self._cluster_dist
+
+    @cluster_dist.setter
+    def cluster_dist(self, value) -> None:
+        self._cluster_dist = list(value) if value is not None else []
+
+    @property
+    def s_t(self):
+        """Spin-configuration trajectory.
+
+        In-RAM when ``savedisk=False``; otherwise a read-only ``(n_rec, N)``
+        memmap of ``sout_*.bin`` (never a full-RAM copy). Iterating yields
+        per-sweep configurations either way.
+        """
+        if self._s_t_cache is not None:
+            return self._s_t_cache
+        if self._sout_path is not None and Path(self._sout_path).exists():
+            return _voter_io.load_sout(self._sout_path, self.N, mmap=True)
+        return []
+
+    @s_t.setter
+    def s_t(self, value) -> None:
+        self._s_t_cache = value
 
     def init_voter_dynamics(self, custom: Any = None, exName: str = "") -> None:
         """Initialise the spin configuration and export data if required."""
@@ -371,14 +550,70 @@ class VoterModel(CBackendMixin, BinDynSys):
         """
         return self.count_frustrated_edges(s) == 0
 
+    # -- domain / interface observables (single-state + trajectory) ---
+    def interface_density(self, s: np.ndarray | None = None) -> float:
+        """Density of active (inter-domain) links: frustrated edges / total edges.
+
+        ``rho = (# unsatisfied edges) / (# edges)`` in ``[0, 1]`` -- the voter
+        "density of active links" (the boundary density between opinion domains).
+        ``rho = 0`` is an absorbing (frozen) configuration; on an unsigned graph
+        it is the fraction of edges joining opposite opinions. Defaults to the
+        current state ``self.s``.
+        """
+        n_edges = len(self._edges())
+        if n_edges == 0:
+            return 0.0
+        return self.count_frustrated_edges(s) / n_edges
+
+    def interface_density_series(self) -> list[float]:
+        """``rho(t)`` over the recorded trajectory ``s_t`` (needs ``savedyn``)."""
+        return [self.interface_density(s) for s in self.s_t]
+
+    def largest_domain_fraction(
+        self, s: np.ndarray | None = None, cluster_mode: str | None = None,
+    ) -> float:
+        """Giant-domain fraction: largest active-edge domain size / ``N``.
+
+        A *domain* is a connected component of the active-edge subgraph (see
+        ``cluster_mode``); returns the largest component size / ``N`` in
+        ``[1/N, 1]`` -- a standard coarsening order parameter. Defaults to the
+        current state ``self.s`` and the instance ``cluster_mode``. For a whole
+        trajectory use :meth:`largest_domain_fraction_series`.
+        """
+        s = self.s if s is None else s
+        mode = (self.cluster_mode if cluster_mode is None
+                else self._validate_cluster_mode(cluster_mode))
+        idx, signs = self._gillespie_neighbors()
+        b = edge_sign_arrays(signs, mode)
+        return largest_fraction([s], idx, b)[0]
+
+    def largest_domain_fraction_series(
+        self, cluster_mode: str | None = None,
+    ) -> list[float]:
+        """Giant-domain fraction over the recorded ``s_t`` (needs ``savedyn``)."""
+        mode = (self.cluster_mode if cluster_mode is None
+                else self._validate_cluster_mode(cluster_mode))
+        idx, signs = self._gillespie_neighbors()
+        b = edge_sign_arrays(signs, mode)
+        return largest_fraction(self.s_t, idx, b)
+
     # -- per-sweep samplers (Axis B) ----------------------------------
     def _record(self) -> None:
-        if self.save_magnetization:
-            self.magn.append(float(np.sum(self.s)) / float(self.N))
+        if self.savemagn:
+            self._magn.append(self.magnetization())
         if self.savedyn:
-            self.s_t.append(self.s.copy())
+            if self._sout_fh is not None:
+                # Streaming to disk (Python loop + savedisk): keep every
+                # ``sout_every``-th recorded sweep, full trajectory off-RAM.
+                if self._sout_seen % self.sout_every == 0:
+                    _voter_io.write_sout_row(self._sout_fh, self.s)
+                    self._sout_nrec += 1
+                self._sout_seen += 1
+            else:
+                # In-RAM trajectory (savedisk=False).
+                self._s_t_cache.append(self.s.copy())
         if self.track_clusters and self._cl_idx is not None:
-            self.cluster_dist.append(
+            self._cluster_dist.append(
                 dict(cluster_size_distribution(self.s, self._cl_idx, self._cl_b))
             )
 
@@ -560,16 +795,17 @@ class VoterModel(CBackendMixin, BinDynSys):
     def _assert_native_supports_config(self, backend: str) -> None:
         """Native backends implement the full rule family + sampler axis
         (including the ``gillespie`` CTMC, via the shared ``_ccore`` kernel) +
-        absorbing early-stop, but capture only the final state and the
-        magnetization series -- not the per-sweep ``savedyn`` trajectory.
-        Refuse rather than silently return an empty ``s_t``. ``PY_ONLY_UPD_MODES``
-        (currently empty) lists any schedule that is still Python-only.
+        absorbing early-stop. The **pybind** backend also records the per-sweep
+        ``savedyn`` trajectory in memory (returned as ``s_t``); the **C
+        subprocess** does not (use ``C0S`` file snapshots there). Refuse rather
+        than silently return an empty ``s_t``. ``PY_ONLY_UPD_MODES`` (currently
+        empty) lists any schedule that is still Python-only.
         """
-        if self.savedyn:
+        if self.savedyn and not self.runlang.lower().startswith("pb"):
             raise NotImplementedError(
                 f"runlang='{self.runlang}' ({backend}) does not record the "
-                f"per-sweep savedyn trajectory; use runlang='py' (full per-sweep "
-                f"s_t) or 'C0S' (nSampleLog file snapshots)."
+                f"per-sweep savedyn trajectory; use runlang='pb' (in-memory "
+                f"s_t), runlang='py', or 'C0S' (nSampleLog file snapshots)."
             )
         if self.upd_mode in PY_ONLY_UPD_MODES:
             raise NotImplementedError(
@@ -577,15 +813,15 @@ class VoterModel(CBackendMixin, BinDynSys):
                 f"upd_mode='{self.upd_mode}' yet (native CTMC kernel pending); "
                 f"use runlang='py'."
             )
-        if self.track_clusters and not (
-            backend == "pybind" and self.upd_mode == "gillespie"
-        ):
-            # Native cluster tracking is wired for pybind + gillespie (the shared
-            # _ccore CTMC kernel); the C subprocess does not emit it yet.
+        if self.track_clusters and backend != "pybind":
+            # The pybind backend records the cluster-size distribution for EVERY
+            # schedule (gillespie via the CTMC kernel; asynchronous/synchronous/
+            # link via a per-sweep full recompute in the native loop); the C
+            # subprocess does not emit it yet.
             raise NotImplementedError(
-                f"runlang='{self.runlang}' ({backend}) emits the cluster-size "
-                f"distribution only via runlang='pb_voter' with "
-                f"upd_mode='gillespie'; use runlang='py' otherwise."
+                f"runlang='{self.runlang}' ({backend}) does not emit the "
+                f"cluster-size distribution; use runlang='pb' (any upd_mode) "
+                f"or runlang='py'."
             )
 
     # ------------------------------------------------------------------
@@ -673,17 +909,21 @@ class VoterModel(CBackendMixin, BinDynSys):
             magn = np.fromfile(self.magn_path, dtype=np.float64)
             if self.absorbing_check and magn.size < self.steps:
                 self.absorbed_at = int(magn.size) - 1
-            # save_magnetization gates exposure (parity with py/pybind).
-            if self.save_magnetization:
-                self.magn = magn.tolist()
+            # savemagn gates exposure (parity with py/pybind).
+            if self.savemagn:
+                self._magn = magn.tolist()
 
     def _get_cleanup_paths(self) -> list[Path | None]:
-        """Return paths to clean up after C run."""
-        return [
-            getattr(self, 'sfout', None),
-            self.magn_path,
-            getattr(self, 'sout_path', None),
-        ]
+        """Return paths to clean up after a C run.
+
+        Under ``savedisk`` the C-written ``m_*``/``sout_*`` files are the
+        persisted observables (stable ``out_suffix`` names), so they are kept;
+        only the transient state/edgelist exports are removed.
+        """
+        paths: list[Path | None] = [getattr(self, 'sfout', None)]
+        if not self.savedisk:
+            paths += [self.magn_path, getattr(self, 'sout_path', None)]
+        return paths
 
     # ------------------------------------------------------------------
     # Pybind11 backend (in-process, GT-compatible, seed-reproducible)
@@ -710,12 +950,12 @@ class VoterModel(CBackendMixin, BinDynSys):
         """
         mod = self._load_native_module()
         ni, nw, nptr = build_graph_csr(self.sg, self.N)
-        s_out, magn, absorbed_at, cluster_dist = mod.voter_sampling(
+        s_out, magn, absorbed_at, cluster_dist, s_t = mod.voter_sampling(
             self.s.astype(np.int8),
             ni, nw, nptr,
             int(self.steps),
             int(self.seed),
-            bool(self.save_magnetization),
+            bool(self.savemagn),
             int(RULE_CODE[self.rule]),
             int(self.q),
             float(self.eps),
@@ -724,15 +964,21 @@ class VoterModel(CBackendMixin, BinDynSys):
             bool(self.absorbing_check),
             bool(self.track_clusters),
             int(CLUSTER_MODE_CODE[self.cluster_mode]),
+            bool(self.savedyn),
         )
         self.s = np.asarray(s_out, dtype=np.int8)
-        self.magn = magn.tolist()
+        self._magn = magn.tolist()
         self.absorbed_at = None if int(absorbed_at) < 0 else int(absorbed_at)
         if self.track_clusters:
-            self.cluster_dist = list(cluster_dist)
+            self._cluster_dist = list(cluster_dist)
+        if self.savedyn:
+            # (n_recorded, N) int8 -> list of per-sweep 1-D arrays (matches py).
+            # _persist_observables dumps this to sout_*.bin and drops the RAM
+            # copy when savedisk=True (s_t then memmaps the file).
+            self._s_t_cache = [row.copy() for row in np.asarray(s_t, dtype=np.int8)]
 
     # ------------------------------------------------------------------
-    # Vectorized backends (NumPy `np_voter` / CuPy `cu_voter`)
+    # Vectorized backends (NumPy `np` / CuPy `cu`)
     # ------------------------------------------------------------------
     def _assert_vectorized_supports_config(self, backend: str) -> None:
         """The vectorized backends implement the **synchronous linear** voter
@@ -744,7 +990,7 @@ class VoterModel(CBackendMixin, BinDynSys):
             raise NotImplementedError(
                 f"runlang='{self.runlang}' ({backend}) implements the vectorized "
                 f"synchronous LINEAR voter only; rule='{self.rule}' is "
-                f"unsupported -- use runlang in (py, C0*, pb_voter)."
+                f"unsupported -- use runlang in (py, C0*, pb)."
             )
         if self.savedyn:
             raise NotImplementedError(
@@ -755,13 +1001,13 @@ class VoterModel(CBackendMixin, BinDynSys):
             raise NotImplementedError(
                 f"runlang='{self.runlang}' ({backend}) is the synchronous "
                 f"vectorized voter; upd_mode='{self.upd_mode}' is a different "
-                f"schedule -- use runlang='py' or 'pb_voter'."
+                f"schedule -- use runlang='py' or 'pb'."
             )
         if self.track_clusters:
             raise NotImplementedError(
                 f"runlang='{self.runlang}' ({backend}) does not emit the "
                 f"cluster-size distribution (the fused vectorized sweep has no "
-                f"per-sweep record hook) -- use runlang='py' or 'pb_voter'."
+                f"per-sweep record hook) -- use runlang='py' or 'pb'."
             )
 
     def _run_vectorized(self, gpu: bool) -> None:
@@ -777,7 +1023,7 @@ class VoterModel(CBackendMixin, BinDynSys):
             if not CUPY_AVAILABLE:
                 raise RuntimeError(
                     f"CuPy backend requested (runlang='{self.runlang}') but cupy "
-                    f"is not available; install cupy or use runlang='np_voter'."
+                    f"is not available; install cupy or use runlang='np'."
                 )
             import cupy as xp
         else:
@@ -786,12 +1032,141 @@ class VoterModel(CBackendMixin, BinDynSys):
         s_out, magn, absorbed_at = run_vectorized_sync(
             xp, self.s.astype(np.int8), ni, nw, nptr,
             int(self.steps), int(self.seed),
-            bool(self.save_magnetization),
+            bool(self.savemagn),
             bool(self.absorbing_check), int(self.absorbing_every),
         )
         self.s = np.asarray(s_out, dtype=np.int8)
-        self.magn = magn
+        self._magn = list(magn)
         self.absorbed_at = absorbed_at
+
+    # ------------------------------------------------------------------
+    # On-disk persistence of observables (savedisk; lazy disk-backed attrs)
+    # ------------------------------------------------------------------
+    def _is_py_runlang(self) -> bool:
+        """True for the pure-Python loop (the only backend that streams sout)."""
+        return not self.runlang.lower().startswith(("c", "pb", "np", "cu"))
+
+    def _guard_sout_size(self) -> None:
+        """Refuse before writing if the (subsampled) sout would blow the cap."""
+        n_rec_est = -(-int(self.steps) // self.sout_every)   # ceil(steps / every)
+        nbytes = n_rec_est * self.N                          # int8 => 1 byte/elem
+        if nbytes > VOTER_SOUT_MAX_BYTES:
+            raise ValueError(
+                f"savedyn trajectory would be ~{nbytes / 2**20:.0f} MiB "
+                f"({n_rec_est} snapshots x N={self.N}), exceeding "
+                f"VOTER_SOUT_MAX_BYTES={VOTER_SOUT_MAX_BYTES / 2**20:.0f} MiB. "
+                f"Increase sout_every (currently {self.sout_every}), reduce steps, "
+                f"raise VOTER_SOUT_MAX_BYTES in VoterModel/defaults.py, or use the "
+                f"streaming C0S backend."
+            )
+
+    def _begin_outputs(self) -> None:
+        """Resolve disk paths and open the sout stream (Python loop) before a run.
+
+        No-op when ``savedisk=False`` (observables stay in RAM). Filenames use the
+        stable ``out_suffix`` so the C backend's own ``m_*``/``sout_*`` outputs and
+        the in-process dumps land on the same, loadable, names.
+        """
+        # Always start from a clean streaming state.
+        self._sout_fh = None
+        self._sout_tmp = None
+        self._sout_nrec = 0
+        self._sout_seen = 0
+        if not self.savedisk:
+            return
+        suf = self.out_suffix
+        if self.savemagn:
+            self._magn_path = self.dynpath / self.sg.get_p_fname(
+                VOTER_MAGN_FBASE, suf, ext=BIN)
+        if self.track_clusters:
+            self._cldist_path = self.dynpath / self.sg.get_p_fname(
+                VOTER_CLDIST_FBASE, suf, ext=NPZ)
+        if self.savedyn:
+            self._sout_path = self.dynpath / self.sg.get_p_fname(
+                VOTER_SOUT_FBASE, suf, ext=BIN)
+            if not self.runlang.startswith("C"):
+                # The C subprocess streams its own snapshots (sampled by
+                # nSampleLog); guard only the in-process backends.
+                self._guard_sout_size()
+            if self._is_py_runlang():
+                self._sout_fh, self._sout_tmp = _voter_io.open_sout_stream(
+                    self._sout_path)
+
+    def _persist_observables(self) -> None:
+        """Finalize disk artifacts and switch attributes to disk-backed views."""
+        if not self.savedisk:
+            return
+        # Close a streamed sout (Python loop) -> finalize sout_*.bin.
+        if self._sout_fh is not None:
+            _voter_io.close_sout_stream(
+                self._sout_fh, self._sout_tmp, self._sout_path)
+            self._sout_fh = None
+            self._sout_tmp = None
+        if self.runlang.startswith("C"):
+            # The C binary already wrote m_*/sout_* under the stable names; just
+            # point the lazy views at them (cleanup is suppressed via
+            # _get_cleanup_paths). C does not emit cldist.
+            if self.savemagn:
+                self._magn_path = self.magn_path
+            sout_p = getattr(self, "sout_path", None)   # set in C0S snapshot mode
+            if sout_p is not None and Path(sout_p).exists():
+                self._sout_path = Path(sout_p)
+                self._s_t_cache = None
+            return
+        # In-process backends: dump the RAM buffers.
+        if self.savedyn and self._sout_path is not None:
+            if self._s_t_cache:   # pybind returned the whole (n_rec, N) array
+                arr = np.asarray(self._s_t_cache, dtype=np.int8)
+                if self.sout_every > 1:
+                    arr = arr[::self.sout_every]
+                _voter_io.save_sout(self._sout_path, arr)
+                self._sout_nrec = int(arr.shape[0])
+            # (the Python loop already streamed the rows above)
+            if Path(self._sout_path).exists():
+                self._s_t_cache = None   # s_t now memmaps the file
+        if self.savemagn and self._magn_path is not None and self._magn:
+            _voter_io.save_magn(self._magn_path, self._magn)
+        if (self.track_clusters and self._cldist_path is not None
+                and self._cluster_dist):
+            _voter_io.save_cldist(self._cldist_path, self._cluster_dist)
+
+    # -- public loaders / introspection (read big output only when needed) --
+    def _require_output(self, attr: str, what: str) -> Path:
+        path = getattr(self, attr, None)
+        if path is None or not Path(path).exists():
+            raise FileNotFoundError(
+                f"No {what} file on disk. Run with savedisk=True and the matching "
+                f"save flag set first (and check out_suffix)."
+            )
+        return Path(path)
+
+    def load_magn(self) -> np.ndarray:
+        """Load the persisted magnetization series (``float64`` array)."""
+        return _voter_io.load_magn(self._require_output("_magn_path", "magnetization"))
+
+    def load_sout(self, mmap: bool = False) -> np.ndarray:
+        """Load the persisted spin trajectory as ``(n_rec, N)`` int8.
+
+        ``mmap=True`` returns a read-only memmap (no full-RAM copy).
+        """
+        return _voter_io.load_sout(
+            self._require_output("_sout_path", "sout trajectory"), self.N, mmap=mmap)
+
+    def load_clusters(self) -> list[dict[int, int]]:
+        """Load the persisted cluster-size-distribution time series."""
+        return _voter_io.load_cldist(
+            self._require_output("_cldist_path", "cluster-size distribution"))
+
+    def output_sizes(self) -> dict[str, int]:
+        """Bytes on disk for each persisted observable (0 if not written)."""
+        sizes: dict[str, int] = {}
+        for key, attr in (("magn", "_magn_path"),
+                          ("sout", "_sout_path"),
+                          ("cldist", "_cldist_path")):
+            path = getattr(self, attr, None)
+            sizes[key] = (Path(path).stat().st_size
+                          if path is not None and Path(path).exists() else 0)
+        return sizes
 
     # ------------------------------------------------------------------
     # Public interface
@@ -799,7 +1174,7 @@ class VoterModel(CBackendMixin, BinDynSys):
     @time_function_accumulate(auto_log=False)
     def run(
         self,
-        tqdm_on: bool = True,
+        tqdm_on: bool = False,
         steps: int | None = None,
         simref: float | None = None,
         eqSTEP: int | None = None,
@@ -821,31 +1196,52 @@ class VoterModel(CBackendMixin, BinDynSys):
         verbose : bool
             Verbose output.
         clean_export : bool
-            Remove exported files after run.
+            Remove the C backend's transient export files (state/edgelist) after
+            a C run. Persisted observable files (``m_*``/``sout_*``) are kept when
+            ``savedisk=True``; only suppressed in-RAM mode removes them.
+
+        Notes
+        -----
+        With ``savedisk=True`` (default), enabled observables are written under
+        ``dynpath`` and ``magn`` / ``s_t`` / ``cluster_dist`` become lazy,
+        disk-backed views; see the class docstring and ``load_sout`` /
+        ``output_sizes``.
         """
+        # Resolve the solver family from the runlang code (same precedence the
+        # old if/elif chain used: C subprocess > pybind > NumPy > CuPy > Python;
+        # the C check is case-sensitive on a leading "C" to avoid catching "cu").
         is_c = self.runlang.startswith("C")
         is_pb = self.runlang.lower().startswith("pb")
         is_np = self.runlang.lower().startswith("np")
         is_cu = self.runlang.lower().startswith("cu")
-        if is_c or is_pb:
-            # Guard before any file export / kernel call so the native backends
-            # never silently ignore rule / upd_mode / absorbing_check.
-            self._assert_native_supports_config("C subprocess" if is_c else "pybind")
-        if is_np or is_cu:
-            self._assert_vectorized_supports_config("CuPy" if is_cu else "NumPy vectorized")
+        if is_c:
+            backend = SolverBackend.C
+        elif is_pb:
+            backend = SolverBackend.PB
+        elif is_np:
+            backend = SolverBackend.NP
+        elif is_cu:
+            backend = SolverBackend.CU
+        else:
+            backend = SolverBackend.PY
+        solver = get_solver(VOTER_SOLVER_NAME, backend)
+        # Guard before any file export / kernel call so the native/vectorized
+        # backends never silently ignore rule / upd_mode / absorbing_check.
+        solver.supports(self)
         self.check_attribute()
         self.initialize_run_parameters(steps=steps, simref=simref, eqSTEP=eqSTEP)
-        if is_c:
-            self.build_cprogram_command()
-            self.run_cprogram(verbose)
-            if clean_export:
-                self.remove_run_c_files()
-                self.sg.remove_exported_files()
-        elif is_pb:
-            self._run_pybind()
-        elif is_np:
-            self._run_vectorized(gpu=False)
-        elif is_cu:
-            self._run_vectorized(gpu=True)
-        else:
-            self.voter_sampling(tqdm_on)
+        self._begin_outputs()
+        try:
+            solver.execute(self, tqdm_on=tqdm_on, verbose=verbose)
+        finally:
+            # Finalize disk artifacts (and always close a streamed sout handle).
+            self._persist_observables()
+        if backend is SolverBackend.C and clean_export:
+            self.remove_run_c_files()
+            self.sg.remove_exported_files()
+
+
+# Register VoterModel's solver backends (py/pb/np/cu/C) in the shared solver
+# registry. Imported after the class so that importing VoterModel wires up
+# dispatch; no circular import (``_solvers`` does not import this class).
+from . import _solvers  # noqa: E402,F401

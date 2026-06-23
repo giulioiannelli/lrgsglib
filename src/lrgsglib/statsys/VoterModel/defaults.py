@@ -118,11 +118,11 @@ UPD_MODE_CODE: dict[str, int] = {
 # A voter configuration is absorbing iff it has zero frustrated edges
 # (w_ij s_i s_j > 0 for every edge) -- consensus on an unsigned graph, the
 # signed ground state on a balanced graph. Such a state exists iff the graph is
-# balanced, i.e. lambda_min(signed Laplacian) <= FRUSTRATION_EIG_TOL
-# (ref [3] Properties (ii)-(iii), p. 9). On a frustrated graph no absorbing
-# state exists and the dynamics never freezes.
+# balanced (lambda_min(signed Laplacian) = 0; ref [3] Properties (ii)-(iii),
+# p. 9). Detection here is the exact integer frustrated-edge count
+# (VoterModel.count_frustrated_edges); on a frustrated graph no absorbing state
+# exists and the dynamics never freezes.
 DEFAULT_ABSORBING_EVERY: int = 1     # check every N sweeps (1 = each sweep)
-FRUSTRATION_EIG_TOL: float = 1e-10   # lambda_min(SL) above this => frustrated
 
 # ---------------------------------------------------------------------------
 # Cluster-size distribution observable (domains of aligned signed opinion)
@@ -146,3 +146,34 @@ DEFAULT_CLUSTER_MODE: str = "satisfied"
 # Integer codes shared with the native cluster recompute (LRGSG_clusters.c
 # `rawspin` flag): 0 = satisfied (signed), 1 = rawspin (edge sign ignored).
 CLUSTER_MODE_CODE: dict[str, int] = {"satisfied": 0, "rawspin": 1}
+
+# ---------------------------------------------------------------------------
+# On-disk persistence of observables (``savedisk``; see VoterModel._persist_*)
+# ---------------------------------------------------------------------------
+# When ``savedisk=True`` (default) an *enabled* observable is written under the
+# run's ``dynpath`` (``data/<lattice>/voter/N=<n>/``) and the in-RAM attribute
+# becomes a lazy, disk-backed view (see VoterModel.magn / s_t / cluster_dist).
+# File bases passed to ``sg.get_p_fname`` (filename ``<base>_p=<pflip>[_suf].<ext>``,
+# mirroring the C-backend convention so an analysis program can stream big output
+# to disk and load it back only when needed):
+VOTER_MAGN_FBASE: str = "m"         # per-spin magnetization series (float64 .bin)
+VOTER_SOUT_FBASE: str = "sout"      # spin-configuration trajectory (int8 .bin, (n_rec, N))
+VOTER_CLDIST_FBASE: str = "cldist"  # cluster-size-distribution time series (.npz)
+# NOTE: ``cldist`` is DISTINCT from Ising's ``outcl{i}`` (time-averaged
+# magnetization moments of pre-defined eigenvector clusters); the voter artifact
+# is a per-sweep histogram {component_size: count} of emergent active-edge
+# connected components -- a time series of domain-size distributions.
+
+# ``sout`` (the spin trajectory) is the only observable whose footprint scales
+# with steps*N, so it is the one that can spill terabytes on extensive runs. It
+# is subsampled to every ``sout_every`` recorded sweeps, and the precomputed size
+# (n_rec * N int8 bytes) must not exceed ``VOTER_SOUT_MAX_BYTES`` -- the run
+# raises BEFORE writing otherwise (raise the cap or ``sout_every``). This guards
+# only the in-process backends; the C subprocess streams snapshots itself
+# (sampled by ``nSampleLog``).
+DEFAULT_SOUT_EVERY: int = 1                       # 1 = every recorded sweep (full trajectory)
+VOTER_SOUT_MAX_BYTES: int = 512 * 1024 * 1024     # 512 MiB hard guard for the sout trajectory
+
+# Registry key under which VoterModel's solver backends are registered in
+# ``statsys._solver_engine`` (single-sourced so the model and its solvers agree).
+VOTER_SOLVER_NAME: str = "voter"

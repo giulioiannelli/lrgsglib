@@ -15,7 +15,7 @@ Signed-substrate / absorbing physics references: ``iannelli2025topological.pdf``
 import numpy as np
 import pytest
 
-from lrgsglib.statsys.VoterModel._cluster_tracker import (
+from lrgsglib.utils.statsys import (
     cluster_components,
     cluster_size_distribution,
     edge_sign_arrays,
@@ -119,7 +119,7 @@ def test_py_cluster_dist_matches_oracle(tmp_path, upd_mode, cluster_mode):
     vm = VoterModel(
         sg=lat, steps=20, runlang="py", rule="linear", upd_mode=upd_mode,
         track_clusters=True, cluster_mode=cluster_mode,
-        save_magnetization=True, absorbing_check=False, seed=3,
+        savemagn=True, absorbing_check=False, seed=3,
     )
     vm.init_voter_dynamics()
     oracle0 = _oracle_initial(vm)
@@ -181,9 +181,9 @@ def test_native_pb_gillespie_clusters(tmp_path, cluster_mode, pflip):
     lat = _lat(tmp_path, side=16, pflip=pflip, seed=11)
     lat.flip_random_fract_edges()
     vm = VoterModel(
-        sg=lat, steps=40, runlang="pb_voter", rule="linear", upd_mode="gillespie",
+        sg=lat, steps=40, runlang="pb", rule="linear", upd_mode="gillespie",
         track_clusters=True, cluster_mode=cluster_mode,
-        save_magnetization=True, absorbing_check=(pflip == 0.0), seed=4,
+        savemagn=True, absorbing_check=(pflip == 0.0), seed=4,
     )
     vm.init_voter_dynamics()
     oracle0 = _oracle_initial(vm)
@@ -199,6 +199,36 @@ def test_native_pb_gillespie_clusters(tmp_path, cluster_mode, pflip):
         assert vm.cluster_dist[-1] == {vm.N: 1}    # consensus = one domain
 
 
+@pytest.mark.physical
+@pytest.mark.parametrize("upd_mode", ["asynchronous", "synchronous", "link"])
+@pytest.mark.parametrize("cluster_mode", ["satisfied", "rawspin"])
+def test_native_pb_nongillespie_clusters(tmp_path, upd_mode, cluster_mode):
+    """pybind records the cluster distribution for the non-gillespie schedules too.
+    With savedyn on, the native per-sweep recompute must equal the Python oracle on
+    EVERY recorded state -- this also exercises the synchronous schedule, whose
+    s/sbuf pointer swap is handled by clusters_set_state on the C side."""
+    pytest.importorskip("lrgsglib.statsys.VoterModel.ccore", reason="pb build")
+    from lrgsglib.statsys import VoterModel
+
+    lat = _lat(tmp_path, side=14, pflip=0.2, seed=7)
+    lat.flip_random_fract_edges()
+    vm = VoterModel(
+        sg=lat, steps=25, runlang="pb", rule="linear", upd_mode=upd_mode,
+        track_clusters=True, cluster_mode=cluster_mode,
+        savemagn=True, savedyn=True, absorbing_check=False, seed=2,
+    )
+    vm.init_voter_dynamics()
+    try:
+        vm.run(tqdm_on=False)
+    except (ImportError, RuntimeError, OSError):
+        pytest.skip("native voter module unavailable")
+    assert len(vm.cluster_dist) == len(vm.s_t) == len(vm.magn) == 25
+    idx, signs = vm._gillespie_neighbors()
+    b = edge_sign_arrays(signs, cluster_mode)
+    for k, sk in enumerate(vm.s_t):
+        assert dict(vm.cluster_dist[k]) == _dist(np.asarray(sk, np.int8), idx, b)
+
+
 # ===================================================================
 # Guards: which backend/schedule combinations emit clusters
 # ===================================================================
@@ -210,22 +240,17 @@ def test_py_all_schedules_support_clusters(tmp_path, upd_mode):
 
     vm = VoterModel(sg=_lat(tmp_path), steps=5, runlang="py",
                     upd_mode=upd_mode, track_clusters=True,
-                    save_magnetization=True, absorbing_check=False, seed=1)
+                    savemagn=True, absorbing_check=False, seed=1)
     vm.init_voter_dynamics()
     vm.run(tqdm_on=False)
     assert len(vm.cluster_dist) == len(vm.magn) == 5
 
 
-def test_track_clusters_rejects_unsupported_native(tmp_path):
-    """Native cluster tracking is pybind+gillespie only; other native combos raise."""
+def test_track_clusters_rejects_c_subprocess(tmp_path):
+    """pybind now emits clusters for every schedule (see the native tests above);
+    only the C subprocess still lacks it (file format deferred) -> it must raise."""
     from lrgsglib.statsys import VoterModel
 
-    # pybind with a non-gillespie schedule
-    vm = VoterModel(sg=_lat(tmp_path), steps=5, runlang="pb_voter",
-                    upd_mode="asynchronous", track_clusters=True, seed=1)
-    with pytest.raises(NotImplementedError):
-        vm.run(tqdm_on=False)
-    # C subprocess does not emit clusters yet (file format deferred)
     vm = VoterModel(sg=_lat(tmp_path), steps=5, runlang="C0",
                     upd_mode="gillespie", track_clusters=True, seed=1)
     with pytest.raises(NotImplementedError):
@@ -236,7 +261,7 @@ def test_track_clusters_rejects_vectorized(tmp_path):
     """The fused NumPy/CuPy sweep has no per-sweep record hook -> raises."""
     from lrgsglib.statsys import VoterModel
 
-    vm = VoterModel(sg=_lat(tmp_path), steps=5, runlang="np_voter",
+    vm = VoterModel(sg=_lat(tmp_path), steps=5, runlang="np",
                     upd_mode="synchronous", track_clusters=True, seed=1)
     with pytest.raises(NotImplementedError):
         vm.run(tqdm_on=False)
@@ -248,3 +273,34 @@ def test_invalid_cluster_mode_raises(tmp_path):
     with pytest.raises(ValueError):
         VoterModel(sg=_lat(tmp_path), steps=5, runlang="py",
                    track_clusters=True, cluster_mode="bogus", seed=1)
+
+
+@pytest.mark.physical
+def test_interface_density_and_largest_domain(tmp_path):
+    """interface_density / largest_domain_fraction sanity (single state + series).
+
+    Consensus is one frozen domain: rho=0, giant fraction=1. Arbitrary states
+    stay in range. The *_series helpers map over a saved trajectory.
+    """
+    from lrgsglib.statsys import VoterModel
+
+    vm = VoterModel(sg=_lat(tmp_path), steps=1, runlang="py", seed=1)
+    N = vm.N
+    consensus = np.ones(N, dtype=np.int8)
+    assert vm.interface_density(consensus) == 0.0
+    assert vm.is_absorbing(consensus)
+    assert vm.largest_domain_fraction(consensus) == 1.0
+
+    rng = np.random.default_rng(0)
+    rand = rng.choice(np.array([-1, 1], dtype=np.int8), size=N)
+    assert 0.0 <= vm.interface_density(rand) <= 1.0
+    assert 1.0 / N <= vm.largest_domain_fraction(rand) <= 1.0
+
+    vm2 = VoterModel(sg=_lat(tmp_path), steps=5, runlang="py", seed=2,
+                     savedyn=True, savedisk=False)
+    vm2.run(tqdm_on=False)
+    rho_t = vm2.interface_density_series()
+    gf_t = vm2.largest_domain_fraction_series()
+    assert len(rho_t) == len(gf_t) == len(vm2.s_t)
+    assert all(0.0 <= x <= 1.0 for x in rho_t)
+    assert all(1.0 / N <= x <= 1.0 for x in gf_t)

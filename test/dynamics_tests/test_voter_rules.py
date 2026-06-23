@@ -32,7 +32,7 @@ def test_voter_rule_runs(tmp_path, rule):
     from lrgsglib.statsys import VoterModel
 
     v = VoterModel(sg=_lat(tmp_path), steps=30, runlang="py", seed=3,
-                   rule=rule, save_magnetization=True)
+                   rule=rule, savemagn=True)
     v.run(tqdm_on=False)
     assert v.s.size == v.N
     assert np.all(np.isin(v.s, (-1, 1)))
@@ -83,7 +83,7 @@ def test_voter_sampler_runs(tmp_path, mode):
     from lrgsglib.statsys import VoterModel
 
     v = VoterModel(sg=_lat(tmp_path), steps=25, runlang="py", seed=3,
-                   upd_mode=mode, save_magnetization=True)
+                   upd_mode=mode, savemagn=True)
     v.run(tqdm_on=False)
     assert np.all(np.isin(v.s, (-1, 1)))
     assert len(v.magn) == 25
@@ -114,7 +114,7 @@ def test_absorbing_balanced_reaches_consensus(tmp_path):
     hit = 0
     for r in range(8):
         v = VoterModel(sg=g, steps=5000, runlang="py", seed=r,
-                       absorbing_check=True, save_magnetization=True)
+                       absorbing_check=True, savemagn=True)
         v.run(tqdm_on=False)
         if v.absorbed_at is not None:
             hit += 1
@@ -173,48 +173,65 @@ def _c_missing() -> bool:
 
 
 def _skip_if_unavailable(runlang):
-    if runlang == "pb_voter" and not _pb_available():
+    if runlang == "pb" and not _pb_available():
         pytest.skip("_voter_native not built")
     if runlang == "C0" and _c_missing():
         pytest.skip("VoterSimulator not built")
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("runlang", ["pb_voter", "C0"])
+@pytest.mark.parametrize("runlang", ["pb", "C0"])
 @pytest.mark.parametrize("rule", ["linear", "majority", "qvoter", "nonlinear"])
 def test_native_rule_family_runs(tmp_path, runlang, rule):
     """Every rule runs on the native backends and yields a valid config."""
     from lrgsglib.statsys import VoterModel
     _skip_if_unavailable(runlang)
     v = VoterModel(sg=_lat(tmp_path, side=8), steps=20, runlang=runlang,
-                   seed=1, rule=rule, save_magnetization=True)
+                   seed=1, rule=rule, savemagn=True)
     v.run(tqdm_on=False)
     assert v.s.size == v.N and np.all(np.isin(v.s, (-1, 1)))
     assert len(v.magn) <= 20
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("runlang", ["pb_voter", "C0"])
+@pytest.mark.parametrize("runlang", ["pb", "C0"])
 @pytest.mark.parametrize("mode", ["asynchronous", "synchronous", "link"])
 def test_native_samplers_run(tmp_path, runlang, mode):
     """async / synchronous / link all run on the native backends."""
     from lrgsglib.statsys import VoterModel
     _skip_if_unavailable(runlang)
     v = VoterModel(sg=_lat(tmp_path, side=8), steps=20, runlang=runlang,
-                   seed=1, upd_mode=mode, save_magnetization=True)
+                   seed=1, upd_mode=mode, savemagn=True)
     v.run(tqdm_on=False)
     assert np.all(np.isin(v.s, (-1, 1)))
 
 
-@pytest.mark.parametrize("runlang", ["pb_voter", "C0"])
-def test_native_refuses_savedyn(tmp_path, runlang):
-    """Native backends do not capture the per-sweep savedyn trajectory."""
+@pytest.mark.parametrize("runlang", ["C0", "C0S"])
+def test_c_subprocess_refuses_savedyn(tmp_path, runlang):
+    """The C subprocess does not capture the in-memory savedyn trajectory."""
     from lrgsglib.statsys import VoterModel
     _skip_if_unavailable(runlang)
     v = VoterModel(sg=_lat(tmp_path, side=6), steps=5, runlang=runlang,
                    seed=1, savedyn=True)
     with pytest.raises(NotImplementedError):
         v.run(tqdm_on=False)
+
+
+def test_pybind_records_savedyn(tmp_path):
+    """The pybind backend records the full per-sweep trajectory in vm.s_t,
+    sampled at the same points as the magnetization."""
+    from lrgsglib.statsys import VoterModel
+    _skip_if_unavailable("pb")
+    v = VoterModel(sg=_lat(tmp_path, side=8), steps=30, runlang="pb",
+                   upd_mode="gillespie", seed=1, savedyn=True,
+                   savemagn=True, absorbing_check=True)
+    v.init_voter_dynamics()
+    v.run(tqdm_on=False)
+    assert len(v.s_t) == len(v.magn)
+    assert np.asarray(v.s_t[0]).shape == (v.N,)
+    means = np.array([float(np.mean(s)) for s in v.s_t])
+    assert np.allclose(means, np.array(v.magn))          # same record points
+    assert np.array_equal(np.asarray(v.s_t[-1]), v.s)    # last == final state
 
 
 # ===================================================================
@@ -229,7 +246,7 @@ def test_gillespie_runs(tmp_path):
 
     v = VoterModel(sg=_lat(tmp_path, side=10, pflip=0.1, seed=4), steps=40,
                    runlang="py", seed=4, upd_mode="gillespie",
-                   save_magnetization=True)
+                   savemagn=True)
     v.sg.flip_random_fract_edges()
     v.run(tqdm_on=False)
     assert v.s.size == v.N and np.all(np.isin(v.s, (-1, 1)))
@@ -247,14 +264,14 @@ def test_gillespie_requires_linear_rule(tmp_path):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("runlang", ["pb_voter", "C0"])
+@pytest.mark.parametrize("runlang", ["pb", "C0"])
 def test_gillespie_native_runs(tmp_path, runlang):
     """The native (shared _ccore) CTMC kernel runs and yields a valid config."""
     from lrgsglib.statsys import VoterModel
     _skip_if_unavailable(runlang)
     v = VoterModel(sg=_lat(tmp_path, side=8, pflip=0.1, seed=1), steps=30,
                    runlang=runlang, seed=1, upd_mode="gillespie",
-                   save_magnetization=True)
+                   savemagn=True)
     v.sg.flip_random_fract_edges()
     v.run(tqdm_on=False)
     assert v.s.size == v.N and np.all(np.isin(v.s, (-1, 1)))
@@ -263,7 +280,7 @@ def test_gillespie_native_runs(tmp_path, runlang):
 
 @pytest.mark.physical
 @pytest.mark.integration
-@pytest.mark.parametrize("runlang", ["py", "pb_voter", "C0"])
+@pytest.mark.parametrize("runlang", ["py", "pb", "C0"])
 def test_gillespie_absorbing_parity_across_backends(tmp_path, runlang):
     """gillespie freezes at consensus on a balanced graph in every backend."""
     from lrgsglib.graphs.nx import FullyConnectedNX
@@ -295,7 +312,7 @@ def test_gillespie_absorbs_on_balanced(tmp_path):
     for r in range(8):
         v = VoterModel(sg=g, steps=50000, runlang="py", seed=r,
                        upd_mode="gillespie", absorbing_check=True,
-                       save_magnetization=True)
+                       savemagn=True)
         v.run(tqdm_on=False)
         if v.absorbed_at is not None:
             hit += 1
@@ -352,7 +369,7 @@ def test_gillespie_exit_probability(tmp_path):
 
 @pytest.mark.physical
 @pytest.mark.integration
-@pytest.mark.parametrize("runlang", ["py", "pb_voter", "C0"])
+@pytest.mark.parametrize("runlang", ["py", "pb", "C0"])
 def test_absorbing_parity_across_backends(tmp_path, runlang):
     """absorbing_check fires (consensus) on a balanced graph in every backend."""
     from lrgsglib.graphs.nx import FullyConnectedNX
@@ -372,7 +389,7 @@ def test_absorbing_parity_across_backends(tmp_path, runlang):
 
 
 # ===================================================================
-# Vectorized backends (np_voter / cu_voter) — Phase 5
+# Vectorized backends (np / cu) — Phase 5
 # Synchronous linear voter via a single CSR gather per sweep.
 # ===================================================================
 
@@ -387,27 +404,27 @@ def _cu_unavailable() -> bool:
 
 
 @pytest.mark.physical
-@pytest.mark.parametrize("runlang", ["np_voter", "cu_voter"])
+@pytest.mark.parametrize("runlang", ["np", "cu"])
 def test_vectorized_runs(tmp_path, runlang):
     """The vectorized synchronous linear voter runs and yields a valid config."""
     from lrgsglib.statsys import VoterModel
-    if runlang == "cu_voter" and _cu_unavailable():
+    if runlang == "cu" and _cu_unavailable():
         pytest.skip("cupy / GPU not available")
     lat = _lat(tmp_path, side=16, pflip=0.1, seed=1)
     lat.flip_random_fract_edges()
     v = VoterModel(sg=lat, steps=40, runlang=runlang, seed=1,
-                   save_magnetization=True)
+                   savemagn=True)
     v.run(tqdm_on=False)
     assert v.s.size == v.N and np.all(np.isin(v.s, (-1, 1)))
     assert len(v.magn) <= 40
 
 
-@pytest.mark.parametrize("runlang", ["np_voter", "cu_voter"])
+@pytest.mark.parametrize("runlang", ["np", "cu"])
 def test_vectorized_guards(tmp_path, runlang):
     """Vectorized backends are synchronous-linear only: reject rule family,
     savedyn, and the intrinsically-sequential schedules."""
     from lrgsglib.statsys import VoterModel
-    if runlang == "cu_voter" and _cu_unavailable():
+    if runlang == "cu" and _cu_unavailable():
         pytest.skip("cupy / GPU not available")
     for kw in (dict(rule="majority"), dict(savedyn=True),
                dict(upd_mode="gillespie"), dict(upd_mode="link")):
@@ -417,22 +434,54 @@ def test_vectorized_guards(tmp_path, runlang):
 
 
 @pytest.mark.physical
-@pytest.mark.parametrize("runlang", ["np_voter", "cu_voter"])
+@pytest.mark.parametrize("runlang", ["np", "cu"])
 def test_vectorized_absorbs_on_balanced(tmp_path, runlang):
     """On a balanced graph the synchronous voter freezes at consensus."""
     from lrgsglib.graphs.nx import FullyConnectedNX
     from lrgsglib.statsys import VoterModel
-    if runlang == "cu_voter" and _cu_unavailable():
+    if runlang == "cu" and _cu_unavailable():
         pytest.skip("cupy / GPU not available")
     g = FullyConnectedNX(N=24, pflip=0.0, seed=1,
                          path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False)
     hit = 0
     for r in range(5):
         v = VoterModel(sg=g, steps=20000, runlang=runlang, seed=r,
-                       absorbing_check=True, save_magnetization=True)
+                       absorbing_check=True, savemagn=True)
         v.run(tqdm_on=False)
         if v.absorbed_at is not None:
             hit += 1
             assert abs(float(v.s.mean())) == 1.0
             assert len(v.magn) == v.absorbed_at + 1
     assert hit >= 4, f"{runlang}: only {hit}/5 reached consensus"
+
+
+@pytest.mark.physical
+@pytest.mark.parametrize("runlang", ["np", "cu"])
+def test_vectorized_martingale(tmp_path, runlang):
+    """Correctness (not just 'it runs'): the vectorized synchronous linear voter
+    conserves E[M] on a complete graph, so <M_final> over many runs equals the
+    initial magnetization (the voter martingale). Validates the np / cu kernel
+    against the exact conservation law -- the CPU/GPU parity anchor."""
+    from lrgsglib.graphs.nx import FullyConnectedNX
+    from lrgsglib.statsys import VoterModel
+    if runlang == "cu" and _cu_unavailable():
+        pytest.skip("cupy / GPU not available")
+
+    N, n_up = 10, 6
+    ic = np.full(N, -1, dtype=np.int8)
+    ic[:n_up] = 1
+    M_init = float(ic.mean())          # 0.2
+    R, tol = 200, 0.30
+
+    g = FullyConnectedNX(
+        N=N, pflip=0.0, seed=1,
+        path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
+    )
+    acc = 0.0
+    for r in range(1, R + 1):
+        v = VoterModel(sg=g, ic="custom", steps=100, runlang=runlang, seed=r)
+        v.init_voter_dynamics(custom=ic)
+        v.run(tqdm_on=False)
+        acc += float(np.mean(v.s))
+    assert abs(acc / R - M_init) < tol, \
+        f"{runlang}: <M_final>={acc / R:.3f}, M_init={M_init}"

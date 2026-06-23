@@ -22,6 +22,16 @@ class BinDynSys(DynSys):
 
     Nodes take binary states: bipolar {-1, +1} or binary {0, 1}.
 
+    Parameters
+    ----------
+    state_type : {'bipolar', 'binary'}, optional
+        State encoding: ``'bipolar'`` -> {-1, +1} (default), ``'binary'`` -> {0, 1}.
+    savemagn : bool, optional
+        If True, the sampling backends record the per-spin magnetization series
+        ``magn`` (see :meth:`magnetization`). A shared option for *every* binary
+        system -- each engine applies it in its own sampler. Other base
+        parameters are inherited from :class:`~lrgsglib.statsys.DynSys.DynSys`.
+
     Directory Management
     --------------------
     When a BinDynSys subclass (IsingDynamics, VoterModel, ContactProcess) is
@@ -30,6 +40,9 @@ class BinDynSys(DynSys):
 
     Attributes
     ----------
+    magn : list[float]
+        Per-spin magnetization time series (populated when
+        ``savemagn=True``).
     s_t : list[np.ndarray]
         Time series of state configurations.
     dynpath : Path
@@ -58,6 +71,8 @@ class BinDynSys(DynSys):
         dynpath: "Path | None" = None,
         *,
         state_type: StateType = "bipolar",
+        savemagn: bool = False,
+        savedisk: bool = True,
     ):
         super().__init__(
             sg,
@@ -75,6 +90,15 @@ class BinDynSys(DynSys):
         )
         self._set_state_type(state_type)
         self.s: np.ndarray = np.zeros(self.N, dtype=np.int8)
+        # Shared binary observable: per-spin magnetization (see magnetization()).
+        self.savemagn = savemagn
+        # Master switch for on-disk persistence of enabled observables. When
+        # True (default) a subclass that implements it (VoterModel) streams/dumps
+        # them under ``dynpath`` and exposes lazy, disk-backed attributes; when
+        # False the observables stay purely in RAM. Inert for subclasses that do
+        # not act on it (e.g. IsingDynamics keeps its own C ``save`` flags).
+        self.savedisk = savedisk
+        self.magn: list[float] = []
 
     # ------------------------------------------------------------------
     # State shape (implements abstract property from DynSys)
@@ -102,6 +126,20 @@ class BinDynSys(DynSys):
     @property
     def active_state(self) -> int:
         return 1
+
+    def magnetization(self, s: NDArray | None = None) -> float:
+        """Per-spin magnetization ``M = (1/N) sum_i s_i`` of a binary state.
+
+        The intensive (size-comparable) magnetization defined for *every* binary
+        system: for bipolar ``{-1, +1}`` states it lies in ``[-1, 1]``; for
+        binary ``{0, 1}`` states it equals the active-site density in ``[0, 1]``.
+
+        Parameters
+        ----------
+        s : ndarray, optional
+            State array to measure; defaults to the current state ``self.s``.
+        """
+        return float(np.mean(self.s if s is None else s))
 
     def _coerce_custom_state(self, custom: Any) -> np.ndarray:
         # np.array (not asarray) so the state never aliases the caller's

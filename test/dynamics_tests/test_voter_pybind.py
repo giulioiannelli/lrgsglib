@@ -1,4 +1,4 @@
-"""Phase-2 tests for the in-process pybind11 voter backend (``pb_voter``).
+"""Phase-2 tests for the in-process pybind11 voter backend (``pb``).
 
 The pybind backend reuses the same ``voter_model_Nstep`` C kernel as the
 subprocess backend but passes the graph as numpy CSR arrays: no file I/O, GT
@@ -33,16 +33,16 @@ def test_pb_voter_runs_and_magn_contract(tmp_path):
             path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
         )
 
-    v = VoterModel(sg=make(), steps=40, runlang="pb_voter", seed=7,
-                   save_magnetization=True)
+    v = VoterModel(sg=make(), steps=40, runlang="pb", seed=7,
+                   savemagn=True)
     v.run(tqdm_on=False)
     assert v.s.size == v.N
     assert np.all(np.isin(v.s, (-1, 1)))
     assert len(v.magn) == 40
 
-    # save_magnetization=False must leave magn empty (parity with py/C)
-    v2 = VoterModel(sg=make(), steps=40, runlang="pb_voter", seed=7,
-                    save_magnetization=False)
+    # savemagn=False must leave magn empty (parity with py/C)
+    v2 = VoterModel(sg=make(), steps=40, runlang="pb", seed=7,
+                    savemagn=False)
     v2.run(tqdm_on=False)
     assert len(v2.magn) == 0
 
@@ -56,7 +56,7 @@ def test_pb_voter_seed_reproducible(tmp_path):
             side1=10, geo="sqr", pbc=True, pflip=0.0, seed=seed,
             path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
         )
-        m = VoterModel(sg=lat, steps=60, runlang="pb_voter", seed=seed)
+        m = VoterModel(sg=lat, steps=60, runlang="pb", seed=seed)
         m.run(tqdm_on=False)
         return m.s.copy()
 
@@ -81,7 +81,7 @@ def test_pb_voter_martingale(tmp_path):
     )
     acc = 0.0
     for r in range(1, R + 1):
-        m = VoterModel(sg=g, ic="custom", steps=100, runlang="pb_voter", seed=r)
+        m = VoterModel(sg=g, ic="custom", steps=100, runlang="pb", seed=r)
         m.init_voter_dynamics(custom=ic)
         m.run(tqdm_on=False)
         acc += float(np.mean(m.s))
@@ -96,8 +96,8 @@ def test_pb_voter_on_gt_graph():
     from lrgsglib.statsys import VoterModel
 
     g = Lattice2DGT(side1=12, geo="sqr", periodic=True, pflip=0.0, seed=3)
-    v = VoterModel(sg=g, steps=50, runlang="pb_voter", seed=3,
-                   save_magnetization=True)
+    v = VoterModel(sg=g, steps=50, runlang="pb", seed=3,
+                   savemagn=True)
     v.run(tqdm_on=False)
     assert v.s.size == g.N
     assert np.all(np.isin(v.s, (-1, 1)))
