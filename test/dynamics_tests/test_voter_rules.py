@@ -369,6 +369,38 @@ def test_gillespie_exit_probability(tmp_path):
 
 @pytest.mark.physical
 @pytest.mark.integration
+@pytest.mark.parametrize("kernel", ["cr", "fenwick"])
+def test_gillespie_cr_fenwick_parity(tmp_path, monkeypatch, kernel):
+    """The native CTMC ships two interchangeable event-selection kernels:
+    composition-rejection (default, O(deg)/event) and the Fenwick BKL fallback
+    (O(deg log N)/event). ``LRGSG_CTMC_KERNEL`` forces one; both are the SAME
+    exact CTMC and must reproduce the voter exit probability P(+1)=up-fraction
+    on a regular graph (ref [1] Sec. II.A). 'fenwick' also exercises the env
+    override on a low-degree graph the auto-dispatch would otherwise route to CR.
+    """
+    from lrgsglib.graphs.nx import FullyConnectedNX
+    from lrgsglib.statsys import VoterModel
+    _skip_if_unavailable("pb")
+    monkeypatch.setenv("LRGSG_CTMC_KERNEL", kernel)
+
+    g = FullyConnectedNX(N=10, pflip=0.0, seed=1,
+                         path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False)
+    ic = np.array([1] * 7 + [-1] * 3, dtype=np.int8)
+    R, plus = 200, 0
+    for r in range(R):
+        v = VoterModel(sg=g, ic="custom", steps=50000, runlang="pb", seed=r,
+                       upd_mode="gillespie", absorbing_check=True)
+        v.init_voter_dynamics(custom=ic)
+        v.run(tqdm_on=False)
+        assert v.absorbed_at is not None, f"{kernel}: CTMC failed to absorb"
+        if float(v.s.mean()) == 1.0:
+            plus += 1
+    frac = plus / R
+    assert abs(frac - 0.7) < 0.12, f"{kernel}: P(+1)={frac:.3f}, expected ~0.7"
+
+
+@pytest.mark.physical
+@pytest.mark.integration
 @pytest.mark.parametrize("runlang", ["py", "pb", "C0"])
 def test_absorbing_parity_across_backends(tmp_path, runlang):
     """absorbing_check fires (consensus) on a balanced graph in every backend."""

@@ -17,9 +17,21 @@
  * where f_i is the number of frustrated edges incident to i
  * (sign(w_ij) * s_j != s_i). The next flip is sampled directly -- node i with
  * probability r_i / R, waiting time dt ~ Exp(R), R = sum_i r_i -- skipping the
- * null events of the rejection method. Flips are O(log N) via a Fenwick tree;
- * absorption (R = 0, no frustrated edge) is detected exactly from an integer
- * frustration counter.
+ * null events of the rejection method. Absorption (R = 0, no frustrated edge)
+ * is detected exactly from an integer frustration counter.
+ *
+ * Two interchangeable event-selection kernels (statistically identical, both
+ * exact CTMC) are dispatched inside voter_ctmc_run:
+ *   - composition-rejection (DEFAULT) -- buckets nodes by the integer key
+ *     (deg_i, f_i); since f_i in {0..deg_i} the rate spectrum is exactly
+ *     discrete, so the within-bucket draw is uniform with zero rejection.
+ *     O(deg) per event, no log N. (Slepoy, Thompson & Plimpton, J. Chem. Phys.
+ *     128, 205101 (2008), specialised to the voter's discrete rates.)
+ *   - Fenwick (binary-indexed tree) BKL -- O(deg log N) per event; the
+ *     fallback for dense graphs (large max degree).
+ * voter_ctmc_run picks composition-rejection when the max degree is <=
+ * CTMC_CR_MAX_DEG, else Fenwick; the env var LRGSG_CTMC_KERNEL
+ * ("cr" | "fenwick" | "auto") overrides the choice for benchmarking.
  */
 
 /*
