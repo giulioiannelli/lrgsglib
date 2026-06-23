@@ -18,6 +18,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.DGMgraphNX import DGMgraphNX
 
 
 def _get_nx_impl():
@@ -71,14 +72,17 @@ class DGMgraph:
         A DGM graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # Annotate ``__new__`` to return the default engine (NetworkX) so editors
+    # give precise method navigation even under ``**dict`` unpacking.
     def __new__(
         cls,
-        n: int,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        n: Any,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "DGMgraphNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

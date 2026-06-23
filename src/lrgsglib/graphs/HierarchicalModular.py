@@ -19,6 +19,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.HierarchicalModularNX import HierarchicalModularNetworkNX
 
 
 def _get_nx_impl():
@@ -83,18 +84,23 @@ class HierarchicalModular:
         A hierarchical modular network instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX) so editors give full,
+    # precise method navigation -- including when the call uses ``**dict``
+    # unpacking, which defeats @overload-based typing.
     def __new__(
         cls,
-        levels: int = 3,
-        branching: int = 4,
-        leaf_nodes: int = 8,
-        p_intra: float = 0.8,
-        p_ratio: float = 0.1,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        levels: Any = 3,
+        branching: Any = 4,
+        leaf_nodes: Any = 8,
+        p_intra: Any = 0.8,
+        p_ratio: Any = 0.1,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "HierarchicalModularNetworkNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

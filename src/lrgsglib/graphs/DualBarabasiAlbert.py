@@ -16,6 +16,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.DualBarabasiAlbertNX import DualBarabasiAlbertNX
 
 
 def _get_nx_impl():
@@ -81,17 +82,20 @@ class DualBarabasiAlbert:
         A dual BA graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # Annotate ``__new__`` to return the default engine (NetworkX) so editors
+    # give precise method navigation even under ``**dict`` unpacking.
     def __new__(
         cls,
-        n: int,
-        m1: int,
-        m2: int,
-        p: float = 0.5,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        n: Any,
+        m1: Any,
+        m2: Any,
+        p: Any = 0.5,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "DualBarabasiAlbertNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

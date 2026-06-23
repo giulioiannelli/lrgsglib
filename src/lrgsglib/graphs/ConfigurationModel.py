@@ -16,6 +16,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.ConfigurationModelNX import ConfigurationModelNX
 
 
 def _get_nx_impl():
@@ -72,14 +73,19 @@ class ConfigurationModel:
         A configuration model graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX) so editors give full,
+    # precise method navigation -- including under ``**dict`` unpacking, which
+    # defeats @overload-based typing.
     def __new__(
         cls,
-        degree_sequence: Sequence[int],
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        degree_sequence: Any,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "ConfigurationModelNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

@@ -18,12 +18,12 @@ Example
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any
 
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .protocols import SignedGraphProtocol
+    from .nx.lattice import Lattice3DNX
 
 
 # === Lazy imports to avoid circular dependencies ===
@@ -102,17 +102,25 @@ class Lattice3D:
     lrgsglib.graphs.gt.lattice.Lattice3DGT : graph-tool implementation
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX, the most complete
+    # backend) so editors give full, precise method navigation -- including when
+    # the call uses ``**dict`` unpacking, which defeats @overload-based typing
+    # (pyright then falls back to the bare factory class, hiding every method).
+    # For graph-tool, construct ``lrgsglib.graphs.gt.Lattice3DGT`` directly or
+    # annotate the target.
     def __new__(
         cls,
-        dim: Union[int, Tuple[int, int, int]] = 10,
-        geo: Literal["sc", "bcc", "fcc"] = "sc",
-        pflip: float = 0.0,
-        periodic: Optional[bool] = None,
-        pbc: Optional[bool] = None,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        dim: Any = 10,
+        geo: Any = "sc",
+        pflip: Any = 0.0,
+        periodic: Any = None,
+        pbc: Any = None,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "Lattice3DNX":
         # Resolve engine
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)

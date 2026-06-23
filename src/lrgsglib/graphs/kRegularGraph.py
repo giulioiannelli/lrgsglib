@@ -16,6 +16,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.kRegularGraphNX import kRegularGraphNX
 
 
 def _get_nx_impl():
@@ -70,15 +71,20 @@ class kRegularGraph:
         A k-regular graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX) so editors give full,
+    # precise method navigation -- including under ``**dict`` unpacking, which
+    # defeats @overload-based typing. Params are ``Any`` to stay unpacking-proof.
     def __new__(
         cls,
-        n: int,
-        k: int,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        n: Any,
+        k: Any,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "kRegularGraphNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

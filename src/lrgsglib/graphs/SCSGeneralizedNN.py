@@ -16,6 +16,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.SCSGeneralizedNNNX import SCSGeneralizedNNNX
 
 
 def _get_nx_impl():
@@ -82,19 +83,24 @@ class SCSGeneralizedNN:
         An SCS generalized NN graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX, the most complete
+    # backend) so editors give full, precise method navigation -- including when
+    # the call uses ``**dict`` unpacking, which defeats @overload-based typing.
     def __new__(
         cls,
-        N: int,
-        gamma: float,
-        J0: float = 0.0,
-        J: float = 1.0,
-        g: float = 1.0,
+        N: Any,
+        gamma: Any,
+        J0: Any = 0.0,
+        J: Any = 1.0,
+        g: Any = 1.0,
         diagonal: Any = None,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "SCSGeneralizedNNNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

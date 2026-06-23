@@ -16,6 +16,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.FullyConnectedNX import FullyConnectedNX
 
 
 def _get_nx_impl():
@@ -77,16 +78,21 @@ class FullyConnected:
         A fully connected graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX) so editors give full,
+    # precise method navigation -- including when the call uses ``**dict``
+    # unpacking, which defeats @overload-based typing.
     def __new__(
         cls,
-        N: int,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        with_positions: bool = False,
-        mode_positions: Union[str, Callable] = "circular",
-        engine: Optional[Union[str, GraphEngine]] = None,
+        N: Any,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        with_positions: Any = False,
+        mode_positions: Any = "circular",
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "FullyConnectedNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

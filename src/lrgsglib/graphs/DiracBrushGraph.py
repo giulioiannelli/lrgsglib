@@ -19,6 +19,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.DiracLatticeNX import DiracBrushGraphNX
 
 
 def _get_nx_impl():
@@ -80,17 +81,20 @@ class DiracBrushGraph:
         A Dirac brush graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # Annotate ``__new__`` to return the default engine (NetworkX) so editors
+    # give precise method navigation even under ``**dict`` unpacking.
     def __new__(
         cls,
-        base_x: int,
-        base_y: int,
-        fiber_nodes: int,
-        periodic: bool = True,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        base_x: Any,
+        base_y: Any,
+        fiber_nodes: Any,
+        periodic: Any = True,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "DiracBrushGraphNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

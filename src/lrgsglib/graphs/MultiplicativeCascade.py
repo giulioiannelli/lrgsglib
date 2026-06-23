@@ -19,6 +19,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.MultiplicativeCascadeNX import MultiplicativeCascadeGraphNX
 
 
 def _get_nx_impl():
@@ -91,22 +92,26 @@ class MultiplicativeCascade:
         A multiplicative cascade graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # Annotate ``__new__`` to return the *default* engine (NetworkX) so editors
+    # give full, precise method navigation -- including under ``**dict``
+    # unpacking, which defeats @overload-based typing.
     def __new__(
         cls,
-        p1: float = 0.9,
-        p2: float = 0.6,
-        p3: float = 0.0,
-        p4: float = 0.0,
-        fraction: float = 0.4,
-        iterations: int = 5,
-        stochastic: bool = False,
-        periodic: bool = False,
-        variant: str = "exp_clocks",
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        p1: Any = 0.9,
+        p2: Any = 0.6,
+        p3: Any = 0.0,
+        p4: Any = 0.0,
+        fraction: Any = 0.4,
+        iterations: Any = 5,
+        stochastic: Any = False,
+        periodic: Any = False,
+        variant: Any = "exp_clocks",
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "MultiplicativeCascadeGraphNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

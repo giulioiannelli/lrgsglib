@@ -19,6 +19,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.LFRBenchmarkNX import LFRBenchmarkNX
 
 
 def _get_nx_impl():
@@ -87,22 +88,26 @@ class LFRBenchmark:
         An LFR benchmark graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # Annotate ``__new__`` to return the *default* engine (NetworkX) so editors
+    # give full, precise method navigation -- including under ``**dict``
+    # unpacking, which defeats @overload-based typing.
     def __new__(
         cls,
-        n: int,
-        tau1: float,
-        tau2: float,
-        mu: float,
-        average_degree: Optional[float] = None,
-        min_degree: Optional[int] = None,
-        max_degree: Optional[int] = None,
-        min_community: Optional[int] = None,
-        max_community: Optional[int] = None,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        n: Any,
+        tau1: Any,
+        tau2: Any,
+        mu: Any,
+        average_degree: Any = None,
+        min_degree: Any = None,
+        max_degree: Any = None,
+        min_community: Any = None,
+        max_community: Any = None,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "LFRBenchmarkNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

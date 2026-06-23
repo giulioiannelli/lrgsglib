@@ -20,6 +20,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.VicsekNX import VicsekGraphNX
 
 
 def _get_nx_impl():
@@ -79,18 +80,23 @@ class VicsekGraph:
         A Vicsek graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX) so editors give full,
+    # precise method navigation -- including under ``**dict`` unpacking, which
+    # defeats @overload-based typing. Params are ``Any`` to stay unpacking-proof.
     def __new__(
         cls,
-        N: int,
-        k: int,
-        pij: Optional[np.ndarray] = None,
-        m: int = 3,
-        symmetric: bool = True,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        N: Any,
+        k: Any,
+        pij: Any = None,
+        m: Any = 3,
+        symmetric: Any = True,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "VicsekGraphNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

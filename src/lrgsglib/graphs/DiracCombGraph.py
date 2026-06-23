@@ -19,6 +19,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.DiracLatticeNX import DiracCombGraphNX
 
 
 def _get_nx_impl():
@@ -80,17 +81,20 @@ class DiracCombGraph:
         A Dirac comb graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # Annotate ``__new__`` to return the default engine (NetworkX) so editors
+    # give precise method navigation even under ``**dict`` unpacking.
     def __new__(
         cls,
-        base_nodes: int,
-        fiber_nodes: int,
-        base_type: str = "line",
-        periodic: bool = True,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        base_nodes: Any,
+        fiber_nodes: Any,
+        base_type: Any = "line",
+        periodic: Any = True,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "DiracCombGraphNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

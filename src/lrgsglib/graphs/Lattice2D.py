@@ -18,14 +18,12 @@ Example
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union, overload
+from typing import TYPE_CHECKING, Any
 
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .gt.Lattice2DGT import Lattice2DGT
     from .nx.Lattice2DNX import Lattice2DNX
-    from .protocols import LatticeGraphProtocol
 
 
 # === Lazy imports to avoid circular dependencies ===
@@ -122,51 +120,29 @@ class Lattice2D:
     lrgsglib.graphs.gt.lattice.Lattice2DGT : graph-tool implementation
     """
 
-    # --- Static typing: resolve the concrete engine class for the IDE. ---
-    # These overloads let editors (Pylance/mypy) autocomplete the *concrete*
-    # backend's full method set based on the ``engine`` literal, instead of
-    # the empty factory class. They are erased at runtime.
-    @overload
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX, the most complete
+    # backend) so editors give full, precise method navigation on the result.
+    # Parameters are typed ``Any`` on purpose: strictly-typed params make
+    # ``Lattice2D(**cfg)`` fail type-checking when ``cfg`` is an inferred
+    # ``dict[str, int | str | float]`` (the value union is not assignable to
+    # ``side1: int`` etc.), which collapses the result to the bare factory class
+    # and hides every attribute. ``Any`` params accept any ``**dict`` unpack.
+    # For graph-tool, construct ``lrgsglib.graphs.gt.Lattice2DGT`` directly or
+    # annotate the target (e.g. ``lat: Lattice2DGT = Lattice2D(engine='gt')``).
     def __new__(
         cls,
-        side1: int = ...,
-        side2: Optional[int] = ...,
-        geo: str = ...,
-        pflip: float = ...,
-        periodic: Optional[bool] = ...,
-        pbc: Optional[bool] = ...,
-        seed: Optional[int] = ...,
-        *,
-        engine: Literal["gt", GraphEngine.GRAPHTOOL],
+        side1: Any,
+        side2: Any = None,
+        geo: Any = "sqr",
+        pflip: Any = 0.0,
+        periodic: Any = None,
+        pbc: Any = None,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ) -> "Lattice2DGT": ...
-
-    @overload
-    def __new__(
-        cls,
-        side1: int = ...,
-        side2: Optional[int] = ...,
-        geo: str = ...,
-        pflip: float = ...,
-        periodic: Optional[bool] = ...,
-        pbc: Optional[bool] = ...,
-        seed: Optional[int] = ...,
-        engine: Optional[Union[Literal["nx"], GraphEngine]] = ...,
-        **kwargs: Any,
-    ) -> "Lattice2DNX": ...
-
-    def __new__(
-        cls,
-        side1: int,
-        side2: Optional[int] = None,
-        geo: str = "sqr",
-        pflip: float = 0.0,
-        periodic: Optional[bool] = None,
-        pbc: Optional[bool] = None,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
-        **kwargs: Any,
-    ) -> "LatticeGraphProtocol":
+    ) -> "Lattice2DNX":
         # Resolve engine
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)

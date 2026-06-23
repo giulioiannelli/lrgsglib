@@ -20,6 +20,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.TemporalGraphNX import TemporalGraphNX
 
 
 def _get_nx_impl():
@@ -74,17 +75,22 @@ class TemporalGraph:
         A temporal graph instance (inherits from SignedGraphNX).
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX) so editors give full,
+    # precise method navigation -- including under ``**dict`` unpacking, which
+    # defeats @overload-based typing. Params are ``Any`` to stay unpacking-proof.
     def __new__(
         cls,
-        n_nodes: Optional[int] = None,
-        n_snapshots: Optional[int] = None,
-        time_unit: str = "continuous",
-        directed: bool = False,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        n_nodes: Any = None,
+        n_snapshots: Any = None,
+        time_unit: Any = "continuous",
+        directed: Any = False,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "TemporalGraphNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

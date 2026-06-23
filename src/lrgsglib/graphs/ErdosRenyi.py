@@ -18,12 +18,12 @@ Example
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .protocols import SignedGraphProtocol
+    from .nx.random import ErdosRenyiNX
 
 
 # === Lazy imports to avoid circular dependencies ===
@@ -95,16 +95,24 @@ class ErdosRenyi:
     lrgsglib.graphs.gt.random.ErdosRenyiGT : graph-tool implementation
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX, the most complete
+    # backend) so editors give full, precise method navigation -- including when
+    # the call uses ``**dict`` unpacking, which defeats @overload-based typing
+    # (pyright then falls back to the bare factory class, hiding every method).
+    # For graph-tool, construct ``lrgsglib.graphs.gt.ErdosRenyiGT`` directly or
+    # annotate the target.
     def __new__(
         cls,
-        n: int,
-        p: float,
-        pflip: float = 0.0,
-        extract_giant_component: bool = True,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        n: Any,
+        p: Any,
+        pflip: Any = 0.0,
+        extract_giant_component: Any = True,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "ErdosRenyiNX":
         # Resolve engine
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)

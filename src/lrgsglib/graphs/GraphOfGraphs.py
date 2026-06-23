@@ -32,6 +32,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.GraphOfGraphsNX import GraphOfGraphsNX
 
 
 # === Lazy imports to avoid circular dependencies ===
@@ -101,18 +102,23 @@ class GraphOfGraphs:
     lrgsglib.graphs.gt.GraphOfGraphsGT : graph-tool implementation
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX) so editors give full,
+    # precise method navigation -- including when the call uses ``**dict``
+    # unpacking, which defeats @overload-based typing.
     def __new__(
         cls,
-        base_graph_type: str,
-        base_params: dict,
-        fiber_graph_type: str,
-        fiber_params: Union[dict, Callable[[int], dict]],
-        anchor_policy: Union[str, Callable[[int, int], int]] = "first",
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        base_graph_type: Any,
+        base_params: Any,
+        fiber_graph_type: Any,
+        fiber_params: Any,
+        anchor_policy: Any = "first",
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "GraphOfGraphsNX":
         # Resolve engine
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)

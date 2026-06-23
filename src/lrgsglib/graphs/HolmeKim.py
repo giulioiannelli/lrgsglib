@@ -19,6 +19,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.HolmeKimNX import HolmeKimNX
 
 
 def _get_nx_impl():
@@ -75,16 +76,20 @@ class HolmeKim:
         A Holme-Kim graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # Annotate ``__new__`` to return the *default* engine (NetworkX) so editors
+    # give full, precise method navigation -- including under ``**dict``
+    # unpacking, which defeats @overload-based typing.
     def __new__(
         cls,
-        n: int,
-        m: int,
-        p: float = 0.5,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        n: Any,
+        m: Any,
+        p: Any = 0.5,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "HolmeKimNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

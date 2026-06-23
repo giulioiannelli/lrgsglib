@@ -18,6 +18,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.BipartiteFromDegreeSequenceNX import BipartiteFromDegreeSequenceNX
 
 
 def _get_nx_impl():
@@ -80,15 +81,20 @@ class BipartiteFromDegreeSequence:
         A bipartite graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX) so editors give full,
+    # precise method navigation -- including under ``**dict`` unpacking, which
+    # defeats @overload-based typing.
     def __new__(
         cls,
-        top_degrees: Sequence[int],
-        bottom_degrees: Sequence[int],
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        top_degrees: Any,
+        bottom_degrees: Any,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "BipartiteFromDegreeSequenceNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

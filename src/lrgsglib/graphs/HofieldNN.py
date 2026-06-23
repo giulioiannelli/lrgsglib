@@ -16,6 +16,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.HofieldNNNX import HofieldNNNX
 
 
 def _get_nx_impl():
@@ -72,17 +73,21 @@ class HofieldNN:
         A Hopfield NN graph instance.
     """
 
+    # --- Static typing for the IDE. ---
+    # Annotate ``__new__`` to return the *default* engine (NetworkX) so editors
+    # give full, precise method navigation -- including under ``**dict``
+    # unpacking, which defeats @overload-based typing.
     def __new__(
         cls,
-        with_patterns: str = "uniform",
+        with_patterns: Any = "uniform",
         digit: Any = None,
-        n_samples: int = 1,
-        threshold: int = 127,
-        pflip: float = 0.0,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        n_samples: Any = 1,
+        threshold: Any = 127,
+        pflip: Any = 0.0,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "HofieldNNNX":
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
 

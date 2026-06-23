@@ -23,6 +23,7 @@ from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
     from .protocols import SignedGraphProtocol
+    from .nx.random import StochasticBlockModelNX
 
 
 # === Lazy imports to avoid circular dependencies ===
@@ -98,16 +99,21 @@ class StochasticBlockModel:
     lrgsglib.graphs.gt.random.StochasticBlockModelGT : graph-tool implementation
     """
 
+    # --- Static typing for the IDE. ---
+    # This factory dispatches to a concrete engine class at runtime. We annotate
+    # ``__new__`` to return the *default* engine (NetworkX, the most complete
+    # backend) so editors give full, precise method navigation -- including when
+    # the call uses ``**dict`` unpacking, which defeats @overload-based typing.
     def __new__(
         cls,
-        sizes: Sequence[int],
-        p_matrix: Sequence[Sequence[float]],
-        pflip: float = 0.0,
-        extract_giant_component: bool = True,
-        seed: Optional[int] = None,
-        engine: Optional[Union[str, GraphEngine]] = None,
+        sizes: Any,
+        p_matrix: Any,
+        pflip: Any = 0.0,
+        extract_giant_component: Any = True,
+        seed: Any = None,
+        engine: Any = None,
         **kwargs: Any,
-    ):
+    ) -> "StochasticBlockModelNX":
         # Resolve engine
         if engine is not None and isinstance(engine, str):
             engine = GraphEngine(engine)
