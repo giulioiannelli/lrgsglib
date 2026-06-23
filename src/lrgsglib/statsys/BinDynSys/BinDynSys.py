@@ -232,6 +232,23 @@ class BinDynSys(DynSys):
     def dsNstep(self):
         return np.vectorize(self.ds1step, excluded="self")
 
+    def make_sweep_fn(self):
+        """Standard binary MCMC sweep: a random-order pass of ``ds1step`` over
+        all ``N`` nodes (see :meth:`DynSys.make_sweep_fn`).
+
+        The node-order buffer and the vectorized update are built once and reused
+        each sweep; reshuffling an array of fixed length consumes the RNG stream
+        identically to rebuilding it, so the draw order is reproducible.
+        """
+        nodes = np.arange(self.N, dtype=np.int64)
+        dsNstep = self.dsNstep()
+
+        def _sweep() -> None:
+            np.random.shuffle(nodes)
+            dsNstep(nodes)
+
+        return _sweep
+
     def run(self, **kw):
         raise NotImplementedError("Subclasses must implement this method")
 

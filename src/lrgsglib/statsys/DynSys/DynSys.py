@@ -19,6 +19,7 @@ import os
 import random
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -156,6 +157,24 @@ class DynSys(ABC):
     def ds1step(self, nd: int) -> None:
         """Perform one single-node update at node *nd*."""
         ...
+
+    # ------------------------------------------------------------------
+    # Frame production (live-view / animation)
+    # ------------------------------------------------------------------
+    def make_sweep_fn(self) -> Callable[[], None]:
+        """Return a zero-argument callable that advances the model one Monte
+        Carlo sweep (``N`` single-node updates) in place.
+
+        Consumed by ``statsys._frames.iter_frames`` to step a model while
+        snapshotting its state. Built once per run so per-sweep setup (node
+        ordering buffer, vectorized update closure, kernel caches) is hoisted
+        out of the loop. Binary models inherit a default from ``BinDynSys``;
+        models with a vectorized sweep kernel override it.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support frame production "
+            "(no make_sweep_fn); only implemented for binary dynamics so far."
+        )
 
     @abstractmethod
     def run(self, **kw: Any) -> None:

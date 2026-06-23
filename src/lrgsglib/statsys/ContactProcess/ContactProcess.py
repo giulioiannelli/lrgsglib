@@ -658,6 +658,39 @@ class ContactProcessEI(ContactProcessBase):
                     w_ji = reverse_weights[j, i]
                     lambda_arr[j] += gamma_eff * w_ji * delta
 
+    def make_sweep_fn(self):
+        """Vectorized EI sweep over the cached lambda buffers (overrides the
+        scalar ``BinDynSys`` default; see :meth:`DynSys.make_sweep_fn`).
+
+        Requires the Python-backend caches built by :meth:`init_contact_dynamics`
+        / :meth:`_init_lambda_cache`.
+        """
+        if self._lambda_arr is None:
+            raise RuntimeError("ContactProcessEI lambda cache is not initialized.")
+        if (
+            self._neigh_indices is None
+            or self._neigh_weights is None
+            or self._neigh_offsets is None
+        ):
+            raise RuntimeError("ContactProcessEI neighbour cache is not initialized.")
+        if self._reverse_weights is None:
+            raise RuntimeError("ContactProcessEI reverse-weights cache is not initialized.")
+
+        def _sweep() -> None:
+            self._sweep_ei_lambda_cache(
+                self.s,
+                self._lambda_arr,
+                self._neigh_indices,
+                self._neigh_weights,
+                self._neigh_offsets,
+                self._reverse_weights,
+                self.gamma_eff,
+                self._activation_fn,
+                self.N,
+            )
+
+        return _sweep
+
     # ------------------------------------------------------------------
     # C backend integration
     # ------------------------------------------------------------------
