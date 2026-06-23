@@ -13,15 +13,18 @@ import graph_tool.all as gt
 from ....config.const import (
     L2D_PBC,
     L2D_WITH_POS,
+    L2D_ONREP,
     L2D_GEO_SHRT_LIST,
     L2D_SHRT_GEO_DICT,
     L2D_GEO_SHRT_DICT,
     L2D_ERRMSG_GEO,
+    SG_INIT_NW_DICT,
 )
 from ....utils.basic.arithmetic import adjust_to_even
 from ..SignedGraphGT import SignedGraphGT
 from ..._shared._draw import draw as _draw_lattice2d
 from . import _generators as _gen2d
+from ._nw_container import Lattice2DGTnwContainer
 
 
 _SW_SUFFIX = "_sw"  # small-world variant marker (mirrors Lattice2DNX)
@@ -92,6 +95,9 @@ class Lattice2DGT(SignedGraphGT):
         s for s in L2D_GEO_SHRT_LIST if not s.endswith(_SW_SUFFIX)
     )
 
+    # Geometry-specific negative-link (nwDict) pattern container.
+    nwContainer = Lattice2DGTnwContainer
+
     def __init__(
         self,
         side1: int,
@@ -102,6 +108,7 @@ class Lattice2DGT(SignedGraphGT):
         prew: float = 0.0,
         seed: Optional[int] = None,
         with_positions: bool = L2D_WITH_POS,
+        init_nw_dict: bool = SG_INIT_NW_DICT,
     ):
         # Normalise geo (accept short alias or full name) to a canonical base
         base, geo_label = self._normalise_geo(geo, prew)
@@ -146,7 +153,8 @@ class Lattice2DGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed,
-                         sgpathn=f"l2d_{geo_label}_gt")
+                         sgpathn=f"l2d_{geo_label}_gt",
+                         init_nw_dict=init_nw_dict)
 
     @classmethod
     def _normalise_geo(cls, geo: str, prew: float) -> Tuple[str, str]:
@@ -250,6 +258,34 @@ class Lattice2DGT(SignedGraphGT):
     def pos(self) -> gt.VertexPropertyMap:
         """Vertex position property map for visualization."""
         return self._pos
+
+    def get_central_edge(self, on_g: str = L2D_ONREP) -> Tuple[int, int]:
+        """Return a bulk edge nearest the geometric centre of the lattice.
+
+        Mirrors the intent of ``Lattice2DNX.get_central_edge`` (a single
+        central defect edge) but operates in GT's integer node space using the
+        stored ``pos`` property. The chosen edge is the incident edge of the
+        centroid-nearest vertex whose midpoint lies closest to the centroid, so
+        the result is deterministic and translation-stable. ``on_g`` is accepted
+        for API parity with the NX engine (GT has a single representation).
+        """
+        pos = np.array(
+            [list(self._pos[self.G.vertex(i)]) for i in range(self.N)]
+        )
+        centroid = pos.mean(axis=0)
+        central = int(np.argmin(((pos - centroid) ** 2).sum(axis=1)))
+        nbrs = self.get_graph_neighbors(central)
+        if not nbrs:
+            raise ValueError(
+                "central node has no neighbours; cannot pick a central edge"
+            )
+        nb = min(
+            nbrs,
+            key=lambda j: (
+                (0.5 * (pos[central] + pos[j]) - centroid) ** 2
+            ).sum(),
+        )
+        return (central, nb)
 
     # Engine-agnostic 2D lattice drawing (shared with Lattice2DNX).
     # See lrgsglib.graphs._shared._draw.draw for the full signature.

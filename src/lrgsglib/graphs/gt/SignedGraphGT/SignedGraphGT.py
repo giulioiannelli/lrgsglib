@@ -43,6 +43,7 @@ from ....config.const import (
     PATHN_GRAPH_LIST, PATHN_DYNAMICS_LIST,
     SG_LAPL_SIGNED, SG_LAPL_RW, SG_LAPL_SYM,
     SG_LAPL_TYPES, SG_LAPL_DEFAULT_TYPE, SG_LAPL_RW_IMAG_TOL,
+    SG_INIT_NW_DICT,
 )
 from ....config.funcs import build_p_fname
 
@@ -113,6 +114,10 @@ class SignedGraphGT:
     >>> print(f"Negative edges: {sg.count_negative_edges()}")
     """
 
+    # Negative-link pattern container class; subclasses (e.g. Lattice2DGT) set
+    # this to their geometry-specific container. Mirrors SignedGraphNX.
+    nwContainer: Optional[type] = None
+
     def __init__(
         self,
         G: Optional["Graph"] = None,
@@ -120,6 +125,7 @@ class SignedGraphGT:
         seed: Optional[int] = None,
         path_data: Optional[Path] = None,
         sgpathn: str = "signed_graph_gt",
+        init_nw_dict: bool = SG_INIT_NW_DICT,
     ) -> None:
         if not GT_AVAILABLE:
             raise ImportError(
@@ -151,6 +157,30 @@ class SignedGraphGT:
         self._sgpathn = sgpathn
         # Paths are initialised lazily by _ensure_paths() on first access.
         self._paths_initialised = False
+
+        # ---- Negative-link patterns (nwDict), built eagerly when requested ----
+        # Mirrors SignedGraphNX: subclasses set the ``nwContainer`` class attr to
+        # their geometry-specific container; here we instantiate it once.
+        self.init_nw_dict = init_nw_dict
+        if self.init_nw_dict and self.nwContainer is not None:
+            self.build_nw_dict()
+
+    def build_nw_dict(self) -> None:
+        """(Re)build ``self.nwDict`` from this graph's ``nwContainer``.
+
+        Called automatically at construction when ``init_nw_dict=True``. Because
+        the GT engine does **not** flip edges at construction (unlike NX —
+        flips are applied later via ``flip_random_fract_edges``), the ``'rand'``
+        pattern is a snapshot of the edges that are negative *at build time*.
+        Call this again after flipping to refresh ``'rand'`` (the geometric
+        ``single*`` / ``rand*`` star/cell patterns do not depend on signs).
+        """
+        if self.nwContainer is None:
+            raise NotImplementedError(
+                f"{type(self).__name__} defines no nwContainer; "
+                "nwDict patterns are unavailable for this graph type."
+            )
+        self.nwDict = self.nwContainer(self)
 
     def __getattr__(self, name: str) -> Any:
         """Trigger lazy path initialisation for ``path_*`` attributes."""
@@ -213,6 +243,40 @@ class SignedGraphGT:
         multiple representations like NX.
         """
         return {"G": self.G}
+
+    @property
+    def graph_reprs(self) -> List[str]:
+        """Available graph-representation keys (mirrors ``SignedGraphNX``).
+
+        GT uses a single representation, so this is always ``["G"]``.
+        """
+        return list(self.gr.keys())
+
+    @property
+    def nflip(self) -> int:
+        """Number of seed nodes used by the negative-link pattern containers.
+
+        Mirrors ``SignedGraphNX.nflip`` (``int(pflip * N)``).
+        """
+        return int(self._pflip * self.N)
+
+    @property
+    def fleset(self) -> Dict[str, set]:
+        """Flip-edge set per representation: currently-negative edges as
+        ``(u, v)`` integer tuples (mirrors ``SignedGraphNX.fleset``).
+
+        NX keeps ``fleset`` as a mutable dict updated on every flip; GT instead
+        derives it from the live ``sign`` property so it always reflects the
+        current state regardless of which flip path (``flip_random_fract_edges``,
+        ``flip_sel_edges``, ``flip_edge``) produced the negatives.
+        """
+        sign_prop = self.G.edge_properties["sign"]
+        neg = {
+            (int(e.source()), int(e.target()))
+            for e in self.G.edges()
+            if sign_prop[e] == -1
+        }
+        return {"G": neg}
 
     @property
     def eigv(self) -> Optional[NDArray[np.floating]]:
