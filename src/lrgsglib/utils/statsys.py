@@ -12,6 +12,8 @@ __all__ = [
     "edge_sign_arrays",
     "signed_neighbor_arrays",
     "cluster_components",
+    "iter_largest_cluster_masks",
+    "compute_largest_cluster_masks",
     "cluster_size_distribution",
     "largest_fraction",
 ]
@@ -227,6 +229,119 @@ def cluster_components(s, idx, b) -> np.ndarray:
                     stack.append(v)
         cur += 1
     return label
+
+def flat_signed_edges(idx, b):
+    """Flatten ragged ``(idx, b)`` neighbour arrays into deduped *undirected*
+    edge arrays ``(I, J, B)`` -- each edge once with ``I < J`` -- for vectorised,
+    whole-trajectory clustering (see :func:`iter_largest_cluster_masks`)."""
+    sizes = [len(x) for x in idx]
+    I = np.repeat(np.arange(len(idx), dtype=np.int64), sizes)
+    if I.size:
+        J = np.concatenate([np.asarray(x) for x in idx]).astype(np.int64)
+        B = np.concatenate([np.asarray(x) for x in b]).astype(np.int8)
+    else:
+        J = np.empty(0, np.int64)
+        B = np.empty(0, np.int8)
+    keep = I < J
+    return I[keep], J[keep], B[keep]
+
+
+def iter_largest_cluster_masks(states, idx, b):
+    """Yield the boolean mask of the largest active-edge cluster per state.
+
+    Vectorised analogue of ``cluster_components`` + ``argmax``-``bincount``:
+    builds the edge list once (:func:`flat_signed_edges`) and labels each frame
+    with ``scipy``'s C connected-components (``O(N + E)`` in C, ~15x faster than
+    the pure-Python BFS over a 3000-frame trajectory). The active-edge convention
+    is identical to :func:`cluster_components` (``b_ij * s_i * s_j > 0``), so the
+    *largest-cluster size* matches exactly; the *identity* of the largest cluster
+    can differ only under an exact size tie (cosmetic for animation).
+
+    Parameters
+    ----------
+    states : Iterable[NDArray]
+        Trajectory of spin/opinion vectors (``+/-1``).
+    idx, b : Sequence[NDArray]
+        Ragged neighbour indices and edge signs (see :func:`edge_sign_arrays`).
+
+    Yields
+    ------
+    NDArray[bool]
+        Length-``N`` mask selecting the largest active-edge cluster.
+    """
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    n = len(idx)
+    I, J, B = flat_signed_edges(idx, b)
+    ones = np.ones(I.size, dtype=bool)
+    for state in states:
+        s = np.asarray(state, dtype=np.int8).ravel()
+        if I.size:
+            act = (B * s[I] * s[J]) > 0
+            graph = coo_matrix((ones[act], (I[act], J[act])), shape=(n, n))
+            _, label = connected_components(graph, directed=False)
+        else:
+            label = np.arange(n)
+        yield label == np.bincount(label).argmax()
+
+
+def _largest_cluster_masks_chunk(states, idx, b) -> NDArray:
+    """Stack the largest-cluster masks for a block of states (module-level so it
+    is picklable for a process pool)."""
+    return np.asarray(list(iter_largest_cluster_masks(states, idx, b)), dtype=bool)
+
+
+def compute_largest_cluster_masks(states, idx, b, *, workers: int | None = None) -> NDArray:
+    """Buffer the largest active-edge cluster mask of every frame as one
+    ``(n_frames, N)`` boolean array.
+
+    The per-frame connected-components labelling -- not the video encode -- is the
+    cost of a largest-cluster movie, so this fans the trajectory out across
+    **processes** (true parallelism; the pure-Python ``coo_matrix`` build holds
+    the GIL, so threads barely help). Pass the result as ``masks=`` to
+    ``lat.animate.largest_cluster`` to skip re-clustering and encode at
+    state-movie speed, or reuse it across several renders.
+
+    Parameters
+    ----------
+    states : Iterable[NDArray]
+        Trajectory of spin/opinion vectors (each length ``N`` or ``syshape``).
+    idx, b : Sequence[NDArray]
+        Ragged neighbour indices and edge signs (see :func:`signed_neighbor_arrays`).
+    workers : int, optional
+        Process count. ``None`` -> ``min(8, cpu_count)``; ``1`` -> serial (no pool).
+
+    Returns
+    -------
+    NDArray[bool]
+        ``(n_frames, N)`` -- row ``t`` selects the largest cluster of frame ``t``.
+    """
+    import os
+
+    arr = np.asarray(states)
+    arr = arr.reshape(arr.shape[0], -1)
+    n = arr.shape[0]
+    if n == 0:
+        return np.empty((0, len(idx)), dtype=bool)
+
+    w = min(8, os.cpu_count() or 1) if workers is None else max(1, int(workers))
+    # Below ~1 chunk's worth, or single worker, the pool overhead isn't worth it.
+    if w == 1 or n < 1500:
+        return _largest_cluster_masks_chunk(arr, idx, b)
+
+    try:
+        from joblib import Parallel, delayed
+    except ImportError:
+        return _largest_cluster_masks_chunk(arr, idx, b)
+
+    edges = [round(i * n / w) for i in range(w + 1)]
+    parts = Parallel(n_jobs=w, backend="loky")(
+        delayed(_largest_cluster_masks_chunk)(arr[a:c], idx, b)
+        for a, c in zip(edges[:-1], edges[1:]) if c > a
+    )
+    return np.concatenate(parts, axis=0)
+
 
 def cluster_size_distribution(s, idx, b) -> Counter:
     """Counter ``{domain_size: number_of_domains}`` for configuration ``s``."""

@@ -16,6 +16,7 @@ from lrgsglib.utils.basic import subsample
 from lrgsglib.utils.statsys import (
     cluster_components,
     edge_sign_arrays,
+    iter_largest_cluster_masks,
     largest_fraction,
 )
 
@@ -72,3 +73,41 @@ def test_largest_fraction_on_known_configs():
     s_alt = np.array([1, -1, 1, -1], np.int8)          # four singletons  -> 0.25
     frac = largest_fraction([s_all, s_half, s_alt], idx, b)
     assert frac == pytest.approx([1.0, 0.5, 0.25])
+
+
+# --------------------------------------------------------------------------- #
+# iter_largest_cluster_masks: the fast (scipy) animation primitive            #
+# --------------------------------------------------------------------------- #
+def test_largest_cluster_mask_size_matches_bfs():
+    """The fast scipy masks must select a cluster of the SAME size as the
+    reference BFS ``cluster_components`` (the contract the cluster movie needs)."""
+    idx, b = _path4_rawspin()
+    configs = [
+        np.array([1, 1, 1, 1], np.int8),     # one domain of 4
+        np.array([1, 1, -1, -1], np.int8),   # two domains of 2
+        np.array([1, -1, 1, -1], np.int8),   # four singletons
+    ]
+    for s, mask in zip(configs, iter_largest_cluster_masks(configs, idx, b)):
+        label = cluster_components(s, idx, b)
+        ref_size = int(np.bincount(label).max())
+        assert int(mask.sum()) == ref_size
+
+
+def test_largest_cluster_mask_matches_bfs_on_random_lattice():
+    """On a frustrated 2D lattice, the fast largest-cluster mask is bit-identical
+    to BFS for non-degenerate configs (random states almost surely break ties)."""
+    from lrgsglib.graphs import Lattice2D
+    from lrgsglib.utils.statsys import signed_neighbor_arrays
+
+    lat = Lattice2D(side1=16, geo="sqr", pbc=True, engine="nx", pflip=0.1)
+    if hasattr(lat, "flip_random_fract_edges"):
+        lat.flip_random_fract_edges()
+    idx, b = signed_neighbor_arrays(lat, "rawspin")
+    rng = np.random.default_rng(0)
+    states = [rng.choice([-1, 1], size=lat.N).astype(np.int8) for _ in range(20)]
+
+    fast = list(iter_largest_cluster_masks(states, idx, b))
+    for s, mask in zip(states, fast):
+        label = cluster_components(s, idx, b)
+        ref = label == np.bincount(label).argmax()
+        assert np.array_equal(mask, ref)

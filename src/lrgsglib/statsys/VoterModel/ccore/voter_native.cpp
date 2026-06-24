@@ -109,7 +109,8 @@ static py::tuple voter_sampling(
     bool savemagn,
     int rule, size_t q, double eps, double alpha,
     int upd_mode, bool absorbing,
-    bool track_clusters, int cluster_mode, bool savedyn
+    bool track_clusters, int cluster_mode, bool savedyn,
+    const py::array_t<int64_t>& snap_sweeps
 ) {
     auto s_buf = spins_in.request();
     size_t N = static_cast<size_t>(s_buf.size);
@@ -139,9 +140,17 @@ static py::tuple voter_sampling(
     std::vector<size_t> cl_off, cl_size, cl_cnt;
     size_t cl_nrec = 0;
 
-    /* Optional full per-sweep trajectory (savedyn): row-major (n_rec, N) int8. */
+    /* Optional per-sweep trajectory (savedyn): row-major (n_rec, N) int8. */
     std::vector<int8_t> snap_buf;
     size_t snap_nrec = 0;
+    /* Optional sorted sweep indices to record (log-spaced sampling); empty = all. */
+    std::vector<size_t> snap_sweeps_vec;
+    {
+        auto ss = snap_sweeps.unchecked<1>();
+        snap_sweeps_vec.reserve(static_cast<size_t>(ss.size()));
+        for (py::ssize_t k = 0; k < ss.size(); ++k)
+            snap_sweeps_vec.push_back(static_cast<size_t>(ss(k)));
+    }
 
     {
         py::gil_scoped_release release;
@@ -174,21 +183,35 @@ static py::tuple voter_sampling(
              * back here for us to copy out and free. */
             spin_tp snap_raw = nullptr;
             spin_tp *snap_out = savedyn ? &snap_raw : nullptr;
+            const size_t *ss_ptr =
+                snap_sweeps_vec.empty() ? nullptr : snap_sweeps_vec.data();
+            size_t snap_rows = 0;
             size_t t_run = voter_ctmc_run(
                 N, s, nlen_ptr, ne, n_sweeps,
-                savemagn ? 1 : 0, magn_ptr, snap_out,
+                savemagn ? 1 : 0, magn_ptr, snap_out, ss_ptr,
+                snap_sweeps_vec.size(), &snap_rows,
                 absorbing ? 1 : 0, &absorbed_at, cctx);
             if (savemagn)
                 magn_out.assign(magn_buf.begin(), magn_buf.begin() + t_run);
             if (savedyn && snap_raw) {
-                snap_nrec = t_run;
-                snap_buf.assign(snap_raw, snap_raw + (size_t)t_run * N);
+                snap_nrec = snap_rows;
+                snap_buf.assign(snap_raw, snap_raw + snap_rows * N);
                 free(snap_raw);
             }
         } else {
+            size_t snap_si = 0;
             for (size_t step = 0; step < n_sweeps; ++step) {
                 if (savemagn) magn_out.push_back(calc_magn(N, s));
-                if (savedyn) { snap_buf.insert(snap_buf.end(), s, s + N); ++snap_nrec; }
+                if (savedyn) {
+                    bool take = snap_sweeps_vec.empty() ||
+                        (snap_si < snap_sweeps_vec.size() &&
+                         snap_sweeps_vec[snap_si] == step);
+                    if (take) {
+                        snap_buf.insert(snap_buf.end(), s, s + N);
+                        ++snap_nrec;
+                        if (!snap_sweeps_vec.empty()) ++snap_si;
+                    }
+                }
                 if (cctx) { clusters_set_state(cctx, s); clusters_record(cctx); }
                 if (absorbing && voter_count_frustrated(N, s, nlen_ptr, ne) == 0) {
                     absorbed_at = static_cast<long>(step);
@@ -268,7 +291,9 @@ absorbing : stop at the first zero-frustration configuration.
 track_clusters : record the cluster-size distribution per sweep (any schedule;
     full connected-components recompute over active edges at each record).
 cluster_mode : 0 satisfied (signed domains) | 1 rawspin (edge sign ignored).
-savedyn : record the full per-sweep spin trajectory (returned as the 5th element).
+savedyn : record the per-sweep spin trajectory (returned as the 5th element).
+snap_sweeps : optional sorted sweep indices to record (log-spaced sampling);
+    empty array = every sweep. Bounds the in-RAM trajectory to len(snap_sweeps) rows.
 
 Returns
 -------
@@ -286,5 +311,6 @@ tuple[ndarray, ndarray, int, list, ndarray]
         py::arg("alpha") = 1.0, py::arg("upd_mode") = 0,
         py::arg("absorbing") = false,
         py::arg("track_clusters") = false, py::arg("cluster_mode") = 0,
-        py::arg("savedyn") = false);
+        py::arg("savedyn") = false,
+        py::arg("snap_sweeps") = py::array_t<int64_t>());
 }
