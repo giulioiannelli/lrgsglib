@@ -160,3 +160,57 @@ def test_bare_save_name_resolves_under_plot_dir(tmp_path):
         path_sgdata=tmp_path / "l2d_squared",
     )
     assert resolve_plot_path(struct, "m.gif") == tmp_path / "plot" / "l2d_squared" / "m.gif"
+
+
+# --------------------------------------------------------------------------- #
+# fast save path (vectorised RGB -> ffmpeg/Pillow, no per-frame matplotlib)    #
+# --------------------------------------------------------------------------- #
+def test_states_to_rgb_maps_cmap_endpoints():
+    # +-1 (with vmin/vmax = -1/1) hit the colormap endpoints; pure LUT, no figure.
+    from lrgsglib.graphs._shared.animation.lattice2d import _states_to_rgb
+
+    s = np.ones(16, np.int8)
+    s[:8] = -1
+    rgb = _states_to_rgb([s], syshape=(4, 4), cmap="hot", vmin=-1, vmax=1)
+    assert rgb.shape == (1, 4, 4, 3) and rgb.dtype == np.uint8
+    lut = (matplotlib.colormaps["hot"](np.linspace(0, 1, 256))[:, :3] * 255).astype(np.uint8)
+    flat = rgb.reshape(-1, 3)
+    assert np.array_equal(flat[s > 0][0], lut[255])    # +1 -> top of cmap
+    assert np.array_equal(flat[s <= 0][0], lut[0])     # -1 -> bottom of cmap
+
+
+def test_cluster_to_rgb_colours_largest_and_greys_rest():
+    # largest-cluster mask painted by spin, everything else the bg colour.
+    from lrgsglib.graphs._shared.animation.lattice2d import _cluster_to_rgb
+
+    s = np.ones(16, np.int8)                                  # all +1
+    masks = np.zeros((1, 16), bool)
+    masks[0, :10] = True                                      # largest = first 10 sites
+    rgb = _cluster_to_rgb(
+        [s], masks, syshape=(4, 4),
+        pos_color=(1.0, 0.0, 0.0), neg_color=(0.0, 0.0, 1.0), bg_color=(0.5, 0.5, 0.5),
+    ).reshape(-1, 3)
+    assert np.array_equal(rgb[masks[0]][0], [255, 0, 0])       # +1 cluster -> red
+    assert np.array_equal(rgb[~masks[0]][0], [127, 127, 127])  # rest -> grey
+
+
+def test_fast_states_gif_no_ffmpeg(lat, states, tmp_path):
+    # The .gif fast path uses Pillow only (no ffmpeg) and returns the written Path.
+    from pathlib import Path
+
+    pytest.importorskip("PIL")
+    out = tmp_path / "fast.gif"
+    res = lat.animate.states(states, n_frames=3, fps=5, save=out, inline=False)
+    assert isinstance(res, Path) and out.exists() and out.stat().st_size > 0
+
+
+def test_fast_cluster_mp4_returns_path(lat, states, tmp_path):
+    # The .mp4 fast path streams to ffmpeg and returns the written Path.
+    from pathlib import Path
+
+    from lrgsglib.plotlib.animation.video import ffmpeg_available
+    if not ffmpeg_available():
+        pytest.skip("ffmpeg not on PATH")
+    out = tmp_path / "fast.mp4"
+    res = lat.animate.largest_cluster(states, n_frames=3, fps=5, save=out, inline=False)
+    assert isinstance(res, Path) and out.exists() and out.stat().st_size > 0

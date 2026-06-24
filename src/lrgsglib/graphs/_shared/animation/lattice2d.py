@@ -23,11 +23,13 @@ primitives in :mod:`lrgsglib.plotlib.animation._core`.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Sequence
 
 import numpy as np
 from numpy.typing import NDArray
 
+from ....config.const import GIF
 from ....plotlib.animation._core import LatticeAnimationResult, render_animation
 from ._accessor import _Accessor, frames_and_model
 from ._common import resolve_plot_path
@@ -57,6 +59,60 @@ def _to_2d_frame(
         raise ValueError("Frames must be 1D state vectors or 2D arrays.")
 
     return arr.astype(np.float64, copy=False)
+
+
+# --------------------------------------------------------------------------- #
+# Fast save path: build the whole frame stack as (n, H, W, 3) uint8 once and    #
+# stream it to ffmpeg/Pillow, skipping matplotlib's per-frame savefig pipeline  #
+# (the lattice is a fixed pixel grid, so re-rendering a Figure per frame is pure #
+# overhead -- ~70 s -> ~1 s for 3000 frames). See plotlib.animation.video.      #
+# --------------------------------------------------------------------------- #
+def _fast_output_ok(save_path, inline: bool) -> bool:
+    """Whether the fast RGB->video path applies.
+
+    Needs either a save target or inline display (with ``save=None`` and
+    ``inline=False`` the caller wants the raw matplotlib animation object). A
+    ``.gif`` target uses Pillow (no ffmpeg); anything else needs an ffmpeg binary.
+    """
+    if save_path is None and not inline:
+        return False
+    if save_path is not None and Path(save_path).suffix.lower() == GIF:
+        return True
+    from ....plotlib.animation.video import ffmpeg_available
+
+    return ffmpeg_available()
+
+
+def _states_to_rgb(frames, *, syshape, cmap, vmin, vmax) -> NDArray[np.uint8]:
+    """Vectorised ``(n, H, W, 3)`` uint8 from state frames via a 256-entry LUT."""
+    import matplotlib
+
+    arr = np.asarray(frames, dtype=np.float32)
+    arr = arr.reshape(arr.shape[0], syshape[0], syshape[1])
+    lo = float(np.min(arr)) if vmin is None else float(vmin)
+    hi = float(np.max(arr)) if vmax is None else float(vmax)
+    span = (hi - lo) or 1.0
+    idx = (np.clip((arr - lo) / span, 0.0, 1.0) * 255).astype(np.uint8)
+    lut = (
+        matplotlib.colormaps[cmap](np.linspace(0.0, 1.0, 256))[:, :3] * 255
+    ).astype(np.uint8)
+    return lut[idx]
+
+
+def _cluster_to_rgb(
+    frames, masks, *, syshape, pos_color, neg_color, bg_color
+) -> NDArray[np.uint8]:
+    """Vectorised ``(n, H, W, 3)`` uint8: largest cluster coloured by spin, rest grey."""
+    s = np.asarray(frames, dtype=np.int8).reshape(len(frames), -1)
+    n, npix = s.shape
+    pos8 = np.asarray(np.asarray(pos_color, np.float64) * 255, np.uint8)
+    neg8 = np.asarray(np.asarray(neg_color, np.float64) * 255, np.uint8)
+    bg8 = np.asarray(np.asarray(bg_color, np.float64) * 255, np.uint8)
+    net = (s * masks).sum(axis=1)                      # net spin of the largest cluster
+    col = np.where(net[:, None] > 0, pos8, neg8)        # (n, 3) per-frame cluster colour
+    rgb = np.broadcast_to(bg8, (n, npix, 3)).copy()
+    rgb = np.where(masks[:, :, None], col[:, None, :], rgb).astype(np.uint8)
+    return rgb.reshape(n, syshape[0], syshape[1], 3)
 
 
 def make_lattice2d_animation(
@@ -268,6 +324,7 @@ def animate_states(
     add_colorbar: bool = False,
     figsize: tuple[float, float] = (4.0, 4.0),
     inline: bool = True,
+    fast: bool = True,
     save=None,
     dpi: int = 150,
     writer: str | None = None,
@@ -287,12 +344,27 @@ def animate_states(
     filename lands under the plot tree
     (``<path_plot>/<structure>/<subfolder>``, the subfolder derived from
     ``model`` when given), while an explicit/absolute path is used as given.
-    """
-    import matplotlib.pyplot as plt
 
+    With ``fast=True`` (default) and no colorbar, frames are built as one RGB
+    stack and streamed straight to ffmpeg (``.mp4``) / Pillow (``.gif``),
+    bypassing matplotlib for a ~50x speed-up; ``fast=False`` forces the
+    matplotlib ``FuncAnimation`` path (needed for a colorbar or a raw animation
+    object).
+    """
     from ....utils.basic import subsample
 
     frames = subsample(list(states), n_frames) if n_frames else list(states)
+    save_path = resolve_plot_path(lattice, save, model=model, subfolder=subfolder)
+
+    if fast and not add_colorbar and _fast_output_ok(save_path, inline):
+        from ....plotlib.animation.video import render_rgb_stack
+
+        syshape = tuple(getattr(lattice, "syshape"))
+        rgb = _states_to_rgb(frames, syshape=syshape, cmap=cmap, vmin=vmin, vmax=vmax)
+        return render_rgb_stack(rgb, save_path, fps=fps, inline=inline)
+
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=figsize)
     ax.axis("off")
     if not add_colorbar:
@@ -314,7 +386,7 @@ def animate_states(
         fig,
         fps=fps,
         inline=inline,
-        save=resolve_plot_path(lattice, save, model=model, subfolder=subfolder),
+        save=save_path,
         dpi=dpi,
         writer=writer,
     )
@@ -329,12 +401,14 @@ def animate_largest_cluster(
     fps: int = 12,
     figsize: tuple[float, float] = (4.0, 4.0),
     inline: bool = True,
+    fast: bool = True,
     save=None,
     dpi: int = 150,
     writer: str | None = None,
     pos_color: tuple[float, float, float] = (0.84, 0.19, 0.15),
     neg_color: tuple[float, float, float] = (0.13, 0.40, 0.74),
     bg_color: tuple[float, float, float] = (0.82, 0.82, 0.82),
+    masks=None,
     model=None,
     subfolder=None,
 ):
@@ -350,8 +424,6 @@ def animate_largest_cluster(
     toggles JS-HTML vs a raw matplotlib animation, and a bare ``save`` filename
     is written under the plot tree (``<path_plot>/<structure>/<subfolder>``).
     """
-    import matplotlib.pyplot as plt
-
     from ....utils.basic import subsample
     from ....utils.statsys import signed_neighbor_arrays
 
@@ -360,6 +432,33 @@ def animate_largest_cluster(
     idx, b = signed_neighbor_arrays(lattice, cluster_mode)
 
     frames = subsample(list(states), n_frames) if n_frames else list(states)
+    cluster_masks = masks
+    if cluster_masks is not None and n_frames:
+        cluster_masks = subsample(list(cluster_masks), n_frames)
+    save_path = resolve_plot_path(lattice, save, model=model, subfolder=subfolder)
+
+    if fast and _fast_output_ok(save_path, inline):
+        from ....plotlib.animation.video import render_rgb_stack
+        from ....utils.statsys import compute_largest_cluster_masks
+
+        syshape = tuple(getattr(lattice, "syshape"))
+        fr = np.asarray(frames, dtype=np.int8)
+        # Largest-cluster mask per frame: reuse the caller's buffered ``masks`` if
+        # given, else compute them in one process-parallel pass (replaces the
+        # matplotlib path's per-frame scipy connected_components).
+        cl = (
+            np.asarray(cluster_masks, dtype=bool)
+            if cluster_masks is not None
+            else compute_largest_cluster_masks(fr, idx, b)
+        )
+        rgb = _cluster_to_rgb(
+            fr, cl, syshape=syshape,
+            pos_color=pos_color, neg_color=neg_color, bg_color=bg_color,
+        )
+        return render_rgb_stack(rgb, save_path, fps=fps, inline=inline)
+
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=figsize)
     ax.axis("off")
     ax.set_position([0.0, 0.0, 1.0, 1.0])
@@ -380,7 +479,7 @@ def animate_largest_cluster(
         fig,
         fps=fps,
         inline=inline,
-        save=resolve_plot_path(lattice, save, model=model, subfolder=subfolder),
+        save=save_path,
         dpi=dpi,
         writer=writer,
     )
