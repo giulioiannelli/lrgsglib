@@ -81,7 +81,15 @@ set(COMMON_INCLUDES
 set(SRC_RBIM  ${ISING_CCORE}/LRGSG_rbim.c)
 set(SRC_SA    ${ISING_CCORE}/LRGSG_sa.c)
 set(SRC_PT    ${ISING_CCORE}/LRGSG_pt.c)
-set(SRC_VM    ${VM_DIR}/LRGSG_vm.c)
+# Voter shares the gillespie CTMC kernel + cluster recording from _ccore; both
+# the VoterSimulator exe and the _voter_native pybind module (which list SRC_VM)
+# must link them, else: undefined reference to voter_ctmc_run / clusters_record.
+set(SRC_VM
+    ${VM_DIR}/LRGSG_vm.c
+    ${CCORE}/LRGSG_ctmc.c       # voter_ctmc_run (gillespie: composition-rejection + Fenwick)
+    ${CCORE}/LRGSG_clusters.c   # clusters_record (fast cluster-size recompute)
+    ${CCORE}/LRGSG_uf.c         # union-find used by cluster recording
+)
 set(SRC_CP    ${CP_DIR}/LRGSG_cp.c)
 
 # Continuous / vector dynamics shared sources
@@ -202,16 +210,10 @@ add_ising_simulator(IsingMetropolis)
 add_ising_sa_simulator(IsingSimulatedAnnealing)
 add_ising_pt_simulator(IsingParallelTempering)
 
-# Legacy Ising simulators (kept for backwards compatibility with old scripts)
-add_ising_simulator(IsingSimulator0)
-add_ising_simulator(IsingSimulator1)
-add_ising_simulator(IsingSimulator2)
-add_ising_simulator(IsingSimulator3)
-add_ising_simulator(IsingSimulator4)
-add_ising_simulator(IsingSimulator5)
-add_ising_simulator(IsingSimulator1b)
-add_ising_sa_simulator(IsingSimulator3b)
-add_ising_pt_simulator(IsingSimulator4b)
+# NB: the legacy IsingSimulator0..5 / 1b / 3b / 4b targets were removed -- their
+# .c sources were dropped in the folder-per-class reorg, so a fresh checkout had
+# no files for them and CMake configure failed ("No SOURCES given to target").
+# The canonical Metropolis / SA / PT binaries above are the ones Python dispatches to.
 
 # ===========================================================================
 # Voter Model simulators

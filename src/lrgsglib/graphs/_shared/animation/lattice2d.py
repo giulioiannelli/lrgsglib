@@ -354,6 +354,12 @@ def animate_states(
     from ....utils.basic import subsample
 
     frames = subsample(list(states), n_frames) if n_frames else list(states)
+    if not len(frames):
+        raise ValueError(
+            "animate.states received an empty trajectory. If this is a "
+            "VoterModel, build it with savedyn=True (and call run()) so that "
+            "vm.s_t holds the recorded configurations."
+        )
     save_path = resolve_plot_path(lattice, save, model=model, subfolder=subfolder)
 
     if fast and not add_colorbar and _fast_output_ok(save_path, inline):
@@ -432,6 +438,12 @@ def animate_largest_cluster(
     idx, b = signed_neighbor_arrays(lattice, cluster_mode)
 
     frames = subsample(list(states), n_frames) if n_frames else list(states)
+    if not len(frames):
+        raise ValueError(
+            "animate.largest_cluster received an empty trajectory. If this is a "
+            "VoterModel, build it with savedyn=True (and call run()) so that "
+            "vm.s_t holds the recorded configurations."
+        )
     cluster_masks = masks
     if cluster_masks is not None and n_frames:
         cluster_masks = subsample(list(cluster_masks), n_frames)
