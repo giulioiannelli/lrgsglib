@@ -15,14 +15,13 @@ __all__ = [
 class SignedLaplacianAnalysis:
     """Laplacian Renormalization Group analysis for signed graphs.
 
-    .. deprecated::
-        This class is deprecated. Use ``SignedGraphNX`` methods directly:
+    .. deprecated:: 1.x
+        This class is deprecated and will be **removed in version 2.0**. It stays
+        importable until then. Use ``SignedGraphNX`` methods directly:
 
         - Entropy/specific heat: ``sg.compute_signed_laplacian_entropy()``
         - Spectral analysis: ``get_graph_lspectrum()`` + ``compute_entropy_observables_from_eigenvalues()``
         - Animation: ``lrgsglib.plotlib.animation.make_animation_fromFrames()``
-
-        Will be removed in a future major version.
     """
     Sm1 = None
     VarL = None
@@ -49,9 +48,9 @@ class SignedLaplacianAnalysis:
         initspect: bool = True
     ) -> None:
         warnings.warn(
-            "SignedLaplacianAnalysis is deprecated. Use SignedGraphNX methods "
-            "directly (e.g., sg.compute_signed_laplacian_entropy()). "
-            "Will be removed in a future major version.",
+            "SignedLaplacianAnalysis is deprecated and will be removed in "
+            "version 2.0. Use SignedGraphNX methods directly "
+            "(e.g., sg.compute_signed_laplacian_entropy()).",
             DeprecationWarning,
             stacklevel=2,
         )
