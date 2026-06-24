@@ -156,6 +156,17 @@ class ArrayBackend(Protocol):
         """
         ...
 
+    def eigvals(self, a: Any) -> Any:
+        """Compute eigenvalues of a general (non-Hermitian) matrix.
+
+        Args:
+            a: Square matrix
+
+        Returns:
+            Eigenvalues (complex, unsorted) as a NumPy array
+        """
+        ...
+
     def eigh(self, a: Any) -> tuple[Any, Any]:
         """Compute eigenvalues and eigenvectors of Hermitian/symmetric matrix.
 
@@ -237,6 +248,10 @@ class NumpyBackend:
     @staticmethod
     def eigvalsh(a: np.ndarray) -> np.ndarray:
         return np.linalg.eigvalsh(a)
+
+    @staticmethod
+    def eigvals(a: np.ndarray) -> np.ndarray:
+        return np.linalg.eigvals(a)
 
     @staticmethod
     def eigh(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -330,6 +345,11 @@ class ScipyBackend:
         # Use SciPy for better performance on large matrices
         from scipy import linalg
         return linalg.eigvalsh(a, driver='evd')
+
+    @staticmethod
+    def eigvals(a: np.ndarray) -> np.ndarray:
+        from scipy import linalg
+        return linalg.eigvals(a)
 
     @staticmethod
     def eigh(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -471,6 +491,15 @@ class CupyBackend:
         eigvals = cp.linalg.eigvalsh(a_gpu)
         # Return as NumPy array for consistency
         return cp.asnumpy(eigvals)
+
+    @classmethod
+    def eigvals(cls, a: Any) -> Any:
+        # CuPy has no general (non-Hermitian) eigenvalue solver -- only
+        # eigvalsh. Fall back to CPU NumPy (the spectrum must return to host
+        # anyway), bringing any device array back first.
+        cp = cls._get_cp()
+        a_host = cp.asnumpy(a) if isinstance(a, cp.ndarray) else np.asarray(a)
+        return np.linalg.eigvals(a_host)
 
     @classmethod
     def eigh(cls, a: Any) -> tuple[Any, Any]:

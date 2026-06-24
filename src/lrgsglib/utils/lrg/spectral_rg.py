@@ -37,6 +37,7 @@ from .quantum import (
     compute_quantum_distance_matrix,
 )
 from .clustering import compute_optimal_threshold
+from ...graphs._shared._backend import BackendManager
 
 __all__ = [
     "negative_edge_fraction",
@@ -169,7 +170,7 @@ def lattice_plaquettes(side: int, periodic: bool = True) -> list:
     return plaquettes
 
 
-def spectral_frustration(G: nx.Graph) -> float:
+def spectral_frustration(G: nx.Graph, backend: str = "numpy") -> float:
     """Spectral frustration: smallest eigenvalue of Kunegis signed Laplacian.
 
     The Kunegis signed Laplacian L_s = D_|w| - A_signed is PSD. It has a
@@ -195,7 +196,7 @@ def spectral_frustration(G: nx.Graph) -> float:
     A = nx.adjacency_matrix(G, nodelist=nodes, weight="weight").toarray().astype(float)
     D = np.diag(np.abs(A).sum(axis=1))
     L = D - A
-    eigv = np.linalg.eigvalsh(L)
+    eigv = BackendManager.get_backend(backend).eigvalsh(L)
     lam_max = max(abs(eigv).max(), 1e-12)
     return float(eigv[0]) / lam_max
 
@@ -598,6 +599,7 @@ def partition_at_scale(
     linkage_method: str = "ward",
     use_abs: bool = True,
     G: Optional[nx.Graph] = None,
+    backend: str = "numpy",
 ) -> dict[str, Any]:
     """Partition nodes at a given RG scale.
 
@@ -671,7 +673,7 @@ def partition_at_scale(
         A_u = np.abs(A_u.toarray().astype(float))
         D_u = np.diag(A_u.sum(axis=1))
         L_u = D_u - A_u
-        eigv_u, eigV_u = np.linalg.eigh(L_u)
+        eigv_u, eigV_u = BackendManager.get_backend(backend).eigh(L_u)
 
         D = compute_signed_diffusion_distance(
             eigv_u, eigV_u, tau_star, use_abs=False
@@ -708,7 +710,7 @@ def partition_at_scale(
         A_u = np.abs(A_u.toarray().astype(float))
         D_u = np.diag(A_u.sum(axis=1))
         L_u = D_u - A_u
-        eigv_u, eigV_u = np.linalg.eigh(L_u)
+        eigv_u, eigV_u = BackendManager.get_backend(backend).eigh(L_u)
         D_topo = compute_signed_diffusion_distance(
             eigv_u, eigV_u, tau_star, use_abs=False
         )
@@ -963,6 +965,7 @@ def build_reduced_graph(
 
 def compute_reduced_spectrum(
     G_reduced: nx.Graph,
+    backend: str = "numpy",
 ) -> tuple[NDArray, NDArray]:
     """Compute eigenvalues and eigenvectors of the reduced graph.
 
@@ -986,7 +989,7 @@ def compute_reduced_spectrum(
     D = np.diag(np.abs(A).sum(axis=1))
     L = D - A
 
-    eigenvalues, eigenvectors = np.linalg.eigh(L)
+    eigenvalues, eigenvectors = BackendManager.get_backend(backend).eigh(L)
     return eigenvalues, eigenvectors
 
 
@@ -999,6 +1002,7 @@ def spectral_rg_step(
     sign_method: str = "separate",
     n_clusters: Optional[int] = None,
     use_abs: bool = True,
+    backend: str = "numpy",
 ) -> dict[str, Any]:
     """Perform one spectral RG step.
 
@@ -1038,7 +1042,7 @@ def spectral_rg_step(
         A = nx.adjacency_matrix(G, nodelist=nodes, weight="weight").toarray().astype(float)
         D = np.diag(np.abs(A).sum(axis=1))
         L = D - A
-        eigenvalues, eigenvectors_col = np.linalg.eigh(L)
+        eigenvalues, eigenvectors_col = BackendManager.get_backend(backend).eigh(L)
 
     # Find RG scales
     rg_info = find_rg_scales(eigenvalues, N, use_abs=use_abs)
@@ -1061,6 +1065,7 @@ def spectral_rg_step(
         n_clusters=n_clusters,
         use_abs=use_abs,
         G=G,
+        backend=backend,
     )
 
     # Build reduced graph
@@ -1091,7 +1096,7 @@ def spectral_rg_step(
         metadata["mean_boundary_frustration"] = 0.0
 
     # Compute reduced spectrum
-    eigv_r, eigV_r = compute_reduced_spectrum(G_reduced)
+    eigv_r, eigV_r = compute_reduced_spectrum(G_reduced, backend=backend)
 
     return {
         "G_reduced": G_reduced,
@@ -1117,6 +1122,7 @@ def spectral_rg_flow(
     sign_method: str = "separate",
     use_abs: bool = True,
     verbose: bool = False,
+    backend: str = "numpy",
 ) -> list[dict[str, Any]]:
     """Iterate spectral RG steps to produce a coarse-graining flow.
 
@@ -1177,6 +1183,7 @@ def spectral_rg_flow(
             partition_method=partition_method,
             sign_method=sign_method,
             use_abs=use_abs,
+            backend=backend,
         )
 
         flow.append(step)

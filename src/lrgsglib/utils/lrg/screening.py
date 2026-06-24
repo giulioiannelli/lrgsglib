@@ -728,6 +728,7 @@ def compute_graph_properties(
     graph_factory: Callable[..., Any],
     graph_params: dict[str, Any],
     seed: int = 0,
+    backend: str = "numpy",
 ) -> dict[str, Any]:
     """Compute structural properties of a graph topology.
 
@@ -773,18 +774,16 @@ def compute_graph_properties(
         "n_independent_cycles": max(E - N + 1, 0),
     }
 
-    # Spectral gap (second-smallest Laplacian eigenvalue)
+    # Spectral gap (second-smallest Laplacian eigenvalue), backend-selectable.
+    # Computed from the dense Laplacian: ARPACK ``which='SM'`` is unreliable for
+    # the smallest Laplacian eigenvalues (it converges to spurious values), so a
+    # full Hermitian solve is both correct and backend-parity-clean.
     if N > 2 and props["is_connected"]:
-        try:
-            from scipy.sparse.linalg import eigsh
-            L = nx.laplacian_matrix(G).astype(float)
-            vals = eigsh(L, k=2, which="SM", return_eigenvectors=False)
-            props["spectral_gap"] = float(sorted(vals)[1])
-        except Exception:
-            eigs = np.sort(np.linalg.eigvalsh(
-                nx.laplacian_matrix(G).toarray().astype(float)
-            ))
-            props["spectral_gap"] = float(eigs[1])
+        from ...graphs._shared._backend import BackendManager
+        be = BackendManager.get_backend(backend)
+        L = nx.laplacian_matrix(G).toarray().astype(float)
+        eigs = np.sort(be.eigvalsh(L))
+        props["spectral_gap"] = float(eigs[1])
     else:
         props["spectral_gap"] = 0.0
 

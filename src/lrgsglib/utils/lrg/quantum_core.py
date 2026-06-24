@@ -90,6 +90,7 @@ class QuantumSignedLaplacianAnalysis:
         init_node: int = 0,
         init_type: str = "localized",
         initspect: bool = True,
+        backend: str = "numpy",
     ) -> None:
         """
         Initialize quantum LRG analysis.
@@ -111,6 +112,9 @@ class QuantumSignedLaplacianAnalysis:
             (default: "localized").
         initspect : bool, optional
             Compute eigendecomposition on initialization (default: True).
+        backend : str, optional
+            Eigensolver backend forwarded to ``compute_k_eigvV``:
+            ``'numpy'`` (default), ``'scipy'``, or ``'cupy'``.
         """
         self.sg = sg
         self.tstep = tstep
@@ -118,6 +122,7 @@ class QuantumSignedLaplacianAnalysis:
         self.thex = thex
         self.init_node = init_node
         self.init_type = init_type
+        self.backend = backend
 
         # Quantum time grid
         self.tTs_quantum = np.logspace(self.tlex, self.thex, self.tstep)
@@ -128,7 +133,7 @@ class QuantumSignedLaplacianAnalysis:
 
     def __initSpectrum__(self) -> None:
         """Compute eigendecomposition if not already done."""
-        self.sg.compute_k_eigvV(backend="numpy")
+        self.sg.compute_k_eigvV(backend=self.backend)
 
     def compute_quantum_entropy(self) -> None:
         """

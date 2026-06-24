@@ -365,7 +365,8 @@ def compute_quantum_coherence(rho_t: NDArray) -> float:
 
 def von_neumann_entropy(
     rho_t: NDArray,
-    numerical_threshold: Optional[float] = None
+    numerical_threshold: Optional[float] = None,
+    backend: str = "numpy",
 ) -> float:
     """
     Compute von Neumann entropy: S_vN(ρ) = -Tr(ρ log ρ).
@@ -407,8 +408,9 @@ def von_neumann_entropy(
     if numerical_threshold is None:
         numerical_threshold = dtype_numerical_precision(np.complex128)
 
-    # Diagonalize density matrix
-    eigenvals = np.linalg.eigvalsh(rho_t)
+    # Diagonalize density matrix (backend-selectable Hermitian eigensolver)
+    from ...graphs._shared._backend import BackendManager
+    eigenvals = BackendManager.get_backend(backend).eigvalsh(rho_t)
 
     # Filter small eigenvalues
     eigenvals = eigenvals[eigenvals > numerical_threshold]

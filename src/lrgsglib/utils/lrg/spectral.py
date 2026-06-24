@@ -16,12 +16,29 @@ from ...config.const import (
     SG_LAPL_DEFAULT_TYPE,
     SG_LAPL_RW_IMAG_TOL,
 )
+from ...graphs._shared._backend import BackendManager
 #
 __all__ = [
     "get_graph_lspectrum",
     "get_graph_lspectrum_rw",
     "compute_laplacian_properties",
 ]
+
+
+# Map the legacy ``library`` argument (numpy/networkx/scipy/cupy + aliases) onto a
+# numerical backend name understood by ``BackendManager.get_backend`` (numpy is
+# the eigen backend for the "networkx" source, which has no GPU eig of its own).
+_LIBRARY_TO_BACKEND: dict[str, str] = {
+    "numpy": "numpy", "networkx": "numpy", "nx": "numpy",
+    "scipy": "scipy", "sp": "scipy",
+    "cupy": "cupy", "cp": "cupy",
+}
+
+
+def _resolve_backend(library: str | None):
+    """Return the ``BackendManager`` backend for a legacy ``library`` selector."""
+    name = _LIBRARY_TO_BACKEND.get((library or "numpy").lower(), "numpy")
+    return BackendManager.get_backend(name)
 
 
 def get_graph_lspectrum(
@@ -105,19 +122,11 @@ def get_graph_lspectrum(
         is_sym = laplacian_type == SG_LAPL_SYM
         builder = signed_sym_laplacian_matrix if is_sym else signed_rw_laplacian_matrix
         L = builder(G).toarray()
-        match library:
-            case "scipy" | "sp":
-                from scipy.linalg import eigvalsh as _eigvalsh, eigvals as _eigvals
-                w = _eigvalsh(L) if is_sym else _eigvals(L)
-            case "cupy" | "cp":
-                import cupy as cp
-
-                Lg = cp.asarray(L)
-                w = (cp.linalg.eigvalsh(Lg) if is_sym else cp.linalg.eigvals(Lg)).get()
-            case _:
-                # numpy / networkx / default: nx has no normalized signed
-                # spectrum, so compute directly from L.
-                w = np.linalg.eigvalsh(L) if is_sym else np.linalg.eigvals(L)
+        # Backend-agnostic: L_sym is symmetric (eigvalsh); L_rw is non-symmetric
+        # but isospectral to it (eigvals, real part taken below). nx has no
+        # normalized signed spectrum, so it falls back to the numpy backend.
+        backend = _resolve_backend(library)
+        w = backend.eigvalsh(L) if is_sym else backend.eigvals(L)
         if not is_sym:
             # L_rw is isospectral to the symmetric L_sym -> eigenvalues are real
             imag = float(np.max(np.abs(np.imag(w)))) if np.iscomplexobj(w) else 0.0
@@ -146,35 +155,22 @@ def get_graph_lspectrum(
     else:
         L = nx.laplacian_matrix(G)
 
-    match library:
-        case "numpy":
-            L = L.toarray()
-            w = np.linalg.eigvals(L)
-        case "networkx" | "nx" | "scipy" | "sp" | "cupy" | "cp":
-            match library:
-                case "networkx" | "nx":
-                    if signed:
-                        # networkx.laplacian_spectrum ignores signs, compute directly
-                        L = L.toarray()
-                        w = np.linalg.eigvals(L)
-                    else:
-                        w = nx.laplacian_spectrum(G)
-                        L = L.toarray()
-                case "scipy" | "sp":
-                    from scipy.linalg import eigvals
+    if library not in _LIBRARY_TO_BACKEND:
+        raise ValueError(
+            "Unsupported library. Choose from 'numpy', 'networkx', 'scipy', or 'cupy'."
+        )
 
-                    L = L.toarray()
-                    w = eigvals(L)
-                case "cupy" | "cp":
-                    import cupy as cp
-
-                    L = L.toarray()
-                    L_gpu = cp.asarray(L)
-                    w = cp.linalg.eigvals(L_gpu).get()
-        case _:
-            raise ValueError(
-                "Unsupported library. Choose from 'numpy', 'networkx', 'scipy', or 'cupy'."
-            )
+    if library in ("networkx", "nx") and not signed:
+        # networkx.laplacian_spectrum is the unsigned-spectrum source (it ignores
+        # edge signs), so it only applies to the unsigned case.
+        w = nx.laplacian_spectrum(G)
+        L = L.toarray()
+    else:
+        # The signed combinatorial Laplacian is general (non-Hermitian API kept for
+        # backward compatibility: complex, unsorted eigenvalues), dispatched to the
+        # selected backend (networkx-signed falls back to the numpy backend).
+        L = L.toarray()
+        w = _resolve_backend(library).eigvals(L)
 
     return L, w
 
@@ -182,6 +178,7 @@ def get_graph_lspectrum(
 def get_graph_lspectrum_rw(
     G: nx.Graph,
     is_signed: bool = False,
+    backend: str = "numpy",
 ) -> tuple[NDArray, NDArray]:
     """
     Symmetric normalized signed Laplacian and its spectrum (thin alias).
@@ -199,7 +196,7 @@ def get_graph_lspectrum_rw(
     from lrgsglib.graphs.nx.funcs.spectral import signed_sym_laplacian_matrix
 
     L = signed_sym_laplacian_matrix(G).toarray()
-    w = np.linalg.eigvalsh(L)
+    w = BackendManager.get_backend(backend).eigvalsh(L)
     return L, w
 
 
@@ -207,6 +204,7 @@ def compute_laplacian_properties(
     G: nx.Graph,
     tau: Optional[float] = None,
     signed: bool = False,
+    backend: str = "numpy",
 ) -> tuple[NDArray, NDArray, NDArray, NDArray, float]:
     """
     Computes the Laplacian spectrum, Laplacian matrix, rho, and Trho for graph G.
@@ -246,7 +244,7 @@ def compute_laplacian_properties(
 
         L_sparse = signed_laplacian_matrix(G)
         L = np.asarray(L_sparse.todense())
-        spectrum = np.linalg.eigvalsh(L)
+        spectrum = BackendManager.get_backend(backend).eigvalsh(L)
     else:
         spectrum = nx.laplacian_spectrum(G)
         L_sparse = nx.laplacian_matrix(G)
