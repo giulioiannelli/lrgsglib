@@ -204,7 +204,7 @@ Regular lattices with random sign assignment:
 
 .. code-block:: python
 
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
    # Create lattice with 30% negative edges
    lattice = Lattice2D(side=32, pflip=0.3, seed=42)
@@ -280,7 +280,7 @@ Creating Signed Graphs
 
 .. code-block:: python
 
-   from lrgsglib.graphs.SignedGraph import SignedGraph
+   from lrgsglib.graphs import SignedGraph
    from lrgsglib.graphs.ErdosRenyi import signed_erdos_renyi
    import networkx as nx
 

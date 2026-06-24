@@ -5,10 +5,16 @@ from .colorbars import *
 from .colormaps import *
 from .const_plotlib import *
 from .formatter import *
+from .io import *
 from .lattices import *
 from .mathplot import *
 from .tilings import *
+from .voxels import *
 from .plot3d import *
+# NOTE: .lrg (plot_graph_analysis) is intentionally NOT star-imported here: it
+# pulls in utils.lrg, which is only partially initialised at the point plotlib is
+# first imported during graph construction -> circular import. Import it directly
+# (`from lrgsglib.plotlib.lrg import plot_graph_analysis`) when needed.
 
 __all__ = [
     # ax_patches
@@ -61,10 +67,19 @@ __all__ = [
     "scheme_Lattice2DSquared",
     # formatter
     "log_latex_formatter",
+    # io
+    "save_fig",
     # lattices
     "plot_honeycomb_grid",
     "plot_honeycomb_grid_fast",
     "plot_log_distribution",
+    # voxels
+    "VOX_KW",
+    "VOX_ALPHA",
+    "VOX_GAP",
+    "explode",
+    "gap_coords",
+    "draw_voxels",
     # tilings
     "plot_hex_tiling_from_nodes",
     "plot_hex_tiling_from_pos",

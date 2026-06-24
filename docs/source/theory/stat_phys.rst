@@ -90,7 +90,7 @@ Equilibration requires O(N) single-spin updates = 1 Monte Carlo sweep.
 .. code-block:: python
 
    from lrgsglib.statsys.IsingDynamics import IsingDynamics
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
    # Create frustrated lattice
    lattice = Lattice2D(side=32, pflip=0.3, seed=42)
@@ -370,7 +370,7 @@ Mapping the Ising phase transition:
 
    import numpy as np
    from lrgsglib.statsys.IsingDynamics import IsingDynamics
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
    temperatures = np.linspace(1.0, 4.0, 20)
    magnetizations = []

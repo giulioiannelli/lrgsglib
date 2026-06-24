@@ -30,9 +30,9 @@ Module Overview
    Plotting and visualization functions specialized for signed graphs and
    lattices, including the engine- and graph-agnostic animation primitives
    (``plotlib.animation``). Structural, graph-type animation renderers live
-   under ``graphs._shared.animation`` (bound as methods on the graph classes)
-   and dynamics frame collection under ``statsys`` (e.g.
-   ``statsys.ContactProcess.frames``).
+   under ``graphs._shared.animation`` (exposed via the ``lat.animate`` /
+   ``lat.plot`` accessors on the graph classes) and dynamics frame collection
+   under ``statsys`` (e.g. ``statsys.ContactProcess.frames``).
 
 **bindings**
    Native language bindings for performance-critical operations

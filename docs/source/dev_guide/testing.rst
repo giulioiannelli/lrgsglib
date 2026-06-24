@@ -110,7 +110,7 @@ Unit Tests
    test/test_contact_process_limiting_cases.py  # Edge cases
    test/test_entropy_expm_multiply.py     # Matrix exponential
    test/test_lattice2d_spectral.py        # Lattice spectral analysis
-   test/test_lattice2d_animation.py       # Animation functionality
+   test/dynamics_tests/test_lattice2d_animation.py  # Animation functionality
    test/test_mcg_output_format.py         # MCG output verification
    test/test_quantum_propagator.py        # Quantum propagator
    test/test_voter_model.py               # Voter model dynamics
@@ -144,7 +144,7 @@ Basic Test Structure
    import pytest
    import numpy as np
    from lrgsglib.statsys.ContactProcess import ContactProcessEI
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
 
    @pytest.fixture

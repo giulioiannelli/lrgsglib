@@ -290,7 +290,7 @@ class SignedLaplacianAnalysis:
         #
         fig, ax = plt.subplots()
         #
-        animate =  self.sg.make_animation(fig, ax, self.frames_dynsys)
+        animate = self.sg.animate.make(fig, ax, self.frames_dynsys)
         ani = animation.FuncAnimation(fig, animate, frames=no_frames)
         #
         fig.tight_layout()

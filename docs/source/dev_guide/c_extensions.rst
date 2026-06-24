@@ -81,7 +81,7 @@ Ising Model Simulators
 .. code-block:: python
 
    from lrgsglib.statsys.IsingDynamics import IsingDynamics
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
    lattice = Lattice2D(side=64, pflip=0.3)
    lattice.flip_random_fract_edges()

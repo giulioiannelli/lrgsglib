@@ -22,8 +22,14 @@ MP4 = ".mp4"
 NPZ = ".npz"
 PDF = ".pdf"
 PKL = ".pkl"
+PNG = ".png"
 TXT = ".txt"
 XML = ".xml"
+# savefig defaults
+SAVEFIG_DPI = 300
+SAVEFIG_FORMATS = (PDF, PNG)
+SAVEFIG_TRANSPARENT = True
+SAVEFIG_BBOX = "tight"
 # paths
 load_dotenv()
 #

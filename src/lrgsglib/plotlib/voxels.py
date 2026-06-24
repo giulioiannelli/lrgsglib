@@ -12,6 +12,15 @@ from __future__ import annotations
 
 import numpy as np
 
+__all__ = [
+    "VOX_KW",
+    "VOX_ALPHA",
+    "VOX_GAP",
+    "explode",
+    "gap_coords",
+    "draw_voxels",
+]
+
 # Voxel cosmetics, shared across static views and movies.
 VOX_KW = dict(edgecolor="w", lw=0.25)   # per-voxel edge borders
 VOX_ALPHA = 0.5                          # default translucency of one phase

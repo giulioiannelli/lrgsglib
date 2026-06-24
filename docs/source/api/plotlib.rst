@@ -49,9 +49,10 @@ Engine- and graph-agnostic animation primitives (codec / output handling). This
 is the bottom layer of the animation stack and knows nothing about graphs.
 
 * **Structural, graph-type renderers** (e.g. the engine-agnostic 2D-lattice
-  ``imshow`` movies ``animate_states`` / ``animate_largest_cluster``) live in
-  :mod:`lrgsglib.graphs._shared.animation` and are bound as methods on the
-  lattice classes -- call them as ``lat.animate_states(states)``.
+  ``imshow`` movies) live in :mod:`lrgsglib.graphs._shared.animation` and are
+  exposed via the ``lat.animate`` / ``lat.plot`` accessors on the lattice
+  classes -- call them as ``lat.animate.states(states)`` /
+  ``lat.animate.largest_cluster(states)``.
 * **Dynamics frame collection** (running a model to produce state snapshots)
   lives with the model, e.g. :mod:`lrgsglib.statsys.ContactProcess.frames`.
 
@@ -102,6 +103,22 @@ Formatters
 ~~~~~~~~~~
 
 .. automodule:: lrgsglib.plotlib.formatter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Figure I/O
+----------
+
+.. automodule:: lrgsglib.plotlib.io
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Voxels
+------
+
+.. automodule:: lrgsglib.plotlib.voxels
    :members:
    :undoc-members:
    :show-inheritance:

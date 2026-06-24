@@ -32,7 +32,7 @@ For basic graph drawing, use NetworkX's built-in functions with lrgsglib graphs:
 
    import matplotlib.pyplot as plt
    import networkx as nx
-   from lrgsglib.graphs.ErdosRenyi import ErdosRenyi
+   from lrgsglib.graphs import ErdosRenyi
 
    # Create signed graph
    er = ErdosRenyi(nnodes=50, prob=0.15, pflip=0.3, seed=42)
@@ -70,7 +70,7 @@ Lattice2D objects have built-in position information:
 
    import matplotlib.pyplot as plt
    import numpy as np
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
    # Create lattice
    lattice = Lattice2D(side1=16, geo='sqr', pflip=0.2, seed=42)
@@ -108,7 +108,7 @@ Visualize spin states as a 2D heatmap:
 
    import matplotlib.pyplot as plt
    import numpy as np
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
    from lrgsglib.statsys.IsingDynamics import IsingDynamics
 
    # Create lattice and run Ising dynamics
@@ -139,7 +139,7 @@ Visualize eigenvector components on the lattice:
 
    import matplotlib.pyplot as plt
    import numpy as np
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
    # Create lattice and compute eigenvectors
    lattice = Lattice2D(side1=32, geo='sqr', pflip=0.2, seed=42)
@@ -178,7 +178,7 @@ Eigenvalue Distribution
 
    import matplotlib.pyplot as plt
    import numpy as np
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
 
    lattice = Lattice2D(side1=32, geo='sqr', pflip=0.3, seed=42)
    lattice.flip_random_fract_edges()
@@ -221,7 +221,7 @@ Entropy Profiles
 
    import matplotlib.pyplot as plt
    import numpy as np
-   from lrgsglib.graphs.MultiplicativeCascade import MultiplicativeCascadeGraph
+   from lrgsglib.graphs.nx import MultiplicativeCascadeGraphNX as MultiplicativeCascadeGraph
    from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
    from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 
@@ -281,7 +281,7 @@ For 3D lattices, use Matplotlib's 3D plotting:
    import matplotlib.pyplot as plt
    from mpl_toolkits.mplot3d import Axes3D
    import numpy as np
-   from lrgsglib.graphs.Lattice3D import Lattice3D
+   from lrgsglib.graphs import Lattice3D
 
    # Create 3D lattice
    lattice3d = Lattice3D(side1=6, geo='cub', pflip=0.2, seed=42)
@@ -416,7 +416,7 @@ For time-evolving visualizations, create animations:
    import matplotlib.pyplot as plt
    import matplotlib.animation as animation
    import numpy as np
-   from lrgsglib.graphs.Lattice2D import Lattice2D
+   from lrgsglib.graphs import Lattice2D
    from lrgsglib.statsys.IsingDynamics import IsingDynamics
 
    # Create lattice and run dynamics with snapshots
@@ -457,11 +457,11 @@ High-Level Animation API
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 For convenience, lrgsglib provides a high-level animation API. The simplest
-entry points are bound directly on the lattice (engine-agnostic) --
-``lat.animate_states(states)`` and ``lat.animate_largest_cluster(states)``. The
-underlying builders live in the structural, graph-type module
-:mod:`lrgsglib.graphs._shared.animation` and the generic codec primitives in
-:mod:`lrgsglib.plotlib.animation`:
+entry points are the ``lat.animate`` / ``lat.plot`` accessors on the lattice
+(engine-agnostic) -- ``lat.animate.states(states)`` and
+``lat.animate.largest_cluster(states)``. The underlying builders live in the
+structural, graph-type module :mod:`lrgsglib.graphs._shared.animation` and the
+generic codec primitives in :mod:`lrgsglib.plotlib.animation`:
 
 .. code-block:: python
 
@@ -543,6 +543,22 @@ Tips for creating publication-ready figures:
 
    plt.savefig('publication_figure.pdf', format='pdf')
    plt.show()
+
+For routine saving, :func:`lrgsglib.plotlib.save_fig` collapses the common
+"vector for the paper, raster for the slide" export into one call. It applies
+the lab's ``SAVEFIG_*`` defaults (300 DPI, ``bbox_inches='tight'``,
+``transparent=True``; all named in :mod:`lrgsglib.config.const`), creates parent
+directories, and -- for an extensionless path -- writes one file per format:
+
+.. code-block:: python
+
+   from lrgsglib.plotlib import save_fig
+
+   # extensionless base -> writes both 'figures/diffusion.pdf' and '.png'
+   save_fig(fig, 'figures/diffusion')
+
+   # explicit suffix -> a single file (defaults still applied), then close it
+   save_fig(fig, 'figures/diffusion.png', close=True)
 
 Best Practices
 --------------

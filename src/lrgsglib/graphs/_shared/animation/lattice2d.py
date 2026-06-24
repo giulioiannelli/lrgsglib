@@ -284,8 +284,9 @@ def animate_states(
     ``IPython.display.HTML`` JS animation for inline notebook display;
     ``False`` returns the raw ``matplotlib`` animation object (pure matplotlib).
     Pass ``save="movie.gif"`` / ``"movie.mp4"`` to also write a file -- a bare
-    filename lands under the lattice's own data directory
-    (``lattice.path_sgdata``), while an explicit/absolute path is used as given.
+    filename lands under the plot tree
+    (``<path_plot>/<structure>/<subfolder>``, the subfolder derived from
+    ``model`` when given), while an explicit/absolute path is used as given.
     """
     import matplotlib.pyplot as plt
 
@@ -347,7 +348,7 @@ def animate_largest_cluster(
 
     Output and ``save`` behave exactly as in :func:`animate_states`: ``inline``
     toggles JS-HTML vs a raw matplotlib animation, and a bare ``save`` filename
-    is written under ``lattice.path_sgdata``.
+    is written under the plot tree (``<path_plot>/<structure>/<subfolder>``).
     """
     import matplotlib.pyplot as plt
 
