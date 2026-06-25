@@ -33,6 +33,9 @@ dependencies = [
     "powerlaw>=1.4.0",
     "joblib>=1.0.0",
     "numba>=0.58.0",
+    "python-dotenv>=1.0.0",   # config.const: load_dotenv (imported at package import)
+    "plotly>=5.0.0",          # plotlib.plot3d (imported in the core import chain)
+    "requests>=2.25.0",       # utils.recon.protein.io (imported in the core import chain)
 ]
 
 [project.optional-dependencies]
@@ -69,8 +72,11 @@ docs = [
 cmake.build-type = "Release"
 wheel.packages = ["src/lrgsglib"]
 
-# Map wheel install paths so executables end up in the right place
-wheel.install-dir = "/"
+# CMake install() DESTINATIONs are already relative to the wheel root (e.g.
+# "lrgsglib/statsys/.../ccore"), so map them onto platlib ("") -> the compiled
+# extensions land inside the installed package. NB: "/" is rejected as an
+# absolute path by scikit-build-core >=0.11 unless experimental mode is on.
+wheel.install-dir = ""
 
 [tool.scikit-build.cmake.define]
 # Pass any custom CMake variables here if needed

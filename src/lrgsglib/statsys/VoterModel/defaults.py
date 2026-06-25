@@ -172,13 +172,15 @@ VOTER_OBS_CLDIST: str = "cldist"
 
 # ``sout`` (the spin trajectory) is the only observable whose footprint scales
 # with steps*N, so it is the one that can spill terabytes on extensive runs. It
-# is subsampled to every ``sout_every`` recorded sweeps, and the precomputed size
-# (n_rec * N int8 bytes) must not exceed ``VOTER_SOUT_MAX_BYTES`` -- the run
-# raises BEFORE writing otherwise (raise the cap or ``sout_every``). This guards
-# only the in-process backends; the C subprocess streams snapshots itself
-# (sampled by ``nSampleLog``).
+# is subsampled to every ``sout_every`` recorded sweeps; if the precomputed size
+# (n_rec * N int8 bytes) would exceed ``VOTER_SOUT_MAX_BYTES`` the run does NOT
+# raise -- it falls back to ``VOTER_SOUT_NLOG_DEFAULT`` LOG-SPACED snapshots (the
+# in-process analogue of the C ``nSampleLog``). Override with ``sout_nlog=K``
+# (explicit count) or ``sout_force_full=True`` (force the full trajectory). The
+# C subprocess streams its own snapshots, sampled by ``nSampleLog``.
 DEFAULT_SOUT_EVERY: int = 1                       # 1 = every recorded sweep (full trajectory)
-VOTER_SOUT_MAX_BYTES: int = 512 * 1024 * 1024     # 512 MiB hard guard for the sout trajectory
+VOTER_SOUT_MAX_BYTES: int = 4096 * 1024 * 1024    # 4 GiB soft cap for the sout trajectory
+VOTER_SOUT_NLOG_DEFAULT: int = 1000               # log-spaced snapshots used on fallback
 
 # Registry key under which VoterModel's solver backends are registered in
 # ``statsys._solver_engine`` (single-sourced so the model and its solvers agree).

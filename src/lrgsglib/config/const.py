@@ -16,6 +16,7 @@ ColorType = Union[
 GeneralInteger = (int, np_int)
 # extensions
 BIN = ".bin"
+GIF = ".gif"
 GML = ".gml"
 LOG = ".log"
 MP4 = ".mp4"
@@ -30,6 +31,14 @@ SAVEFIG_DPI = 300
 SAVEFIG_FORMATS = (PDF, PNG)
 SAVEFIG_TRANSPARENT = True
 SAVEFIG_BBOX = "tight"
+# fast lattice-animation video (direct RGB-stack -> ffmpeg pipe; see
+# lrgsglib.plotlib.animation.video). Lossless yuv420p keeps discrete spin
+# colours exact (no chroma/DCT smear); an even integer upscale gives a viewable,
+# chroma-aligned frame that every player (incl. VS Code) can decode.
+ANIM_VIDEO_TARGET_PX = 240   # nearest-neighbour upscale targets each frame's long edge near this
+ANIM_VIDEO_CRF = 0           # H.264 quality; 0 = lossless -> exact colours
+ANIM_VIDEO_PRESET = "ultrafast"
+ANIM_VIDEO_FPS = 12          # default playback fps for lattice animations
 # paths
 load_dotenv()
 #

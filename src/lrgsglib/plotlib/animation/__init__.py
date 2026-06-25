@@ -8,6 +8,14 @@ under :mod:`lrgsglib.graphs` (structural) and dynamics frame collection under
 from ._core import LatticeAnimationResult, render_animation, save_animation
 from .frames import make_animation_fromFrames
 from .raster import autocrop_frames, figure_to_image, frames_to_player_html
+from .video import (
+    encode_rgb_video,
+    even_upscale,
+    ffmpeg_available,
+    render_rgb_stack,
+    save_rgb_gif,
+    video_to_html,
+)
 
 __all__ = [
     "LatticeAnimationResult",
@@ -17,4 +25,10 @@ __all__ = [
     "figure_to_image",
     "autocrop_frames",
     "frames_to_player_html",
+    "ffmpeg_available",
+    "encode_rgb_video",
+    "save_rgb_gif",
+    "even_upscale",
+    "render_rgb_stack",
+    "video_to_html",
 ]

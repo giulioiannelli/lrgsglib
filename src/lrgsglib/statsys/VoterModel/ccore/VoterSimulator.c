@@ -100,7 +100,8 @@ int main(int argc, char *argv[]) {
          * distribution yet (the shared tracker is wired here via pybind; the
          * subprocess file format is a follow-up -- see the cluster-tracking TODO). */
         t_run = voter_ctmc_run(N, s, neigh_len, node_edges, eqSTEP,
-                               1, magn, NULL, absorbing, &absorbed_at, NULL);
+                               1, magn, NULL, NULL, 0, NULL,
+                               absorbing, &absorbed_at, NULL);
     } else {
         for (size_t t = 0; t < eqSTEP; ++t) {
             if (snapshot_mode && t % freq == 0)

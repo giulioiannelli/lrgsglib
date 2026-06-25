@@ -63,6 +63,7 @@ from .defaults import (
     VOTER_SOLVER_NAME,
     VOTER_SOUT_FBASE,
     VOTER_SOUT_MAX_BYTES,
+    VOTER_SOUT_NLOG_DEFAULT,
     VOTER_UPD_MODES,
     VOTER_UPD_MODES_PLANNED,
 )
@@ -169,6 +170,16 @@ class VoterModel(CBackendMixin, BinDynSys):
         Subsampling stride for the ``savedyn`` spin trajectory: keep every
         ``sout_every``-th recorded sweep (clamped to >= 1); default 1 (full
         trajectory). Bounds the trajectory's on-disk/-RAM footprint.
+    sout_nlog : int, optional
+        Record this many LOG-SPACED ``savedyn`` snapshots instead of the uniform
+        ``sout_every`` stride (the in-process analogue of ``nSampleLog``). When
+        ``None`` (default), full/uniform recording is used -- but if that would
+        exceed ``VOTER_SOUT_MAX_BYTES`` the run auto-falls back to
+        ``VOTER_SOUT_NLOG_DEFAULT`` log-spaced snapshots (with a warning) rather
+        than raising.
+    sout_force_full : bool, optional
+        Record the full ``savedyn`` trajectory even when it exceeds
+        ``VOTER_SOUT_MAX_BYTES`` (overrides the log-spaced fallback). Default False.
     savedisk : bool, optional
         Persist *enabled* observables to disk under ``dynpath`` and expose them
         as lazy, disk-backed attributes (default True; inherited from
@@ -229,6 +240,10 @@ class VoterModel(CBackendMixin, BinDynSys):
     # (see the "Disk-backed observables" section below); their backing fields
     # are initialised in ``reset_observables``.
     _voter_snapshot_mode: bool = False
+    # Resolved log-spaced savedyn sample sweeps (None = full/uniform), set per run
+    # in _begin_outputs; _sout_sample_set is its O(1)-membership companion (py loop).
+    _sout_sample_sweeps: "np.ndarray | None" = None
+    _sout_sample_set: "set | None" = None
 
     def __init__(
         self,
@@ -249,6 +264,8 @@ class VoterModel(CBackendMixin, BinDynSys):
         freq: int = 10,
         nSampleLog: int = 100,
         sout_every: int = DEFAULT_SOUT_EVERY,
+        sout_nlog: int | None = None,
+        sout_force_full: bool = False,
         **kwargs: Any,
     ) -> None:
         dynpath = getattr(sg, 'path_voter', None)
@@ -293,6 +310,12 @@ class VoterModel(CBackendMixin, BinDynSys):
         # sout (savedyn) subsampling stride: keep every ``sout_every``-th recorded
         # sweep so the trajectory's on-disk/-RAM footprint stays bounded.
         self.sout_every = max(1, int(sout_every))
+        # Log-spaced savedyn sampling: ``sout_nlog`` snapshots (None = uniform
+        # ``sout_every``). Auto-engaged with VOTER_SOUT_NLOG_DEFAULT points when the
+        # full trajectory would exceed VOTER_SOUT_MAX_BYTES, unless
+        # ``sout_force_full`` overrides the cap and records the full trajectory.
+        self.sout_nlog = None if sout_nlog is None else max(1, int(sout_nlog))
+        self.sout_force_full = bool(sout_force_full)
         self.reset_observables()
         self.sini: np.ndarray | None = None
         self.out_id: str = self.out_suffix
@@ -401,6 +424,19 @@ class VoterModel(CBackendMixin, BinDynSys):
     @magn.setter
     def magn(self, value) -> None:
         self.observables[VOTER_OBS_MAGN].set_values(value)
+
+    @property
+    def sout_sweep_times(self) -> np.ndarray:
+        """Sweep index of each recorded ``s_t`` row.
+
+        ``arange(len(s_t))`` for a full/uniform trajectory; the log-spaced sample
+        indices when ``savedyn`` subsampling is active (so ``s_t[i]`` is the
+        configuration at sweep ``sout_sweep_times[i]`` -- the x-axis for plots).
+        """
+        n = len(self.s_t)
+        if self._sout_sample_sweeps is not None:
+            return np.asarray(self._sout_sample_sweeps[:n], dtype=np.int64)
+        return np.arange(n, dtype=np.int64)
 
     @property
     def cluster_dist(self) -> list[dict[int, int]]:
@@ -610,15 +646,17 @@ class VoterModel(CBackendMixin, BinDynSys):
             self.observables[VOTER_OBS_MAGN].append(self.magnetization())
         if self.savedyn:
             sout = self.observables[VOTER_OBS_SOUT]
-            if sout.streaming:
-                # Streaming to disk (Python loop + savedisk): keep every
-                # ``sout_every``-th recorded sweep, full trajectory off-RAM.
-                if self._sout_seen % self.sout_every == 0:
-                    sout.stream_row(self.s)
-                self._sout_seen += 1
-            else:
-                # In-RAM trajectory (savedisk=False).
-                sout.append_row(self.s.copy())
+            # Log-spaced sampling (self._sout_sample_set) takes precedence over the
+            # uniform ``sout_every`` stride; either bounds the trajectory footprint.
+            sset = self._sout_sample_set
+            take = (self._sout_seen in sset if sset is not None
+                    else self._sout_seen % self.sout_every == 0)
+            if take:
+                if sout.streaming:
+                    sout.stream_row(self.s)        # off-RAM (Python loop + savedisk)
+                else:
+                    sout.append_row(self.s.copy())  # in-RAM (savedisk=False)
+            self._sout_seen += 1
         if self.track_clusters and self._cl_idx is not None:
             self.observables[VOTER_OBS_CLDIST].append(
                 dict(cluster_size_distribution(self.s, self._cl_idx, self._cl_b))
@@ -972,6 +1010,8 @@ class VoterModel(CBackendMixin, BinDynSys):
             bool(self.track_clusters),
             int(CLUSTER_MODE_CODE[self.cluster_mode]),
             bool(self.savedyn),
+            (self._sout_sample_sweeps if self._sout_sample_sweeps is not None
+             else np.empty(0, dtype=np.int64)),
         )
         self.s = np.asarray(s_out, dtype=np.int8)
         self.observables[VOTER_OBS_MAGN].set_values(magn.tolist())
@@ -1054,19 +1094,48 @@ class VoterModel(CBackendMixin, BinDynSys):
         """True for the pure-Python loop (the only backend that streams sout)."""
         return not self.runlang.lower().startswith(("c", "pb", "np", "cu"))
 
-    def _guard_sout_size(self) -> None:
-        """Refuse before writing if the (subsampled) sout would blow the cap."""
-        n_rec_est = -(-int(self.steps) // self.sout_every)   # ceil(steps / every)
-        nbytes = n_rec_est * self.N                          # int8 => 1 byte/elem
-        if nbytes > VOTER_SOUT_MAX_BYTES:
-            raise ValueError(
-                f"savedyn trajectory would be ~{nbytes / 2**20:.0f} MiB "
-                f"({n_rec_est} snapshots x N={self.N}), exceeding "
-                f"VOTER_SOUT_MAX_BYTES={VOTER_SOUT_MAX_BYTES / 2**20:.0f} MiB. "
-                f"Increase sout_every (currently {self.sout_every}), reduce steps, "
-                f"raise VOTER_SOUT_MAX_BYTES in VoterModel/defaults.py, or use the "
-                f"streaming C0S backend."
-            )
+    def _logspaced_sweeps(self, nlog: int) -> np.ndarray:
+        """``nlog`` log-spaced sweep indices in ``[0, steps)`` (incl. 0, steps-1)."""
+        steps = int(self.steps)
+        if nlog >= steps:
+            return np.arange(steps, dtype=np.int64)
+        idx = np.unique(
+            np.logspace(0.0, np.log10(steps - 1), int(nlog)).astype(np.int64))
+        idx = np.unique(np.concatenate(([0], idx, [steps - 1]))).astype(np.int64)
+        return idx[(idx >= 0) & (idx < steps)]
+
+    def _resolve_sout_sampling(self) -> "np.ndarray | None":
+        """Choose the savedyn sampling: ``None`` = full (uniform ``sout_every``),
+        otherwise a sorted array of log-spaced sweep indices.
+
+        Falls back to ``VOTER_SOUT_NLOG_DEFAULT`` log-spaced snapshots (instead of
+        raising) when the full trajectory would exceed ``VOTER_SOUT_MAX_BYTES``,
+        unless ``sout_force_full`` overrides the cap. An explicit ``sout_nlog``
+        always wins.
+        """
+        if not self.savedyn:
+            return None
+        steps = int(self.steps)
+        n_full = -(-steps // self.sout_every)        # ceil(steps / sout_every)
+        full_bytes = n_full * self.N                 # int8 => 1 byte/elem
+        if self.sout_nlog is not None and self.sout_nlog < steps:
+            return self._logspaced_sweeps(self.sout_nlog)
+        if full_bytes > VOTER_SOUT_MAX_BYTES:
+            if self.sout_force_full:
+                _warnings.warn(
+                    f"sout_force_full=True: recording the full "
+                    f"~{full_bytes / 2**20:.0f} MiB savedyn trajectory in memory "
+                    f"(cap {VOTER_SOUT_MAX_BYTES / 2**20:.0f} MiB).", stacklevel=3)
+                return None
+            nlog = VOTER_SOUT_NLOG_DEFAULT
+            _warnings.warn(
+                f"savedyn full trajectory ~{full_bytes / 2**20:.0f} MiB exceeds "
+                f"VOTER_SOUT_MAX_BYTES={VOTER_SOUT_MAX_BYTES / 2**20:.0f} MiB; "
+                f"recording {nlog} log-spaced snapshots instead. Pass sout_nlog=K "
+                f"to choose the count or sout_force_full=True to force the full "
+                f"trajectory.", stacklevel=3)
+            return self._logspaced_sweeps(nlog)
+        return None
 
     def _begin_outputs(self) -> None:
         """Resolve disk paths and open the sout stream (Python loop) before a run.
@@ -1079,6 +1148,17 @@ class VoterModel(CBackendMixin, BinDynSys):
         # Always start from a clean streaming state.
         sout.reset_stream()
         self._sout_seen = 0
+        # Resolve savedyn sampling (full | log-spaced fallback | forced-full) for
+        # the in-process backends, regardless of savedisk; the C subprocess samples
+        # its own file snapshots via nSampleLog.
+        self._sout_sample_sweeps = (
+            self._resolve_sout_sampling()
+            if self.savedyn and not self.runlang.startswith("C") else None
+        )
+        self._sout_sample_set = (
+            set(self._sout_sample_sweeps.tolist())
+            if self._sout_sample_sweeps is not None else None
+        )
         if not self.savedisk:
             return
         suf = self.out_suffix
@@ -1091,10 +1171,6 @@ class VoterModel(CBackendMixin, BinDynSys):
         if self.savedyn:
             sout.set_path(
                 self.dynpath / self.sg.get_p_fname(VOTER_SOUT_FBASE, suf, ext=BIN))
-            if not self.runlang.startswith("C"):
-                # The C subprocess streams its own snapshots (sampled by
-                # nSampleLog); guard only the in-process backends.
-                self._guard_sout_size()
             if self._is_py_runlang():
                 sout.open_stream()
 

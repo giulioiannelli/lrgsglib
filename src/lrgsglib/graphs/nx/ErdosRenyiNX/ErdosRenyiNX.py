@@ -75,7 +75,12 @@ class ErdosRenyiNX(SignedGraphNX):
         G = nx.erdos_renyi_graph(n, p)
         CC = nx.connected_components(G)
         GC = max(CC, key=len)
-        self.G = G.subgraph(GC).copy()
+        # Relabel the giant component to contiguous 0..N-1 integers. Dropping
+        # isolated nodes otherwise leaves gaps in the node labels, which breaks
+        # every positional consumer (e.g. the statsys sweepers index the state
+        # array by node id); contiguous labels are the invariant all other
+        # graph types already satisfy.
+        self.G = nx.convert_node_labels_to_integers(G.subgraph(GC).copy())
         self.syshape = self.G.number_of_nodes()
         self.syshapePth = f"N={n}_p={p:.3g}"
 

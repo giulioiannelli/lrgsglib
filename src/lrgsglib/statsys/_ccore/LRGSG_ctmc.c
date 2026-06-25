@@ -68,6 +68,21 @@ static inline void snap_record(spin_tp *psnap, size_t *pcap_rows, size_t row,
     memcpy(*psnap + (size_t)row * N, s, N * sizeof(*s));
 }
 
+/* Record the current configuration iff snap_out is requested AND either no
+ * sample list is given (snap_sweeps == NULL => record every sweep) or the
+ * current sweep `recorded` is the next sampled one. Sampled rows are packed
+ * contiguously via `snap_row`, so a log-subsampled (or early-absorbing) run
+ * allocates only the rows it actually keeps. Used identically by both impls. */
+#define VOTER_SNAP_MAYBE()                                                     \
+    do {                                                                       \
+        if (snap_out && (snap_sweeps == NULL ||                               \
+                (snap_si < n_snap_sweeps && snap_sweeps[snap_si] == recorded))) { \
+            snap_record(&snap, &snap_cap_rows, snap_row, s, N);               \
+            snap_row++;                                                        \
+            if (snap_sweeps) snap_si++;                                       \
+        }                                                                      \
+    } while (0)
+
 /*
  * Implementation core. `track` is a COMPILE-TIME literal (0 or 1) supplied by the
  * two call sites in voter_ctmc_run; being `static inline`, the compiler emits a
@@ -84,6 +99,8 @@ static inline void snap_record(spin_tp *psnap, size_t *pcap_rows, size_t row,
 static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
                                    NodesEdges node_edges, size_t n_sweeps,
                                    int save_magn, double *magn, spin_tp *snap_out,
+                                   const size_t *snap_sweeps, size_t n_snap_sweeps,
+                                   size_t *snap_rows,
                                    int absorbing, long *absorbed_at,
                                    const int track, ClusterCtx *cctx) {
     size_tp f    = __chMalloc(N * sizeof(*f));        /* frustrated edges/node */
@@ -107,11 +124,12 @@ static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
     size_t recorded = 0;     /* next integer sweep-time to record */
     spin_tp snap = NULL;     /* grown on demand, only when snap_out != NULL */
     size_t snap_cap_rows = 0;
+    size_t snap_row = 0, snap_si = 0;   /* packed snapshot row + sample cursor */
     while (recorded < n_sweeps) {
         if (total_f == 0) {                       /* frozen => absorbing */
             if (absorbing) {
                 if (save_magn) magn[recorded] = calc_magn(N, s);
-                if (snap_out) snap_record(&snap, &snap_cap_rows, recorded, s, N);
+                VOTER_SNAP_MAYBE();
                 if (track) clusters_record(cctx);
                 *absorbed_at = (long)recorded;
                 recorded++;
@@ -119,7 +137,7 @@ static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
                 double m = save_magn ? calc_magn(N, s) : 0.0;
                 while (recorded < n_sweeps) {      /* pad the frozen tail */
                     if (save_magn) magn[recorded] = m;
-                    if (snap_out) snap_record(&snap, &snap_cap_rows, recorded, s, N);
+                    VOTER_SNAP_MAYBE();
                     if (track) clusters_record(cctx);   /* distribution frozen too */
                     recorded++;
                 }
@@ -134,7 +152,7 @@ static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
         /* State is constant on [t, t_next): emit any integer times in between. */
         while (recorded < n_sweeps && (double)recorded < t_next) {
             if (save_magn) magn[recorded] = calc_magn(N, s);
-            if (snap_out) snap_record(&snap, &snap_cap_rows, recorded, s, N);
+            VOTER_SNAP_MAYBE();
             if (track) clusters_record(cctx);
             recorded++;
         }
@@ -175,6 +193,7 @@ static inline size_t ctmc_run_impl(size_t N, spin_tp s, size_tp nlen,
     free(rate);
     free(bit);
     if (snap_out) *snap_out = snap;
+    if (snap_rows) *snap_rows = snap_row;
     return recorded;
 }
 
@@ -295,9 +314,10 @@ static size_t cr_sample_node(CRBuckets *b) {
 static inline size_t ctmc_run_cr_impl(size_t N, spin_tp s, size_tp nlen,
                                       NodesEdges node_edges, size_t n_sweeps,
                                       int save_magn, double *magn,
-                                      spin_tp *snap_out, int absorbing,
-                                      long *absorbed_at, const int track,
-                                      ClusterCtx *cctx) {
+                                      spin_tp *snap_out, const size_t *snap_sweeps,
+                                      size_t n_snap_sweeps, size_t *snap_rows,
+                                      int absorbing, long *absorbed_at,
+                                      const int track, ClusterCtx *cctx) {
     size_t max_deg = 0;
     for (size_t i = 0; i < N; i++) if (nlen[i] > max_deg) max_deg = nlen[i];
     size_t stride = max_deg + 1;
@@ -331,11 +351,12 @@ static inline size_t ctmc_run_cr_impl(size_t N, spin_tp s, size_tp nlen,
     size_t recorded = 0;     /* next integer sweep-time to record */
     spin_tp snap = NULL;     /* grown on demand, only when snap_out != NULL */
     size_t snap_cap_rows = 0;
+    size_t snap_row = 0, snap_si = 0;   /* packed snapshot row + sample cursor */
     while (recorded < n_sweeps) {
         if (total_f == 0) {                       /* frozen => absorbing */
             if (absorbing) {
                 if (save_magn) magn[recorded] = calc_magn(N, s);
-                if (snap_out) snap_record(&snap, &snap_cap_rows, recorded, s, N);
+                VOTER_SNAP_MAYBE();
                 if (track) clusters_record(cctx);
                 *absorbed_at = (long)recorded;
                 recorded++;
@@ -343,7 +364,7 @@ static inline size_t ctmc_run_cr_impl(size_t N, spin_tp s, size_tp nlen,
                 double m = save_magn ? calc_magn(N, s) : 0.0;
                 while (recorded < n_sweeps) {      /* pad the frozen tail */
                     if (save_magn) magn[recorded] = m;
-                    if (snap_out) snap_record(&snap, &snap_cap_rows, recorded, s, N);
+                    VOTER_SNAP_MAYBE();
                     if (track) clusters_record(cctx);   /* distribution frozen too */
                     recorded++;
                 }
@@ -357,7 +378,7 @@ static inline size_t ctmc_run_cr_impl(size_t N, spin_tp s, size_tp nlen,
         /* State is constant on [t, t_next): emit any integer times in between. */
         while (recorded < n_sweeps && (double)recorded < t_next) {
             if (save_magn) magn[recorded] = calc_magn(N, s);
-            if (snap_out) snap_record(&snap, &snap_cap_rows, recorded, s, N);
+            VOTER_SNAP_MAYBE();
             if (track) clusters_record(cctx);
             recorded++;
         }
@@ -394,6 +415,7 @@ static inline size_t ctmc_run_cr_impl(size_t N, spin_tp s, size_tp nlen,
     free(b.npos); free(b.nkey); free(b.occ); free(b.occpos);
     free(f);
     if (snap_out) *snap_out = snap;
+    if (snap_rows) *snap_rows = snap_row;
     return recorded;
 }
 
@@ -404,12 +426,16 @@ static inline size_t ctmc_run_cr_impl(size_t N, spin_tp s, size_tp nlen,
 #define CTMC_CR_MAX_DEG 64
 #endif
 
+#undef VOTER_SNAP_MAYBE
+
 size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
                       size_t n_sweeps, int save_magn, double *magn,
-                      spin_tp *snap_out,
+                      spin_tp *snap_out, const size_t *snap_sweeps,
+                      size_t n_snap_sweeps, size_t *snap_rows,
                       int absorbing, long *absorbed_at, ClusterCtx *cctx) {
     *absorbed_at = -1;
     if (snap_out) *snap_out = NULL;
+    if (snap_rows) *snap_rows = 0;
     if (n_sweeps == 0) return 0;
 
     /* Kernel choice: composition-rejection by default (O(deg)/event), with the
@@ -431,13 +457,13 @@ size_t voter_ctmc_run(size_t N, spin_tp s, size_tp nlen, NodesEdges node_edges,
     if (use_cr) {
         if (cctx)
             return ctmc_run_cr_impl(N, s, nlen, node_edges, n_sweeps, save_magn,
-                                    magn, snap_out, absorbing, absorbed_at, 1, cctx);
+                                    magn, snap_out, snap_sweeps, n_snap_sweeps, snap_rows, absorbing, absorbed_at, 1, cctx);
         return ctmc_run_cr_impl(N, s, nlen, node_edges, n_sweeps, save_magn,
-                                magn, snap_out, absorbing, absorbed_at, 0, NULL);
+                                magn, snap_out, snap_sweeps, n_snap_sweeps, snap_rows, absorbing, absorbed_at, 0, NULL);
     }
     if (cctx)
         return ctmc_run_impl(N, s, nlen, node_edges, n_sweeps, save_magn, magn,
-                             snap_out, absorbing, absorbed_at, 1, cctx);
+                             snap_out, snap_sweeps, n_snap_sweeps, snap_rows, absorbing, absorbed_at, 1, cctx);
     return ctmc_run_impl(N, s, nlen, node_edges, n_sweeps, save_magn, magn,
-                         snap_out, absorbing, absorbed_at, 0, NULL);
+                         snap_out, snap_sweeps, n_snap_sweeps, snap_rows, absorbing, absorbed_at, 0, NULL);
 }
