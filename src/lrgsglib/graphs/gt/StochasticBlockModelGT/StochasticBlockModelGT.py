@@ -75,6 +75,7 @@ class StochasticBlockModelGT(SignedGraphGT):
         pflip: float = 0.0,
         extract_giant_component: bool = True,
         seed: Optional[int] = None,
+        **kwargs,
     ):
         self.sizes = list(sizes)
         self.p_matrix = [list(row) for row in p_matrix]
@@ -99,7 +100,7 @@ class StochasticBlockModelGT(SignedGraphGT):
             )
 
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
     def _validate_inputs(self) -> None:
         """Validate sizes and p_matrix inputs."""

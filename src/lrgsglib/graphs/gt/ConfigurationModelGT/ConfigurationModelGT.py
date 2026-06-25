@@ -58,6 +58,7 @@ class ConfigurationModelGT(SignedGraphGT):
         degree_sequence: Sequence[int],
         pflip: float = 0.0,
         seed: Optional[int] = None,
+        **kwargs,
     ):
         self.degree_sequence = list(degree_sequence)
         self.n = len(self.degree_sequence)
@@ -83,11 +84,8 @@ class ConfigurationModelGT(SignedGraphGT):
         G = self._generate_graph()
 
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
-        # Apply sign flips if requested
-        if pflip > 0:
-            self.flip_random_fract_edges()
 
     def _generate_graph(self) -> gt.Graph:
         """Generate configuration model graph using graph-tool's random_graph."""

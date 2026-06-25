@@ -68,6 +68,7 @@ class WattsStrogatzGT(SignedGraphGT):
         p: float,
         pflip: float = 0.0,
         seed: Optional[int] = None,
+        **kwargs,
     ):
         # Validate inputs
         if k >= n:
@@ -92,7 +93,7 @@ class WattsStrogatzGT(SignedGraphGT):
         G = self._generate_graph()
 
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
     def _generate_graph(self) -> gt.Graph:
         """Generate Watts-Strogatz small-world graph.

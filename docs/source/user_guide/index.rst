@@ -8,6 +8,7 @@ This guide provides comprehensive tutorials and examples for using lrgsglib. Eac
 
    graph_architecture
    graphs
+   disorder
    lattices
    advanced_graphs
    spectral
@@ -23,6 +24,9 @@ The user guide is organized into the following sections:
 
 **Graphs**
    Learn how to create and manipulate signed graphs using various topologies (Erdős-Rényi, regular, small-world, etc.)
+
+**Disorder**
+   Assign edge signs and continuous couplings with the :py:class:`~lrgsglib.graphs.Disorder` spec (support × coupling-law), realized at construction on either engine
 
 **Lattices**
    Work with 2D and 3D lattices including square, triangular, hexagonal, and cubic geometries

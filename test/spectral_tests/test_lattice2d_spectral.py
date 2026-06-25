@@ -29,7 +29,9 @@ def test_basic_lattice_generation():
     for geo in geometries:
         print(f"\n--- Testing {geo.upper()} lattice ---")
         
-        # Create a small lattice
+        # Create a small lattice. The default disorder ('rand' + 'flip') is
+        # realized at construction, so a pflip>0 lattice is signed immediately
+        # (Ne_n > 0) with no explicit flip call needed.
         lat = Lattice2D(
             side1=10,
             geo=geo,
@@ -37,7 +39,7 @@ def test_basic_lattice_generation():
             pbc=True,   # Periodic boundary conditions
             seed=42
         )
-        
+
         print(f"  Nodes: {lat.N}")
         print(f"  Edges: {lat.Ne}")
         print(f"  Negative edges: {lat.Ne_n}")

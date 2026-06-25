@@ -108,7 +108,19 @@ def flip_random_fract_edges(
         else:
             self.Ne_flips = int(self.pflip * self.Ne)
             self.check_Ne_flips()
-            self.flip_sel_edges(self.fleset[on_g], on_g=on_g)
+            # Idempotent realize: SET the current flip set to negative weight
+            # (-|w|) rather than toggling. A redundant call after the
+            # construction-time auto-flip (disorder default) is then a no-op,
+            # and the deferred (disorder=None) workflow converges here too.
+            graph = self.gr[on_g]
+            neg = {
+                (u, v): -abs(self.get_edge_data(u, v, on_g=on_g))
+                for (u, v) in self.fleset[on_g]
+            }
+            nx.set_edge_attributes(graph, values=neg, name='weight')
+            self.upd_edge_sets(on_g)
+            self.upd_GraphRepr_All(on_g)
+            self.upd_graph_matrices(on_g)
     except NflipError:
         logger.error(SG_ERRMSG_NFLIP)
         pass

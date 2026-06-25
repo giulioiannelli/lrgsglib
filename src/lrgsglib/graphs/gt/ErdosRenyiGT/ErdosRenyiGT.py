@@ -73,6 +73,7 @@ class ErdosRenyiGT(SignedGraphGT):
         extract_giant_component: bool = True,
         seed: Optional[int] = None,
         init_nw_dict: bool = SG_INIT_NW_DICT,
+        **kwargs,
     ):
         # Validate inputs
         if not 0.0 <= p <= 1.0:
@@ -104,7 +105,7 @@ class ErdosRenyiGT(SignedGraphGT):
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed,
                          sgpathn="erdos_renyi_gt",
-                         init_nw_dict=init_nw_dict)
+                         init_nw_dict=init_nw_dict, **kwargs)
 
     def _generate_graph(self) -> gt.Graph:
         """Generate Erdos-Renyi random graph using graph-tool."""
