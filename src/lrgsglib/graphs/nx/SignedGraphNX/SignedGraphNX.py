@@ -34,7 +34,7 @@ from ....utils.tools import NestedDict, ConditionalPartitioning
 from ....utils.tools.ConditionalPartitioning import ConditionalPartitioningInput
 from ._backend import Backend, BackendManager, ArrayBackend
 from ..._shared._nw_container import NwContainer
-from ..._shared._nw_geometry import hub_central_edge
+from ..._shared._nw_geometry import hub_central_edge, elementary_cell_edges
 from ..._shared._disorder import Disorder, as_disorder, structured_build_flags
 #
 logger = logging.getLogger(__name__)
@@ -1003,6 +1003,17 @@ class SignedGraphNX:
         override with a coordinate-aware centre.
         """
         return hub_central_edge(self, on_g)
+
+    def cell_edges(self, node, on_g: str = SG_REPR):
+        """Edges of ``node``'s ZERR cell — the smallest cycle through it.
+
+        Geometry-free baseline: the deterministic, engine-independent
+        lexicographically-smallest minimal face (so NX and graph-tool agree).
+        Geometric subclasses (lattices) override with a coordinate-oriented
+        plaquette so that distinct seed nodes own distinct cells in the bulk.
+        Returns ``[]`` if ``node`` lies on no cycle (tree / pendant).
+        """
+        return elementary_cell_edges(self, node, on_g)
 
     def _nw_build_flags(self) -> dict:
         """Container build-flag overrides for the requested disorder support.
