@@ -114,11 +114,8 @@ class VicsekGraphGT(MultispectralGraphGT):
         G = self._generate()
 
         # Initialize base class with generated graph
-        super().__init__(G=G, pflip=pflip, seed=seed, sgpathn=sgpathn)
+        super().__init__(G=G, pflip=pflip, seed=seed, sgpathn=sgpathn, **kwargs)
 
-        # Apply sign flips if requested
-        if pflip > 0:
-            self.flip_random_fract_edges()
 
     def _generate(self) -> "Graph":
         """Generate Vicsek graph using native graph-tool operations.

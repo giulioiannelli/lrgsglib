@@ -193,11 +193,8 @@ class GraphOfGraphsGT(SignedGraphGT):
         G = self._generate()
 
         # Initialize base class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
-        # Apply sign flips if requested
-        if pflip > 0:
-            self.flip_random_fract_edges()
 
     def _instantiate_base_graph(self) -> SignedGraphGT:
         """Create the base graph instance."""

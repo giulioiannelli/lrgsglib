@@ -83,6 +83,7 @@ class LatticeNDGT(SignedGraphGT):
             pflip=pflip,
             seed=seed,
             sgpathn=f"lnd_{shape_str}_gt",
+            **kwargs,
         )
 
     @property

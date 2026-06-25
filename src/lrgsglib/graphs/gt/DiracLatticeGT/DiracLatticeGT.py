@@ -80,11 +80,8 @@ class DiracLatticeGraphGT(SignedGraphGT):
         G = self._generate()
 
         # Initialize base class with generated graph
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
-        # Apply sign flips if requested
-        if pflip > 0:
-            self.flip_random_fract_edges()
 
     def _generate(self) -> "Graph":
         """Generate the Dirac graph. Must be implemented by subclasses."""

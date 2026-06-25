@@ -83,6 +83,18 @@ Base
 
 .. autoclass:: SignedGraph
 
+Disorder
+--------
+
+Edge signs and continuous couplings are assigned through the engine-neutral
+``Disorder`` spec (support × coupling-law), realized at construction. See the
+:doc:`../user_guide/disorder` guide for usage.
+
+.. autoclass:: Disorder
+   :members:
+
+.. autofunction:: register_coupling
+
 Lattice Graphs
 --------------
 

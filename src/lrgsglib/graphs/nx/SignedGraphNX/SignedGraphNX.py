@@ -33,6 +33,9 @@ from ....utils.lrg import compute_ising_pairwise_energy
 from ....utils.tools import NestedDict, ConditionalPartitioning
 from ....utils.tools.ConditionalPartitioning import ConditionalPartitioningInput
 from ._backend import Backend, BackendManager, ArrayBackend
+from ..._shared._nw_container import NwContainer
+from ..._shared._nw_geometry import hub_central_edge
+from ..._shared._disorder import Disorder, as_disorder, structured_build_flags
 #
 logger = logging.getLogger(__name__)
 
@@ -219,8 +222,11 @@ class SignedGraphNX:
     """
     sgpathn = "signed_graph"
     
-    # Optional class-level attributes that can be overridden by subclasses
-    nwContainer: Optional[Type[Any]] = None  # Network container class for subclasses
+    # Optional class-level attributes that can be overridden by subclasses.
+    # Defaults to the engine-neutral NwContainer so every graph (BA, Holme-Kim,
+    # …) gets the geometry-free patterns (rand, randXERR); geometric subclasses
+    # override with a container that also builds single*/*ZERR.
+    nwContainer: Optional[Type[Any]] = NwContainer  # Network container class
     syshape: Optional[int] = None  # System shape (set by topology subclasses)
     syshapePth: Optional[str] = None  # System shape path string
     #
@@ -240,6 +246,10 @@ class SignedGraphNX:
         import_fname: str = '',
         import_mode: str = SG_LOAD_M,
         backend: Union[str, Backend] = Backend.NUMPY,
+        prew: float = SG_PREW,
+        pdil: float = SG_PDIL,
+        extract_giant_component: bool = SG_DIL_EXTRACT_GIANT,
+        disorder: Optional[Union[str, "Disorder"]] = SG_DISORDER,
     ) -> None:
         """
         Initialize a SignedGraph instance.
@@ -322,8 +332,14 @@ class SignedGraphNX:
         self.largest_cc: Optional[set] = None
         self.largest_cc_subgraph: Optional[Graph] = None
         
+        # Resolve the disorder spec (support x coupling-law). A bare str/None is
+        # coerced; a Disorder carries its own pflip which then wins. The
+        # effective pflip drives the construction-time fleset selection.
+        self.disorder = as_disorder(disorder, pflip)
+        eff_pflip = self.disorder.pflip if self.disorder is not None else pflip
+
         # Validate pflip and initialize randomness
-        self._verify_pflip(pflip)
+        self._verify_pflip(eff_pflip)
         self.__init_randomness__(seed)
         
         # Ensure compatibility with topology subclasses
@@ -346,25 +362,51 @@ class SignedGraphNX:
         
         # Load or assign base graph
         self.G = (
-            self.__load_graph__(import_fname, import_mode) 
-            if self.load_g 
+            self.__load_graph__(import_fname, import_mode)
+            if self.load_g
             else G
         )
-        
+
+        # ---- Topology disorder (engine-level, before signs) ----------------
+        # Rewiring then dilution applied to every NX graph here, so any subclass
+        # that forwards prew/pdil gets them without bespoke code. Geometry
+        # subclasses (Lattice2DNX/Lattice3DNX) consume prew/pdil as their own
+        # explicit params (applied at generator time), so they are NOT forwarded
+        # here and there is no double application.
+        self._prew = prew
+        self._pdil = pdil
+        if prew > 0.0 or pdil > 0.0:
+            from ..funcs.base import rewire_edges_optimized, remove_edges
+            if prew > 0.0:
+                self.G = rewire_edges_optimized(self.G, prew)
+            if pdil > 0.0:
+                self.G = remove_edges(self.G, pdil)
+
         # Initialize graph representations
         self.__init_reprdict__()
         
         # Initialize signed graph structure (unless in const-only mode)
         if not self.only_const_mode:
             self.__init_sgraph__()
-            
-            # Initialize network dictionary if requested
-            if self.init_nw_dict:
+
+            # Build nwDict when explicitly requested OR when a structured
+            # disorder support (randXERR/…) needs the pattern to realize signs.
+            need_nw = self.init_nw_dict or (
+                self.disorder is not None and self.disorder.is_structured
+            )
+            if need_nw:
                 if self.nwContainer is not None:
-                    self.nwDict = self.nwContainer(self)
+                    self.nwDict = self.nwContainer(
+                        self, **self._nw_build_flags()
+                    )
                 else:
                     raise AttributeError(SG_ERRMSG_NW_DICT)
-            
+
+            # Realize the disorder at construction (auto-flip / distributional).
+            # Loaded graphs keep the signs read from file.
+            if self.disorder is not None and not self.load_g:
+                self._apply_disorder(self.disorder)
+
             # Initialize clustering utility
             self.__init_graph_clustering_utility__()
 
@@ -950,6 +992,87 @@ class SignedGraphNX:
                 self.__init_weights__(init_weights_val)
         self.upd_GraphRepr_All(on_g)
         self.upd_graph_matrices()
+    #
+    def get_central_edge(self, on_g: str = SG_REPR):
+        """A central edge for the ``single*`` nwDict patterns.
+
+        Base (geometry-free) implementation: the graph's hub — its
+        highest-degree node and an edge to that node's highest-degree neighbour
+        — so ``single`` / ``singleXERR`` / ``singleZERR`` supports work on any
+        graph (ER/BA/Holme-Kim/…). Geometric subclasses (lattices, DGM)
+        override with a coordinate-aware centre.
+        """
+        return hub_central_edge(self, on_g)
+
+    def _nw_build_flags(self) -> dict:
+        """Container build-flag overrides for the requested disorder support.
+
+        Geometry-free graphs default to a container that builds only
+        ``rand``/``randXERR``; a structured ``single*`` / ``*ZERR`` support
+        needs ``build_single`` / ``build_zerr`` forced on so the pattern exists.
+        Only forwarded to engine-neutral :class:`NwContainer` subclasses (the
+        bespoke lattice containers build the full set already and take no such
+        kwargs).
+        """
+        if (
+            self.disorder is None
+            or not self.disorder.is_structured
+            or not (
+                isinstance(self.nwContainer, type)
+                and issubclass(self.nwContainer, NwContainer)
+            )
+        ):
+            return {}
+        bs, bz = structured_build_flags(self.disorder.support)
+        flags: dict = {}
+        if bs:
+            flags["build_single"] = True
+        if bz:
+            flags["build_zerr"] = True
+        return flags
+
+    def _disorder_support_edges(self, d: "Disorder", on_g: str) -> list:
+        """Resolve a :class:`Disorder` support to the edges it acts on.
+
+        ``rand`` -> the random ``pflip`` fraction pre-selected in
+        ``__init_sgraph__``; ``all`` -> every edge; a structured support
+        (``randXERR``/…) -> the pattern stored in ``nwDict`` (built in
+        ``__init__`` when the disorder is structured).
+        """
+        support = d.support
+        if support == "rand":
+            return list(self.fleset[on_g])
+        if support == "all":
+            return list(self.eset[on_g])
+        if d.is_structured:
+            return list(self.nwDict[support][on_g])
+        return []
+
+    def _apply_disorder(self, d: "Disorder", on_g: Optional[str] = None) -> None:
+        """Realize a :class:`Disorder` on the graph at construction.
+
+        ``flip`` SETs the support edges to negative weight (``-|w|``,
+        idempotent); a distributional law assigns continuous couplings drawn
+        from the law (NX edge ``weight`` is a float, so no dtype change). Edge
+        sets and matrices are then refreshed from the realized weights.
+        """
+        on_g = on_g or self.on_g
+        edges = self._disorder_support_edges(d, on_g)
+        if not edges:
+            return
+        if d.is_flip:
+            vals = {
+                (u, v): -abs(self.get_edge_data(u, v, on_g=on_g))
+                for (u, v) in edges
+            }
+        else:
+            draws = d.draw(len(edges), np.random)
+            vals = {(u, v): float(w) for (u, v), w in zip(edges, draws)}
+        nx.set_edge_attributes(self.gr[on_g], values=vals, name="weight")
+        # Negative weight == flipped; recompute fleset/lfeset from the weights.
+        self.upd_edge_sets(on_g)
+        self.upd_GraphRepr_All(on_g)
+        self.upd_graph_matrices(on_g)
     #
     def __init_loaded_graph__(
         self,

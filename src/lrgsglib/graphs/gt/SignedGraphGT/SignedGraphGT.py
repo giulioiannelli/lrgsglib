@@ -38,12 +38,17 @@ except ImportError:
 import networkx as nx
 
 from .._converters import nx_to_gt, gt_to_nx, get_laplacian_matrix_gt
+from ..._shared._nw_container import NwContainer
+from ..._shared._nw_geometry import hub_central_edge
+from ..._shared._disorder import Disorder, as_disorder, structured_build_flags
+from .._topology_ops import apply_rewiring, apply_dilution
 from ....config.const import (
-    BIN, PATHDATA,
+    BIN, PATHDATA, SG_REPR,
     PATHN_GRAPH_LIST, PATHN_DYNAMICS_LIST,
     SG_LAPL_SIGNED, SG_LAPL_RW, SG_LAPL_SYM,
     SG_LAPL_TYPES, SG_LAPL_DEFAULT_TYPE, SG_LAPL_RW_IMAG_TOL,
-    SG_INIT_NW_DICT,
+    SG_INIT_NW_DICT, SG_PREW, SG_PDIL, SG_DIL_EXTRACT_GIANT,
+    SG_DISORDER,
 )
 from ....config.funcs import build_p_fname
 
@@ -114,9 +119,11 @@ class SignedGraphGT:
     >>> print(f"Negative edges: {sg.count_negative_edges()}")
     """
 
-    # Negative-link pattern container class; subclasses (e.g. Lattice2DGT) set
-    # this to their geometry-specific container. Mirrors SignedGraphNX.
-    nwContainer: Optional[type] = None
+    # Negative-link pattern container class. Defaults to the engine-neutral
+    # NwContainer so every GT graph gets the geometry-free patterns (rand,
+    # randXERR) for free; geometric subclasses (e.g. Lattice2DGT) override with
+    # a container that also builds single*/*ZERR. Mirrors SignedGraphNX.
+    nwContainer: Optional[type] = NwContainer
 
     def __init__(
         self,
@@ -126,6 +133,10 @@ class SignedGraphGT:
         path_data: Optional[Path] = None,
         sgpathn: str = "signed_graph_gt",
         init_nw_dict: bool = SG_INIT_NW_DICT,
+        prew: float = SG_PREW,
+        pdil: float = SG_PDIL,
+        extract_giant_component: bool = SG_DIL_EXTRACT_GIANT,
+        disorder: Optional[Union[str, "Disorder"]] = SG_DISORDER,
     ) -> None:
         if not GT_AVAILABLE:
             raise ImportError(
@@ -133,7 +144,10 @@ class SignedGraphGT:
                 "conda install -c conda-forge graph-tool"
             )
 
-        self._pflip = pflip
+        # Resolve the disorder spec (support x coupling-law); a Disorder's own
+        # pflip wins, otherwise the top-level pflip feeds the str/default path.
+        self.disorder = as_disorder(disorder, pflip)
+        self._pflip = self.disorder.pflip if self.disorder is not None else pflip
         self._seed = seed
         self._rng = np.random.default_rng(seed)
 
@@ -142,12 +156,44 @@ class SignedGraphGT:
         else:
             self.G = Graph(directed=False)
 
+        # A graph handed in already carrying NEGATIVE signs (e.g. converted from
+        # a signed NX graph via nx_to_gt, or loaded from disk) is respected
+        # as-is: do NOT layer construction-time random disorder on top. Freshly
+        # generated subclass graphs arrive all-positive (sign property all +1),
+        # so they auto-flip normally. Mirrors the NX ``load_g`` guard.
+        _incoming_signed = (
+            G is not None
+            and "sign" in self.G.edge_properties
+            and bool((self.G.edge_properties["sign"].a < 0).any())
+        )
+
+        # ---- Topology disorder (engine-level, before signs) ----------------
+        # Rewiring then dilution are applied to every GT graph here, so any
+        # subclass that forwards prew/pdil gets them without bespoke code.
+        # Done before the sign property is created so signs stay consistent.
+        self._prew = prew
+        self._pdil = pdil
+        if prew > 0.0:
+            self.G = apply_rewiring(self.G, prew)
+        if pdil > 0.0:
+            self.G = apply_dilution(self.G, pdil, extract_giant_component)
+            # Dilution may prune+relabel vertices (giant component); keep a
+            # geometric subclass's ``_pos`` consistent with the new graph.
+            if "pos" in self.G.vertex_properties:
+                self._pos = self.G.vertex_properties["pos"]
+
         # Ensure sign property exists
         if "sign" not in self.G.edge_properties:
             self.G.edge_properties["sign"] = self.G.new_edge_property("int", val=1)
 
         # Track edges marked for flipping
         self._flip_edges = set()
+
+        # Set once a distributional coupling law writes continuous edge weights:
+        # the signed adjacency then reads the 'weight' (double) property instead
+        # of the ±1 'sign' (int) property. Discrete sign-flip graphs keep using
+        # 'sign', so all existing behavior is byte-for-byte unchanged.
+        self._continuous_couplings = False
 
         # Lazy neighbor cache for dynamics performance
         self._neighbor_cache: dict[int, list[tuple[int, float]]] | None = None
@@ -162,10 +208,56 @@ class SignedGraphGT:
         # Mirrors SignedGraphNX: subclasses set the ``nwContainer`` class attr to
         # their geometry-specific container; here we instantiate it once.
         self.init_nw_dict = init_nw_dict
-        if self.init_nw_dict and self.nwContainer is not None:
-            self.build_nw_dict()
+        need_nw = self.init_nw_dict or (
+            self.disorder is not None and self.disorder.is_structured
+        )
+        if need_nw and self.nwContainer is not None:
+            self.build_nw_dict(**self._nw_build_flags())
 
-    def build_nw_dict(self) -> None:
+        # Realize the disorder at construction (auto-flip / distributional), so
+        # SomeGraph(pflip=0.2) is signed on GT exactly as on NX. Uniform across
+        # all GT subclasses now; the old per-subclass auto-flip calls are gone.
+        # Skipped for graphs handed in pre-signed (respect the caller's signs).
+        if self.disorder is not None and not _incoming_signed:
+            self._apply_disorder(self.disorder)
+
+    def get_central_edge(self, on_g: str = SG_REPR) -> Tuple[int, int]:
+        """A central edge for the ``single*`` nwDict patterns.
+
+        Base (geometry-free) implementation: the graph's hub — its
+        highest-degree node and an edge to that node's highest-degree neighbour
+        — so ``single`` / ``singleXERR`` / ``singleZERR`` supports work on any
+        GT graph (ER/BA/Holme-Kim/…). Geometric subclasses (``Lattice2DGT`` /
+        ``Lattice3DGT``) override with a coordinate-aware centre.
+        """
+        return hub_central_edge(self, on_g)
+
+    def _nw_build_flags(self) -> dict:
+        """Container build-flag overrides for the requested disorder support.
+
+        Geometry-free graphs default to a container that builds only
+        ``rand``/``randXERR``; a structured ``single*`` / ``*ZERR`` support
+        needs ``build_single`` / ``build_zerr`` forced on so the pattern exists.
+        Only forwarded to engine-neutral :class:`NwContainer` subclasses.
+        """
+        if (
+            self.disorder is None
+            or not self.disorder.is_structured
+            or not (
+                isinstance(self.nwContainer, type)
+                and issubclass(self.nwContainer, NwContainer)
+            )
+        ):
+            return {}
+        bs, bz = structured_build_flags(self.disorder.support)
+        flags: dict = {}
+        if bs:
+            flags["build_single"] = True
+        if bz:
+            flags["build_zerr"] = True
+        return flags
+
+    def build_nw_dict(self, **build_flags) -> None:
         """(Re)build ``self.nwDict`` from this graph's ``nwContainer``.
 
         Called automatically at construction when ``init_nw_dict=True``. Because
@@ -174,13 +266,76 @@ class SignedGraphGT:
         pattern is a snapshot of the edges that are negative *at build time*.
         Call this again after flipping to refresh ``'rand'`` (the geometric
         ``single*`` / ``rand*`` star/cell patterns do not depend on signs).
+        ``build_flags`` (``build_single`` / ``build_zerr``) force on-demand
+        construction of the structured patterns for geometry-free graphs.
         """
         if self.nwContainer is None:
             raise NotImplementedError(
                 f"{type(self).__name__} defines no nwContainer; "
                 "nwDict patterns are unavailable for this graph type."
             )
-        self.nwDict = self.nwContainer(self)
+        self.nwDict = self.nwContainer(self, **build_flags)
+
+    def _disorder_support_edges(self, d: "Disorder") -> list:
+        """Resolve a :class:`Disorder` support to a list of GT ``Edge`` objects.
+
+        ``rand`` -> a random ``pflip`` fraction (sampled via
+        :meth:`mark_flip_edges`); ``all`` -> every edge; a structured support
+        (``randXERR``/…) -> the pattern stored in ``nwDict`` (built in
+        ``__init__`` when the disorder is structured).
+        """
+        support = d.support
+        if support == "rand":
+            self.mark_flip_edges(d.pflip)
+            return list(self._flip_edges)
+        if support == "all":
+            return list(self.G.edges())
+        if d.is_structured:
+            pattern = self.nwDict[support]
+            tuples = pattern[SG_REPR] if isinstance(pattern, dict) else pattern
+            edges = []
+            for (u, v) in tuples:
+                e = self.G.edge(int(u), int(v))
+                if e is not None:
+                    edges.append(e)
+            return edges
+        return []
+
+    def _apply_disorder(self, d: "Disorder") -> None:
+        """Realize a :class:`Disorder` on the GT graph at construction.
+
+        ``flip`` SETs the support edges' ``sign`` to ``-1`` (idempotent), so
+        ``SomeGraph(pflip=0.2)`` is signed on GT exactly as on NX. Distributional
+        coupling laws require the ``sign`` property to be widened to ``double``
+        (PLAN-Disorder-Model Stage 3) and are rejected here until then.
+        """
+        if d.is_none:
+            return
+        edges = self._disorder_support_edges(d)
+        if not edges:
+            return
+        if d.is_flip:
+            sign_prop = self.G.edge_properties["sign"]
+            for e in edges:
+                sign_prop[e] = -1
+            # Record the realized set so a later no-arg flip_random_fract_edges()
+            # re-asserts it idempotently (rather than re-sampling).
+            self._flip_edges = set(edges)
+        else:
+            # Distributional couplings: write continuous values into a 'weight'
+            # (double) property and switch matrix building onto it. The discrete
+            # ±1 'sign' property is left intact; the signed Laplacian uses |J|
+            # degrees, so continuous couplings need no further change.
+            if "weight" not in self.G.edge_properties:
+                self.G.edge_properties["weight"] = self.G.new_edge_property(
+                    "double", val=1.0
+                )
+            weight_prop = self.G.edge_properties["weight"]
+            draws = d.draw(len(edges), self._rng)
+            for e, w in zip(edges, draws):
+                weight_prop[e] = float(w)
+            self._continuous_couplings = True
+        self.invalidate_cache()
 
     def __getattr__(self, name: str) -> Any:
         """Trigger lazy path initialisation for ``path_*`` attributes."""
@@ -442,7 +597,12 @@ class SignedGraphGT:
         fraction : float, optional
             Fraction to flip. If None, uses self.pflip.
         """
-        self.mark_flip_edges(fraction)
+        # Idempotent for the no-arg case: re-assert the current flip set rather
+        # than re-sampling, so a redundant call after construction-time
+        # auto-flip is a no-op. An explicit ``fraction`` re-samples; an empty
+        # flip set (deferred disorder=None workflow) samples on first call.
+        if fraction is not None or not self._flip_edges:
+            self.mark_flip_edges(fraction)
         sign_prop = self.G.edge_properties["sign"]
 
         for e in self._flip_edges:
@@ -564,8 +724,8 @@ class SignedGraphGT:
         int
             Number of edges with sign = -1.
         """
-        sign_prop = self.G.edge_properties["sign"]
-        return sum(1 for e in self.G.edges() if sign_prop[e] == -1)
+        prop = self._coupling_edge_prop()
+        return sum(1 for e in self.G.edges() if prop[e] < 0)
 
     def count_positive_edges(self) -> int:
         """
@@ -578,6 +738,20 @@ class SignedGraphGT:
         """
         return self.num_edges - self.count_negative_edges()
 
+    def _coupling_edge_prop(self):
+        """Edge property carrying the signed couplings for matrix building.
+
+        Discrete sign-flip graphs use the ±1 ``'sign'`` (int) property; graphs
+        with a distributional coupling law use the continuous ``'weight'``
+        (double) property written by :meth:`_apply_disorder`. Gated on
+        ``_continuous_couplings`` so existing behavior is unchanged.
+        """
+        if getattr(self, "_continuous_couplings", False) and (
+            "weight" in self.G.edge_properties
+        ):
+            return self.G.edge_properties["weight"]
+        return self.G.edge_properties["sign"]
+
     def get_signed_adjacency(self) -> np.ndarray:
         """
         Get signed adjacency matrix.
@@ -585,9 +759,11 @@ class SignedGraphGT:
         Returns
         -------
         np.ndarray
-            Signed adjacency matrix A where A[i,j] = sign of edge (i,j).
+            Signed adjacency matrix ``A`` where ``A[i,j]`` is the signed
+            coupling of edge ``(i,j)`` (``±1`` by default, or the continuous
+            coupling when a distributional disorder law is in effect).
         """
-        return adjacency(self.G, weight=self.G.edge_properties["sign"]).toarray()
+        return adjacency(self.G, weight=self._coupling_edge_prop()).toarray()
 
     def get_adjacency_matrix(self) -> np.ndarray:
         """
@@ -707,9 +883,15 @@ class SignedGraphGT:
             f"laplacian_type must be one of {SG_LAPL_TYPES}, got {laplacian_type!r}"
         )
 
-    def get_nodes_list(self) -> List[int]:
+    def get_nodes_list(self, on_g: Optional[str] = None) -> List[int]:
         """
         Get list of node indices.
+
+        Parameters
+        ----------
+        on_g : str, optional
+            Accepted for cross-engine API parity (GT has a single
+            representation); ignored.
 
         Returns
         -------

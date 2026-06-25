@@ -66,6 +66,7 @@ class BarabasiAlbertGT(SignedGraphGT):
         m: int,
         pflip: float = 0.0,
         seed: Optional[int] = None,
+        **kwargs,
     ):
         # Validate inputs
         if m > n:
@@ -87,11 +88,8 @@ class BarabasiAlbertGT(SignedGraphGT):
         G = self._generate_graph(seed or 0)
 
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
-        # Apply sign flips if requested
-        if pflip > 0:
-            self.flip_random_fract_edges()
 
     def _generate_graph(self, seed: int) -> gt.Graph:
         """Generate Barabasi-Albert graph using C++ extension."""

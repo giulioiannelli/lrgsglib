@@ -44,7 +44,6 @@ _NX_SPECIFIC_PARAMS = {
     "only_const_mode",
     "path_data",
     "path_plot",
-    "init_nw_dict",
 }
 
 _GT_SPECIFIC_PARAMS: set[str] = set()
