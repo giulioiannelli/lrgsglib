@@ -379,14 +379,6 @@ add_multispec_simulator(MultiSpeciesSimulator0)
 # pybind11 Python extensions
 # ===========================================================================
 
-# Signed random walk on CSR adjacency matrix (already pybind11)
-pybind11_add_module(_random_walk
-    ${SRW_CCORE}/random_walk.cpp
-)
-target_include_directories(_random_walk PRIVATE ${Python_NumPy_INCLUDE_DIRS})
-target_compile_options(_random_walk PRIVATE -O3)
-install(TARGETS _random_walk DESTINATION lrgsglib)
-
 # Ising model (base) - pybind11 binding
 pybind11_add_module(ising_model
     ${RBIM_BASE}/IsingModel.cpp

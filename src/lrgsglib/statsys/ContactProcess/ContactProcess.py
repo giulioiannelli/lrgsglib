@@ -41,8 +41,21 @@ import tqdm
 from numba import njit
 
 from .._c_backend import CBackendMixin
+from .._observables import ObservableSet, RowTrajectory, ScalarSeries
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
 from ..BinDynSys import BinDynSys
+from ...config.const import BIN
 from ...utils.tools.chronometer import time_function_accumulate
+from .defaults import (
+    CP_DENSITY_FBASE,
+    CP_OBS_DENSITY,
+    CP_OBS_SNAPSHOTS,
+    CP_SNAPSHOT_EVERY,
+    CP_SNAPSHOT_MAX_BYTES,
+    CP_SNAPSHOTS_FBASE,
+    CP_SOLVER_NAME,
+)
 
 if TYPE_CHECKING:
     from ...graphs.protocols import SignedGraphProtocol as SignedGraph
@@ -177,7 +190,6 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
     """
 
     dyn_UVclass = "contact_process"
-    s_t: list[np.ndarray] = []
 
     # CBackendMixin configuration
     _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
@@ -189,6 +201,8 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
         sg: "SignedGraph",
         *,
         state_type: Literal["binary", "bipolar"] | None = None,
+        savedensity: bool = False,
+        snapshot_every: int = CP_SNAPSHOT_EVERY,
         **kwargs: Any,
     ) -> None:
         dynpath = getattr(sg, "path_cntct", None)
@@ -201,6 +215,18 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
             state_type=state_type or "binary",
             **kwargs,
         )
+        # Disk-backed observables (Phase 2/4 spine): the active-site density
+        # series and the spin-configuration trajectory, behind the reusable
+        # ObservableSet. ``savedensity`` enables the density series (off by
+        # default to preserve legacy behaviour); ``savedyn`` enables snapshots
+        # (``s_t``); ``savedisk`` (from BinDynSys, default True) is the master
+        # switch deciding RAM vs disk.
+        self.savedensity = bool(savedensity)
+        self.snapshot_every = max(1, int(snapshot_every))
+        self.observables = ObservableSet([
+            ScalarSeries(CP_OBS_DENSITY, dtype=np.float64),
+            RowTrajectory(CP_OBS_SNAPSHOTS, ncols=sg.N, dtype=np.int8),
+        ])
         self.reset_observables()
         self.sini: np.ndarray | None = None
         self.stderr_path: Path | None = None
@@ -209,12 +235,110 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
         self.out_id: str = self.out_suffix
 
     # ------------------------------------------------------------------
+    # Disk-backed observables (lazy views over the ObservableSet)
+    # ------------------------------------------------------------------
+    @property
+    def s_t(self):
+        """Spin-configuration trajectory: an in-RAM list of per-sweep states
+        (``savedisk=False``) or a read-only ``(n_rec, N)`` memmap once streamed
+        to disk (``savedisk=True`` + ``savedyn``)."""
+        return self.observables[CP_OBS_SNAPSHOTS].data
+
+    @s_t.setter
+    def s_t(self, value) -> None:
+        self.observables[CP_OBS_SNAPSHOTS].set_rows(value)
+
+    @property
+    def density(self) -> list:
+        """Active-site density series rho(t) = <s> over MCMC time (populated when
+        ``savedensity=True``); lazily disk-backed when persisted."""
+        return self.observables[CP_OBS_DENSITY].data
+
+    @density.setter
+    def density(self, value) -> None:
+        self.observables[CP_OBS_DENSITY].set_values(value)
+
+    # ------------------------------------------------------------------
     # Utility helpers
     # ------------------------------------------------------------------
     def reset_observables(self) -> None:
         """Reset cached observables collected during a run."""
 
-        self.s_t = []
+        self.observables.reset()
+        self._snap_seen = 0
+
+    # ------------------------------------------------------------------
+    # Observable recording / persistence (Python backends)
+    # ------------------------------------------------------------------
+    def _is_py_runlang(self) -> bool:
+        """True for the pure-Python loop (the only backend that streams snapshots
+        through the ObservableSet); C backends write their own files."""
+        return not self.runlang.upper().startswith("C")
+
+    def _record(self) -> None:
+        """Sample the enabled observables for the current sweep (Python loop).
+
+        Records *before* the sweep advances ``self.s`` (matching the legacy
+        ``s_t.append(self.s.copy())`` cadence: states at sweep times 0..steps-1).
+        """
+        if self.savedensity:
+            self.observables[CP_OBS_DENSITY].append(self.magnetization())
+        if self.savedyn:
+            snap = self.observables[CP_OBS_SNAPSHOTS]
+            if snap.streaming:
+                # Streaming to disk: keep every ``snapshot_every``-th sweep.
+                if self._snap_seen % self.snapshot_every == 0:
+                    snap.stream_row(self.s)
+                self._snap_seen += 1
+            else:
+                snap.append_row(self.s.copy())
+
+    def _guard_snapshot_size(self) -> None:
+        """Refuse before writing if the (subsampled) trajectory would blow the cap."""
+        n_rec_est = -(-int(self.steps) // self.snapshot_every)   # ceil(steps / every)
+        nbytes = n_rec_est * self.N                              # int8 => 1 byte/elem
+        if nbytes > CP_SNAPSHOT_MAX_BYTES:
+            raise ValueError(
+                f"savedyn trajectory would be ~{nbytes / 2**20:.0f} MiB "
+                f"({n_rec_est} snapshots x N={self.N}), exceeding "
+                f"CP_SNAPSHOT_MAX_BYTES={CP_SNAPSHOT_MAX_BYTES / 2**20:.0f} MiB. "
+                f"Increase snapshot_every (currently {self.snapshot_every}), reduce "
+                f"steps, or raise CP_SNAPSHOT_MAX_BYTES in ContactProcess/defaults.py."
+            )
+
+    def _begin_outputs(self) -> None:
+        """Resolve disk paths and open the snapshot stream before a Python run.
+
+        No-op (observables stay in RAM) unless ``savedisk`` is on; only the
+        Python backends stream through the ObservableSet (the C subprocess writes
+        its own density/snapshot files).
+        """
+        snap = self.observables[CP_OBS_SNAPSHOTS]
+        snap.reset_stream()
+        self._snap_seen = 0
+        if not self.savedisk or not self._is_py_runlang():
+            return
+        suf = self.out_suffix
+        if self.savedensity:
+            self.observables[CP_OBS_DENSITY].set_path(
+                self.dynpath / self.sg.get_p_fname(CP_DENSITY_FBASE, suf, ext=BIN))
+        if self.savedyn:
+            snap.set_path(
+                self.dynpath / self.sg.get_p_fname(CP_SNAPSHOTS_FBASE, suf, ext=BIN))
+            self._guard_snapshot_size()
+            snap.open_stream()
+
+    def _persist_observables(self) -> None:
+        """Finalize disk artifacts and switch attributes to disk-backed views."""
+        if not self.savedisk or not self._is_py_runlang():
+            return
+        snap = self.observables[CP_OBS_SNAPSHOTS]
+        # Close a streamed trajectory (no-op if never opened).
+        snap.close_stream()
+        if self.savedyn and snap.path is not None:
+            snap.finalize_batch(subsample=self.snapshot_every)
+        if self.savedensity:
+            self.observables[CP_OBS_DENSITY].persist()
 
     def _iter_neighbour_data(self, node: int) -> Iterable[tuple[int, float]]:
         return self.sg.get_neighbors_with_weights(node)
@@ -255,11 +379,12 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
         dsNstep = self.dsNstep()
         nodes = np.arange(self.N)
         iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
+        self._begin_outputs()
         for _ in iterator:
-            if self.savedyn:
-                self.s_t.append(self.s.copy())
+            self._record()
             np.random.shuffle(nodes)
             dsNstep(nodes)
+        self._persist_observables()
 
     def run_py(self, tqdm_on: bool = False) -> None:
         self.contact_sampling(tqdm_on)
@@ -318,6 +443,14 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
+    def _resolve_backend(self) -> SolverBackend:
+        """Map the runlang code to a solver family: a leading ``C`` selects the C
+        subprocess (``C0`` SIR / ``C1*`` EI), anything else the Python loop."""
+        return (
+            SolverBackend.C if self.runlang.upper().startswith("C")
+            else SolverBackend.PY
+        )
+
     @time_function_accumulate(auto_log=False)
     def run(
         self,
@@ -327,16 +460,22 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
         verbose: bool = False,
         clean_export: bool = True,
     ) -> None:
+        """Run contact-process dynamics through the shared solver registry.
+
+        Behaviour-preserving front door for the old runlang if/else: the runlang
+        resolves to a backend (``py`` Python loop / ``C`` subprocess), the
+        registry hands back its solver, and the C subprocess's transient export
+        files are cleaned afterwards when ``clean_export`` is set.
+        """
+        backend = self._resolve_backend()
+        solver = get_solver(CP_SOLVER_NAME, backend)
+        solver.supports(self)
         self.check_attribute()
         self.initialize_run_parameters(steps, simref)
-        if self.runlang.startswith("C"):
-            self.build_cprogram_command()
-            self.run_cprogram(verbose)
-            if clean_export:
-                self.remove_run_c_files()
-                self.sg.remove_exported_files()
-        else:
-            self.contact_sampling(tqdm_on)
+        solver.execute(self, tqdm_on=tqdm_on, verbose=verbose)
+        if backend is SolverBackend.C and clean_export:
+            self.remove_run_c_files()
+            self.sg.remove_exported_files()
 
 
 class ContactProcessSIR(ContactProcessBase):
@@ -725,67 +864,42 @@ class ContactProcessEI(ContactProcessBase):
             args.append(f"{self.num_log_samples}")
         return args
 
-    def run(
-        self,
-        tqdm_on: bool = True,
-        steps: int | None = None,
-        simref: float | None = None,
-        verbose: bool = False,
-        clean_export: bool = True,
-    ) -> None:
-        """Run contact process dynamics (C1*, CU, or Python backend).
+    def _resolve_backend(self) -> SolverBackend:
+        """EI accepts only the unified ``C1*`` / ``CU`` C subprocess or ``py``."""
+        u = self.runlang.upper()
+        if u.startswith("C1") or u == "CU":
+            return SolverBackend.C
+        if u == "PY":
+            return SolverBackend.PY
+        raise ValueError(
+            f"ContactProcessEI supports C1*, 'CU', or 'py' backends, "
+            f"got '{self.runlang}'"
+        )
 
-        Parameters
-        ----------
-        tqdm_on : bool, optional
-            Show progress bar (default: True)
-        steps : int, optional
-            Number of Monte Carlo sweeps (default: None, uses existing config)
-        simref : float, optional
-            Size-normalised time (steps = simref * N). Ignored if ``steps`` is provided.
-        verbose : bool, optional
-            Verbose output (default: False)
-        clean_export : bool, optional
-            Clean up exported files after run (default: True)
+    def run_py(self, tqdm_on: bool = False) -> None:
+        """Python backend: the numba-optimized lambda-cache sweep (overrides the
+        base scalar ``contact_sampling`` loop).
+
+        Run setup (``check_attribute`` / ``initialize_run_parameters``) is
+        performed by the inherited ``run()`` dispatcher before this is invoked.
         """
-        runlang_upper = self.runlang.upper()
-
-        if runlang_upper.startswith("C1") or runlang_upper in ("CU",):
-            # Use C backend (C1, C1D, C1S, or deprecated C1a-g/CU)
-            super().run(
-                tqdm_on=tqdm_on,
-                steps=steps,
-                simref=simref,
-                verbose=verbose,
-                clean_export=clean_export,
+        iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
+        self._begin_outputs()
+        for _ in iterator:
+            self._record()
+            # numba-optimized sweep (random node selection + incremental lambda)
+            self._sweep_ei_lambda_cache(
+                self.s,
+                self._lambda_arr,
+                self._neigh_indices,
+                self._neigh_weights,
+                self._neigh_offsets,
+                self._reverse_weights,
+                self.gamma_eff,
+                self._activation_fn,
+                self.N,
             )
-        elif runlang_upper == "PY":
-            # Use Python backend with numba-optimized sweep
-            self.check_attribute()
-            self.initialize_run_parameters(steps=steps, simref=simref)
-
-            # Use optimized sweep directly instead of contact_sampling
-            iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
-            for _ in iterator:
-                if self.savedyn:
-                    self.s_t.append(self.s.copy())
-
-                # Call numba-optimized sweep
-                self._sweep_ei_lambda_cache(
-                    self.s,
-                    self._lambda_arr,
-                    self._neigh_indices,
-                    self._neigh_weights,
-                    self._neigh_offsets,
-                    self._reverse_weights,
-                    self.gamma_eff,
-                    self._activation_fn,
-                    self.N
-                )
-        else:
-            raise ValueError(
-                f"ContactProcessEI supports C1*, 'CU', or 'py' backends, got '{self.runlang}'"
-            )
+        self._persist_observables()
 
 
 def ContactProcess(sg: "SignedGraph", *args: Any, **kwargs: Any):
@@ -808,3 +922,9 @@ def ContactProcess(sg: "SignedGraph", *args: Any, **kwargs: Any):
     ):
         return ContactProcessEI(sg, *args, **kwargs)
     return ContactProcessSIR(sg, *args, **kwargs)
+
+
+# Register ContactProcess's solver backends (py / C) in the shared solver
+# registry. Imported after the classes so that importing ContactProcess wires up
+# dispatch; no circular import (``_solvers`` does not import these classes).
+from . import _solvers  # noqa: E402,F401

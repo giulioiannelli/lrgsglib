@@ -14,6 +14,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ..BinDynSys import BinDynSys
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
+from .defaults import SRW_COPY_SOLVER_NAME
 
 if TYPE_CHECKING:
     from ...graphs.protocols import SignedGraphProtocol as SignedGraph
@@ -74,9 +77,19 @@ class SignedSpinCopy(BinDynSys):
         ]
         subprocess.call(self.cprogram)
 
-    def run(self, **kwargs) -> None:
-        """Dispatch to Python or C backend based on ``runlang``."""
+    def _resolve_backend(self) -> SolverBackend:
+        """Map the runlang code to a solver family (``py`` / ``C``)."""
         if self.runlang.startswith("py"):
-            self.run_py()
-        elif self.runlang.startswith("C"):
-            self.run_c(**kwargs)
+            return SolverBackend.PY
+        if self.runlang.startswith("C"):
+            return SolverBackend.C
+        raise ValueError(
+            f"SignedSpinCopy supports 'py' or 'C' backends, got {self.runlang!r}."
+        )
+
+    def run(self, **kwargs) -> None:
+        """Dispatch to the Python or C backend through the shared solver registry."""
+        backend = self._resolve_backend()
+        solver = get_solver(SRW_COPY_SOLVER_NAME, backend)
+        solver.supports(self)
+        solver.execute(self, **kwargs)

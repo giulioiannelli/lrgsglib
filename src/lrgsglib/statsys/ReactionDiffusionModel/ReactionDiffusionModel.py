@@ -24,7 +24,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .._c_backend import CBackendMixin
+from .._csr import build_graph_csr
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
 from ..ContDynSys import ContDynSys
+from .defaults import RD_SOLVER_NAME
 from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
@@ -229,6 +233,36 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
         return [getattr(self, 'sfout', None)]
 
     # ------------------------------------------------------------------
+    # Native (pybind11) backend
+    # ------------------------------------------------------------------
+    def _run_pybind(self) -> None:
+        """Integrate via the in-process ``_rd_native`` RK4 kernel.
+
+        Marshals the graph into the engine-agnostic CSR triple (NX + GT) and
+        runs the same ``rd_rhs`` + ``rk4_step`` kernels the C subprocess uses,
+        with the identical per-step clamp to [0, inf). Deterministic, so it
+        matches the Python integrator numerically. Mirrors
+        ``KuramotoModel._run_pybind``.
+        """
+        from .ccore import _rd_native
+
+        ni, nw, nptr = build_graph_csr(self.sg, self.N)
+        u0 = np.ascontiguousarray(self.s, dtype=np.float64)
+        # Resolve reaction params exactly as the Python ``_reaction`` does.
+        r = float(self.reaction_params.get("r", 1.0))
+        a = float(self.reaction_params.get("a", 0.5))
+        save_mean = bool(getattr(self, "savedyn", False))
+        u, mean = _rd_native.rd_sampling(
+            u0, ni, nw, nptr,
+            float(self.D), float(self.dt),
+            str(self.reaction), r, a,
+            int(self.steps), save_mean,
+        )
+        self.s = u
+        if save_mean:
+            self.mean_concentrations = mean.tolist()
+
+    # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
     @time_function_accumulate(auto_log=False)
@@ -239,11 +273,23 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
         **kw: Any,
     ) -> None:
         self.check_attribute()
+        # Resolve the solver family from the runlang code (C check is
+        # case-sensitive on a leading "C" to avoid catching native prefixes).
         if self.runlang.startswith("C"):
-            self.build_cprogram_command()
-            self.run_cprogram(verbose)
-            if clean_export:
+            backend = SolverBackend.C
+        elif self.runlang.lower().startswith("pb"):
+            backend = SolverBackend.PB
+        else:
+            backend = SolverBackend.PY
+        solver = get_solver(RD_SOLVER_NAME, backend)
+        solver.supports(self)
+        try:
+            solver.execute(self, verbose=verbose)
+        finally:
+            if backend is SolverBackend.C and clean_export:
                 self.remove_run_c_files()
                 self.sg.remove_exported_files()
-        else:
-            self.run_py(verbose=verbose)
+
+
+# Register ReactionDiffusionModel's solver backends (py/pb/C) in the registry.
+from . import _solvers  # noqa: E402,F401
