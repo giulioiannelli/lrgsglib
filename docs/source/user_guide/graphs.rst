@@ -15,13 +15,15 @@ Core Concepts
   weights represent antagonistic or frustrated links.
 - **Signed edge sets**: ``SignedGraph`` tracks edge sets in ``eset``
   (all edges), ``fleset`` (negative edges), and ``lfeset`` (positive edges).
-- **Sign flips**: use ``flip_random_fract_edges`` or ``flip_sel_edges`` to
-  apply signs to the underlying NetworkX graph.
+- **Disorder**: signs (and continuous couplings) are assigned via the
+  :py:class:`~lrgsglib.graphs.Disorder` spec and **realized at construction**.
+  ``flip_sel_edges`` still applies a hand-picked set of flips. See
+  :doc:`disorder` for the full model.
 
 Creating a SignedGraph
 ----------------------
 
-From a NetworkX graph:
+From a NetworkX graph — ``pflip`` is applied during construction:
 
 .. code-block:: python
 
@@ -29,8 +31,7 @@ From a NetworkX graph:
    from lrgsglib.graphs import SignedGraph
 
    G = nx.path_graph(6)
-   sg = SignedGraph(G, pflip=0.25, seed=123)
-   sg.flip_random_fract_edges()  # apply signs to edge weights
+   sg = SignedGraph(G, pflip=0.25, seed=123)  # already signed
 
    print(sg.N, sg.Ne, sg.Ne_n)
 
@@ -40,10 +41,17 @@ From built-in generators:
 
    from lrgsglib.graphs import ErdosRenyi
 
-   er = ErdosRenyi(n=200, p=0.05, pflip=0.2, seed=7)
-   er.flip_random_fract_edges()
+   er = ErdosRenyi(n=200, p=0.05, pflip=0.2, seed=7)  # already signed
 
-   print(er.N, er.Ne)
+   print(er.N, er.Ne, er.Ne_n)
+
+.. note::
+
+   Construction realizes the disorder, so a separate
+   ``flip_random_fract_edges()`` call is no longer required (it remains an
+   idempotent no-op for backward compatibility). Pass ``disorder=None`` to defer
+   sign realization, or a :py:class:`~lrgsglib.graphs.Disorder` for structured /
+   continuous couplings — see :doc:`disorder`.
 
 Signed Graph Utilities
 ----------------------
@@ -82,12 +90,12 @@ Set a ``seed`` in constructors to make stochastic steps deterministic:
 
 .. code-block:: python
 
-   sg = SignedGraph(G, pflip=0.1, seed=42)
-   sg.flip_random_fract_edges()
+   sg = SignedGraph(G, pflip=0.1, seed=42)  # disorder realized deterministically
 
 Next Steps
 ----------
 
+- :doc:`disorder` for the full disorder model (supports × coupling laws)
 - :doc:`lattices` for 2D and 3D lattice construction
 - :doc:`spectral` for Laplacian spectra and embeddings
 - :doc:`dynamics` for statistical physics simulations

@@ -66,6 +66,7 @@ class Lattice3DGT(SignedGraphGT):
         periodic: bool = False,
         seed: Optional[int] = None,
         init_nw_dict: bool = SG_INIT_NW_DICT,
+        **kwargs,
     ):
         # Validate inputs
         if geo not in self.GEOMETRIES:
@@ -115,7 +116,7 @@ class Lattice3DGT(SignedGraphGT):
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed,
                          sgpathn=f"l3d_{geo}_gt",
-                         init_nw_dict=init_nw_dict)
+                         init_nw_dict=init_nw_dict, **kwargs)
 
     def get_central_edge(self, on_g: str = L3D_ONREP) -> Tuple[int, int]:
         """Return a bulk edge nearest the geometric centre of the lattice.

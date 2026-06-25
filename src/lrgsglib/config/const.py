@@ -94,6 +94,13 @@ SG_PFLIP = 0.0
 SG_IMPORT_ON = False
 SG_IMPORT_EIGV = False
 SG_INIT_NW_DICT = False
+SG_PREW = 0.0   # default edge-rewiring fraction (small-world); 0 = no rewiring
+SG_PDIL = 0.0   # default bond-dilution fraction; 0 = no dilution
+SG_DIL_EXTRACT_GIANT = True  # after dilution, keep largest connected component
+SG_DISORDER = 'rand'   # default disorder support; see graphs/_shared/_disorder.py.
+                       # 'rand'+pflip=0 -> positive graph (backward compatible);
+                       # None -> defer (select fleset, realize signs manually later)
+SG_COUPLING = 'flip'   # default coupling law: w -> -w (sign flip, the ±1 behavior)
 SG_INIT_WVAL = 1.0
 SG_EXPORT_M = 'pk'
 SG_LOAD_M = 'pk'

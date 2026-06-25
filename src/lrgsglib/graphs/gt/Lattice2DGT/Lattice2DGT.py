@@ -111,6 +111,7 @@ class Lattice2DGT(SignedGraphGT):
         seed: Optional[int] = None,
         with_positions: bool = L2D_WITH_POS,
         init_nw_dict: bool = SG_INIT_NW_DICT,
+        **kwargs,
     ):
         # Normalise geo (accept short alias or full name) to a canonical base
         base, geo_label = self._normalise_geo(geo, prew)
@@ -156,7 +157,7 @@ class Lattice2DGT(SignedGraphGT):
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed,
                          sgpathn=f"l2d_{geo_label}_gt",
-                         init_nw_dict=init_nw_dict)
+                         init_nw_dict=init_nw_dict, **kwargs)
 
     @classmethod
     def _normalise_geo(cls, geo: str, prew: float) -> Tuple[str, str]:

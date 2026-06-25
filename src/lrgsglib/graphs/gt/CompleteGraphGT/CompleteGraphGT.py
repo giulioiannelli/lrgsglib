@@ -81,7 +81,7 @@ class CompleteGraphGT(SignedGraphGT):
         else:
             G = gt.Graph(directed=False)
 
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
     @abstractmethod
     def _init_network(self) -> gt.Graph:

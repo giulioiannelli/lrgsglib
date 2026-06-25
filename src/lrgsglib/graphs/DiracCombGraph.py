@@ -46,7 +46,6 @@ _NX_SPECIFIC_PARAMS = {
     "stdFnameSFFX",
     "path_data",
     "path_plot",
-    "init_nw_dict",
 }
 
 _GT_SPECIFIC_PARAMS: set[str] = set()

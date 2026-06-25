@@ -251,11 +251,8 @@ class BipartiteGraphGT(SignedGraphGT):
             self.bottom_nodes: Set[int] = set()
 
         # Initialize base class with generated graph
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
-        # Apply sign flips if requested
-        if pflip > 0 and not only_const_mode:
-            self.flip_random_fract_edges()
 
     def _init_std_fname(self, suffix: str = "") -> None:
         """Initialize standard filename."""

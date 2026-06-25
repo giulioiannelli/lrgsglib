@@ -69,6 +69,7 @@ class RandomGeometricGT(SignedGraphGT):
         pflip: float = 0.0,
         seed: Optional[int] = None,
         extract_giant_component: bool = False,
+        **kwargs,
     ):
         if n <= 0:
             raise ValueError(f"n must be positive, got {n}")
@@ -97,11 +98,8 @@ class RandomGeometricGT(SignedGraphGT):
             G, self._pos = self._extract_gc(G, self._pos)
 
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
-        # Apply sign flips if requested
-        if pflip > 0:
-            self.flip_random_fract_edges()
 
     @staticmethod
     def _extract_gc(

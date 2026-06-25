@@ -89,11 +89,8 @@ class FullyConnectedGT(SignedGraphGT):
             self._add_positions(G)
 
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed)
+        super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
-        # Apply sign flips if requested
-        if pflip > 0:
-            self.flip_random_fract_edges()
 
     def _generate_graph(self) -> gt.Graph:
         """Generate complete graph using C++ extension."""

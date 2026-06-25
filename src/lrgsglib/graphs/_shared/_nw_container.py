@@ -1,22 +1,26 @@
-"""Configurable negative-link (``nwDict``) pattern container for GT graphs.
+"""Engine-neutral negative-link (``nwDict``) pattern container.
 
-A single base, ``GTnwContainer``, builds the negative-link defect patterns that
-the NX engine exposes per graph class, driven by two class-level flags so each
-GT graph type opts into exactly the patterns its NX counterpart has:
+A single base, ``NwContainer``, builds the negative-link defect patterns for
+**any** signed graph on **either** engine (NX or GT). It is the default
+``nwContainer`` on both ``SignedGraph`` bases, so every graph — lattices, ER, BA,
+Holme-Kim, … — gets the geometry-free patterns (``rand``, ``randXERR``) for free.
+Two class-level flags add the geometry-dependent patterns where they apply:
 
 ==================  ==============  =============  =================================
 graph class         build_single    build_zerr     keys built
 ==================  ==============  =============  =================================
-ErdosRenyiGT        False           False          rand, randXERR
-Lattice3DGT         True            False          single, singleXERR, rand, randXERR
-Lattice2DGT         True            True           + singleZERR, randZERR
+default (ER/BA/…)   False           False          rand, randXERR
+Lattice3D           True            False          single, singleXERR, rand, randXERR
+Lattice2D           True            True           + singleZERR, randZERR
 ==================  ==============  =============  =================================
 
 The geometry is delegated to the engine-neutral helpers in ``_nw_geometry``
 (star = XERR, elementary cell = generalized ZERR, all over the cross-engine
 ``get_graph_neighbors`` seam), so there is no per-engine or per-geometry pattern
 code here. ``single*`` patterns require the graph to implement
-``get_central_edge`` (lattices do; ErdosRenyi does not, hence ``build_single``).
+``get_central_edge`` (lattices do; non-geometric graphs do not, hence
+``build_single`` defaults ``False``). ``GTnwContainer`` is kept as a back-compat
+alias.
 """
 from __future__ import annotations
 
@@ -56,8 +60,8 @@ def geometric_central_edge(sg: Any, on_g: str = SG_REPR) -> Edge:
     return (central, nb)
 
 
-class GTnwContainer(dict):
-    """Negative-link pattern dict for the graph-tool engine (see module doc)."""
+class NwContainer(dict):
+    """Engine-neutral negative-link pattern dict (see module doc)."""
 
     #: build ``single`` / ``singleXERR`` (needs ``sg.get_central_edge``).
     build_single: bool = False
@@ -69,10 +73,21 @@ class GTnwContainer(dict):
         sg: Any,
         iterable=(),
         constant: Any = None,
+        *,
+        build_single: bool | None = None,
+        build_zerr: bool | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.update((key, constant) for key in iterable)
+
+        # Per-build overrides win over the class-level defaults. Lattices set
+        # the flags True as class attrs; geometry-free graphs (ER/BA/…) leave
+        # them False but the engine base passes an override here when a
+        # structured ``single*`` / ``*ZERR`` disorder support is requested, so
+        # those patterns build on demand for *any* subclass.
+        bs = self.build_single if build_single is None else build_single
+        bz = self.build_zerr if build_zerr is None else build_zerr
 
         self.sg = sg
         self.rd = sg.graph_reprs
@@ -80,13 +95,13 @@ class GTnwContainer(dict):
             g: random.sample(sg.get_nodes_list(), sg.nflip) for g in self.rd
         }
 
-        if self.build_single:
+        if bs:
             self.centedge = {g: sg.get_central_edge(g) for g in self.rd}
             self["single"] = {g: [self.centedge[g]] for g in self.rd}
             self["singleXERR"] = {
                 g: star_edges(sg, self.centedge[g][0], g) for g in self.rd
             }
-            if self.build_zerr:
+            if bz:
                 self["singleZERR"] = {
                     g: elementary_cell_edges(sg, self.centedge[g][0], g)
                     for g in self.rd
@@ -94,7 +109,7 @@ class GTnwContainer(dict):
 
         self["rand"] = {g: list(sg.fleset[g]) for g in self.rd}
         self["randXERR"] = {g: self._rand_pattern("XERR", g) for g in self.rd}
-        if self.build_zerr:
+        if bz:
             self["randZERR"] = {g: self._rand_pattern("ZERR", g) for g in self.rd}
 
     def get_links_XERR(self, node: Any, on_g: str = SG_REPR) -> List[Edge]:
@@ -148,4 +163,7 @@ class GTnwContainer(dict):
         return pattern
 
 
-__all__ = ["GTnwContainer"]
+# Back-compat alias (was GT-only before the container became engine-neutral).
+GTnwContainer = NwContainer
+
+__all__ = ["NwContainer", "GTnwContainer", "geometric_central_edge"]

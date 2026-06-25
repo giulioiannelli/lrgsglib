@@ -80,6 +80,33 @@ def neighbors_at_distance(sg, node: Any, R: int, on_g: str) -> List[Any]:
     return [n for n, d in dist.items() if d == R]
 
 
+def hub_central_edge(sg, on_g: str) -> Edge:
+    """A graph-general central edge: the highest-degree node and an edge to its
+    highest-degree neighbour.
+
+    This is the non-geometric fallback for ``get_central_edge`` so the central
+    ``single`` / ``singleXERR`` / ``singleZERR`` patterns work on *any* graph
+    (ER, BA, Holme-Kim, …), not only lattices (which override with a
+    geometry-aware centre). The hub is a natural "centre" for scale-free and
+    random graphs. Deterministic given a constructed graph: ties fall to the
+    engine's stable node/neighbour iteration order. Raises if the graph has no
+    edges.
+    """
+    nodes = sg.get_nodes_list(on_g)
+    best_node, best_deg = None, -1
+    for n in nodes:
+        d = len(sg.get_graph_neighbors(n, on_g))
+        if d > best_deg:
+            best_deg, best_node = d, n
+    if best_node is None or best_deg == 0:
+        raise ValueError(
+            "hub_central_edge: graph has no edges; cannot pick a central edge"
+        )
+    nbrs = sg.get_graph_neighbors(best_node, on_g)
+    nb = max(nbrs, key=lambda j: len(sg.get_graph_neighbors(j, on_g)))
+    return (best_node, nb)
+
+
 def star_edges(sg, node: Any, on_g: str) -> List[Edge]:
     """All edges incident to ``node`` — the XERR (star) pattern.
 
