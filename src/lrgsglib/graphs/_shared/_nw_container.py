@@ -30,7 +30,7 @@ from typing import Any, List, Tuple
 import numpy as np
 
 from ...config.const import COUNT_XERR_PATTERNS, SG_REPR
-from ._nw_geometry import elementary_cell_edges, star_edges
+from ._nw_geometry import star_edges
 
 Edge = Tuple[int, int]
 
@@ -91,8 +91,12 @@ class NwContainer(dict):
 
         self.sg = sg
         self.rd = sg.graph_reprs
+        # Sample the random seed nodes per representation: a graph may label its
+        # reprs differently (e.g. a lattice's ``G`` are ints, ``H`` are coordinate
+        # tuples), so the seeds for the ``H`` patterns must come from ``H``'s own
+        # node set, not the default repr's.
         self.rNodeFlip = {
-            g: random.sample(sg.get_nodes_list(), sg.nflip) for g in self.rd
+            g: random.sample(sg.get_nodes_list(g), sg.nflip) for g in self.rd
         }
 
         if bs:
@@ -103,7 +107,7 @@ class NwContainer(dict):
             }
             if bz:
                 self["singleZERR"] = {
-                    g: elementary_cell_edges(sg, self.centedge[g][0], g)
+                    g: sg.cell_edges(self.centedge[g][0], g)
                     for g in self.rd
                 }
 
@@ -118,7 +122,7 @@ class NwContainer(dict):
 
     def get_links_ZERR(self, node: Any, on_g: str = SG_REPR) -> List[Edge]:
         """Elementary-cell pattern (smallest cycle through ``node``)."""
-        return elementary_cell_edges(self.sg, node, on_g)
+        return self.sg.cell_edges(node, on_g)
 
     def _rand_pattern(self, mode: str, on_g: str) -> List[Edge]:
         nodes = self.rNodeFlip[on_g]
@@ -134,7 +138,7 @@ class NwContainer(dict):
                 pattern = [
                     e
                     for i in nodes
-                    for e in elementary_cell_edges(self.sg, i, on_g)
+                    for e in self.sg.cell_edges(i, on_g)
                 ]
             case _:
                 pattern = []

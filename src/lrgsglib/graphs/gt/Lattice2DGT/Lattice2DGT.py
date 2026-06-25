@@ -27,6 +27,7 @@ from ..._shared.animation.lattice2d import _Lattice2DAnimate, _Lattice2DPlot
 from . import _generators as _gen2d
 from ._nw_container import Lattice2DGTnwContainer
 from ..._shared._nw_container import geometric_central_edge
+from ..._shared._nw_geometry import oriented_cell_edges
 
 
 _SW_SUFFIX = "_sw"  # small-world variant marker (mirrors Lattice2DNX)
@@ -288,6 +289,33 @@ class Lattice2DGT(SignedGraphGT):
         ``graphs._shared._nw_container.geometric_central_edge``.
         """
         return geometric_central_edge(self, on_g)
+
+    def cell_edges(self, node, on_g: str = L2D_ONREP):
+        """Coordinate-oriented ZERR cell on the **square** lattice (overrides the
+        geometry-free base).
+
+        On a square lattice the integer ``_pos`` grid is shared verbatim with
+        ``Lattice2DNX``'s ``(i, j)`` labels, so picking the minimal face at the
+        smallest CCW angle from ``+x`` (its ``+x/+y`` / north-east plaquette)
+        gives distinct seeds distinct cells in the bulk *and* matches NX
+        node-for-node. The other geometries label their nodes differently between
+        engines (or use a sheared ``_pos`` that disagrees with NX's lattice
+        index), so for them this defers to the engine-independent canonical
+        lex-min face of the base — keeping NX==GT wherever the labels correspond.
+        """
+        if not str(self.geo).startswith("sqr"):
+            return super().cell_edges(node, on_g)
+
+        def _pos_of(n):
+            p = self._pos[self.G.vertex(int(n))]
+            return (float(p[0]), float(p[1]))
+
+        # square ``_pos`` is the unit-spaced integer grid, so the periodic period
+        # along each axis is the side length.
+        box = None
+        if getattr(self, "periodic", False):
+            box = (float(self.side1), float(self.side2))
+        return oriented_cell_edges(self, node, on_g, _pos_of, box)
 
     # Engine-agnostic 2D lattice drawing (shared with Lattice2DNX).
     # See lrgsglib.graphs._shared._draw.draw for the full signature.

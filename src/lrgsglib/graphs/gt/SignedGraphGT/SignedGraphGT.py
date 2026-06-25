@@ -39,7 +39,7 @@ import networkx as nx
 
 from .._converters import nx_to_gt, gt_to_nx, get_laplacian_matrix_gt
 from ..._shared._nw_container import NwContainer
-from ..._shared._nw_geometry import hub_central_edge
+from ..._shared._nw_geometry import hub_central_edge, elementary_cell_edges
 from ..._shared._disorder import Disorder, as_disorder, structured_build_flags
 from .._topology_ops import apply_rewiring, apply_dilution
 from ....config.const import (
@@ -231,6 +231,17 @@ class SignedGraphGT:
         ``Lattice3DGT``) override with a coordinate-aware centre.
         """
         return hub_central_edge(self, on_g)
+
+    def cell_edges(self, node, on_g: str = SG_REPR):
+        """Edges of ``node``'s ZERR cell — the smallest cycle through it.
+
+        Geometry-free baseline: the deterministic, engine-independent
+        lexicographically-smallest minimal face (so graph-tool and NX agree).
+        ``Lattice2DGT`` overrides with a coordinate-oriented plaquette so that
+        distinct seed nodes own distinct cells in the bulk. Returns ``[]`` if
+        ``node`` lies on no cycle.
+        """
+        return elementary_cell_edges(self, node, on_g)
 
     def _nw_build_flags(self) -> dict:
         """Container build-flag overrides for the requested disorder support.

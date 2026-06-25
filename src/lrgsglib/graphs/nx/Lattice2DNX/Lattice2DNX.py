@@ -1,6 +1,4 @@
 from os.path import join as pth_join
-from typing import Any
-import random
 import warnings
 
 import numpy as np
@@ -16,6 +14,8 @@ from ..funcs import *
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 from .generators_2d import *
 from ..._shared._draw import draw as _draw_lattice2d
+from ..._shared._nw_geometry import oriented_cell_edges, hub_central_edge
+from ._nw_container import Lattice2DNXnwContainer
 from ..._shared.animation.lattice2d import _Lattice2DAnimate, _Lattice2DPlot
 #
 class Lattice2DNX(SignedGraphNX):
@@ -238,172 +238,82 @@ class Lattice2DNX(SignedGraphNX):
         return np.where(np.array(list(map(lambda x: x[1], 
                                           list(self.G.degree())))) != degree)
     #
-    def get_central_edge(self, on_g: str = L2D_ONREP):
-        cnode = (self.side1//2-1, self.side2//2)
-        cnode_t = (self.side1//2, self.side2//2)
-        if self.geo == 'triangular':
-            cnode = (self.side2//2, self.side1//2-1)
-            cnode_t = (self.side2//2, self.side1//2)
-        edge_t = (cnode, cnode_t)
-        if not self.H.has_edge(*edge_t):
-            if self.geo =='hexagonal':
-                cnode = cnode_t
-                cnode_t = (self.side1//2+1, self.side2//2)
-                edge_t = (cnode, cnode_t)
-        if on_g == 'G':
-            return self.map_edge['G']['H'][edge_t]
-        elif on_g == 'H':
-            return edge_t
-    #
-    class nwContainer(dict):
-        def __init__(self, l: "Lattice2DNX", iterable=[], constant=None,
-                     **kwargs):
-            super().__init__(**kwargs)
-            self.update((key, constant) for key in iterable)
-            self.l = l
-            self.rd = self.l.graph_reprs
-            self.rNodeFlip = {g: random.sample(list(self.l.gr[g].nodes()), 
-                                    self.l.nflip
-                                ) for g in self.rd}
-            #
-            self.centedge = {g: self.l.get_central_edge(g) 
-                             for g in self.rd}
-            self['single'] = {g: [self.centedge[g]] for g in self.rd}
-            self['singleZERR'] = {g: self.get_links_ZERR(
-                self.centedge[g][0], g, self.l.geo) for g in self.rd}
-            self['singleXERR'] = {g: self.get_links_XERR(
-                self.centedge[g][0], g) for g in self.rd}
-            self['rand'] = {g: [e for e in self.l.fleset[g]] 
-                            for g in self.rd}
-            self['randZERR'] = {g: self.get_rand_pattern('ZERR', on_g=g) 
-                                   for g in self.rd}
-            self['randXERR'] = {g: self.get_rand_pattern('XERR', on_g=g) 
-                                   for g in self.rd}
-        #
-        def get_links_XERR(self, node: Any, on_g: str = L2D_ONREP):
-            return [(node, nn) for nn in self.l.get_graph_neighbors(node, on_g)]
-        #
-        def get_links_ZERR(self, node: Any, on_g: str = L2D_ONREP, 
-                           geometry: str = L2D_GEO):
-            dd = {'triangular': self.get_links_triangle,
-             'squared': self.get_links_square,
-             'hexagonal': self.get_links_hexagon}
-            return dd[geometry](node, on_g)
-        #
-        def get_links_triangle(self, node: Any, on_g = L2D_ONREP):
-            node2 = list(self.l.get_graph_neighbors(node, on_g))[0]
-            common_neighbors = list(nx.common_neighbors(
-                self.l.gr[on_g], node, node2))
-            try:
-                node3 = common_neighbors[0]
-                links = [(node, node2), (node2, node3), (node, node3)]
-            except IndexError:
-                links = [(node, node2)]
-            return links
-        #
-        def get_links_square(self, node: Any, on_g = L2D_ONREP):
-            g = self.l.gr[on_g]
-            neighbors = list(g.neighbors(node))
-            for i in range(1, len(neighbors)):
-                first_neighbor = neighbors[0]  # Always the first neighbor
-                second_neighbor = neighbors[i]  # Iterating through the rest
-                # Find common neighbors excluding the start_node
-                common_neighbors = set(g.neighbors(first_neighbor)) \
-                    & set(g.neighbors(second_neighbor))
-                common_neighbors.discard(node)
-                # If there is a common neighbor, we found a square
-                if common_neighbors:
-                    common_neighbor = common_neighbors.pop()
-                    # Now, extract the links forming the square
-                    links = [(node, first_neighbor),
-                            (node, second_neighbor),
-                            (first_neighbor, common_neighbor),
-                            (second_neighbor, common_neighbor)]
-                    return links
-            links = [(node, first_neighbor),
-                     (node, second_neighbor)]
-            return links
-        #
-        def get_links_hexagon(self, node: int, 
-                              on_g: str = L2D_ONREP):
-            graph = self.l.gr[on_g]
-            nodes_in_cycle = [node]
-            node_nn = list(self.l.gr[on_g].neighbors(node))
+    def _cell_posfn(self, on_g: str = L2D_ONREP):
+        """Return a ``node -> (x, y)`` coordinate function for repr ``on_g``.
 
-            samp_node_nn_1 = node_nn[0]
-            node_nn.remove(samp_node_nn_1)
-            # #
-            node_nn_1 = list(graph.neighbors(samp_node_nn_1))
-            node_nn_1.remove(node)
-            samp_node_nn_2 = node_nn_1[0]
-            node_nn_1.remove(samp_node_nn_2)
-            #
-            flag = True
-            for nn in node_nn:
-                if flag:
-                    common_nn = None
-                    node_nn_1b = list(graph.neighbors(nn))
-                    node_nn_1b.remove(node)
-                    for i in node_nn_1b:
-                        common_neighs = list(
-                            nx.common_neighbors(graph, samp_node_nn_2, i))
-                        if common_neighs != []:
-                            nodes_in_cycle.extend([nn, i, common_neighs[0]])
-                            flag = False
-                            break
-            try:
-                nodes_in_cycle.extend([samp_node_nn_1, samp_node_nn_2])
-            except IndexError:
-                pass
-            subH = graph.subgraph(nodes_in_cycle)
-            links = [tuple(sorted(edge)) for edge in subH.edges()]
-            return links
-        #
-        def get_rand_pattern(self, mode: str, on_g: str = L2D_ONREP):
-            match mode:
-                case "XERR":
-                    if COUNT_XERR_PATTERNS:
-                        patternList = [k for i in self.rNodeFlip[on_g] 
-                                    for k in self.get_links_XERR(i, on_g)]
-                    else:
-                        tmplst = self.rNodeFlip[on_g]
-                        grph = self.l.gr[on_g]
-                        _ = 0
-                        patternList = []
-                        while _ < len(tmplst):
-                            leval = [all([nnn['weight'] == -1 
-                                        for nnn in grph[nn].values()])
-                                        for nn in grph.neighbors(tmplst[_])]
-                            if any(leval):
-                                tmplst.pop(_)  # Removing the element
-                            else:
-                                glXERR = self.get_links_XERR(tmplst[_], 
-                                                             on_g)
-                                patternList.extend([k for k in glXERR])
-                                _ += 1
-                case "ZERR":
-                    match self.l.geo:
-                        case 'squared':
-                            patternList = [k for i in self.rNodeFlip[on_g] 
-                                for k in self.get_links_square(i, on_g)]
-                        case "hexagonal":
-                            patternList = [k for i in self.rNodeFlip[on_g]
-                                for k in self.get_links_hexagon(i, on_g)]    
-                        case "triangular":
-                            patternList = [k for i in self.rNodeFlip[on_g] 
-                               for k in self.get_links_triangle(i, on_g)]
-            return list(set(patternList))
-        #
-        def get_links_rball(self, R: int = 1, center: Any = None, 
-                            on_g: str = L2D_ONREP):
-            graph = self.l.gr[on_g]
-            if not center:
-                center = self.centedge[on_g][0]
-            neighs_to_flip = get_neighbors_at_distance(graph, center, R)
-            links = {(node, neighbor) for node in neighs_to_flip 
-                     for neighbor in graph.neighbors(node)}
-            return links
-    #     # #
+        ``sqr`` / ``tri`` / ``hex`` label nodes by integer ``(i, j)`` coordinates
+        (directly for ``H``; via ``map_node`` for ``G``). ``oct_sqr`` / ``kgm`` /
+        ``tri_hex`` use opaque labels (plain ints / edge-pair tuples) with no 2D
+        coordinate, so the function returns ``None`` there and callers degrade to
+        the geometry-free behaviour.
+        """
+        base = (lambda n: n) if on_g == "H" else self.map_node["H"]["G"].get
+
+        def posfn(n):
+            c = base(n)
+            if (
+                isinstance(c, tuple)
+                and len(c) == 2
+                and all(isinstance(x, (int, float)) for x in c)
+            ):
+                return (float(c[0]), float(c[1]))
+            return None
+
+        return posfn
+
+    def get_central_edge(self, on_g: str = L2D_ONREP):
+        """A central edge for the ``single*`` nwDict patterns.
+
+        Uses the lattice's 2D coordinates when the geometry provides them
+        (``sqr`` / ``tri`` / ``hex``): the edge of the centroid-nearest node whose
+        midpoint is closest to the centroid — mirroring ``geometric_central_edge``
+        on the GT side. Geometries whose labels carry no coordinate (``oct_sqr`` /
+        ``kgm`` / ``tri_hex``) fall back to the geometry-free hub edge instead of
+        raising (the old ``map_edge`` lookup ``KeyError``'d on them).
+        """
+        posfn = self._cell_posfn(on_g)
+        pts = [(n, posfn(n)) for n in self.get_nodes_list(on_g)]
+        pts = [(n, p) for (n, p) in pts if p is not None]
+        if not pts:
+            return hub_central_edge(self, on_g)
+        arr = np.array([p for _, p in pts])
+        centroid = arr.mean(axis=0)
+        ci = int(np.argmin(((arr - centroid) ** 2).sum(axis=1)))
+        central, cpos = pts[ci][0], arr[ci]
+        nbrs = list(self.get_graph_neighbors(central, on_g))
+        if not nbrs:
+            return hub_central_edge(self, on_g)
+
+        def _mid(j):
+            pj = posfn(j)
+            if pj is None:
+                return np.inf
+            return float(((0.5 * (np.array(pj) + cpos) - centroid) ** 2).sum())
+
+        return (central, min(nbrs, key=_mid))
+
+    def cell_edges(self, node, on_g: str = L2D_ONREP):
+        """Coordinate-oriented ZERR cell on the **square** lattice (overrides the
+        geometry-free base).
+
+        On a square lattice the ``(i, j)`` coordinates are shared verbatim with
+        ``Lattice2DGT``'s ``_pos`` grid, so picking the minimal face at the
+        smallest CCW angle from ``+x`` (its ``+x/+y`` / north-east plaquette)
+        gives distinct seeds distinct cells in the bulk *and* matches GT
+        node-for-node. The other geometries either label nodes differently
+        between engines (``tri``) or expose no shared 2D coordinate
+        (``oct_sqr`` / ``kgm`` / ``tri_hex``, whose labels are opaque; ``hex``,
+        whose sheared GT ``_pos`` disagrees with NX's index), so for them this
+        defers to the engine-independent canonical lex-min face of the base.
+        """
+        if not str(self.geo).startswith("squared"):
+            return super().cell_edges(node, on_g)
+        box = None
+        if self.pbc:
+            box = (float(self.side1), float(self.side2))
+        return oriented_cell_edges(self, node, on_g, self._cell_posfn(on_g), box)
+    #
+    nwContainer = Lattice2DNXnwContainer
     # Engine-agnostic 2D lattice drawing (shared with Lattice2DGT).
     # See lrgsglib.graphs._shared._draw.draw for the full signature.
     draw = _draw_lattice2d

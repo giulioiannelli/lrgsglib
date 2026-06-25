@@ -13,6 +13,7 @@ from .utils.ipy import *
 # Engine-agnostic graph factories (preferred interface in notebooks).
 from .graphs import (
     SignedGraph,
+    Disorder,
     Lattice2D,
     Lattice3D,
     LatticeND,
