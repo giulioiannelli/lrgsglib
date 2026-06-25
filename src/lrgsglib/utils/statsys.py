@@ -16,6 +16,12 @@ __all__ = [
     "compute_largest_cluster_masks",
     "cluster_size_distribution",
     "largest_fraction",
+    "cluster_wraps",
+    "giant_cluster_spans",
+    "consensus_time_stats",
+    "survival_curve",
+    "interface_density_ensemble",
+    "order_parameter_susceptibility",
 ]
 #
 def boltzmann_factor(E: NDArray, T: float, k_B: float = 1.0) -> NDArray:
@@ -369,4 +375,243 @@ def largest_fraction(s_t, idx, b) -> list:
     N = len(idx)
     return [int(np.bincount(cluster_components(np.asarray(s, np.int8), idx, b)).max()) / N
             for s in s_t]
+
+
+# ---------------------------------------------------------------------------
+# Canonical voter / coarsening observables (ensemble-aware)
+# ---------------------------------------------------------------------------
+def cluster_wraps(mask) -> bool:
+    """True iff the ``True`` region of a boolean grid ``mask`` wraps the torus.
+
+    The discrete-percolation *spanning* test: flood-fill the active cells while
+    carrying each cell's **unwrapped** integer coordinate; if the fill returns to
+    an already-visited cell with a *shifted* unwrapped coordinate along some axis,
+    the cluster wraps that axis (it connects to its own periodic image). This is
+    the standard wrapping criterion -- strictly stronger than a naive
+    "touches both opposite faces", which can false-positive.
+
+    ``mask`` carries one axis per lattice dimension (e.g. a per-node giant-cluster
+    mask reshaped to ``sg.syshape``); neighbours are the von Neumann ``+/-1`` per
+    axis, so this is exact for square / cubic lattices. N-D generalisation of the
+    2D test used in the ``ipy/labs/VM`` giant-cluster lab.
+
+    Parameters
+    ----------
+    mask : NDArray[bool]
+        Boolean array, one axis per lattice dimension.
+
+    Returns
+    -------
+    bool
+        ``True`` iff the masked region wraps along at least one axis.
+    """
+    mask = np.asarray(mask, dtype=bool)
+    if not mask.any():
+        return False
+    shape = mask.shape
+    ndim = mask.ndim
+    visited = np.zeros(shape, dtype=bool)
+    # unwrapped[d] holds the un-modded coordinate along axis d for each cell.
+    unwrapped = np.zeros((ndim,) + shape, dtype=np.int64)
+    wrap = [False] * ndim
+    offsets = []
+    for d in range(ndim):
+        for step in (1, -1):
+            off = [0] * ndim
+            off[d] = step
+            offsets.append(tuple(off))
+    for seed in np.argwhere(mask):
+        seed = tuple(int(x) for x in seed)
+        if visited[seed]:
+            continue
+        visited[seed] = True
+        for d in range(ndim):
+            unwrapped[(d,) + seed] = seed[d]
+        stack = [seed]
+        while stack:
+            cur = stack.pop()
+            cur_uw = [int(unwrapped[(d,) + cur]) for d in range(ndim)]
+            for off in offsets:
+                nb = tuple((cur[d] + off[d]) % shape[d] for d in range(ndim))
+                if not mask[nb]:
+                    continue
+                nb_uw = [cur_uw[d] + off[d] for d in range(ndim)]
+                if not visited[nb]:
+                    visited[nb] = True
+                    for d in range(ndim):
+                        unwrapped[(d,) + nb] = nb_uw[d]
+                    stack.append(nb)
+                else:
+                    for d in range(ndim):
+                        if nb_uw[d] != int(unwrapped[(d,) + nb]):
+                            wrap[d] = True
+        if all(wrap):
+            break
+    return any(wrap)
+
+
+def giant_cluster_spans(s, idx, b, shape) -> bool:
+    """True iff the largest active-edge cluster of ``s`` spans (wraps) the torus.
+
+    Combines the engine-agnostic clustering (:func:`cluster_components`, exact for
+    any geometry) with the grid wrapping test (:func:`cluster_wraps`): the giant
+    component is identified from the real adjacency ``(idx, b)``, then its boolean
+    mask is reshaped to ``shape`` and tested for torus wrapping. The reshape
+    assumes row-major grid-ordered nodes and a square / cubic lattice (the
+    convention of ``LatticeND`` / ``sg.syshape``).
+
+    Parameters
+    ----------
+    s : NDArray
+        Spin / opinion vector (``+/-1``).
+    idx, b : Sequence[NDArray]
+        Ragged neighbour indices and edge signs (see :func:`signed_neighbor_arrays`).
+    shape : tuple of int
+        Lattice grid shape (e.g. ``sg.syshape``); ``prod(shape) == len(idx)``.
+
+    Returns
+    -------
+    bool
+        ``True`` iff the giant cluster wraps the torus along some axis.
+    """
+    label = cluster_components(np.asarray(s, np.int8), idx, b)
+    if label.size == 0:
+        return False
+    giant = int(np.bincount(label).argmax())
+    mask = (label == giant).reshape(shape)
+    return cluster_wraps(mask)
+
+
+def consensus_time_stats(absorbed_times, n_steps) -> dict:
+    """Exit / consensus-time summary over an ensemble of runs.
+
+    ``absorbed_times`` is one entry per run: the sweep index at which the run
+    reached an absorbing (consensus / frozen) state, or ``None`` if it never did
+    (right-censored at ``n_steps``). Statistics (mean / std / median) are taken
+    over the runs that *did* absorb; ``p_consensus`` is the absorbed fraction and
+    ``censored`` counts the rest.
+
+    Parameters
+    ----------
+    absorbed_times : Sequence[int | None]
+        Per-run absorption sweep (``None`` = never absorbed).
+    n_steps : int
+        Run length (the censoring horizon).
+
+    Returns
+    -------
+    dict
+        ``{n, p_consensus, censored, mean, std, median, n_steps}``; the time
+        statistics are ``nan`` when no run absorbed.
+    """
+    times = list(absorbed_times)
+    n = len(times)
+    absorbed = np.asarray([int(t) for t in times if t is not None], dtype=float)
+    n_abs = absorbed.size
+    nan = float("nan")
+    return {
+        "n": n,
+        "p_consensus": (n_abs / n) if n else nan,
+        "censored": n - n_abs,
+        "mean": float(absorbed.mean()) if n_abs else nan,
+        "std": float(absorbed.std(ddof=0)) if n_abs else nan,
+        "median": float(np.median(absorbed)) if n_abs else nan,
+        "n_steps": int(n_steps),
+    }
+
+
+def survival_curve(absorbed_times, n_steps) -> NDArray:
+    """Survival function ``S(t)`` = fraction of runs not yet absorbed by sweep ``t``.
+
+    A run that absorbs at sweep ``a`` is alive for ``t < a`` and dead afterwards;
+    a run that never absorbs (``None``) is alive at every ``t``. The result is
+    monotone non-increasing with ``S(0) = 1`` (no run absorbs before the first
+    sweep).
+
+    Parameters
+    ----------
+    absorbed_times : Sequence[int | None]
+        Per-run absorption sweep (``None`` = never absorbed).
+    n_steps : int
+        Length of the returned curve.
+
+    Returns
+    -------
+    NDArray
+        ``float`` array of length ``n_steps`` with ``S(t) in [0, 1]``.
+    """
+    n_steps = int(n_steps)
+    times = list(absorbed_times)
+    n = len(times)
+    if n == 0:
+        return np.ones(n_steps, dtype=float)
+    t = np.arange(n_steps)
+    alive = np.zeros(n_steps, dtype=float)
+    for a in times:
+        if a is None:
+            alive += 1.0
+        else:
+            alive += (t < int(a)).astype(float)
+    return alive / n
+
+
+def interface_density_ensemble(rho_series) -> tuple:
+    """Ensemble mean and std of the interface-density coarsening curve ``rho(t)``.
+
+    Runs that froze early give shorter ``rho(t)`` series; each is **forward-filled**
+    at its last value (an absorbed run keeps its terminal ``rho``, typically 0 at
+    consensus) up to the longest run, then the ensemble mean / std are taken per
+    sweep.
+
+    Parameters
+    ----------
+    rho_series : Sequence[Sequence[float]]
+        One interface-density series per run (e.g. each
+        ``VoterModel.interface_density_series()``).
+
+    Returns
+    -------
+    (NDArray, NDArray)
+        ``(mean_rho_t, std_rho_t)``, both length = the longest run (empty if no
+        non-empty series were given).
+    """
+    series = [np.asarray(r, dtype=float) for r in rho_series if len(r)]
+    if not series:
+        empty = np.empty(0, dtype=float)
+        return empty, empty
+    max_len = max(s.size for s in series)
+    stacked = np.empty((len(series), max_len), dtype=float)
+    for i, s in enumerate(series):
+        if s.size < max_len:
+            s = np.concatenate([s, np.full(max_len - s.size, s[-1])])
+        stacked[i] = s
+    return stacked.mean(axis=0), stacked.std(axis=0, ddof=0)
+
+
+def order_parameter_susceptibility(op_samples, n_sites=None) -> tuple:
+    """Ensemble mean and susceptibility of an order parameter across disorder.
+
+    ``chi = n_sites * Var(op)`` (population variance ``<op^2> - <op>^2``), the
+    standard finite-system fluctuation susceptibility. Pass ``n_sites`` (the
+    system size ``N``) for the finite-size-scaling normalisation; with
+    ``n_sites=None`` the bare variance is returned (``chi = Var(op)``).
+
+    Parameters
+    ----------
+    op_samples : Sequence[float]
+        Order-parameter value per disorder realisation.
+    n_sites : int, optional
+        System size ``N`` for the ``N * Var`` normalisation; default ``None``.
+
+    Returns
+    -------
+    (float, float)
+        ``(mean, chi)``; both ``nan`` for an empty sample.
+    """
+    arr = np.asarray(list(op_samples), dtype=float)
+    if arr.size == 0:
+        return float("nan"), float("nan")
+    var = float(arr.var(ddof=0))
+    chi = var * (1.0 if n_sites is None else float(n_sites))
+    return float(arr.mean()), chi
 

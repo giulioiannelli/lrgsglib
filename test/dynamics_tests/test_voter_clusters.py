@@ -246,15 +246,21 @@ def test_py_all_schedules_support_clusters(tmp_path, upd_mode):
     assert len(vm.cluster_dist) == len(vm.magn) == 5
 
 
-def test_track_clusters_rejects_c_subprocess(tmp_path):
-    """pybind now emits clusters for every schedule (see the native tests above);
-    only the C subprocess still lacks it (file format deferred) -> it must raise."""
+def test_track_clusters_c_subprocess_emits(tmp_path):
+    """The C subprocess now emits the cluster-size distribution too (sparse
+    cldist file -> list[{size: count}]), for every schedule."""
     from lrgsglib.statsys import VoterModel
 
-    vm = VoterModel(sg=_lat(tmp_path), steps=5, runlang="C0",
-                    upd_mode="gillespie", track_clusters=True, seed=1)
-    with pytest.raises(NotImplementedError):
+    for upd_mode in ("asynchronous", "gillespie"):
+        vm = VoterModel(sg=_lat(tmp_path), steps=5, runlang="C0",
+                        upd_mode=upd_mode, track_clusters=True,
+                        savemagn=True, savedisk=False, seed=1)
+        vm.init_voter_dynamics()
         vm.run(tqdm_on=False)
+        cd = list(vm.cluster_dist)
+        assert len(cd) > 0
+        for rec in cd:                       # each record partitions the N nodes
+            assert sum(int(k) * int(v) for k, v in rec.items()) == vm.N
 
 
 def test_track_clusters_rejects_vectorized(tmp_path):

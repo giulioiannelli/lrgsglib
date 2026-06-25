@@ -82,3 +82,32 @@ def save_cldist(path, cluster_dist):
 def load_cldist(path):
     """Reconstruct the list of ``{size: count}`` histograms from a .npz file."""
     return load_histogram_series(path)
+
+
+def load_cldist_bin(path):
+    """Read the C-subprocess sparse-binary cluster-size distribution.
+
+    Format (raw little-endian ``uint64``, written by ``VoterSimulator.c``):
+    ``[n_records][offsets[n_records+1]][sizes[nent]][counts[nent]]`` with
+    ``nent = offsets[n_records]``; record ``r`` occupies
+    ``[offsets[r], offsets[r+1])`` of ``sizes``/``counts``. Returns the same
+    ``list[{size: count}]`` as :func:`load_cldist` (the ``.npz`` path used by the
+    py / pybind backends), so the C backend's ``cluster_dist`` is byte-equivalent
+    downstream.
+    """
+    raw = np.fromfile(path, dtype="<u8")
+    if raw.size == 0:
+        return []
+    nrec = int(raw[0])
+    pos = 1
+    offsets = raw[pos:pos + nrec + 1]
+    pos += nrec + 1
+    nent = int(offsets[-1])
+    sizes = raw[pos:pos + nent]
+    pos += nent
+    counts = raw[pos:pos + nent]
+    out = []
+    for r in range(nrec):
+        a, b = int(offsets[r]), int(offsets[r + 1])
+        out.append({int(sizes[k]): int(counts[k]) for k in range(a, b)})
+    return out
