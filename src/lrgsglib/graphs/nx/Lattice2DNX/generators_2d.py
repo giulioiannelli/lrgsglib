@@ -685,14 +685,47 @@ def kagome_lattice_graph(
     G = _nx.line_graph(hex_graph)
 
     if with_positions:
-        hex_pos = _nx.get_node_attributes(hex_graph, "pos")
+        # A kagome node is the midpoint of a hex edge. Two PBC-only fixes keep
+        # the tiling clean (both drawing-only — topology / ZERR unaffected):
+        #  (1) networkx's *periodic* hex layout shifts boundary nodes by up to a
+        #      bond, distorting the lattice — so borrow the *open* lattice's
+        #      clean positions (the periodic node labels are a subset of the
+        #      open ones, identically labelled);
+        #  (2) a periodic wrap edge joins opposite boundaries, so its naive
+        #      midpoint lands in the centre — relocate it just outside the
+        #      +x / +y boundary (keeping the transverse coordinate) so the seam
+        #      reads as a clean edge column/row, not a stripe through the middle.
+        ref_hex = (
+            _nx.hexagonal_lattice_graph(m, n, periodic=False)
+            if periodic else hex_graph
+        )
+        hex_pos = _nx.get_node_attributes(ref_hex, "pos")
         pos = {}
+        xmax = ymax = spanx = spany = off = 0.0
+        if periodic and hex_pos:
+            xs = [p[0] for p in hex_pos.values()]
+            ys = [p[1] for p in hex_pos.values()]
+            xmax, ymax = max(xs), max(ys)
+            spanx, spany = xmax - min(xs), ymax - min(ys)
+            blens = [
+                ((hex_pos[a][0] - hex_pos[b][0]) ** 2
+                 + (hex_pos[a][1] - hex_pos[b][1]) ** 2) ** 0.5
+                for a, b in ref_hex.edges()
+                if a in hex_pos and b in hex_pos
+            ]
+            off = 0.5 * float(np.median(blens)) if blens else 0.5
         for node in G.nodes():
             u, v = node
             if u in hex_pos and v in hex_pos:
                 xu, yu = hex_pos[u]
                 xv, yv = hex_pos[v]
-                pos[node] = ((xu + xv) / 2.0, (yu + yv) / 2.0)
+                mx, my = (xu + xv) / 2.0, (yu + yv) / 2.0
+                if periodic:
+                    if abs(xu - xv) > 0.5 * spanx:
+                        mx = xmax + off
+                    if abs(yu - yv) > 0.5 * spany:
+                        my = ymax + off
+                pos[node] = (mx, my)
         set_node_attributes(G, pos, "pos")
 
     return G
