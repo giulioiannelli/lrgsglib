@@ -453,16 +453,22 @@ def test_vectorized_runs(tmp_path, runlang):
 
 @pytest.mark.parametrize("runlang", ["np", "cu"])
 def test_vectorized_guards(tmp_path, runlang):
-    """Vectorized backends are synchronous-linear only: reject rule family,
-    savedyn, and the intrinsically-sequential schedules."""
+    """Vectorized backends are synchronous (full rule family) but still reject
+    savedyn, cluster recording, and the intrinsically-sequential schedules."""
     from lrgsglib.statsys import VoterModel
     if runlang == "cu" and _cu_unavailable():
         pytest.skip("cupy / GPU not available")
-    for kw in (dict(rule="majority"), dict(savedyn=True),
+    for kw in (dict(savedyn=True), dict(track_clusters=True),
                dict(upd_mode="gillespie"), dict(upd_mode="link")):
         with pytest.raises(NotImplementedError):
             VoterModel(sg=_lat(tmp_path, side=6), steps=5, runlang=runlang,
                        seed=1, **kw).run(tqdm_on=False)
+    # the rule family IS now supported on the synchronous vectorized backend
+    for rule in ("majority", "qvoter", "nonlinear"):
+        v = VoterModel(sg=_lat(tmp_path, side=6), steps=5, runlang=runlang,
+                       rule=rule, upd_mode="synchronous", seed=1)
+        v.run(tqdm_on=False)
+        assert np.all(np.isin(v.s, (-1, 1)))
 
 
 @pytest.mark.physical

@@ -28,8 +28,13 @@ from ...config.const import BIN, NPZ
 from ...utils.tools.chronometer import time_function_accumulate
 from ...utils.statsys import (
     cluster_size_distribution,
+    consensus_time_stats as _consensus_time_stats,
     edge_sign_arrays,
+    giant_cluster_spans as _giant_cluster_spans,
+    interface_density_ensemble as _interface_density_ensemble,
     largest_fraction,
+    order_parameter_susceptibility as _order_parameter_susceptibility,
+    survival_curve as _survival_curve,
 )
 from . import _voter_io
 from .._observables import (
@@ -55,6 +60,7 @@ from .defaults import (
     RULE_CODE,
     UPD_MODE_CODE,
     VOTER_CLDIST_FBASE,
+    VOTER_DEFAULT_OP,
     VOTER_MAGN_FBASE,
     VOTER_OBS_CLDIST,
     VOTER_OBS_MAGN,
@@ -119,11 +125,13 @@ class VoterModel(CBackendMixin, BinDynSys):
         - ``'qvoter'`` -- sample ``q`` neighbours with replacement; copy them
           if their signed opinions are unanimous, else flip with probability
           ``eps`` (non-linear q-voter).
-        - ``'nonlinear'`` -- reinforcement voter: adopt signed opinion
-          ``sigma`` with probability ``f_sigma**alpha / (f_+**alpha +
+        - ``'nonlinear'`` -- nonlinear (power-alpha) voter: adopt signed
+          opinion ``sigma`` with probability ``f_sigma**alpha / (f_+**alpha +
           f_-**alpha)``, where ``f_sigma`` is the fraction of neighbours
-          holding ``sigma``. Project-chosen form (no exact primary source;
-          citation pending -- see ``defaults.py``).
+          holding ``sigma``. alpha=1 -> linear voter, alpha>1 -> local
+          majority, alpha<1 -> minority. Yang et al. 2012, Eq. 1 (see
+          ``defaults.py`` ref [5]; they count over agent i + neighbours,
+          we use neighbour fractions -- identical power form).
     q : int, optional
         Number of neighbours sampled with replacement for the ``'qvoter'``
         rule (must be >= 1); default 2. Ignored by the other rules.
@@ -553,7 +561,9 @@ class VoterModel(CBackendMixin, BinDynSys):
             #   P(+1) = f_+^alpha / (f_+^alpha + f_-^alpha),
             # where f_+ is the fraction of neighbours with signed opinion +1.
             # alpha=1 recovers the linear voter; alpha>1 reinforces the local
-            # majority. Project-chosen form (citation pending; see defaults.py).
+            # majority; alpha<1 favours the minority. Yang et al. 2012 Eq. 1
+            # (defaults.py ref [5]); they count over agent i + neighbours, we
+            # use neighbour fractions -- the power form is identical.
             deg = len(nbrs)
             nplus = 0
             for j, w in nbrs:
@@ -639,6 +649,97 @@ class VoterModel(CBackendMixin, BinDynSys):
         idx, signs = self._gillespie_neighbors()
         b = edge_sign_arrays(signs, mode)
         return largest_fraction(self.s_t, idx, b)
+
+    def giant_cluster_spans(
+        self, s: np.ndarray | None = None, cluster_mode: str | None = None,
+    ) -> bool:
+        """Whether the giant active-edge domain spans (wraps) the lattice torus.
+
+        Reshapes the largest-domain mask of ``s`` to the lattice grid and applies
+        the torus-wrap percolation test
+        (:func:`lrgsglib.utils.statsys.giant_cluster_spans`). Needs a lattice
+        substrate exposing ``syshape`` (square / cubic, von Neumann neighbours);
+        for a general graph use :meth:`largest_domain_fraction` instead. Defaults
+        to the current state ``self.s`` and the instance ``cluster_mode``.
+        """
+        shape = getattr(self.sg, "syshape", None)
+        if shape is None:
+            raise NotImplementedError(
+                "giant_cluster_spans needs a lattice substrate with `syshape` "
+                "(square/cubic); for a general graph use largest_domain_fraction."
+            )
+        s = self.s if s is None else s
+        mode = (self.cluster_mode if cluster_mode is None
+                else self._validate_cluster_mode(cluster_mode))
+        idx, signs = self._gillespie_neighbors()
+        b = edge_sign_arrays(signs, mode)
+        return _giant_cluster_spans(s, idx, b, shape)
+
+    # -- ensemble observables (static; over a list of finished runs) ---
+    @staticmethod
+    def consensus_time_stats(runs: "Sequence[VoterModel]") -> dict:
+        """Exit / consensus-time statistics over an ensemble of finished runs.
+
+        Reads each run's ``absorbed_at`` (``None`` = never absorbed, right-censored
+        at its ``steps``) and delegates to
+        :func:`lrgsglib.utils.statsys.consensus_time_stats`; the horizon is the
+        max ``steps`` across the ensemble.
+        """
+        runs = list(runs)
+        n_steps = max((r.steps for r in runs), default=0)
+        return _consensus_time_stats([r.absorbed_at for r in runs], n_steps)
+
+    @staticmethod
+    def survival_curve(runs: "Sequence[VoterModel]",
+                       n_steps: int | None = None) -> np.ndarray:
+        """Ensemble survival curve ``S(t)`` (fraction not yet absorbed by sweep t).
+
+        Delegates to :func:`lrgsglib.utils.statsys.survival_curve`; ``n_steps``
+        defaults to the max ``steps`` across ``runs``.
+        """
+        runs = list(runs)
+        if n_steps is None:
+            n_steps = max((r.steps for r in runs), default=0)
+        return _survival_curve([r.absorbed_at for r in runs], n_steps)
+
+    @staticmethod
+    def interface_density_ensemble(runs: "Sequence[VoterModel]"):
+        """Ensemble-mean interface-density coarsening curve ``rho(t)`` (+ std).
+
+        Each run needs a recorded trajectory (``savedyn=True``); delegates to
+        :func:`lrgsglib.utils.statsys.interface_density_ensemble` over each run's
+        :meth:`interface_density_series`.
+        """
+        return _interface_density_ensemble(
+            [r.interface_density_series() for r in runs]
+        )
+
+    @staticmethod
+    def order_parameter_susceptibility(
+        runs: "Sequence[VoterModel]", op: str = VOTER_DEFAULT_OP,
+        n_sites: int | None = None,
+    ):
+        """Mean and susceptibility ``chi = n_sites * Var(op)`` of an order
+        parameter across an ensemble (disorder / seed realisations).
+
+        ``op`` selects the per-run scalar: ``"largest_domain_fraction"`` (giant
+        domain / N, default) or ``"interface_density"``. ``n_sites`` defaults to
+        the runs' common ``N``. Delegates to
+        :func:`lrgsglib.utils.statsys.order_parameter_susceptibility`.
+        """
+        runs = list(runs)
+        if op == "largest_domain_fraction":
+            samples = [r.largest_domain_fraction() for r in runs]
+        elif op == "interface_density":
+            samples = [r.interface_density() for r in runs]
+        else:
+            raise ValueError(
+                f"unknown op={op!r}; expected 'largest_domain_fraction' or "
+                "'interface_density'."
+            )
+        if n_sites is None and runs:
+            n_sites = runs[0].N
+        return _order_parameter_susceptibility(samples, n_sites=n_sites)
 
     # -- per-sweep samplers (Axis B) ----------------------------------
     def _record(self) -> None:
@@ -858,16 +959,9 @@ class VoterModel(CBackendMixin, BinDynSys):
                 f"upd_mode='{self.upd_mode}' yet (native CTMC kernel pending); "
                 f"use runlang='py'."
             )
-        if self.track_clusters and backend != "pybind":
-            # The pybind backend records the cluster-size distribution for EVERY
-            # schedule (gillespie via the CTMC kernel; asynchronous/synchronous/
-            # link via a per-sweep full recompute in the native loop); the C
-            # subprocess does not emit it yet.
-            raise NotImplementedError(
-                f"runlang='{self.runlang}' ({backend}) does not emit the "
-                f"cluster-size distribution; use runlang='pb' (any upd_mode) "
-                f"or runlang='py'."
-            )
+        # track_clusters is supported by BOTH native backends: pybind builds the
+        # cluster_dist in memory; the C subprocess writes the sparse cldist file
+        # (read back by run_cprogram via _voter_io.load_cldist_bin).
 
     # ------------------------------------------------------------------
     # C backend integration (via CBackendMixin)
@@ -920,7 +1014,16 @@ class VoterModel(CBackendMixin, BinDynSys):
         else:
             self.sout_path = None
 
-        # Base arguments (7) + Phase-3 rule/sampler/absorbing (6) = 13.
+        # Track the cldist output path (sparse-binary; written by the C binary
+        # when track_clusters, read back via _voter_io.load_cldist_bin).
+        if self.track_clusters:
+            self.cldist_path = self.dynpath / self.sg.get_p_fname(
+                'cldist', self.out_id,
+            )
+        else:
+            self.cldist_path = None
+
+        # Base (7) + rule/sampler/absorbing (6) + seed/clusters (3) = 16.
         arglist = [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
@@ -935,9 +1038,12 @@ class VoterModel(CBackendMixin, BinDynSys):
             f"{self.alpha:.12g}",
             f"{UPD_MODE_CODE[self.upd_mode]}",
             f"{1 if self.absorbing_check else 0}",
+            f"{int(self.seed)}",
+            f"{1 if self.track_clusters else 0}",
+            f"{CLUSTER_MODE_CODE[self.cluster_mode]}",
         ]
 
-        # 14th arg triggers snapshot mode in the unified binary
+        # 17th arg triggers snapshot mode in the unified binary
         if self._voter_snapshot_mode:
             arglist.append(f"{self.nSampleLog}")
 
@@ -957,6 +1063,13 @@ class VoterModel(CBackendMixin, BinDynSys):
             # savemagn gates exposure (parity with py/pybind).
             if self.savemagn:
                 self.observables[VOTER_OBS_MAGN].set_values(magn.tolist())
+        # Cluster-size distribution (sparse-binary file from the C binary) ->
+        # the same list[{size: count}] the py/pybind backends produce.
+        if self.track_clusters:
+            cldist_path = getattr(self, "cldist_path", None)
+            if cldist_path is not None and Path(cldist_path).exists():
+                self.observables[VOTER_OBS_CLDIST].set_values(
+                    _voter_io.load_cldist_bin(cldist_path))
 
     def _get_cleanup_paths(self) -> list[Path | None]:
         """Return paths to clean up after a C run.
@@ -967,7 +1080,8 @@ class VoterModel(CBackendMixin, BinDynSys):
         """
         paths: list[Path | None] = [getattr(self, 'sfout', None)]
         if not self.savedisk:
-            paths += [self.magn_path, getattr(self, 'sout_path', None)]
+            paths += [self.magn_path, getattr(self, 'sout_path', None),
+                      getattr(self, 'cldist_path', None)]
         return paths
 
     # ------------------------------------------------------------------
@@ -1029,17 +1143,12 @@ class VoterModel(CBackendMixin, BinDynSys):
     # Vectorized backends (NumPy `np` / CuPy `cu`)
     # ------------------------------------------------------------------
     def _assert_vectorized_supports_config(self, backend: str) -> None:
-        """The vectorized backends implement the **synchronous linear** voter
-        only -- a single CSR gather per sweep. They do not consult ``upd_mode``
-        (always synchronous), and reject the rule family / savedyn / the
-        intrinsically-sequential schedules rather than silently mislabel a run.
+        """The vectorized backends implement the **synchronous** voter for the
+        full rule family (linear / majority / qvoter / nonlinear) via per-sweep
+        CSR gathers + segment reductions. They do not consult ``upd_mode``
+        (always synchronous), and reject savedyn / the intrinsically-sequential
+        schedules / cluster recording rather than silently mislabel a run.
         """
-        if self.rule != "linear":
-            raise NotImplementedError(
-                f"runlang='{self.runlang}' ({backend}) implements the vectorized "
-                f"synchronous LINEAR voter only; rule='{self.rule}' is "
-                f"unsupported -- use runlang in (py, C0*, pb)."
-            )
         if self.savedyn:
             raise NotImplementedError(
                 f"runlang='{self.runlang}' ({backend}) does not record the "
@@ -1059,12 +1168,13 @@ class VoterModel(CBackendMixin, BinDynSys):
             )
 
     def _run_vectorized(self, gpu: bool) -> None:
-        """Run the vectorized synchronous linear voter (NumPy or CuPy).
+        """Run the vectorized synchronous voter (NumPy or CuPy).
 
-        Every node copies a uniformly chosen signed neighbour from a frozen
-        snapshot via one CSR gather per sweep (the schedule is synchronous;
-        ``upd_mode`` is not consulted). Graph is passed as CSR arrays, so there
-        is no file I/O and GT graphs are supported.
+        Every node updates from a frozen snapshot via per-sweep CSR gathers +
+        segment reductions under the configured ``rule`` (linear / majority /
+        qvoter / nonlinear); the schedule is synchronous and ``upd_mode`` is not
+        consulted. Graph is passed as CSR arrays, so there is no file I/O and GT
+        graphs are supported.
         """
         from ._vectorized_voter import run_vectorized_sync, CUPY_AVAILABLE
         if gpu:
@@ -1082,6 +1192,8 @@ class VoterModel(CBackendMixin, BinDynSys):
             int(self.steps), int(self.seed),
             bool(self.savemagn),
             bool(self.absorbing_check), int(self.absorbing_every),
+            rule=self.rule, q=int(self.q), eps=float(self.eps),
+            alpha=float(self.alpha),
         )
         self.s = np.asarray(s_out, dtype=np.int8)
         self.observables[VOTER_OBS_MAGN].set_values(list(magn))

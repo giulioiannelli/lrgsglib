@@ -7,6 +7,7 @@
 #define SINI_FNAME VTR_DIR "s_" PSTR "%s" BINX
 #define MAGN_FNAME VTR_DIR "m_" PSTR "%s" BINX
 #define VTR_SOUT_FNAME VTR_DIR "sout_" PSTR "%s" BINX
+#define CLDIST_FNAME VTR_DIR "cldist_" PSTR "%s" BINX
 
 /* Update rule (Axis A). Keep in sync with VoterModel/defaults.py RULE_CODE.
  * Signed substrate: the effective neighbour opinion is sign(w_ij) * s_j. */

@@ -23,6 +23,15 @@ References
        iannelli2025topological.pdf -- signed Laplacian L_bar = D_bar - A
        (Eq. 4, p. 9); lambda_min(L_bar)=0 iff balanced, >0 iff frustrated,
        and lambda_min measures frustration (Properties (i)-(iii), p. 9).
+.. [4] Redner, C. R. Physique 20, 275 (2019). voter_dynamics/redner2019reality.pdf
+       -- mini-review of reality-inspired voter extensions (survey context for the
+       q-voter / nonlinear-voter / majority-vote families).
+.. [5] Yang, Wang, Lai, Wang, Phys. Lett. A 376, 282 (2012); arXiv:1008.0901.
+       voter_dynamics/yang2012nonlinear.pdf -- nonlinear (power-alpha) voter:
+       agent i selects opinion +1 w.p. p_+ = n_+^alpha / (n_+^alpha + n_-^alpha)
+       (Eq. 1, Sec. II, p. 1), with n_+/n_- the counts among agent i AND its
+       nearest neighbours; alpha=1 -> voter, alpha->inf -> local majority, alpha<1
+       -> minority-favouring.
 """
 
 from __future__ import annotations
@@ -42,10 +51,14 @@ from __future__ import annotations
 #             P(sigma) = f_sigma^alpha / (f_+^alpha + f_-^alpha), where f_sigma
 #             is the fraction of neighbours holding the signed opinion sigma.
 #             alpha=1 recovers the linear voter; alpha>1 reinforces the local
-#             majority. NOTE: this normalized power form is a project-chosen
-#             parametrisation; it has no exact primary source among the refs
-#             (citation PENDING) -- it is the nonlinear-voter family surveyed in
-#             ref [4] Redner 2019, but no equation there matches it verbatim.
+#             majority; alpha<1 favours the minority. This is the nonlinear
+#             power-alpha voter of ref [5] Yang et al. 2012 (Eq. 1:
+#             p_+ = n_+^alpha / (n_+^alpha + n_-^alpha); alpha=1 -> voter,
+#             alpha->inf -> local majority). CAVEAT: Yang et al. count n_+/n_-
+#             over agent i AND its neighbours (focal site INCLUDED); this repo
+#             normalises over neighbour fractions f_sigma (focal site EXCLUDED).
+#             The power form is identical (the degree normalisation cancels in the
+#             ratio); the focal-site inclusion is the only difference from [5].
 #             ``eps`` does NOT enter this rule (it is a q-voter parameter).
 VOTER_RULES: tuple[str, ...] = ("linear", "majority", "qvoter", "nonlinear")
 DEFAULT_RULE: str = "linear"
@@ -123,6 +136,11 @@ UPD_MODE_CODE: dict[str, int] = {
 # (VoterModel.count_frustrated_edges); on a frustrated graph no absorbing state
 # exists and the dynamics never freezes.
 DEFAULT_ABSORBING_EVERY: int = 1     # check every N sweeps (1 = each sweep)
+
+# Default order parameter for the ensemble susceptibility helper
+# (VoterModel.order_parameter_susceptibility); one of the per-run scalar
+# observables {"largest_domain_fraction", "interface_density"}.
+VOTER_DEFAULT_OP: str = "largest_domain_fraction"
 
 # ---------------------------------------------------------------------------
 # Cluster-size distribution observable (domains of aligned signed opinion)
