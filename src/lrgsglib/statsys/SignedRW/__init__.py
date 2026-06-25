@@ -19,6 +19,7 @@ from .SignedWalker import (
     StickyWalker,
 )
 from . import _overlap
+from . import _solvers  # noqa: F401  (registers the SignedRW solvers at import)
 
 # Backward-compatible alias: this model was formerly named `SignedRW`.
 SignedRW = SignedSpinCopy

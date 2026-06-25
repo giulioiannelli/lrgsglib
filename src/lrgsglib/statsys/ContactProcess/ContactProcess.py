@@ -42,6 +42,8 @@ from numba import njit
 
 from .._c_backend import CBackendMixin
 from .._observables import ObservableSet, RowTrajectory, ScalarSeries
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
 from ..BinDynSys import BinDynSys
 from ...config.const import BIN
 from ...utils.tools.chronometer import time_function_accumulate
@@ -52,6 +54,7 @@ from .defaults import (
     CP_SNAPSHOT_EVERY,
     CP_SNAPSHOT_MAX_BYTES,
     CP_SNAPSHOTS_FBASE,
+    CP_SOLVER_NAME,
 )
 
 if TYPE_CHECKING:
@@ -440,6 +443,14 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
+    def _resolve_backend(self) -> SolverBackend:
+        """Map the runlang code to a solver family: a leading ``C`` selects the C
+        subprocess (``C0`` SIR / ``C1*`` EI), anything else the Python loop."""
+        return (
+            SolverBackend.C if self.runlang.upper().startswith("C")
+            else SolverBackend.PY
+        )
+
     @time_function_accumulate(auto_log=False)
     def run(
         self,
@@ -449,16 +460,22 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
         verbose: bool = False,
         clean_export: bool = True,
     ) -> None:
+        """Run contact-process dynamics through the shared solver registry.
+
+        Behaviour-preserving front door for the old runlang if/else: the runlang
+        resolves to a backend (``py`` Python loop / ``C`` subprocess), the
+        registry hands back its solver, and the C subprocess's transient export
+        files are cleaned afterwards when ``clean_export`` is set.
+        """
+        backend = self._resolve_backend()
+        solver = get_solver(CP_SOLVER_NAME, backend)
+        solver.supports(self)
         self.check_attribute()
         self.initialize_run_parameters(steps, simref)
-        if self.runlang.startswith("C"):
-            self.build_cprogram_command()
-            self.run_cprogram(verbose)
-            if clean_export:
-                self.remove_run_c_files()
-                self.sg.remove_exported_files()
-        else:
-            self.contact_sampling(tqdm_on)
+        solver.execute(self, tqdm_on=tqdm_on, verbose=verbose)
+        if backend is SolverBackend.C and clean_export:
+            self.remove_run_c_files()
+            self.sg.remove_exported_files()
 
 
 class ContactProcessSIR(ContactProcessBase):
@@ -847,68 +864,42 @@ class ContactProcessEI(ContactProcessBase):
             args.append(f"{self.num_log_samples}")
         return args
 
-    def run(
-        self,
-        tqdm_on: bool = True,
-        steps: int | None = None,
-        simref: float | None = None,
-        verbose: bool = False,
-        clean_export: bool = True,
-    ) -> None:
-        """Run contact process dynamics (C1*, CU, or Python backend).
+    def _resolve_backend(self) -> SolverBackend:
+        """EI accepts only the unified ``C1*`` / ``CU`` C subprocess or ``py``."""
+        u = self.runlang.upper()
+        if u.startswith("C1") or u == "CU":
+            return SolverBackend.C
+        if u == "PY":
+            return SolverBackend.PY
+        raise ValueError(
+            f"ContactProcessEI supports C1*, 'CU', or 'py' backends, "
+            f"got '{self.runlang}'"
+        )
 
-        Parameters
-        ----------
-        tqdm_on : bool, optional
-            Show progress bar (default: True)
-        steps : int, optional
-            Number of Monte Carlo sweeps (default: None, uses existing config)
-        simref : float, optional
-            Size-normalised time (steps = simref * N). Ignored if ``steps`` is provided.
-        verbose : bool, optional
-            Verbose output (default: False)
-        clean_export : bool, optional
-            Clean up exported files after run (default: True)
+    def run_py(self, tqdm_on: bool = False) -> None:
+        """Python backend: the numba-optimized lambda-cache sweep (overrides the
+        base scalar ``contact_sampling`` loop).
+
+        Run setup (``check_attribute`` / ``initialize_run_parameters``) is
+        performed by the inherited ``run()`` dispatcher before this is invoked.
         """
-        runlang_upper = self.runlang.upper()
-
-        if runlang_upper.startswith("C1") or runlang_upper in ("CU",):
-            # Use C backend (C1, C1D, C1S, or deprecated C1a-g/CU)
-            super().run(
-                tqdm_on=tqdm_on,
-                steps=steps,
-                simref=simref,
-                verbose=verbose,
-                clean_export=clean_export,
+        iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
+        self._begin_outputs()
+        for _ in iterator:
+            self._record()
+            # numba-optimized sweep (random node selection + incremental lambda)
+            self._sweep_ei_lambda_cache(
+                self.s,
+                self._lambda_arr,
+                self._neigh_indices,
+                self._neigh_weights,
+                self._neigh_offsets,
+                self._reverse_weights,
+                self.gamma_eff,
+                self._activation_fn,
+                self.N,
             )
-        elif runlang_upper == "PY":
-            # Use Python backend with numba-optimized sweep
-            self.check_attribute()
-            self.initialize_run_parameters(steps=steps, simref=simref)
-
-            # Use optimized sweep directly instead of contact_sampling
-            iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
-            self._begin_outputs()
-            for _ in iterator:
-                self._record()
-
-                # Call numba-optimized sweep
-                self._sweep_ei_lambda_cache(
-                    self.s,
-                    self._lambda_arr,
-                    self._neigh_indices,
-                    self._neigh_weights,
-                    self._neigh_offsets,
-                    self._reverse_weights,
-                    self.gamma_eff,
-                    self._activation_fn,
-                    self.N
-                )
-            self._persist_observables()
-        else:
-            raise ValueError(
-                f"ContactProcessEI supports C1*, 'CU', or 'py' backends, got '{self.runlang}'"
-            )
+        self._persist_observables()
 
 
 def ContactProcess(sg: "SignedGraph", *args: Any, **kwargs: Any):
@@ -931,3 +922,9 @@ def ContactProcess(sg: "SignedGraph", *args: Any, **kwargs: Any):
     ):
         return ContactProcessEI(sg, *args, **kwargs)
     return ContactProcessSIR(sg, *args, **kwargs)
+
+
+# Register ContactProcess's solver backends (py / C) in the shared solver
+# registry. Imported after the classes so that importing ContactProcess wires up
+# dispatch; no circular import (``_solvers`` does not import these classes).
+from . import _solvers  # noqa: E402,F401

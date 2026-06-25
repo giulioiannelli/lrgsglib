@@ -32,7 +32,10 @@ from ...config.const import (
     SRW_X_NODE_BEHAVIORS,
 )
 from ..DynSys import DynSys
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
 from ._kernel import _kill_masks, run_walker, signed_lattice_tables
+from .defaults import SRW_WALKER_SOLVER_NAME
 
 if TYPE_CHECKING:
     from ...graphs.protocols import SignedGraphProtocol as SignedGraph
@@ -231,24 +234,31 @@ class SignedWalker(DynSys):
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
-    def run(self, **kw: Any) -> None:
-        """Dispatch to the chosen backend.
+    def _resolve_backend(self) -> SolverBackend:
+        """Map the runlang code to a solver family (``py`` / ``pb_absorb``)."""
+        if self.runlang.startswith('pb'):
+            return SolverBackend.PB
+        if self.runlang.startswith('py'):
+            return SolverBackend.PY
+        raise NotImplementedError(
+            f"runlang={self.runlang!r} is not available yet; "
+            f"use 'py' or 'pb_absorb'."
+        )
 
-        Supported runlang values (Phase 2):
+    def run(self, **kw: Any) -> None:
+        """Dispatch to the chosen backend through the shared solver registry.
+
+        Supported runlang values:
 
         * ``'py'`` — reference numpy kernel (all three rules).
-        * ``'pb_absorb'`` — pybind11 / C kernel for the absorb rule.
-          Statistical parity with the Python backend (different RNG).
+        * ``'pb_absorb'`` — pybind11 / C kernel for the absorb rule (requires
+          ``rule='absorb'``). Statistical parity with the Python backend
+          (different RNG).
         """
-        if self.runlang.startswith('pb'):
-            self._run_pybind(**kw)
-        elif self.runlang.startswith('py'):
-            self.run_py(**kw)
-        else:
-            raise NotImplementedError(
-                f"runlang={self.runlang!r} is not available yet; "
-                f"use 'py' or 'pb_absorb'."
-            )
+        backend = self._resolve_backend()
+        solver = get_solver(SRW_WALKER_SOLVER_NAME, backend)
+        solver.supports(self)
+        solver.execute(self, **kw)
 
     def run_py(self, **kw: Any) -> None:
         """Run the Python kernel and populate per-walker observables."""

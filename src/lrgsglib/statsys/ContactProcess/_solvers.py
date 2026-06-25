@@ -1,0 +1,74 @@
+"""ContactProcess solver backends, registered in ``statsys._solver_engine``.
+
+Mirrors ``VoterModel/_solvers.py``: each solver is a stateless wrapper that
+validates the model's configuration (``supports``) and invokes its existing
+kernel path (``execute``), so dispatching through the registry is
+behavior-preserving — the registry just becomes the single front door.
+
+ContactProcess exposes two families: the pure-Python loop (selected
+polymorphically via ``run_py`` — the scalar ``ds1step`` sweep for SIR, the numba
+lambda-cache sweep for EI) and the C subprocess (``C0`` SIR / ``C1*`` EI).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from .._solver import Solver, SolverBackend
+from .._solver_engine import register_solver
+from .defaults import CP_SOLVER_NAME
+
+if TYPE_CHECKING:
+    from .ContactProcess import ContactProcessBase
+
+__all__ = ["register_contact_process_solvers"]
+
+
+class _CpPySolver:
+    """Pure-Python loop (SIR scalar sweep / EI numba lambda-cache, via ``run_py``)."""
+
+    backend = SolverBackend.PY
+
+    def supports(self, model: "ContactProcessBase") -> None:
+        return None
+
+    def execute(self, model: "ContactProcessBase", *, tqdm_on: bool = False,
+                verbose: bool = False) -> None:
+        model.run_py(tqdm_on)
+
+    def is_available(self) -> bool:
+        return True
+
+
+class _CpCSolver:
+    """C subprocess backend (file-transported state; SIR ``C0`` / EI ``C1*``)."""
+
+    backend = SolverBackend.C
+
+    def supports(self, model: "ContactProcessBase") -> None:
+        return None
+
+    def execute(self, model: "ContactProcessBase", *, tqdm_on: bool = False,
+                verbose: bool = False) -> None:
+        model.build_cprogram_command()
+        model.run_cprogram(verbose)
+
+    def is_available(self) -> bool:
+        bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
+        return bin_dir.exists() and any(bin_dir.glob("ContactProcess*"))
+
+
+_CP_SOLVERS: tuple[Solver, ...] = (
+    _CpPySolver(),
+    _CpCSolver(),
+)
+
+
+def register_contact_process_solvers() -> None:
+    """Register ContactProcess backends (idempotent; safe to call on import)."""
+    for solver in _CP_SOLVERS:
+        register_solver(CP_SOLVER_NAME, solver.backend, solver)
+
+
+register_contact_process_solvers()

@@ -10,6 +10,7 @@ streamed/dumped under ``dynpath`` and exposed as lazy disk-backed attributes.
 from __future__ import annotations
 
 __all__ = [
+    "CP_SOLVER_NAME",
     "CP_OBS_DENSITY",
     "CP_OBS_SNAPSHOTS",
     "CP_DENSITY_FBASE",
@@ -17,6 +18,9 @@ __all__ = [
     "CP_SNAPSHOT_EVERY",
     "CP_SNAPSHOT_MAX_BYTES",
 ]
+
+# Solver-registry name for ContactProcess (key in ``statsys._solver_engine``).
+CP_SOLVER_NAME: str = "contact_process"
 
 # ObservableSet keys (the names used to index ``self.observables``).
 CP_OBS_DENSITY: str = "density"

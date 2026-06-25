@@ -23,11 +23,13 @@ from lrgsglib.statsys._solver_engine import (
 _BASE_OR_INFRA = {
     "DynSys", "BinDynSys", "ContDynSys", "VecDynSys", "_ccore", "__pycache__",
 }
-# Models whose run() does not yet dispatch via the registry (tracked tail; see
-# .agents/todo/2026-06-25_registry-tail-contactprocess-signedrw.md).
-# ContactProcess already has defaults.py + ObservableSet but no _solvers.py;
-# SignedRW is fully off-pattern (no defaults.py / _solvers.py).
-KNOWN_OFF_PATTERN = {"ContactProcess", "SignedRW"}
+# Models whose run() does not yet dispatch via the registry (tracked tail).
+# Empty since 2026-06-25: ContactProcess and SignedRW were migrated onto the
+# solver registry, so every dynamics model now ships defaults.py + _solvers.py
+# and dispatches via get_solver. A NEW off-pattern model fails
+# test_model_package_on_pattern until it is migrated or explicitly listed here
+# with a tracking TODO.
+KNOWN_OFF_PATTERN: set[str] = set()
 
 
 def _statsys_dir() -> Path:
