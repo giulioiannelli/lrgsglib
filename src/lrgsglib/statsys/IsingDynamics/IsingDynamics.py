@@ -12,7 +12,7 @@ from .._c_backend import CBackendMixin
 from .._solver import SolverBackend
 from .._solver_engine import get_solver
 from ..BinDynSys import BinDynSys
-from .defaults import ISING_SOLVER_NAME
+from .defaults import ISING_SOLVER_NAME, ISING_TIE_FLIP_DEFAULT
 from ...config.const import BIN, SG_REPR
 from ...config.funcs import build_pT_fname
 from ...utils.lrg.ising import compute_ising_pairwise_energy
@@ -256,6 +256,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     s_t = []
     Ising_clusters = []
     k_B = 1
+    # Tie-flip probability for ΔE == 0 Metropolis moves (kinetic knob): 1.0 =
+    # standard Metropolis (ties always accepted), 0.0 = ties frozen (→ T=0
+    # absorbing dynamics), 0.5 = the T=0 Glauber rule. See ``metropolis`` /
+    # ``is_absorbing``.
+    tie_flip_p = ISING_TIE_FLIP_DEFAULT
 
     def __init__(
         self,
@@ -405,8 +410,34 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         DeltaE = 2 * self.s[node] * neighene
         if DeltaE < 0:
             self.flip_spin(node)
+        elif DeltaE == 0:
+            # Tie (ΔE=0): accept with the kinetic tie-flip probability instead of
+            # always. tie_flip_p=1 reproduces standard Metropolis; tie_flip_p=0
+            # freezes ties, so at T=0 a configuration with no energy-lowering move
+            # is absorbing (frozen); tie_flip_p=0.5 is the T=0 Glauber rule.
+            if self.tie_flip_p >= 1.0 or np.random.uniform() < self.tie_flip_p:
+                self.flip_spin(node)
         elif np.random.uniform() < boltzmann_factor(DeltaE, self.T, self.k_B):
             self.flip_spin(node)
+    #
+    def is_absorbing(self) -> bool:
+        """Zero-temperature frozen check: ``True`` when no spin flip can change
+        the configuration any more.
+
+        Meaningful in the zero-temperature limit (``T`` → 0), where ``DeltaE > 0``
+        moves are never accepted. A spin can then still move if its flip is
+        downhill (``DeltaE < 0``) or, when ties are mobile (``tie_flip_p > 0``),
+        a tie (``DeltaE == 0``). So the configuration is frozen when every
+        ``DeltaE`` is ``>= 0`` (ties frozen, ``tie_flip_p == 0``) or strictly
+        ``> 0`` (ties mobile).
+        """
+        de = np.array([
+            2 * self.s[node] * self.neigh_ene(self.neigh_wghtmagn(node))
+            for node in range(self.sg.N)
+        ])
+        if self.tie_flip_p <= 0.0:
+            return bool(np.all(de >= 0))
+        return bool(np.all(de > 0))
     #
     def calc_full_energy(self) -> float:
         neigh_energies = np.array([
