@@ -17,7 +17,17 @@ __all__ = [
     "CP_SNAPSHOTS_FBASE",
     "CP_SNAPSHOT_EVERY",
     "CP_SNAPSHOT_MAX_BYTES",
+    "CP_SIR_BETA_DEFAULT",
+    "CP_SIR_MU_DEFAULT",
 ]
+
+# ----------------------------------------------------------------------------
+# Rate defaults for the SIR (infection/recovery) contact process. ``beta`` is
+# the infection rate accumulated per active positive-edge neighbour; ``mu`` is
+# the spontaneous recovery rate. beta=mu=1 reproduces the historical mu-only
+# behaviour where the infection rate equalled the edge weight.
+CP_SIR_BETA_DEFAULT: float = 1.0
+CP_SIR_MU_DEFAULT: float = 1.0
 
 # Solver-registry name for ContactProcess (key in ``statsys._solver_engine``).
 CP_SOLVER_NAME: str = "contact_process"

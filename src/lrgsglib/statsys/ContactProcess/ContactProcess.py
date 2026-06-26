@@ -51,6 +51,8 @@ from .defaults import (
     CP_DENSITY_FBASE,
     CP_OBS_DENSITY,
     CP_OBS_SNAPSHOTS,
+    CP_SIR_BETA_DEFAULT,
+    CP_SIR_MU_DEFAULT,
     CP_SNAPSHOT_EVERY,
     CP_SNAPSHOT_MAX_BYTES,
     CP_SNAPSHOTS_FBASE,
@@ -479,11 +481,18 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
 
 
 class ContactProcessSIR(ContactProcessBase):
-    """Infection-rate contact process (SIR-style) driven by ``mu``.
+    """Infection/recovery contact process driven by an infection rate ``beta``
+    and a recovery rate ``mu``.
 
-    Use this class for the standard infection/recovery dynamics. The Python
-    backend (``runlang="py"``) mirrors the logic in :meth:`ds1step`, while the
-    ``C0`` runlang targets the ``ContactProcessSIR`` executable.
+    Each susceptible (inactive) site catches the infection at rate
+    ``beta * sum(weight)`` over its active positive-edge neighbours; each
+    infected (active) site recovers spontaneously at rate ``mu`` (negative edges
+    to active neighbours add to the recovery rate — frustration accelerates
+    healing). ``beta = 1`` reproduces the historical behaviour where the
+    infection rate equalled the summed edge weight. The Python backend
+    (``runlang="py"``) mirrors :meth:`ds1step`; the ``C0`` runlang targets the
+    ``ContactProcessSIR`` executable (mu-only — ``beta`` is a Python-backend
+    parameter for now).
     """
 
     _allowed_c_keys = ("C0",)
@@ -494,11 +503,13 @@ class ContactProcessSIR(ContactProcessBase):
     def __init__(
         self,
         sg: "SignedGraph",
-        mu: float = 1.0,
+        mu: float = CP_SIR_MU_DEFAULT,
+        beta: float = CP_SIR_BETA_DEFAULT,
         **kwargs: Any,
     ) -> None:
         super().__init__(sg, **kwargs)
         self.mu = float(mu)
+        self.beta = float(beta)
 
     # ------------------------------------------------------------------
     # Python dynamics
@@ -517,7 +528,7 @@ class ContactProcessSIR(ContactProcessBase):
             rate = 0.0
             for neighbour, weight in neighbours:
                 if weight > 0.0 and self.s[neighbour]:
-                    rate += weight
+                    rate += self.beta * weight
             prob = 1.0 - np.exp(-rate)
             if prob > 0.0 and np.random.random() < prob:
                 self.s[node] = np.int8(1)
@@ -717,14 +728,17 @@ class ContactProcessEI(ContactProcessBase):
         # Get probability from cached lambda
         P = self._activation_fn(self._lambda_arr[node])
 
-        # Sample new state
+        # Sample new state (active/inactive encoding follows state_type:
+        # binary {0, 1} or bipolar {-1, +1}). The lambda update below is written
+        # in terms of the signed delta, so it is correct for either encoding.
         old_state = self.s[node]
-        new_state = np.int8(1 if np.random.random() < P else 0)
+        new_state = np.int8(self.active_state if np.random.random() < P
+                            else self.inactive_state)
 
         # Update if changed
         if new_state != old_state:
             self.s[node] = new_state
-            delta = new_state - old_state
+            delta = int(new_state) - int(old_state)
 
             # Update lambda for all neighbors
             start = self._neigh_offsets[node]
@@ -745,7 +759,9 @@ class ContactProcessEI(ContactProcessBase):
         reverse_weights: np.ndarray,
         gamma_eff: float,
         activation_fn,
-        N: int
+        N: int,
+        active_val: int,
+        inactive_val: int,
     ) -> None:
         """Numba-optimized sweep for ContactProcessEI with lambda caching.
 
@@ -755,7 +771,7 @@ class ContactProcessEI(ContactProcessBase):
         Parameters
         ----------
         state : np.ndarray[int8]
-            Current state configuration (binary: 0 or 1)
+            Current state configuration (binary {0, 1} or bipolar {-1, +1})
         lambda_arr : np.ndarray[float64]
             Cached lambda values (gamma_eff * sum(w_ji * s[j]))
         neigh_indices : np.ndarray[int32]
@@ -772,6 +788,10 @@ class ContactProcessEI(ContactProcessBase):
             Pre-selected activation function (_activation_relu or _activation_tanh)
         N : int
             Number of nodes
+        active_val, inactive_val : int
+            State encoding: the value written for an active vs inactive node
+            (binary 1/0 or bipolar +1/-1). The lambda update uses the signed
+            delta, so it stays correct for either encoding.
         """
         for _ in range(N):
             i = np.random.randint(N)
@@ -781,12 +801,12 @@ class ContactProcessEI(ContactProcessBase):
 
             # Sample new state
             old_state = state[i]
-            new_state = np.int8(1 if np.random.random() < P else 0)
+            new_state = np.int8(active_val if np.random.random() < P else inactive_val)
 
             # Update if changed
             if new_state != old_state:
                 state[i] = new_state
-                delta = new_state - old_state
+                delta = np.float64(new_state) - np.float64(old_state)
 
                 # Update lambda for all neighbors of i
                 start = neigh_offsets[i]
@@ -815,6 +835,9 @@ class ContactProcessEI(ContactProcessBase):
         if self._reverse_weights is None:
             raise RuntimeError("ContactProcessEI reverse-weights cache is not initialized.")
 
+        active_val = int(self.active_state)
+        inactive_val = int(self.inactive_state)
+
         def _sweep() -> None:
             self._sweep_ei_lambda_cache(
                 self.s,
@@ -826,6 +849,8 @@ class ContactProcessEI(ContactProcessBase):
                 self.gamma_eff,
                 self._activation_fn,
                 self.N,
+                active_val,
+                inactive_val,
             )
 
         return _sweep
@@ -898,6 +923,8 @@ class ContactProcessEI(ContactProcessBase):
                 self.gamma_eff,
                 self._activation_fn,
                 self.N,
+                int(self.active_state),
+                int(self.inactive_state),
             )
         self._persist_observables()
 
