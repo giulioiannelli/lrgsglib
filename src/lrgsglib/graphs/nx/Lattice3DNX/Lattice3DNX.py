@@ -1,8 +1,7 @@
 # from ..common import *
-import random
 import warnings
 #
-from typing import Union, Tuple, Any
+from typing import Union, Tuple
 from networkx import convert_node_labels_to_integers, set_node_attributes, Graph
 #
 from os.path import join as pth_join
@@ -15,6 +14,7 @@ from ....utils.basic.numeric import is_positive_int
 from ....utils.basic.iterables import compose
 from ..funcs import LatticeND_graph_FastPatch, remove_edges
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
+from ._nw_container import Lattice3DNXnwContainer
 from .generators_3d import *
 from ..._shared.animation.lattice3d import _Lattice3DAnimate, _Lattice3DPlot
 
@@ -207,54 +207,8 @@ class Lattice3DNX(SignedGraphNX):
             return edge_t
         elif on_g == 'G':
             return self.map_edge['G']['H'][edge_t]
-    class nwContainer(dict):
-        def __init__(self, l: "Lattice3DNX", iterable=[], constant=None, 
-                    **kwargs):
-            super().__init__(**kwargs)
-            self.update((key, constant) for key in iterable)
-            self.l = l
-            self.rd = self.l.graph_reprs
-            self.rNodeFlip = {g: random.sample(
-                                    list(self.l.gr[g].nodes()), 
-                                    self.l.nflip
-                                ) for g in self.rd}
-            #
-            self.centedge = {g: self.l.get_central_edge(g) 
-                            for g in self.rd}
-            self['single'] = {g: [self.centedge[g]] for g in self.rd}
-            self['singleXERR'] = {g: self.get_links_XERR(
-                self.centedge[g][0], g) for g in self.rd}
-            self['rand'] = {g: [e for e in self.l.fleset[g]] 
-                        for g in self.rd}
-            self['randXERR'] = {g: self.get_rand_pattern('XERR', on_g=g) 
-                        for g in self.rd}
-        #
-        def get_links_XERR(self, node: Any, on_g: str = L3D_ONREP):
-            return [(node, nn) for nn in self.l.get_graph_neighbors(node, on_g)]
-        #
-        def get_rand_pattern(self, mode: str, on_g: str = L3D_ONREP):
-            match mode:
-                case "XERR":
-                    if COUNT_XERR_PATTERNS:
-                        patternList = [k for i in self.rNodeFlip[on_g] 
-                                    for k in self.get_links_XERR(i, on_g)]
-                    else:
-                        tmplst = self.rNodeFlip[on_g]
-                        grph = self.l.gr[on_g]
-                        _ = 0
-                        patternList = []
-                        while _ < len(tmplst):
-                            leval = [all([nnn['weight'] == -1 
-                                        for nnn in grph[nn].values()])
-                                        for nn in grph.neighbors(tmplst[_])]
-                            if any(leval):
-                                tmplst.pop(_)  # Removing the element
-                            else:
-                                glXERR = self.get_links_XERR(tmplst[_], 
-                                                             on_g)
-                                patternList.extend([k for k in glXERR])
-                                _ += 1
-            return list(set(patternList))
+
+    nwContainer = Lattice3DNXnwContainer
 
     # Plotting / animation namespaces (shared with Lattice3DGT): the voxel
     # methods live on accessors -- `lat.plot.voxel(state)` (static),

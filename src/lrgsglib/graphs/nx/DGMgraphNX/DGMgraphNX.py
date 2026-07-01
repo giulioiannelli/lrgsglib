@@ -1,5 +1,3 @@
-from typing import Any
-
 import networkx as nx
 
 from ....config.const import *
@@ -52,41 +50,3 @@ class DGMgraphNX(SignedGraphNX):
 
     def get_central_edge(self, on_g: str = DGM_ONREP):
         return (0, 1)
-
-    class nwContainer(dict):
-        def __init__(self, dgm: SignedGraphNX, iterable=[], constant=None, **kwargs):
-            super().__init__(**kwargs)
-            self.update((key, constant) for key in iterable)
-            self.dgm = dgm
-            self.rd = self.dgm.graph_reprs
-            self.rNodeFlip = {
-                g: random.sample(list(self.dgm.nodes_in(g)), self.dgm.nflip)
-                for g in self.rd
-            }
-            self['rand'] = {g: [e for e in self.dgm.fleset[g]] for g in self.rd}
-            self['randXERR'] = {g: self.get_rand_pattern('XERR', on_g=g) for g in self.rd}
-
-        def get_links_XERR(self, node: Any, on_g: str = DGM_ONREP):
-            return [(node, nn) for nn in self.dgm.get_graph_neighbors(node, on_g)]
-
-        def get_rand_pattern(self, mode: str, on_g: str = DGM_ONREP):
-            match mode:
-                case 'XERR':
-                    if COUNT_XERR_PATTERNS:
-                        patternList = [k for i in self.rNodeFlip[on_g]
-                                        for k in self.get_links_XERR(i, on_g)]
-                    else:
-                        tmplst = self.rNodeFlip[on_g]
-                        grph = self.dgm.gr[on_g]
-                        _ = 0
-                        patternList = []
-                        while _ < len(tmplst):
-                            leval = [all([nnn['weight'] == -1 for nnn in grph[nn].values()])
-                                     for nn in grph.neighbors(tmplst[_])]
-                            if any(leval):
-                                tmplst.pop(_)
-                            else:
-                                glXERR = self.get_links_XERR(tmplst[_], on_g)
-                                patternList.extend([k for k in glXERR])
-                                _ += 1
-            return list(set(patternList))

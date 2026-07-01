@@ -14,8 +14,11 @@ node. Two guarantees this pins:
    its ``+x/+y`` north-east plaquette, a bijection in the bulk, so distinct
    ``randZERR`` seeds flip distinct cells instead of silently colliding.
 
-Plus the §5b regression: structured supports on the ``oct_sqr`` / ``kgm``
-geometries (whose labels carry no coordinate) must build without ``KeyError``.
+Plus the §5b / §6.3 regression: structured supports must build through the shared
+``NwContainer`` on the families whose bespoke containers used to choke — the
+coordinate-less ``oct_sqr`` / ``kgm`` geometries (a ``KeyError``), the 3D lattice
+(``KeyError`` on the loop ``*ZERR`` patterns it never built), and the DGM graph (a
+``NameError`` from an unimported ``random``).
 
 Note: the ``triangular`` generators label nodes differently on the two engines
 (same graph up to isomorphism, different integer labels), so NX==GT cannot hold
@@ -27,7 +30,7 @@ from collections import Counter
 
 import pytest
 
-from lrgsglib.graphs import Lattice2D, Disorder
+from lrgsglib.graphs import Lattice2D, Lattice3D, DGMgraph, Disorder
 from lrgsglib.graphs._shared._nw_geometry import elementary_cell_edges
 
 pytest.importorskip("graph_tool.all")
@@ -119,3 +122,39 @@ def test_structured_support_oct_kgm_no_keyerror(geo, support):
         )
     assert support in g.nwDict, f"{geo}: {support!r} not built"
     assert g.Ne_n > 0, f"{geo}: {support!r} flipped no edge"
+
+
+# §6.3 (Shape-A): the Lattice3DNX / DGMgraphNX bespoke containers were retired onto
+# the shared NwContainer, so those families gain the full structured-support set — and
+# the cascade reaches Lattice3DGT / DGMgraphGT, which subclass the NX impls. Before:
+# the 3D lattice raised KeyError on the loop ``*ZERR`` patterns it never built; DGM
+# raised NameError on an unimported ``random``. Both engines must now build every one.
+STRUCTURED_SUPPORTS = ["single", "singleXERR", "randXERR", "singleZERR", "randZERR"]
+
+
+@pytest.mark.parametrize("engine", ENGINES)
+@pytest.mark.parametrize("support", STRUCTURED_SUPPORTS)
+def test_structured_support_lattice3d(engine, support):
+    """3D-lattice structured disorder builds + flips (``*ZERR`` was a KeyError)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        g = Lattice3D(
+            dim=4, engine=engine, seed=7,
+            disorder=Disorder(support, pflip=0.15),
+        )
+    assert support in g.nwDict, f"L3D/{engine}: {support!r} not built"
+    assert g.Ne_n > 0, f"L3D/{engine}: {support!r} flipped no edge"
+
+
+@pytest.mark.parametrize("engine", ENGINES)
+@pytest.mark.parametrize("support", STRUCTURED_SUPPORTS)
+def test_structured_support_dgm(engine, support):
+    """DGM structured disorder builds + flips (every support was a NameError)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        g = DGMgraph(
+            n=4, engine=engine, seed=7,
+            disorder=Disorder(support, pflip=0.15),
+        )
+    assert support in g.nwDict, f"DGM/{engine}: {support!r} not built"
+    assert g.Ne_n > 0, f"DGM/{engine}: {support!r} flipped no edge"
