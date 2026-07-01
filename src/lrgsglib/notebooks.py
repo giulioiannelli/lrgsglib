@@ -14,6 +14,10 @@ from .utils.ipy import *
 from .graphs import (
     SignedGraph,
     Disorder,
+    CompositeDisorder,
+    register_coupling,
+    register_support,
+    registered_supports,
     Lattice2D,
     Lattice3D,
     LatticeND,

@@ -100,7 +100,13 @@ from ._engine import (
 from .SignedGraph import SignedGraph
 
 # Disorder model (engine-neutral): support x coupling-law spec carried on sg
-from ._shared._disorder import Disorder, register_coupling
+from ._shared._disorder import (
+    Disorder,
+    CompositeDisorder,
+    register_coupling,
+    register_support,
+    registered_supports,
+)
 
 # Lattice
 from .Lattice2D import Lattice2D
@@ -175,7 +181,10 @@ __all__ = [
     "SignedGraph",
     # Disorder model
     "Disorder",
+    "CompositeDisorder",
     "register_coupling",
+    "register_support",
+    "registered_supports",
     # Lattice
     "Lattice2D",
     "Lattice3D",

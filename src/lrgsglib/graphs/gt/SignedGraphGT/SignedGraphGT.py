@@ -40,7 +40,12 @@ import networkx as nx
 from .._converters import nx_to_gt, gt_to_nx, get_laplacian_matrix_gt
 from ..._shared._nw_container import NwContainer
 from ..._shared._nw_geometry import hub_central_edge, elementary_cell_edges
-from ..._shared._disorder import Disorder, as_disorder, structured_build_flags
+from ..._shared._disorder import (
+    Disorder,
+    CompositeDisorder,
+    as_disorder,
+    plan_composite_ops,
+)
 from .._topology_ops import apply_rewiring, apply_dilution
 from ....config.const import (
     BIN, PATHDATA, SG_REPR,
@@ -260,7 +265,7 @@ class SignedGraphGT:
             )
         ):
             return {}
-        bs, bz = structured_build_flags(self.disorder.support)
+        bs, bz = self.disorder.build_flags()
         flags: dict = {}
         if bs:
             flags["build_single"] = True
@@ -301,16 +306,22 @@ class SignedGraphGT:
             return list(self._flip_edges)
         if support == "all":
             return list(self.G.edges())
+        if d.is_registered_support:
+            return self._edges_from_tuples(d.build_support(self, self._rng, SG_REPR))
         if d.is_structured:
             pattern = self.nwDict[support]
             tuples = pattern[SG_REPR] if isinstance(pattern, dict) else pattern
-            edges = []
-            for (u, v) in tuples:
-                e = self.G.edge(int(u), int(v))
-                if e is not None:
-                    edges.append(e)
-            return edges
+            return self._edges_from_tuples(tuples)
         return []
+
+    def _edges_from_tuples(self, tuples) -> list:
+        """Map ``(u, v)`` int tuples to existing GT ``Edge`` objects (skip absent)."""
+        edges = []
+        for (u, v) in tuples:
+            e = self.G.edge(int(u), int(v))
+            if e is not None:
+                edges.append(e)
+        return edges
 
     def _apply_disorder(self, d: "Disorder") -> None:
         """Realize a :class:`Disorder` on the GT graph at construction.
@@ -321,6 +332,9 @@ class SignedGraphGT:
         (PLAN-Disorder-Model Stage 3) and are rejected here until then.
         """
         if d.is_none:
+            return
+        if isinstance(d, CompositeDisorder):
+            self._apply_composite(d)
             return
         edges = self._disorder_support_edges(d)
         if not edges:
@@ -337,12 +351,69 @@ class SignedGraphGT:
             # (double) property and switch matrix building onto it. The discrete
             # ±1 'sign' property is left intact; the signed Laplacian uses |J|
             # degrees, so continuous couplings need no further change.
-            if "weight" not in self.G.edge_properties:
-                self.G.edge_properties["weight"] = self.G.new_edge_property(
-                    "double", val=1.0
-                )
-            weight_prop = self.G.edge_properties["weight"]
+            weight_prop = self._ensure_weight_prop()
             draws = d.draw(len(edges), self._rng)
+            for e, w in zip(edges, draws):
+                weight_prop[e] = float(w)
+            self._continuous_couplings = True
+        self.invalidate_cache()
+
+    def _ensure_weight_prop(self):
+        """The ``weight`` (double) edge property, created on first use (val 1.0)."""
+        if "weight" not in self.G.edge_properties:
+            self.G.edge_properties["weight"] = self.G.new_edge_property(
+                "double", val=1.0
+            )
+        return self.G.edge_properties["weight"]
+
+    def _apply_composite(self, comp: "CompositeDisorder") -> None:
+        """Realize a :class:`CompositeDisorder` on GT.
+
+        ``overlay`` applies each component in turn; ``mixture`` / the set-algebra
+        modes reduce to combined write-ops via the engine-neutral planner. Because
+        GT's signed matrix reads the ``weight`` property exclusively once any
+        continuous law fires, a discrete ``flip`` op inside a composite that also
+        carries a distributional component must ALSO write ``weight = -1``, else
+        the flips would be read back as ``+1`` and silently lost.
+        """
+        if comp.mode == "overlay":
+            for c in comp.components:
+                self._apply_disorder(c)
+            return
+        force_weight = any(not c.is_flip for c in comp.components)
+        ops = plan_composite_ops(comp, self, SG_REPR, self._resolve_edge_keys)
+        for keys, law in ops:
+            self._write_edge_keys(keys, law, force_weight=force_weight)
+
+    def _resolve_edge_keys(self, d: "Disorder") -> set:
+        """A component's support as canonical ``(min, max)`` int edge keys."""
+        out = set()
+        for e in self._disorder_support_edges(d):
+            u, v = int(e.source()), int(e.target())
+            out.add((u, v) if u <= v else (v, u))
+        return out
+
+    def _write_edge_keys(
+        self, keys, law: "Disorder", force_weight: bool = False
+    ) -> None:
+        """Write one composite op (``flip`` or distributional) over ``keys``."""
+        if not keys:
+            return
+        edges = self._edges_from_tuples(keys)
+        if not edges:
+            return
+        if law.is_flip:
+            sign_prop = self.G.edge_properties["sign"]
+            for e in edges:
+                sign_prop[e] = -1
+            if force_weight:
+                weight_prop = self._ensure_weight_prop()
+                for e in edges:
+                    weight_prop[e] = -1.0
+            self._flip_edges = getattr(self, "_flip_edges", set()) | set(edges)
+        else:
+            weight_prop = self._ensure_weight_prop()
+            draws = law.draw(len(edges), self._rng)
             for e, w in zip(edges, draws):
                 weight_prop[e] = float(w)
             self._continuous_couplings = True

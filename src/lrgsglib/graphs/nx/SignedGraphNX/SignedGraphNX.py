@@ -35,7 +35,12 @@ from ....utils.tools.ConditionalPartitioning import ConditionalPartitioningInput
 from ._backend import Backend, BackendManager, ArrayBackend
 from ..._shared._nw_container import NwContainer
 from ..._shared._nw_geometry import hub_central_edge, elementary_cell_edges
-from ..._shared._disorder import Disorder, as_disorder, structured_build_flags
+from ..._shared._disorder import (
+    Disorder,
+    CompositeDisorder,
+    as_disorder,
+    plan_composite_ops,
+)
 #
 logger = logging.getLogger(__name__)
 
@@ -1034,7 +1039,7 @@ class SignedGraphNX:
             )
         ):
             return {}
-        bs, bz = structured_build_flags(self.disorder.support)
+        bs, bz = self.disorder.build_flags()
         flags: dict = {}
         if bs:
             flags["build_single"] = True
@@ -1055,6 +1060,8 @@ class SignedGraphNX:
             return list(self.fleset[on_g])
         if support == "all":
             return list(self.eset[on_g])
+        if d.is_registered_support:
+            return list(d.build_support(self, np.random, on_g))
         if d.is_structured:
             return list(self.nwDict[support][on_g])
         return []
@@ -1068,6 +1075,9 @@ class SignedGraphNX:
         sets and matrices are then refreshed from the realized weights.
         """
         on_g = on_g or self.on_g
+        if isinstance(d, CompositeDisorder):
+            self._apply_composite(d, on_g)
+            return
         edges = self._disorder_support_edges(d, on_g)
         if not edges:
             return
@@ -1081,6 +1091,52 @@ class SignedGraphNX:
             vals = {(u, v): float(w) for (u, v), w in zip(edges, draws)}
         nx.set_edge_attributes(self.gr[on_g], values=vals, name="weight")
         # Negative weight == flipped; recompute fleset/lfeset from the weights.
+        self.upd_edge_sets(on_g)
+        self.upd_GraphRepr_All(on_g)
+        self.upd_graph_matrices(on_g)
+
+    def _apply_composite(
+        self, comp: "CompositeDisorder", on_g: Optional[str] = None
+    ) -> None:
+        """Realize a :class:`CompositeDisorder`.
+
+        ``overlay`` applies each component in turn (idempotent SET for ``flip``,
+        so overlapping edges are negative once); ``mixture`` and the set-algebra
+        modes reduce to combined write-ops via the engine-neutral planner.
+        """
+        on_g = on_g or self.on_g
+        if comp.mode == "overlay":
+            for c in comp.components:
+                self._apply_disorder(c, on_g)
+            return
+        ops = plan_composite_ops(
+            comp, self, on_g, lambda c: self._resolve_edge_keys(c, on_g)
+        )
+        for keys, law in ops:
+            self._write_edge_keys(keys, law, on_g)
+
+    def _resolve_edge_keys(self, d: "Disorder", on_g: str) -> set:
+        """A component's support as canonical ``(min, max)`` int edge keys."""
+        out = set()
+        for (u, v) in self._disorder_support_edges(d, on_g):
+            iu, iv = int(u), int(v)
+            out.add((iu, iv) if iu <= iv else (iv, iu))
+        return out
+
+    def _write_edge_keys(self, keys, law: "Disorder", on_g: str) -> None:
+        """Write one composite op (``flip`` or distributional) over ``keys``."""
+        if not keys:
+            return
+        edges = list(keys)
+        if law.is_flip:
+            vals = {
+                (u, v): -abs(self.get_edge_data(u, v, on_g=on_g))
+                for (u, v) in edges
+            }
+        else:
+            draws = law.draw(len(edges), np.random)
+            vals = {(u, v): float(w) for (u, v), w in zip(edges, draws)}
+        nx.set_edge_attributes(self.gr[on_g], values=vals, name="weight")
         self.upd_edge_sets(on_g)
         self.upd_GraphRepr_All(on_g)
         self.upd_graph_matrices(on_g)
