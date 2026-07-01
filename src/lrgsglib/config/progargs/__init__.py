@@ -6,6 +6,7 @@ from .ErdosRenyi import *
 #
 from .IsingDynamics import *
 from .ContactProcess import *
+from .VoterModel import *
 from .SlaplSpect import *
 from .Recon import *
 from .TransCluster import *
