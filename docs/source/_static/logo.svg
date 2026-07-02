@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="lrgsglib logo">
+  <defs>
+    <linearGradient id="lrg-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b4bff"/>
+      <stop offset="1" stop-color="#a99bff"/>
+    </linearGradient>
+  </defs>
+  <!-- edges: solid = positive coupling, dashed = negative (signed graph) -->
+  <g stroke="url(#lrg-grad)" stroke-width="4" stroke-linecap="round" fill="none">
+    <line x1="30" y1="34" x2="90" y2="34"/>
+    <line x1="30" y1="34" x2="60" y2="86"/>
+    <line x1="90" y1="34" x2="60" y2="86"/>
+    <line x1="30" y1="34" x2="90" y2="34" stroke="none"/>
+  </g>
+  <g stroke="#a99bff" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 8" fill="none">
+    <line x1="60" y1="86" x2="60" y2="24"/>
+  </g>
+  <!-- nodes -->
+  <g fill="#5b4bff" stroke="#ffffff" stroke-width="3">
+    <circle cx="30" cy="34" r="11"/>
+    <circle cx="90" cy="34" r="11"/>
+    <circle cx="60" cy="86" r="11"/>
+    <circle cx="60" cy="24" r="8" fill="#a99bff"/>
+  </g>
+</svg>

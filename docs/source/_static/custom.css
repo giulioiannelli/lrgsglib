@@ -1,0 +1,52 @@
+/* ------------------------------------------------------------------ *
+ * lrgsglib docs — indigo/violet palette on top of pydata-sphinx-theme *
+ * ------------------------------------------------------------------ */
+
+/* Light mode */
+html[data-theme="light"] {
+    --pst-color-primary: #5b4bff;
+    --pst-color-primary-highlight: #4a3ae0;
+    --pst-color-secondary: #a99bff;
+    --pst-color-secondary-highlight: #8f7dff;
+    --pst-color-link: #5b4bff;
+    --pst-color-link-hover: #4a3ae0;
+    --pst-color-inline-code: #4a3ae0;
+    --pst-color-target: #ece9ff;
+}
+
+/* Dark mode */
+html[data-theme="dark"] {
+    --pst-color-primary: #a99bff;
+    --pst-color-primary-highlight: #c4baff;
+    --pst-color-secondary: #7c6cff;
+    --pst-color-secondary-highlight: #9585ff;
+    --pst-color-link: #a99bff;
+    --pst-color-link-hover: #c4baff;
+    --pst-color-inline-code: #c4baff;
+    --pst-color-target: #26224a;
+}
+
+/* Subtle gradient accent on the top navbar brand + a little polish */
+.bd-header {
+    box-shadow: 0 1px 6px rgba(91, 75, 255, 0.12);
+}
+
+.navbar-brand img {
+    height: 2.2rem;
+}
+
+/* Rounder, softer code blocks and admonitions */
+div.highlight,
+pre {
+    border-radius: 8px;
+}
+
+.admonition,
+div.admonition {
+    border-radius: 8px;
+}
+
+/* Accent the active sidebar item a touch more strongly */
+nav.bd-links .current > a {
+    font-weight: 600;
+}

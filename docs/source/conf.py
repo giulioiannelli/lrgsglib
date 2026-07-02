@@ -40,7 +40,6 @@ extensions = [
     'sphinx.ext.coverage',          # Check documentation coverage
 
     # Third-party extensions
-    'sphinx_rtd_theme',             # ReadTheDocs theme
     'sphinx_copybutton',            # Copy button for code blocks
     'myst_parser',                  # Markdown support
     'sphinxcontrib.bibtex',         # Bibliography support
@@ -127,41 +126,58 @@ master_doc = 'index'
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
+html_css_files = ['custom.css']
 
-# Theme options
+# Branding
+html_logo = '_static/logo.svg'
+html_favicon = '_static/favicon.svg'
+html_title = f'{project} {version}'
+
+# Theme options (pydata-sphinx-theme)
 html_theme_options = {
+    # Start in the reader's OS preference, offer a light/dark toggle.
+    'default_mode': 'auto',
+    # Top navbar: title on the left, icons on the right.
+    'navbar_start': ['navbar-logo'],
+    'navbar_center': ['navbar-nav'],
+    'navbar_end': ['theme-switcher', 'navbar-icon-links'],
+    'navbar_persistent': ['search-button'],
+    # Left sidebar: show two levels expanded, collapse deeper.
+    'show_nav_level': 1,
     'navigation_depth': 4,
     'collapse_navigation': False,
-    'sticky_navigation': True,
-    'includehidden': True,
-    'titles_only': False,
-    'logo_only': False,
+    # Right-hand on-page table of contents.
+    'show_toc_level': 2,
+    # Header link to the source repo.
+    'icon_links': [
+        {
+            'name': 'GitHub',
+            'url': 'https://github.com/giulioiannelli/lrgsglib',
+            'icon': 'fa-brands fa-github',
+            'type': 'fontawesome',
+        },
+    ],
+    'use_edit_page_button': True,
+    'header_links_before_dropdown': 6,
+    'pygments_light_style': 'default',
+    'pygments_dark_style': 'monokai',
 }
 
-# HTML context
+# HTML context — powers the "Edit on GitHub" button.
 html_context = {
-    'display_github': True,
     'github_user': 'giulioiannelli',
     'github_repo': 'lrgsglib',
     'github_version': 'main',
-    'conf_py_path': '/docs/source/',
+    'doc_path': 'docs/source',
+    'default_mode': 'auto',
 }
 
-# Custom sidebar
+# Sidebars: navigation on inner pages, hidden on the landing page.
 html_sidebars = {
-    '**': [
-        'globaltoc.html',
-        'relations.html',
-        'sourcelink.html',
-        'searchbox.html',
-    ]
+    'index': [],
 }
-
-# Add any paths that contain custom static files
-html_logo = None  # Can add logo later
-html_favicon = None  # Can add favicon later
 
 # Output file base name for HTML help builder
 htmlhelp_basename = 'lrgsglibdoc'
