@@ -34,6 +34,25 @@ def _resolve_modes(model: "IsingDynamics", sa_mode: bool, pt_mode: bool):
     return rl, use_sa, use_pt
 
 
+def _is_new_style(model) -> bool:
+    """True for the new scheme classes (IsingBase & leaves); the ONE registry
+    key polymorphs on the instance (plan §4)."""
+    from .IsingBase import IsingBase
+
+    return isinstance(model, IsingBase)
+
+
+def _reject_new_style(model, backend_name: str) -> None:
+    """Hard capability error (invariant #3): the native backends for the new
+    scheme classes land in Phase 2 — never a silent fallback."""
+    if _is_new_style(model):
+        raise NotImplementedError(
+            f"The {backend_name} backend is not wired for the new Ising "
+            "scheme classes yet (Phase 2: native backends); use "
+            "runlang='py' or the legacy IsingDynamics."
+        )
+
+
 class _IsingPySolver:
     """Pure-Python reference loops (met/sa/pt/wolff/sw/topo_met/topo_fca/topo_cem)."""
 
@@ -45,6 +64,11 @@ class _IsingPySolver:
     def execute(self, model: "IsingDynamics", *, tqdm_on: bool = True,
                 verbose: bool = False, sa_mode: bool = False,
                 pt_mode: bool = False) -> None:
+        if _is_new_style(model):
+            # New scheme classes (IsingBase leaves): the compiled
+            # ThermalEngine loop. ONE registry key, instance polymorphism.
+            model._sample_py(tqdm_on=tqdm_on, verbose=verbose)
+            return
         rl, use_sa, use_pt = _resolve_modes(model, sa_mode, pt_mode)
         if "topo_cem" in rl:
             model.cem_spectral_sampling(tqdm_on)
@@ -73,6 +97,7 @@ class _IsingPbSolver:
     backend = SolverBackend.PB
 
     def supports(self, model: "IsingDynamics") -> None:
+        _reject_new_style(model, "pybind (pb)")
         return None
 
     def execute(self, model: "IsingDynamics", *, tqdm_on: bool = True,
@@ -110,6 +135,7 @@ class _IsingCuSolver:
     backend = SolverBackend.CU
 
     def supports(self, model: "IsingDynamics") -> None:
+        _reject_new_style(model, "CuPy (cu)")
         return None
 
     def execute(self, model: "IsingDynamics", *, tqdm_on: bool = True,
@@ -148,6 +174,7 @@ class _IsingCSolver:
     backend = SolverBackend.C
 
     def supports(self, model: "IsingDynamics") -> None:
+        _reject_new_style(model, "C subprocess")
         return None
 
     def execute(self, model: "IsingDynamics", *, tqdm_on: bool = True,
