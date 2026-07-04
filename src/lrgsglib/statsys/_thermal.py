@@ -39,8 +39,15 @@ __all__ = [
     "ASYNC_ORDERS",
     "TIE_FLIP_PRESETS",
     "ThermalSubstrate",
+    "ClusterSubstrate",
+    "ExchangeSubstrate",
     "resolve_acceptance",
+    "resolve_tie_flip",
+    "resolve_visit_order",
     "ThermalEngine",
+    "WolffEngine",
+    "SwendsenWangEngine",
+    "KawasakiEngine",
 ]
 
 #: Acceptance rules (see the module-docstring citation map).
@@ -101,10 +108,83 @@ class ThermalSubstrate(Protocol):
         """The model's scalar order parameter for the current state."""
         ...
 
-    def bond_activation(self, u: int, v: int) -> float:
-        """Bond-activation probability for cluster moves (Wolff / SW); models
-        without cluster moves may raise ``NotImplementedError``."""
+
+@runtime_checkable
+class ClusterSubstrate(ThermalSubstrate, Protocol):
+    """Extension contract for cluster moves (Wolff / Swendsen–Wang).
+
+    The model owns everything state- and Hamiltonian-specific: what a
+    "satisfied" bond is (Ising: ``J_ij s_i s_j > 0``; Potts:
+    ``J_ij δ(σ_i, σ_j) > 0``) and the energy change of flipping a cluster.
+    The engines own the Fortuin–Kasteleyn activation probability
+    ``p = 1 − e^{−2·sat/T}`` and the cluster growth/percolation itself.
+    """
+
+    def bond_satisfaction(self, nd: int) -> tuple[np.ndarray, np.ndarray]:
+        """``(neighbor_indices, satisfactions)`` of site *nd*; a bond's
+        satisfaction is its satisfied-coupling magnitude (> 0 activatable,
+        <= 0 never activated)."""
         ...
+
+    def edge_satisfactions(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """``(u, v, satisfactions)`` over every undirected edge once."""
+        ...
+
+    def flip_cluster(self, nodes: np.ndarray) -> float:
+        """Flip the cluster *nodes* in place; return the energy change."""
+        ...
+
+
+@runtime_checkable
+class ExchangeSubstrate(ThermalSubstrate, Protocol):
+    """Extension contract for the pair-exchange (Kawasaki) move: dynamics
+    conserving the order parameter by swapping two neighboring states."""
+
+    def neighbor_indices(self, nd: int) -> np.ndarray:
+        """Neighbor indices of site *nd*."""
+        ...
+
+    def swap_delta_E(self, u: int, v: int) -> float:
+        """Energy change of swapping the states at *u* and *v*."""
+        ...
+
+    def commit_swap(self, u: int, v: int) -> None:
+        """Swap the states at *u* and *v* (in place)."""
+        ...
+
+
+def resolve_tie_flip(
+    rule: str,
+    tie_flip_p: float | str | None,
+    default: float | None = None,
+) -> float | None:
+    """Resolve the user-facing tie policy to a float (or None).
+
+    Shared by every thermal scheme leaf (Metropolis / annealing / tempering):
+    under ``rule='metropolis'`` the value may be a probability, a named preset
+    from :data:`TIE_FLIP_PRESETS`, or ``None`` (→ *default*); the other rules
+    bake their own ΔE=0 rate and reject an explicit value (plan §3b).
+    """
+    if rule == "metropolis":
+        if tie_flip_p is None:
+            return default
+        if isinstance(tie_flip_p, str):
+            try:
+                return TIE_FLIP_PRESETS[tie_flip_p]
+            except KeyError:
+                raise ValueError(
+                    f"Unknown tie_flip_p preset {tie_flip_p!r}; known "
+                    f"presets: {tuple(TIE_FLIP_PRESETS)}."
+                ) from None
+        return float(tie_flip_p)
+    if tie_flip_p is not None:
+        raise ValueError(
+            f"tie_flip_p is metropolis-only; rule {rule!r} bakes its own "
+            "ΔE=0 rate."
+        )
+    return None
 
 
 def _logistic_neg(x: float) -> float:
@@ -198,6 +278,37 @@ def resolve_acceptance(
     return p_accept
 
 
+def resolve_visit_order(
+    order: str, n_sites: int, rng: Any
+) -> Callable[[], np.ndarray]:
+    """Resolve an async site-visit ``order`` name (see :data:`ASYNC_ORDERS`)
+    to a compiled zero-argument callable returning the sweep's site sequence.
+    Shared by every single-site engine (thermal and exchange kinetics)."""
+    if order not in ASYNC_ORDERS:
+        raise ValueError(
+            f"Unknown async order {order!r}; expected one of {ASYNC_ORDERS}."
+        )
+    if order == "random":
+
+        def visit_order() -> np.ndarray:
+            return rng.randint(0, n_sites, size=n_sites)
+
+    elif order == "permutation":
+
+        def visit_order() -> np.ndarray:
+            sites = np.arange(n_sites)
+            rng.shuffle(sites)
+            return sites
+
+    else:  # typewriter (legacy/debug)
+        fixed = np.arange(n_sites)
+
+        def visit_order() -> np.ndarray:
+            return fixed
+
+    return visit_order
+
+
 class ThermalEngine:
     """Configure-then-run MCMC driver over a :class:`ThermalSubstrate`.
 
@@ -278,25 +389,7 @@ class ThermalEngine:
         rng = self.rng
         p_accept = resolve_acceptance(self.rule, self.T, self.tie_flip_p)
         n_sites = int(len(substrate.s))
-
-        if self.order == "random":
-
-            def visit_order() -> np.ndarray:
-                return rng.randint(0, n_sites, size=n_sites)
-
-        elif self.order == "permutation":
-
-            def visit_order() -> np.ndarray:
-                sites = np.arange(n_sites)
-                rng.shuffle(sites)
-                return sites
-
-        else:  # typewriter (legacy/debug)
-            fixed = np.arange(n_sites)
-
-            def visit_order() -> np.ndarray:
-                return fixed
-
+        visit_order = resolve_visit_order(self.order, n_sites, rng)
         propose = substrate.propose_local
         delta_E = substrate.delta_E
         commit = substrate.commit
@@ -310,6 +403,259 @@ class ThermalEngine:
                 p = p_accept(dE)
                 if p >= 1.0 or rng.random() < p:
                     commit(nd, proposal)
+                    dE_sweep += dE
+            return dE_sweep
+
+        return sweep
+
+
+def _cluster_p_add(T: float) -> Callable[[float], float]:
+    """Compile the Fortuin–Kasteleyn bond-activation probability
+    ``p(sat) = 1 − e^{−2·sat/T}`` for satisfied bonds (sat > 0); the T = 0
+    limit activates every satisfied bond (refs M5/M6)."""
+    if T > 0.0:
+        inv_T = 1.0 / T
+
+        def p_add(sat: float) -> float:
+            return -math.expm1(-2.0 * sat * inv_T)
+
+    else:
+
+        def p_add(sat: float) -> float:
+            return 1.0
+
+    return p_add
+
+
+class WolffEngine:
+    """Wolff single-cluster kinetics (ref M6) over a :class:`ClusterSubstrate`.
+
+    One "sweep" repeats single-cluster steps (grow from a random seed along
+    satisfied bonds with the FK probability, flip the whole cluster — always
+    accepted) until at least N sites have been flipped, so a sweep is
+    comparable to N single-site attempts. Requires zero external field (the
+    plain cluster rule breaks detailed balance under h; the ghost-spin
+    extension is not wired) — the SCHEME validates that, since the field
+    lives on the model, not here.
+
+    Per-sweep flipped-site counts accumulate in :attr:`cluster_sizes`.
+    """
+
+    def __init__(
+        self,
+        substrate: ClusterSubstrate,
+        *,
+        T: float,
+        rng: Any = None,
+    ) -> None:
+        if not isinstance(substrate, ClusterSubstrate):
+            raise NotImplementedError(
+                f"{type(substrate).__name__} does not implement the cluster "
+                "substrate contract (bond_satisfaction / edge_satisfactions "
+                "/ flip_cluster); cluster moves are unavailable."
+            )
+        if T < 0.0:
+            raise ValueError(f"Temperature must be >= 0; got {T}.")
+        self.substrate = substrate
+        self.T = float(T)
+        self.rng = rng if rng is not None else np.random
+        self.cluster_sizes: list[int] = []
+
+    def compile_step(self) -> Callable[[], float]:
+        substrate = self.substrate
+        rng = self.rng
+        p_add = _cluster_p_add(self.T)
+        n_sites = int(len(substrate.s))
+        bond_satisfaction = substrate.bond_satisfaction
+        flip_cluster = substrate.flip_cluster
+        cluster_sizes = self.cluster_sizes
+        in_cluster = np.zeros(n_sites, dtype=np.bool_)
+
+        def cluster_step() -> tuple[float, int]:
+            seed = int(rng.randint(0, n_sites))
+            in_cluster.fill(False)
+            in_cluster[seed] = True
+            queue = [seed]
+            head = 0
+            while head < len(queue):
+                node = queue[head]
+                head += 1
+                nbrs, sats = bond_satisfaction(node)
+                for j, sat in zip(nbrs, sats):
+                    j = int(j)
+                    if in_cluster[j] or sat <= 0.0:
+                        continue
+                    if rng.random() < p_add(float(sat)):
+                        in_cluster[j] = True
+                        queue.append(j)
+            nodes = np.asarray(queue, dtype=np.intp)
+            return flip_cluster(nodes), len(queue)
+
+        def sweep() -> float:
+            dE_sweep = 0.0
+            flipped = 0
+            while flipped < n_sites:
+                dE, size = cluster_step()
+                dE_sweep += dE
+                flipped += size
+            cluster_sizes.append(flipped)
+            return dE_sweep
+
+        return sweep
+
+
+class SwendsenWangEngine:
+    """Swendsen–Wang multi-cluster kinetics (ref M5) over a
+    :class:`ClusterSubstrate`.
+
+    One sweep: activate every satisfied bond with the FK probability,
+    partition the sites with union–find, flip each cluster with probability
+    ½. Same zero-field requirement as :class:`WolffEngine` (validated by the
+    scheme). Per-sweep cluster counts accumulate in :attr:`cluster_counts`.
+    """
+
+    def __init__(
+        self,
+        substrate: ClusterSubstrate,
+        *,
+        T: float,
+        rng: Any = None,
+    ) -> None:
+        if not isinstance(substrate, ClusterSubstrate):
+            raise NotImplementedError(
+                f"{type(substrate).__name__} does not implement the cluster "
+                "substrate contract (bond_satisfaction / edge_satisfactions "
+                "/ flip_cluster); cluster moves are unavailable."
+            )
+        if T < 0.0:
+            raise ValueError(f"Temperature must be >= 0; got {T}.")
+        self.substrate = substrate
+        self.T = float(T)
+        self.rng = rng if rng is not None else np.random
+        self.cluster_counts: list[int] = []
+
+    def compile_step(self) -> Callable[[], float]:
+        substrate = self.substrate
+        rng = self.rng
+        T = self.T
+        n_sites = int(len(substrate.s))
+        edge_satisfactions = substrate.edge_satisfactions
+        flip_cluster = substrate.flip_cluster
+        cluster_counts = self.cluster_counts
+
+        def sweep() -> float:
+            u_arr, v_arr, sat = edge_satisfactions()
+            sat = np.asarray(sat, dtype=np.float64)
+            # FK activation, vectorized: satisfied bonds only.
+            if T > 0.0:
+                p = -np.expm1(-2.0 * np.clip(sat, 0.0, None) / T)
+            else:
+                p = (sat > 0.0).astype(np.float64)
+            active = rng.random(len(sat)) < p
+
+            # Union-find with path halving + union by rank.
+            parent = np.arange(n_sites)
+            rank = np.zeros(n_sites, dtype=np.int32)
+
+            def find(x: int) -> int:
+                while parent[x] != x:
+                    parent[x] = parent[parent[x]]
+                    x = int(parent[x])
+                return x
+
+            for u, v in zip(u_arr[active], v_arr[active]):
+                ru, rv = find(int(u)), find(int(v))
+                if ru == rv:
+                    continue
+                if rank[ru] < rank[rv]:
+                    parent[ru] = rv
+                elif rank[ru] > rank[rv]:
+                    parent[rv] = ru
+                else:
+                    parent[rv] = ru
+                    rank[ru] += 1
+
+            roots = np.fromiter(
+                (find(i) for i in range(n_sites)), dtype=np.intp, count=n_sites
+            )
+            unique_roots = np.unique(roots)
+            flip_bit = rng.random(len(unique_roots)) < 0.5
+
+            dE_sweep = 0.0
+            for root, flip in zip(unique_roots, flip_bit):
+                if flip:
+                    nodes = np.flatnonzero(roots == root)
+                    dE_sweep += flip_cluster(nodes)
+            cluster_counts.append(len(unique_roots))
+            return dE_sweep
+
+        return sweep
+
+
+class KawasakiEngine:
+    """Pair-exchange (Kawasaki, ref M8) kinetics over an
+    :class:`ExchangeSubstrate`: order-parameter-conserving dynamics.
+
+    One sweep makes N exchange attempts: visit a site (same ``order`` axis
+    as the single-site engine), pick a uniform random neighbor, and swap the
+    two states with the chosen acceptance ``rule`` applied to the swap's ΔE.
+    Attempts on equal states are null moves.
+    """
+
+    def __init__(
+        self,
+        substrate: ExchangeSubstrate,
+        *,
+        rule: str,
+        T: float,
+        order: str = "random",
+        tie_flip_p: float | None = None,
+        rng: Any = None,
+    ) -> None:
+        if not isinstance(substrate, ExchangeSubstrate):
+            raise NotImplementedError(
+                f"{type(substrate).__name__} does not implement the exchange "
+                "substrate contract (neighbor_indices / swap_delta_E / "
+                "commit_swap); the exchange move is unavailable."
+            )
+        if order not in ASYNC_ORDERS:
+            raise ValueError(
+                f"Unknown async order {order!r}; expected one of {ASYNC_ORDERS}."
+            )
+        # Validates rule / T / tie eagerly (setup-time capability error).
+        resolve_acceptance(rule, T, tie_flip_p)
+        self.substrate = substrate
+        self.rule = rule
+        self.T = float(T)
+        self.order = order
+        self.tie_flip_p = tie_flip_p
+        self.rng = rng if rng is not None else np.random
+
+    def compile_step(self) -> Callable[[], float]:
+        substrate = self.substrate
+        rng = self.rng
+        p_accept = resolve_acceptance(self.rule, self.T, self.tie_flip_p)
+        n_sites = int(len(substrate.s))
+        visit_order = resolve_visit_order(self.order, n_sites, rng)
+        neighbor_indices = substrate.neighbor_indices
+        swap_delta_E = substrate.swap_delta_E
+        commit_swap = substrate.commit_swap
+
+        def sweep() -> float:
+            s = substrate.s
+            dE_sweep = 0.0
+            for u in visit_order():
+                u = int(u)
+                nbrs = neighbor_indices(u)
+                if len(nbrs) == 0:
+                    continue
+                v = int(nbrs[rng.randint(0, len(nbrs))])
+                if s[u] == s[v]:
+                    continue  # identity swap
+                dE = swap_delta_E(u, v)
+                p = p_accept(dE)
+                if p >= 1.0 or rng.random() < p:
+                    commit_swap(u, v)
                     dE_sweep += dE
             return dE_sweep
 
