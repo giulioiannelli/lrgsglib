@@ -44,6 +44,50 @@ def pytest_addoption(parser):
         default=False,
         help="Display plots interactively (default: save only)",
     )
+    parser.addoption(
+        "--require-binaries",
+        action="store_true",
+        default=False,
+        help=(
+            "Fail (instead of skip) tests that need a compiled artifact "
+            "(C binary, pybind/C++ extension). Use in built environments so "
+            "a broken build cannot silently skip its test net."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Strict binary mode: convert missing-binary skips into failures
+# ---------------------------------------------------------------------------
+
+# Matches the skip reasons used by compiled-artifact guards across the suite
+# ("<x> not built", "<x> binary not built", "native voter module unavailable",
+# "C++ extension not available"). Optional *dependencies* (cupy, a GPU) keep
+# skipping — only artifacts our own build produces are enforced.
+import re as _re
+
+_BINARY_SKIP_PATTERN = _re.compile(
+    r"(?i)not built|binary|c\+\+ extension|native .*(unavailable|not available)"
+)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    if not (report.skipped and item.config.getoption("--require-binaries")):
+        return
+    if isinstance(report.longrepr, tuple):
+        reason = str(report.longrepr[2])
+    else:
+        reason = str(report.longrepr)
+    if _BINARY_SKIP_PATTERN.search(reason):
+        report.outcome = "failed"
+        report.longrepr = (
+            f"--require-binaries: this test was about to SKIP because a "
+            f"compiled artifact is missing ({reason}). Build it (make "
+            f"cpp-make / the model's native target) or drop the flag."
+        )
 
 
 # ---------------------------------------------------------------------------

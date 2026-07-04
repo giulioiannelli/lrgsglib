@@ -1,0 +1,81 @@
+"""Cross-model parity suite (D-B6) — run -> record -> output contract.
+
+Phase-0 consumers: VoterModel and ContactProcessSIR (the two models already
+on the shared spine), Python backend. Each model joins this suite as it
+modernizes (Ising with the Phase-1 vertical slice, then the spin quad);
+native backends join the agreement matrix as the CMake fold (D-B7) brings
+their binaries under test.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+np = pytest.importorskip("numpy")
+pytest.importorskip("networkx")
+
+from lrgsglib.statsys.ContactProcess import ContactProcessSIR
+from lrgsglib.statsys.ContactProcess.defaults import (
+    CP_OBS_DENSITY,
+    CP_OBS_SNAPSHOTS,
+)
+from lrgsglib.statsys.VoterModel import VoterModel
+from lrgsglib.statsys.VoterModel.defaults import VOTER_OBS_MAGN, VOTER_OBS_SOUT
+
+from .parity_harness import (
+    PARITY_SEED,
+    PARITY_STEPS,
+    ParityCase,
+    assert_seeded_reproducibility,
+    run_record_output_contract,
+)
+
+
+def _voter_case() -> ParityCase:
+    return ParityCase(
+        name="voter",
+        make_model=lambda sg: VoterModel(
+            sg,
+            runlang="py",
+            savedisk=True,
+            savedyn=True,
+            savemagn=True,
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False, steps=PARITY_STEPS),
+        expected_observables=(VOTER_OBS_MAGN, VOTER_OBS_SOUT),
+        expected_lengths={VOTER_OBS_MAGN: PARITY_STEPS},
+    )
+
+
+def _cp_case() -> ParityCase:
+    return ParityCase(
+        name="contact_process_sir",
+        make_model=lambda sg: ContactProcessSIR(
+            sg,
+            runlang="py",
+            savedisk=True,
+            savedyn=True,
+            savedensity=True,
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False, steps=PARITY_STEPS),
+        expected_observables=(CP_OBS_DENSITY, CP_OBS_SNAPSHOTS),
+        expected_lengths={CP_OBS_DENSITY: PARITY_STEPS},
+    )
+
+
+CASES = {
+    "voter": _voter_case,
+    "contact_process_sir": _cp_case,
+}
+
+
+@pytest.mark.parametrize("case_name", sorted(CASES))
+def test_run_record_output_contract(case_name, tmp_path):
+    run_record_output_contract(CASES[case_name](), tmp_path)
+
+
+@pytest.mark.parametrize("case_name", sorted(CASES))
+def test_seeded_reproducibility(case_name, tmp_path):
+    assert_seeded_reproducibility(CASES[case_name](), tmp_path)
