@@ -19,6 +19,12 @@ from lrgsglib.statsys.ContactProcess.defaults import (
     CP_OBS_DENSITY,
     CP_OBS_SNAPSHOTS,
 )
+from lrgsglib.statsys.IsingDynamics import IsingMetropolis
+from lrgsglib.statsys.IsingDynamics.defaults import (
+    ISING_OBS_ENERGY,
+    ISING_OBS_MAGN,
+    ISING_OBS_SNAPSHOTS,
+)
 from lrgsglib.statsys.VoterModel import VoterModel
 from lrgsglib.statsys.VoterModel.defaults import VOTER_OBS_MAGN, VOTER_OBS_SOUT
 
@@ -65,9 +71,34 @@ def _cp_case() -> ParityCase:
     )
 
 
+def _ising_case() -> ParityCase:
+    return ParityCase(
+        name="ising_metropolis",
+        make_model=lambda sg: IsingMetropolis(
+            sg,
+            T=2.0,
+            runlang="py",
+            savedisk=True,
+            observables=(ISING_OBS_ENERGY, ISING_OBS_MAGN, ISING_OBS_SNAPSHOTS),
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False, steps=PARITY_STEPS),
+        expected_observables=(
+            ISING_OBS_ENERGY,
+            ISING_OBS_MAGN,
+            ISING_OBS_SNAPSHOTS,
+        ),
+        expected_lengths={
+            ISING_OBS_ENERGY: PARITY_STEPS,
+            ISING_OBS_MAGN: PARITY_STEPS,
+        },
+    )
+
+
 CASES = {
     "voter": _voter_case,
     "contact_process_sir": _cp_case,
+    "ising_metropolis": _ising_case,
 }
 
 
