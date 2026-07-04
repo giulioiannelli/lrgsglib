@@ -93,7 +93,14 @@ Edge signs and continuous couplings are assigned through the engine-neutral
 .. autoclass:: Disorder
    :members:
 
+.. autoclass:: CompositeDisorder
+   :members:
+
 .. autofunction:: register_coupling
+
+.. autofunction:: register_support
+
+.. autofunction:: registered_supports
 
 Lattice Graphs
 --------------

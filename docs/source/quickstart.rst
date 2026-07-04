@@ -21,14 +21,18 @@ Let's start by creating a simple signed Erdős-Rényi random graph:
    p = 0.1  # Edge probability
    q = 0.3  # Fraction of negative edges
 
-   G = ErdosRenyi.signed_erdos_renyi(N, p, q)
+   # Any SignedGraph subclass auto-flips a ``pflip`` fraction of edges at
+   # construction; ``flip_random_fract_edges()`` (re)applies the disorder.
+   er = ErdosRenyi(n=N, p=p, pflip=q)
+   er.flip_random_fract_edges()
+   G = er.gr['G']  # underlying networkx graph
 
    print(f"Created graph with {G.number_of_nodes()} nodes")
    print(f"Number of edges: {G.number_of_edges()}")
 
-   # Count positive and negative edges
-   positive_edges = sum(1 for u, v in G.edges() if G[u][v]['sign'] > 0)
-   negative_edges = sum(1 for u, v in G.edges() if G[u][v]['sign'] < 0)
+   # Count positive and negative edges (sign is stored under the 'weight' key)
+   positive_edges = sum(1 for u, v in G.edges() if G[u][v]['weight'] > 0)
+   negative_edges = sum(1 for u, v in G.edges() if G[u][v]['weight'] < 0)
 
    print(f"Positive edges: {positive_edges}")
    print(f"Negative edges: {negative_edges}")
@@ -58,7 +62,7 @@ Create and manipulate 2D lattices with signed edges:
 
    print(f"Lattice size: {lattice.side1}x{lattice.side2}")
    print(f"Total nodes: {lattice.N}")
-   print(f"Total edges: {lattice.graph.number_of_edges()}")
+   print(f"Total edges: {lattice.gr['G'].number_of_edges()}")
 
 Computing Spectral Properties
 ------------------------------
@@ -78,7 +82,7 @@ Analyze the Laplacian spectrum of signed graphs:
 
    # Compute Laplacian spectrum
    L, eigenvalues = spectral.get_graph_lspectrum(
-       lattice.graph,
+       lattice.gr['G'],
        library='numpy'
    )
 
@@ -87,7 +91,7 @@ Analyze the Laplacian spectrum of signed graphs:
    print(f"Largest eigenvalue: {eigenvalues.max():.4f}")
 
    # Compute Laplacian properties
-   props = spectral.compute_laplacian_properties(lattice.graph)
+   props = spectral.compute_laplacian_properties(lattice.gr['G'])
    print(f"Laplacian properties computed")
 
 Running Contact Process Simulations
@@ -108,7 +112,7 @@ Simulate the contact process on a signed lattice:
 
    # Initialize contact process
    cp = ContactProcess(
-       lattice=lattice,
+       sg=lattice,
        gamma=0.5,              # Recovery rate
        activation='relu',       # Activation function
        state_type='binary',     # Binary states (0 or 1)
@@ -139,24 +143,18 @@ Plot signed graphs and lattices:
 
 .. code-block:: python
 
-   from lrgsglib.graphs import Lattice2D
    from lrgsglib.plotlib import lattices
    import matplotlib.pyplot as plt
-   import numpy as np
 
-   # Create a small lattice for visualization
-   np.random.seed(42)
-   lattice = Lattice2D(
-       side1=10,
-       geo='sqr',
-       pflip=0.3,
-       with_positions=True
-   )
-   lattice.flip_random_fract_edges()
-
-   # Plot the lattice structure
+   # Draw a schematic signed square lattice with a random negative-edge pattern
    fig, ax = plt.subplots(figsize=(8, 8))
-   lattices.plot_signed_lattice(lattice.graph, ax=ax)
+   lattices.scheme_Lattice2DSquared(
+       ax,
+       side1=10,
+       side2=10,
+       mode='rand',
+       pflip=0.3,
+   )
    plt.title("Signed 2D Lattice")
    plt.show()
 
@@ -174,19 +172,18 @@ Create and analyze 3D cubic lattices:
    np.random.seed(42)
 
    lattice_3d = Lattice3D(
-       side1=10,
-       side2=10,
-       side3=10,
-       geo='cubic',
-       pflip=0.2
+       dim=(10, 10, 10),   # 10x10x10 lattice
+       geo='sc',           # Simple-cubic geometry
+       pflip=0.2           # 20% of edges will be negative
    )
 
    # Flip edges
    lattice_3d.flip_random_fract_edges()
 
-   print(f"3D Lattice: {lattice_3d.side1}x{lattice_3d.side2}x{lattice_3d.side3}")
+   sx, sy, sz = lattice_3d.dim
+   print(f"3D Lattice: {sx}x{sy}x{sz}")
    print(f"Total nodes: {lattice_3d.N}")
-   print(f"Total edges: {lattice_3d.graph.number_of_edges()}")
+   print(f"Total edges: {lattice_3d.gr['G'].number_of_edges()}")
 
 Using Different Graph Types
 ----------------------------
@@ -200,13 +197,14 @@ lrgsglib supports various graph topologies:
        Lattice2D,
        Lattice3D,
    )
-   from lrgsglib.graphs.nx import WeightedGraph
    import numpy as np
 
    np.random.seed(42)
 
    # Erdős-Rényi random graph
-   er_graph = ErdosRenyi.signed_erdos_renyi(N=100, p=0.1, q=0.3)
+   er = ErdosRenyi(n=100, p=0.1, pflip=0.3)
+   er.flip_random_fract_edges()
+   er_graph = er.gr['G']
 
    # 2D triangular lattice
    tri_lattice = Lattice2D(side1=15, geo='tri', pflip=0.2)
@@ -216,8 +214,8 @@ lrgsglib supports various graph topologies:
    hex_lattice = Lattice2D(side1=15, geo='hex', pflip=0.2)
    hex_lattice.flip_random_fract_edges()
 
-   # 3D cubic lattice
-   cubic_3d = Lattice3D(side1=8, side2=8, side3=8, geo='cubic', pflip=0.2)
+   # 3D simple-cubic lattice
+   cubic_3d = Lattice3D(dim=(8, 8, 8), geo='sc', pflip=0.2)
    cubic_3d.flip_random_fract_edges()
 
    print(f"ER graph: {er_graph.number_of_nodes()} nodes")
@@ -242,14 +240,14 @@ lrgsglib provides multiple backends for simulations:
 
    # Python backend (slower, more flexible)
    cp_python = ContactProcess(
-       lattice=lattice,
+       sg=lattice,
        gamma=0.5,
-       runlang='python'
+       runlang='py'
    )
 
    # C backend (faster, optimized)
    cp_c = ContactProcess(
-       lattice=lattice,
+       sg=lattice,
        gamma=0.5,
        runlang='C1c'
    )

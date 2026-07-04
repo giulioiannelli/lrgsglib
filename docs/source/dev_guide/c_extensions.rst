@@ -32,7 +32,7 @@ Directory Structure
    ├── IsingDynamics/               ← Ising model
    │   ├── IsingDynamics.py
    │   └── ccore/
-   │       ├── bin/                  ← Compiled binaries (IsingSimulator*)
+   │       ├── bin/                  ← Compiled binaries (IsingMetropolis, …)
    │       ├── LRGSG_rbim.c/.h
    │       ├── base/                 ← Core Ising functions (pybind11)
    │       └── storer/               ← Data storage (pybind11)
@@ -57,24 +57,37 @@ Ising Model Simulators
 
    * - Binary
      - Algorithm
-     - Features
-     - ``runlang``
-   * - ``IsingSimulator0``
-     - Basic Metropolis
-     - Minimal, fast
-     - ``C0``
-   * - ``IsingSimulator1b``
-     - Optimized Metropolis
-     - Logging, magnetization tracking
-     - ``C1b``
-   * - ``IsingSimulator3b``
-     - Simulated Annealing
-     - Temperature schedule
-     - ``C3b``
-   * - ``IsingSimulator4b``
-     - Parallel Tempering
-     - Replica exchange
-     - ``C4b``
+     - digit
+     - Example ``runlang``
+   * - ``IsingMetropolis``
+     - Glauber-Metropolis at fixed *T*
+     - ``0``
+     - ``C0E``
+   * - ``IsingSimulatedAnnealing``
+     - Simulated Annealing (temperature schedule)
+     - ``1``
+     - ``C1E``
+   * - ``IsingParallelTempering``
+     - Parallel Tempering (replica exchange)
+     - ``2``
+     - ``C2E``
+
+These three unified binaries replace the historical
+``IsingSimulator{0,1,1b,3,4,5}`` family. The ``runlang`` selector uses the
+grammar ``C<digit><letters>``:
+
+- **digit** picks the algorithm: ``0`` = Metropolis, ``1`` = Simulated
+  Annealing, ``2`` = Parallel Tempering.
+- **letters** pick the outputs: ``E`` = energy + magnetization, ``S`` = spin
+  snapshots, ``K`` = cluster magnetization, ``V`` = eigenvector overlap,
+  ``H`` = external field. A bare digit defaults to ``E`` (so ``C0`` is
+  ``C0E``); combine letters for several outputs, e.g. ``C0ES`` = Metropolis +
+  energy/magnetization + snapshots.
+
+Legacy codes (``C0``, ``C1b``, ``C3b``, ``C4b``, …) are still accepted but emit
+a ``DeprecationWarning`` and normalise to the new form: ``C1b`` maps to
+``C0E`` (Metropolis), ``C3b`` to ``C1E`` (Simulated Annealing), and ``C4b`` to
+``C2E`` (Parallel Tempering).
 
 **Usage from Python:**
 
@@ -83,11 +96,11 @@ Ising Model Simulators
    from lrgsglib.statsys.IsingDynamics import IsingDynamics
    from lrgsglib.graphs import Lattice2D
 
-   lattice = Lattice2D(side=64, pflip=0.3)
+   lattice = Lattice2D(64, pflip=0.3)
    lattice.flip_random_fract_edges()
 
-   # Use C backend with runlang parameter
-   ising = IsingDynamics(sg=lattice, T=2.0, steps=10000, runlang='C1b')
+   # Use C backend with runlang parameter (grammar: C<digit><letters>)
+   ising = IsingDynamics(sg=lattice, T=2.0, steps=10000, runlang='C0E')
    ising.init_ising_dynamics()
    ising.run(verbose=False)
 
@@ -100,15 +113,12 @@ Contact Process Simulators
    * - Binary
      - Description
      - ``runlang``
-   * - ``ContactSimulator0``
-     - Basic implementation
+   * - ``ContactProcessSIR``
+     - SIR infection/recovery process
      - ``C0``
-   * - ``ContactSimulator1c``
-     - Optimized with survival tracking
-     - ``C1c``
-   * - ``ContactSimulator1d``
-     - 1D lattice optimized
-     - ``C1d``
+   * - ``ContactProcessEI``
+     - Excitation/inhibition dynamics (default)
+     - ``C1``
 
 **Usage from Python:**
 
@@ -116,15 +126,19 @@ Contact Process Simulators
 
    from lrgsglib.statsys.ContactProcess import ContactProcessEI
 
-   cp = ContactProcessEI(sg=lattice, gamma=1.5, steps=5000, runlang='C1c')
+   cp = ContactProcessEI(sg=lattice, gamma=1.5, steps=5000, runlang='C1')
    cp.init_contact_dynamics()
    cp.run(verbose=False)
 
 Voter Model Simulators
 ~~~~~~~~~~~~~~~~~~~~~~
 
-- ``VoterSimulator0`` - Basic voter dynamics
-- ``VoterSimulator1`` - With magnetization logging
+A single unified ``VoterSimulator`` binary is built; its output is selected at
+run time rather than by separate binaries. By default it writes only the final
+spin configuration; supplying the optional trailing ``nSampleLog`` argument
+enables periodic snapshots. From Python this maps onto the ``runlang`` grammar
+``C<digit><letters>``: a bare ``C0`` writes the final state only, while the
+``S`` letter (``C0S``) enables file snapshots.
 
 Random Number Generation
 ------------------------
@@ -193,7 +207,8 @@ Binary dynamics system utilities:
 Ising-Specific Code
 ~~~~~~~~~~~~~~~~~~~
 
-Located in ``statsys/RBIsingM/``:
+Located in ``statsys/IsingDynamics/ccore/`` (``LRGSG_rbim.*``, ``LRGSG_sa.*``,
+``LRGSG_pt.*``):
 
 .. code-block:: c
 
@@ -257,21 +272,31 @@ File Formats
 C Program Interface
 ~~~~~~~~~~~~~~~~~~~
 
-All simulators follow this command-line interface:
+The Ising simulators follow this command-line interface (shown for
+``IsingMetropolis``; the annealing and tempering binaries add their own
+schedule arguments):
 
 .. code-block:: bash
 
-   ./IsingSimulator1b N pflip steps datadir syshape run_id out_id
+   ./IsingMetropolis N T p NoClust thSTEP eqSTEP datdir syshape \
+                     run_id out_id update_mode nSampleLog NeigV output_mode
 
 Arguments:
 
 - ``N`` - Number of nodes
-- ``pflip`` - Fraction of negative edges
-- ``steps`` - Number of Monte Carlo sweeps
-- ``datadir`` - Directory containing input files
+- ``T`` - Temperature
+- ``p`` - Fraction of negative (flipped) edges
+- ``NoClust`` - Number of clusters (only used for the ``clust`` output)
+- ``thSTEP`` - Thermalization sweeps
+- ``eqSTEP`` - Equilibrium (measurement) sweeps
+- ``datdir`` - Directory containing input files
 - ``syshape`` - System shape descriptor (e.g., "L=64")
 - ``run_id`` - Suffix for input files
 - ``out_id`` - Suffix for output files
+- ``update_mode`` - Spin-update order (``sequential`` or ``asynchronous``)
+- ``nSampleLog`` - Number of log-spaced snapshots (for the ``snap`` output)
+- ``NeigV`` - Eigenvector index (for the ``eigvec`` overlap output)
+- ``output_mode`` - Comma-separated output flags (``em``, ``snap``, ``clust``, ``eigvec``, ``hfield``)
 
 Building C Extensions
 ---------------------
@@ -284,7 +309,7 @@ The Makefile handles compilation:
    make c-make
 
    # Build specific simulator
-   make src/lrgsglib/statsys/IsingDynamics/ccore/bin/IsingSimulator1b
+   make src/lrgsglib/statsys/IsingDynamics/ccore/bin/IsingMetropolis
 
    # Clean and rebuild
    make clean && make c-make
@@ -494,7 +519,7 @@ Debugging C Code
 
 .. code-block:: bash
 
-   valgrind --leak-check=full ./src/lrgsglib/statsys/IsingDynamics/ccore/bin/IsingSimulator1b ...
+   valgrind --leak-check=full ./src/lrgsglib/statsys/IsingDynamics/ccore/bin/IsingMetropolis ...
 
 **Add debug prints:**
 

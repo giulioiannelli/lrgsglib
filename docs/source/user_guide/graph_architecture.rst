@@ -80,7 +80,7 @@ analysis, entropy computation, clustering, and dynamics integration.
    ├── ErdosRenyiNX / ErdosRenyiGT      (random graphs)
    ├── BarabasiAlbertNX / BarabasiAlbertGT
    ├── WattsStrogatzNX / WattsStrogatzGT
-   ├── StochasticBlockModelNX / SBM_GT
+   ├── StochasticBlockModelNX / StochasticBlockModelGT
    ├── kRegularGraphNX / kRegularGraphGT
    ├── ConfigurationModelNX / ...GT
    ├── RandomGeometricNX / ...GT

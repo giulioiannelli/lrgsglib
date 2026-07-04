@@ -30,7 +30,7 @@ Create a random signed graph and analyze its spectral properties.
    # - 200 nodes
    # - Connection probability 0.1
    # - 30% of edges will be negative
-   er = ErdosRenyi(nnodes=200, prob=0.1, pflip=0.3, seed=42)
+   er = ErdosRenyi(n=200, p=0.1, pflip=0.3, seed=42)
    er.flip_random_fract_edges()
 
    print(f"Graph created: {er.N} nodes, {er.gr['G'].number_of_edges()} edges")
@@ -38,17 +38,17 @@ Create a random signed graph and analyze its spectral properties.
    # Compute the Laplacian spectrum
    er.compute_laplacian_spectrum()
 
-   # Analyze frustration via negative eigenvalues
-   negative_eigvals = er.eigv[er.eigv < -1e-10]
-   positive_eigvals = er.eigv[er.eigv > 1e-10]
+   # Frustration signal: the smallest eigenvalue of the (positive-semidefinite)
+   # signed Laplacian. lambda_min == 0 -> balanced; lambda_min > 0 -> frustrated.
+   eigvals = np.sort(er.eigv)
 
    print(f"\nSpectral Analysis:")
-   print(f"  Total eigenvalues: {len(er.eigv)}")
-   print(f"  Negative eigenvalues: {len(negative_eigvals)}")
-   print(f"  Zero eigenvalues: {len(er.eigv) - len(negative_eigvals) - len(positive_eigvals)}")
-   print(f"  Spectral gap: {er.eigv[1] - er.eigv[0]:.4f}")
-   print(f"  Min eigenvalue: {er.eigv.min():.4f}")
-   print(f"  Max eigenvalue: {er.eigv.max():.4f}")
+   print(f"  Total eigenvalues: {len(eigvals)}")
+   print(f"  Smallest eigenvalue (frustration signal): {eigvals[0]:.4f}")
+   print(f"  Balanced: {np.isclose(eigvals[0], 0.0, atol=1e-8)}")
+   print(f"  Spectral gap: {eigvals[1] - eigvals[0]:.4f}")
+   print(f"  Min eigenvalue: {eigvals.min():.4f}")
+   print(f"  Max eigenvalue: {eigvals.max():.4f}")
 
    # Plot spectrum
    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
@@ -107,7 +107,6 @@ Simulate excitation-inhibition dynamics near the critical point.
            steps=2000,
            runlang='py',  # Use Python backend (C1c for production)
            ic='random',
-           rho_init=0.5,
            seed=42,
        )
        cp.init_contact_dynamics()
@@ -384,24 +383,25 @@ Analyze spectral properties of a 3D cubic lattice.
 
    # Create 10x10x10 cubic lattice with signed edges
    lattice3d = Lattice3D(
-       side1=10,
-       geo='cub',     # cubic geometry
+       dim=10,
+       geo='sc',      # simple-cubic geometry
        pflip=0.1,     # 10% frustrated edges
        seed=42,
    )
    lattice3d.flip_random_fract_edges()
 
-   print(f"3D Lattice: {lattice3d.N} nodes ({lattice3d.side1}^3)")
+   print(f"3D Lattice: {lattice3d.N} nodes ({lattice3d.dim[0]}^3)")
    print(f"Edges: {lattice3d.gr['G'].number_of_edges()}")
 
    # Compute spectrum
    lattice3d.compute_laplacian_spectrum()
 
-   # Compare signed vs unsigned spectrum
-   n_negative = np.sum(lattice3d.eigv < -1e-10)
+   # Frustration signal: smallest eigenvalue of the (PSD) signed Laplacian
+   # (0 if balanced, > 0 if frustrated).
+   eigvals = np.sort(lattice3d.eigv)
    print(f"\nSpectral Analysis:")
-   print(f"  Negative eigenvalues: {n_negative}")
-   print(f"  Spectral range: [{lattice3d.eigv.min():.4f}, {lattice3d.eigv.max():.4f}]")
+   print(f"  Smallest eigenvalue (frustration signal): {eigvals[0]:.4f}")
+   print(f"  Spectral range: [{eigvals.min():.4f}, {eigvals.max():.4f}]")
 
    # Compute entropy
    entropy, heat, var, tau = compute_entropy_observables_from_eigenvalues(
@@ -410,10 +410,11 @@ Analyze spectral properties of a 3D cubic lattice.
        steps=200,
    )
 
-   # Spectral dimension
-   tail_len = int(0.1 * len(heat))
-   ds = 2.0 * np.mean(heat[-tail_len:])
-   print(f"  Spectral dimension: {ds:.2f} (expected ~3 for 3D lattice)")
+   # Specific-heat peak: approaches d_s/2 in the large-N scaling regime, so
+   # 2 * C_max is a finite-size proxy for the spectral dimension (~3 for a 3D
+   # lattice only in the thermodynamic limit; a small lattice overshoots).
+   c_peak = float(np.max(heat))
+   print(f"  Specific-heat peak C_max = {c_peak:.2f}  (~ d_s/2 in the scaling limit)")
 
    # Plot eigenvalue density for different pflip values
    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
@@ -427,7 +428,7 @@ Analyze spectral properties of a 3D cubic lattice.
 
    # Specific heat
    axes[1].semilogx(tau, heat)
-   axes[1].axhline(y=ds/2, color='r', linestyle='--', label=f'$d_s/2={ds/2:.2f}$')
+   axes[1].axhline(y=c_peak, color='r', linestyle='--', label=f'$C_{{max}}={c_peak:.2f}$')
    axes[1].set_xlabel(r'$\tau$')
    axes[1].set_ylabel(r'$C(\tau)$')
    axes[1].set_title('Specific Heat')
@@ -438,14 +439,15 @@ Analyze spectral properties of a 3D cubic lattice.
    plt.savefig('lattice3d_analysis.png', dpi=150)
    plt.show()
 
-   # Compare different frustration levels
-   print("\nFrustration comparison:")
+   # Compare different frustration levels via the smallest eigenvalue
+   # (0 for the balanced pflip=0 case, growing as frustration increases).
+   print("\nFrustration comparison (smallest signed-Laplacian eigenvalue):")
    for pflip in [0.0, 0.1, 0.3, 0.5]:
-       lat = Lattice3D(side1=8, geo='cub', pflip=pflip, seed=42)
+       lat = Lattice3D(dim=8, geo='sc', pflip=pflip, seed=42)
        lat.flip_random_fract_edges()
        lat.compute_laplacian_spectrum()
-       n_neg = np.sum(lat.eigv < -1e-10)
-       print(f"  pflip={pflip}: {n_neg} negative eigenvalues ({100*n_neg/lat.N:.1f}%)")
+       lam_min = float(np.sort(lat.eigv)[0])
+       print(f"  pflip={pflip}: lambda_min = {lam_min:.4f}")
 
 Example 7: Custom Analysis Pipeline
 -----------------------------------
@@ -498,11 +500,11 @@ Build a complete analysis pipeline for signed graph research.
    eigenvalues = np.sort(np.real(eigenvalues))
 
    spectral_gap = eigenvalues[1] - eigenvalues[0]
-   n_negative_eig = np.sum(eigenvalues < -1e-10)
+   lambda_min = eigenvalues[0]   # frustration signal (0 balanced, >0 frustrated)
 
    print(f"Spectral gap: {spectral_gap:.6f}")
-   print(f"Negative eigenvalues: {n_negative_eig}")
-   print(f"Min eigenvalue: {eigenvalues.min():.4f}")
+   print(f"Smallest eigenvalue (frustration signal): {lambda_min:.4f}")
+   print(f"Max eigenvalue: {eigenvalues.max():.4f}")
 
    # =========================================================
    # Step 3: Entropy and information measures
@@ -622,7 +624,7 @@ Build a complete analysis pipeline for signed graph research.
    print("\nSummary Report")
    print("=" * 50)
    print(f"Graph: {lattice.N} nodes, {G.number_of_edges()} edges")
-   print(f"Frustration: pflip={lattice.pflip}, {n_negative_eig} negative eigenvalues")
+   print(f"Frustration: pflip={lattice.pflip}, lambda_min = {lambda_min:.4f}")
    print(f"Spectral dimension: {ds:.3f}")
    print(f"Critical Ising magnetization: {avg_magn:.4f} +/- {std_magn:.4f}")
    print("=" * 50)
@@ -699,7 +701,7 @@ Build hierarchical "graph of graphs" structures with arbitrary base and fiber co
        base_graph_type='Lattice2D',
        base_params={'side1': 4, 'geo': 'sqr'},
        fiber_graph_type='ErdosRenyi',
-       fiber_params={'nnodes': 20, 'prob': 0.15, 'extract_giant_component': False},
+       fiber_params={'n': 20, 'p': 0.15, 'extract_giant_component': False},
        anchor_policy='first',
        pflip=0.2,
        seed=42,

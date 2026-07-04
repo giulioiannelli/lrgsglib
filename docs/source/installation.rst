@@ -26,14 +26,23 @@ Core dependencies are automatically installed via pip:
 - tqdm >= 4.60.0
 - lmfit >= 1.0.0
 - powerlaw >= 1.4.0
-- pybind11 >= 2.10.0
 - joblib >= 1.0.0
 - numba >= 0.58.0
+- python-dotenv >= 1.0.0
+- plotly >= 5.0.0
+- requests >= 2.25.0
 
 Optional dependencies:
 
 - cupy >= 9.0.0 (for GPU acceleration)
 - graph-tool (from conda, for high-performance graph operations)
+
+Build-time requirements (installed automatically by ``pip`` in an isolated
+build environment; not runtime dependencies):
+
+- scikit-build-core >= 0.11
+- pybind11 >= 2.12
+- setuptools_scm >= 8
 
 Standalone Installation
 ------------------------
@@ -58,22 +67,11 @@ For using lrgsglib as an independent library:
       conda env create -f lrgsgenv.yml
       conda activate lrgsgenv
 
-3. **Build the project:**
+3. **Install in editable mode:**
 
-   This step compiles C/C++ extensions and configures environment variables:
-
-   .. code-block:: bash
-
-      make all
-
-   The build process:
-
-   - Compiles C/C++ simulators in ``src/lrgsglib/statsys/<Model>/ccore/``
-   - Builds pybind11 Python extensions
-   - Generates a ``.env`` file with configured paths
-   - Sets up data, log, and binary directories
-
-4. **Install in editable mode:**
+   ``pip`` uses the ``scikit-build-core`` backend, so this single step
+   compiles the C/C++ (CMake + pybind11) extensions automatically — no
+   separate build step is required:
 
    .. code-block:: bash
 
@@ -84,6 +82,18 @@ For using lrgsglib as an independent library:
    .. code-block:: bash
 
       pip install -e ".[dev,jupyter,docs]"
+
+.. note::
+
+   A legacy ``make`` route exists for maintainers who want to compile the
+   C/C++ simulators outside of ``pip`` (``make all`` in the repository root).
+   It is **not** required to install or use the library. In particular, do
+   **not** run ``make env-config``: it overwrites
+   ``src/lrgsglib/config/lrgsg_env.py`` with machine-pinned absolute paths.
+   To relocate output directories, set the ``LRGSG_DATA`` (and optionally
+   ``LRGSG_LLIB``/``LRGSG_LOG``/``LRGSG_IPYNB``) environment variables — or a
+   ``.env`` file — instead. Data and log directories are created lazily on
+   first write.
 
 Submodule Installation
 -----------------------
@@ -107,36 +117,29 @@ For using lrgsglib as a git submodule within a larger project (e.g., ``lrgsglib-
       conda env create -f lrgsglib/lrgsgenv.yml -n your_env_name
       conda activate your_env_name
 
-3. **Build with custom paths:**
+3. **Point output paths at the outer project (optional):**
 
-   Configure paths relative to the outer project root instead of the ``lrgsglib`` subdirectory:
-
-   .. code-block:: bash
-
-      cd lrgsglib
-      make all LRGSG_LLIB=$(pwd)/.. CONDA_ENV_NAME=your_env_name
-
-   **What this does:**
-
-   - Sets ``LRGSG_LLIB`` to the outer project root
-   - Configures data folder as ``outer-project/data`` (not ``lrgsglib/data``)
-   - Configures notebooks as ``outer-project/ipynb`` (not ``lrgsglib/ipynb``)
-   - Configures logs as ``outer-project/.log`` (not ``lrgsglib/.log``)
-   - Keeps library source code paths relative to ``lrgsglib/``
-   - Uses your custom conda environment name
-
-   **Example for lrgsglib-ipynb:**
+   By default the library derives its data/log/notebook directories from the
+   ``lrgsglib`` subdirectory. To place them under the outer project root
+   instead, set environment variables (or a ``.env`` file) before importing
+   the library — from the outer project root:
 
    .. code-block:: bash
 
-      cd lrgsglib
-      make all LRGSG_LLIB=$(pwd)/.. CONDA_ENV_NAME=lrgsgnb
+      export LRGSG_LLIB="$(pwd)"        # outer project root
+      export LRGSG_DATA="$(pwd)/data"   # e.g. outer-project/data
+
+   These are read by ``src/lrgsglib/config/lrgsg_env.py`` (environment first,
+   otherwise derived from the package location). ``LRGSG_LOG`` and
+   ``LRGSG_IPYNB`` are available too; all such directories are created lazily
+   on first write.
 
 4. **Install in editable mode:**
 
+   From the outer project root:
+
    .. code-block:: bash
 
-      cd ..  # Return to outer project root
       pip install -e lrgsglib
 
 Verifying Installation
@@ -168,28 +171,34 @@ Run the test suite to ensure everything is working:
    # Full test suite
    pytest test/
 
-   # Quick smoke test
-   python test/quick_test.py
-
-   # Extended validation
-   python test/extended_test.py
+   # Quick smoke test (small systems, minimal iterations)
+   pytest test/ --quick
 
 Building from Scratch
 ---------------------
 
-If you need to rebuild after making changes:
+To rebuild the compiled extensions after editing the C/C++ sources, re-run the
+editable install — ``scikit-build-core`` recompiles the changed CMake/pybind11
+targets:
+
+.. code-block:: bash
+
+   pip install -e .
+
+For a submodule checkout, run the same command against the subdirectory from
+the outer project root:
+
+.. code-block:: bash
+
+   pip install -e lrgsglib
+
+Maintainers using the legacy ``make`` route can instead rebuild the standalone
+C/C++ simulators directly (not required for normal use):
 
 .. code-block:: bash
 
    make clean
    make all
-
-For submodule builds, include the same parameters:
-
-.. code-block:: bash
-
-   make clean
-   make all LRGSG_LLIB=$(pwd)/.. CONDA_ENV_NAME=your_env_name
 
 Troubleshooting
 ---------------
@@ -219,13 +228,17 @@ Troubleshooting
 
 4. **Path configuration issues in submodule mode:**
 
-   Verify the ``.env`` file in ``lrgsglib/`` contains correct paths pointing to your outer project directories.
+   Output paths are derived from the package location by default. To redirect
+   them at the outer project, set the ``LRGSG_LLIB``/``LRGSG_DATA`` environment
+   variables (or add an optional ``.env`` file) before importing the library,
+   as shown in the Submodule Installation section above.
 
 5. **Build system errors:**
 
-   Check the Makefile output for specific error messages. Common issues include:
+   Inspect the ``pip install -e .`` output for the failing CMake/compiler
+   step. Common issues include:
 
-   - Missing dependencies (numpy, pybind11)
+   - Missing build requirements (a C/C++ compiler or CMake)
    - Incorrect Python version (needs 3.12+)
    - Missing conda environment
 

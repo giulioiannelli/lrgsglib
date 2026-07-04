@@ -6,14 +6,14 @@ framework derived from the quantum propagator on graphs.
 
 The key quantity is the signed diffusion distance:
 
-    d_diff(i,j,τ)² = Σ_k exp(-2τ|λ_k|) (v_k(i) - v_k(j))²
+    d_diff(i,j,τ)² = Σ_k exp(-2τ``|λ_k|``) (v_k(i) - v_k(j))²
 
-The |λ_k| weighting is not an ad-hoc fix for signed graphs — it is the
+The ``|λ_k|`` weighting is not an ad-hoc fix for signed graphs — it is the
 natural consequence of the quantum propagator exp(-itL) being unitary
-(|exp(-itλ)| = 1 for all λ). Time-averaging the quantum walk produces
-|λ| in the Boltzmann factors, making the signed Laplacian unnecessary.
+(``|exp(-itλ)|`` = 1 for all λ). Time-averaging the quantum walk produces
+``|λ|`` in the Boltzmann factors, making the signed Laplacian unnecessary.
 
-On unsigned graphs, |λ| = λ and d_diff reduces exactly to the classical
+On unsigned graphs, ``|λ|`` = λ and d_diff reduces exactly to the classical
 diffusion distance, recovering standard LRG. On signed/frustrated graphs,
 the formalism extends naturally without blow-up.
 
@@ -178,7 +178,7 @@ def spectral_frustration(G: nx.Graph, backend: str = "numpy") -> float:
     The smallest eigenvalue is a continuous measure of frustration:
     zero for balanced graphs, positive otherwise.
 
-    Normalized by max(|λ|) to give a dimensionless quantity in [0, 1].
+    Normalized by max(``|λ|``) to give a dimensionless quantity in [0, 1].
 
     Parameters
     ----------
@@ -214,7 +214,7 @@ def compute_signed_diffusion_distance(
 ) -> NDArray:
     """Compute signed diffusion distance matrix at scale τ.
 
-    The signed diffusion distance uses |λ_k| in the Boltzmann weights,
+    The signed diffusion distance uses ``|λ_k|`` in the Boltzmann weights,
     making it valid for signed/frustrated graphs where classical diffusion
     distances (using exp(-τλ)) break due to negative eigenvalues.
 
@@ -232,7 +232,7 @@ def compute_signed_diffusion_distance(
     tau : float
         Diffusion time / RG scale parameter.
     use_abs : bool
-        If True, use |λ_k| in Boltzmann weights (required for signed graphs).
+        If True, use ``|λ_k|`` in Boltzmann weights (required for signed graphs).
 
     Returns
     -------
@@ -547,7 +547,7 @@ def find_rg_scales(
     min_prominence : float
         Minimum peak prominence as fraction of max C(τ).
     use_abs : bool
-        Use |λ| in Boltzmann weights (required for signed graphs).
+        Use ``|λ|`` in Boltzmann weights (required for signed graphs).
 
     Returns
     -------
@@ -617,7 +617,7 @@ def partition_at_scale(
         - ``'signed_diffusion'`` (default): Hierarchical clustering on
           the signed diffusion distance using the provided eigenvectors.
         - ``'topological'``: Same d_diff formula but recomputes the
-          eigendecomposition from the **unsigned** Laplacian (|weights|).
+          eigendecomposition from the **unsigned** Laplacian (``|weights|``).
           Detects block/community structure that survives frustration.
           Requires ``G`` parameter.
         - ``'joint'``: Computes both signed and topological d_diff
@@ -640,7 +640,7 @@ def partition_at_scale(
     linkage_method : str
         Linkage method for hierarchical clustering.
     use_abs : bool
-        Use |λ| in Boltzmann weights (required for signed graphs).
+        Use ``|λ|`` in Boltzmann weights (required for signed graphs).
     G : nx.Graph, optional
         Required for ``method='topological'``. The graph from which to
         compute unsigned Laplacian eigenvectors.
@@ -1026,7 +1026,7 @@ def spectral_rg_step(
     n_clusters : int, optional
         Force cluster count. If None, auto-detect via silhouette scan.
     use_abs : bool
-        Use |λ| for signed graph compatibility.
+        Use ``|λ|`` for signed graph compatibility.
 
     Returns
     -------
@@ -1148,7 +1148,7 @@ def spectral_rg_flow(
     sign_method : str
         Edge construction: ``'separate'`` (default) or ``'majority'``.
     use_abs : bool
-        Use |λ| for signed graphs.
+        Use ``|λ|`` for signed graphs.
     verbose : bool
         Print progress.
 
@@ -1236,7 +1236,7 @@ def rg_flow_observables(
           boundaries — the RG flow variable for frustration
         - ``intra_frustration``: mean intra-cluster frustration (should
           stay low if eigenmode partition is working)
-        - ``spectral_gap``: smallest nonzero |eigenvalue|
+        - ``spectral_gap``: smallest nonzero ``|eigenvalue|``
         - ``tau_stars``: RG scale at each step
         - ``entropy_at_tau_star``: global entropy at the chosen scale
     """

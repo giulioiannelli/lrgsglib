@@ -93,7 +93,7 @@ Equilibration requires O(N) single-spin updates = 1 Monte Carlo sweep.
    from lrgsglib.graphs import Lattice2D
 
    # Create frustrated lattice
-   lattice = Lattice2D(side=32, pflip=0.3, seed=42)
+   lattice = Lattice2D(32, geo='squared', pflip=0.3, seed=42)
    lattice.flip_random_fract_edges()
 
    # Metropolis simulation
@@ -119,8 +119,9 @@ where α < 1 is the cooling rate.
    # Simulated annealing
    ising = IsingDynamics(
        sg=lattice,
-       T=5.0,           # Starting temperature
-       Tfin=0.01,       # Final temperature
+       sa_enabled=True,
+       T_init=5.0,      # Starting temperature
+       T_final=0.01,    # Final temperature
        steps=50000,
        runlang='C3b'    # SA backend
    )
@@ -141,8 +142,9 @@ Run multiple replicas at different temperatures and exchange configurations:
    # Parallel tempering
    ising = IsingDynamics(
        sg=lattice,
-       T=1.0,           # Lowest temperature
-       Tmax=4.0,        # Highest temperature
+       pt_enabled=True,
+       T_min=1.0,       # Lowest temperature
+       T_max=4.0,       # Highest temperature
        n_replicas=8,
        steps=10000,
        runlang='C4b'    # PT backend
@@ -207,7 +209,7 @@ lrgsglib provides two variants:
    cp.run()
 
    # Density time series
-   rho_t = cp.rho_t
+   rho_t = cp.density
 
 **SIR Model** (Susceptible → Infected → Recovered):
 
@@ -217,9 +219,10 @@ lrgsglib provides two variants:
 
    cp = ContactProcessSIR(
        sg=lattice,
-       gamma=1.5,      # Infection rate
+       beta=1.5,       # Infection rate
+       mu=1.0,         # Recovery rate
        steps=5000,
-       runlang='C1c'
+       runlang='C0'
    )
    cp.init_contact_dynamics()
    cp.run()
@@ -376,7 +379,7 @@ Mapping the Ising phase transition:
    magnetizations = []
 
    for T in temperatures:
-       lattice = Lattice2D(side=32, pflip=0.0, seed=42)
+       lattice = Lattice2D(32, geo='squared', pflip=0.0, seed=42)
 
        ising = IsingDynamics(sg=lattice, T=T, steps=5000, runlang='C1b')
        ising.init_ising_dynamics()

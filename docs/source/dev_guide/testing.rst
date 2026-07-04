@@ -17,11 +17,19 @@ All tests live in the ``test/`` directory with specific naming conventions:
    │   ├── *.png                       ← Generated plots
    │   └── *.log                       ← Log files
    │
-   ├── test_*.py                       ← Unit tests (pytest-compatible)
-   ├── bench_*.py                      ← Performance benchmarks
-   ├── demo_*.py                       ← Demonstration scripts
-   ├── diagnose_*.py                   ← Diagnostic/debugging scripts
-   └── script_*.py                     ← Utility scripts
+   ├── conftest.py                     ← Shared fixtures + --quick/--show-plots
+   ├── code_tests/                     ← Imports, instantiation, execution, portability
+   ├── dynamics_tests/                 ← Ising, contact process, voter, Kuramoto, …
+   ├── graph_tests/                    ← Graph construction, disorder, engine parity
+   ├── integration_tests/              ← End-to-end pipelines
+   ├── physical_tests/                 ← Physics / invariant checks
+   ├── spectral_tests/                 ← Spectra, entropy, quantum propagator
+   ├── utils_tests/                    ← Utility helpers
+   ├── benchmarks/                     ← Performance benchmarks (bench_*.py)
+   └── scripts/                        ← One-off utility scripts
+
+Unit tests are ``test_*.py`` files inside the ``*_tests/`` domain
+subdirectories.
 
 File Naming Conventions
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -69,11 +77,11 @@ Quick Start
    # Run with verbose output
    pytest test/ -v
 
-   # Run specific test file
-   pytest test/test_contact_process.py
+   # Run a specific test file
+   pytest test/dynamics_tests/test_contact_process.py
 
-   # Run specific test function
-   pytest test/test_contact_process.py::test_limiting_cases
+   # Run a specific test class (or ::Class::method for one function)
+   pytest test/dynamics_tests/test_contact_process.py::TestContactProcess
 
    # Run tests matching a pattern
    pytest test/ -k "lattice"
@@ -98,6 +106,19 @@ Common pytest Options
    # Coverage report
    pytest test/ --cov=src/lrgsglib --cov-report=html
 
+   # Fast smoke run — small systems (side=4, steps=50); this is what CI runs
+   pytest test/ --quick
+
+   # Display generated figures interactively instead of only saving them
+   pytest test/ --show-plots
+
+.. note::
+
+   ``--quick`` and ``--show-plots`` are custom options defined in
+   ``test/conftest.py``; they drive the ``quick_mode``, ``system_size``,
+   ``n_steps`` and ``save_figure`` fixtures. ``--quick`` is the flag the CI
+   pipeline uses (see ``.github/workflows/quality.yml``).
+
 Current Test Suite
 ------------------
 
@@ -106,15 +127,15 @@ Unit Tests
 
 .. code-block:: bash
 
-   test/test_contact_process.py           # Contact process dynamics
-   test/test_contact_process_limiting_cases.py  # Edge cases
-   test/test_entropy_expm_multiply.py     # Matrix exponential
-   test/test_lattice2d_spectral.py        # Lattice spectral analysis
-   test/dynamics_tests/test_lattice2d_animation.py  # Animation functionality
-   test/test_mcg_output_format.py         # MCG output verification
-   test/test_quantum_propagator.py        # Quantum propagator
-   test/test_voter_model.py               # Voter model dynamics
-   test/test_refactoring.py               # Refactoring checks
+   test/dynamics_tests/test_contact_process.py           # Contact process dynamics
+   test/dynamics_tests/test_contact_process_limiting.py  # Edge cases
+   test/spectral_tests/test_entropy_expm_multiply.py     # Matrix exponential
+   test/spectral_tests/test_lattice2d_spectral.py        # Lattice spectral analysis
+   test/dynamics_tests/test_lattice2d_animation.py       # Animation functionality
+   test/integration_tests/test_mcg_output_format.py      # MCG output verification
+   test/spectral_tests/test_quantum_propagator.py        # Quantum propagator
+   test/dynamics_tests/test_voter_model.py               # Voter model dynamics
+   test/graph_tests/test_refactoring.py                  # Refactoring checks
 
 Benchmarks
 ~~~~~~~~~~
@@ -122,14 +143,14 @@ Benchmarks
 .. code-block:: bash
 
    # Contact process benchmarks
-   test/bench_contact_process_quick.py    # Quick benchmark
-   test/bench_contact_process_extended.py # Extended benchmark
-   test/bench_contact_process_c1b_vs_c1c.py  # Backend comparison
+   test/benchmarks/bench_contact_process_quick.py     # Quick benchmark
+   test/benchmarks/bench_contact_process_extended.py  # Extended benchmark
+   test/benchmarks/bench_contact_process_c1b_vs_c1c.py  # Backend comparison
 
    # Spectral analysis benchmarks
-   test/bench_mcg_slaplspect_backends.py  # Backend comparison
-   test/bench_mcg_backends.py             # Alternative backends
-   test/bench_entropy_methods.py          # Entropy computation methods
+   test/benchmarks/bench_mcg_slaplspect_backends.py   # Backend comparison
+   test/benchmarks/bench_mcg_backends.py              # Alternative backends
+   test/benchmarks/bench_entropy_methods.py           # Entropy computation methods
 
 Writing Tests
 -------------
@@ -150,7 +171,7 @@ Basic Test Structure
    @pytest.fixture
    def lattice():
        """Create a test lattice."""
-       lat = Lattice2D(side=16, pflip=0.1, seed=42)
+       lat = Lattice2D(16, pflip=0.1, seed=42)
        lat.flip_random_fract_edges()
        return lat
 
@@ -164,10 +185,11 @@ Basic Test Structure
 
    def test_contact_process_run(lattice):
        """Test ContactProcessEI completes a run."""
-       cp = ContactProcessEI(sg=lattice, gamma=1.5, steps=100, runlang='py')
+       cp = ContactProcessEI(sg=lattice, gamma=1.5, steps=100, runlang='py',
+                             savedensity=True)
        cp.init_contact_dynamics()
        cp.run(verbose=False)
-       assert len(cp.rho_t) > 0
+       assert len(cp.density) > 0
 
 
    @pytest.mark.parametrize("gamma", [0.5, 1.0, 2.0, 3.0])
@@ -202,7 +224,7 @@ Use fixtures for common setup:
    @pytest.fixture
    def small_lattice():
        """Small lattice for fast tests."""
-       lat = Lattice2D(side=8, pflip=0.2, seed=123)
+       lat = Lattice2D(8, pflip=0.2, seed=123)
        lat.flip_random_fract_edges()
        return lat
 
@@ -210,7 +232,7 @@ Use fixtures for common setup:
    @pytest.fixture
    def medium_lattice():
        """Medium lattice for integration tests."""
-       lat = Lattice2D(side=32, pflip=0.3, seed=456)
+       lat = Lattice2D(32, pflip=0.3, seed=456)
        lat.flip_random_fract_edges()
        return lat
 
@@ -229,7 +251,7 @@ Test multiple inputs efficiently:
    ])
    def test_lattice_creation(side, pflip):
        """Test lattice creation with various parameters."""
-       lat = Lattice2D(side=side, pflip=pflip, seed=42)
+       lat = Lattice2D(side, pflip=pflip, seed=42)
        assert lat.N == side * side
 
 
@@ -436,19 +458,35 @@ Writing doctests:
 Continuous Integration
 ----------------------
 
-Tests run automatically on:
+CI is driven by three GitHub Actions workflows under
+``.github/workflows/``:
 
-- Push to main branch
-- Pull requests
-- Release tags
+**Code Quality** (``quality.yml``) — runs on pushes to ``main``,
+``dev-notebooks`` and ``feature/**``, and on pull requests to ``main`` and
+``dev-notebooks``:
 
-The CI pipeline:
+1. **Lint** — ``black --check``, ``isort --check`` and ``flake8`` over
+   ``src/lrgsglib/``.
+2. **Docs** — build the Sphinx site with ``make html`` under ``-W``
+   (warnings are errors).
+3. **Test** — ``pip install -e ".[dev]"`` then ``pytest test/ --quick`` on
+   Ubuntu and macOS.
 
-1. Sets up conda environment
-2. Builds C extensions
-3. Runs pytest
-4. Reports coverage
-5. Builds documentation
+**Build & Test Wheels** (``build-wheels.yml``) — runs on pushes to
+``main``/``dev``/``feature/**``, on pull requests to ``main``/``dev``, and on
+``v*`` tags. It builds wheels with ``cibuildwheel`` and an sdist, installs the
+built wheel and runs ``pytest test/ --quick`` against it, then publishes to
+PyPI on tag pushes.
+
+**Deploy Documentation** (``docs-deploy.yml``) — runs on pushes to ``main``
+and on ``v*`` tags. It builds the docs with micromamba and deploys the
+multi-version site to the ``gh-pages`` branch.
+
+.. note::
+
+   Tests install via ``pip`` (``.[dev]``), not conda; C extensions are
+   compiled implicitly by the editable / ``cibuildwheel`` install. Conda
+   (micromamba) is used only by the documentation-deploy workflow.
 
 See Also
 --------

@@ -54,7 +54,9 @@ For a signed graph G with N nodes and signed adjacency matrix A:
 where D is the absolute degree matrix. Key properties:
 
 - Symmetric for undirected graphs
-- Can have negative eigenvalues (frustration signature)
+- Positive semidefinite: the smallest eigenvalue is
+  :math:`\lambda_{\min} = 0` for balanced graphs and strictly positive under
+  frustration (:math:`\lambda_{\min} > 0` is the frustration signature)
 - Spectral gap controls mixing/diffusion times
 
 See :doc:`signed_graphs` for complete theory.
@@ -74,11 +76,13 @@ yields the Von Neumann entropy:
 
    S(\tau) = -\text{Tr}[\rho \log \rho]
 
-The spectral dimension :math:`d_s` characterizes scaling:
+The spectral dimension :math:`d_s` characterizes the entropy scaling in the
+intermediate, scale-invariant regime (the entropy itself decreases toward
+:math:`S(\tau) \to 0` as :math:`\tau \to \infty`):
 
 .. math::
 
-   S(\tau) \sim \frac{d_s}{2} \log \tau
+   S(\tau) \sim \text{const} - \frac{d_s}{2} \log \tau
 
 See :doc:`lrg_theory` for the renormalization framework.
 
@@ -131,7 +135,7 @@ Key Results
 ~~~~~~~~~~~
 
 - **Balanced graphs**: All eigenvalues ≥ 0, λ₁ = 0
-- **Frustrated graphs**: Negative eigenvalues, ``|λ₁|`` measures frustration
+- **Frustrated (unbalanced) graphs**: strictly positive definite, λ₁ > 0; the smallest eigenvalue measures frustration
 - **Spectral gap**: Controls relaxation times: τ ∼ 1/Δλ
 - **Localization**: Frustration can localize eigenvectors
 
@@ -183,18 +187,27 @@ See the :doc:`/user_guide/index` for practical usage.
 References
 ----------
 
-Key papers on signed graphs and spectral methods:
+Key primary sources underlying the theory in this section:
 
-.. note::
-
-   A comprehensive bibliography is planned for future releases.
-   Key topics include:
-
-   - Structural balance theory (Heider, Cartwright-Harary)
-   - Spectral graph theory (Chung, Mohar)
-   - Spin glasses (Edwards-Anderson, Sherrington-Kirkpatrick)
-   - Contact process (Harris, Liggett)
-   - Renormalization group (Wilson, Kadanoff)
+- **Laplacian Renormalization Group** — network propagator, spectral entropy,
+  specific heat, real-space coarse-graining:
+  Villegas, Gili, Caldarelli, Gabrielli, *Nat. Phys.* **19**, 445 (2023).
+- **Multiscale Laplacian community detection**:
+  Villegas, Gabrielli, Poggialini, Gili,
+  *Phys. Rev. Research* **7**, 013065 (2025).
+- **Signed Laplacian for spectral clustering and embedding**
+  (:math:`\bar{L} = \bar{D} - A`):
+  Kunegis, Schmidt, Lommatzsch, Lerner, De Luca, Albayrak,
+  *Proc. SIAM Int. Conf. Data Mining (SDM)*, 559 (2010).
+- **Signed-Laplacian spectra and topological symmetry breaking** — positive
+  (semi)definiteness, frustration signature, S/Z/X defects:
+  Iannelli, Villegas, Gili, Gabrielli, arXiv:2504.00144 (2026).
+- **Chladni states in Ising spin lattices** — eigenvector binarization and the
+  RBIM ground-state connection:
+  Iannelli, Villegas, arXiv:2507.05961 (2025).
+- **Geometric criticality in scale-invariant networks** — LRG fixed points and
+  the spectral dimension:
+  Lucarini, Cimini, Villegas, *Phys. Rev. Research* **8**, 013330 (2026).
 
 Further Reading
 ---------------

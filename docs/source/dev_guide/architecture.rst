@@ -35,10 +35,12 @@ low-level utilities up through graph operations to high-level programs.
    │   │   └── funcs/             ← Utility functions for graphs
    │   │
    │   ├── statsys/               ← Statistical physics simulations
-   │   │   ├── IsingDynamics.py   ← Ising model (Metropolis, SA, PT)
-   │   │   ├── ContactProcess.py  ← Contact process (EI, SIR)
-   │   │   ├── VoterModel.py      ← Voter model dynamics
-   │   │   └── BinDynSys.py       ← Base class for binary dynamics
+   │   │   ├── _ccore/            ← Shared C infrastructure (SFMT, utils)
+   │   │   ├── IsingDynamics/     ← Ising model package (IsingDynamics.py + ccore/)
+   │   │   ├── ContactProcess/    ← Contact process package (ContactProcess.py + ccore/)
+   │   │   ├── VoterModel/        ← Voter model package (VoterModel.py + ccore/)
+   │   │   ├── ...                ← Other model packages (Potts, XY, Kuramoto, ...)
+   │   │   └── BinDynSys/         ← Base-class package for binary dynamics
    │   │
    │   ├── utils/                 ← Utilities organized by domain
    │   │   ├── basic/             ← General utilities (linalg, numeric, I/O)
@@ -48,8 +50,6 @@ low-level utilities up through graph operations to high-level programs.
    │   ├── plotlib/               ← Visualization utilities
    │   ├── config/                ← Configuration and constants
    │   │   └── progargs/          ← Command-line argument definitions
-   │   │   ├── _ccore/            ← Shared C infrastructure (SFMT, utils)
-   │   │   └── <Model>/ccore/    ← Per-model C code + compiled binaries
    │   │
    │   └── bindings/              ← pybind11 Python-C++ bindings
    │
@@ -195,7 +195,7 @@ not just NetworkX graphs. This is achieved through a protocol-based design.
 Graph Protocols
 ~~~~~~~~~~~~~~~
 
-Defined in ``graphs/_base.py`` using ``typing.runtime_checkable``:
+Defined in ``graphs/protocols.py`` using ``typing.runtime_checkable``:
 
 .. code-block:: text
 
@@ -349,10 +349,9 @@ Performance-critical code is co-located with Python classes (folder-per-class):
 
 **Simulator variants:**
 
-- ``IsingSimulator0`` - Basic Metropolis
-- ``IsingSimulator1b`` - Optimized Metropolis with logging
-- ``IsingSimulator3b`` - Simulated Annealing
-- ``IsingSimulator4b`` - Parallel Tempering
+- ``IsingMetropolis`` - Metropolis (fixed temperature)
+- ``IsingSimulatedAnnealing`` - Simulated Annealing
+- ``IsingParallelTempering`` - Parallel Tempering
 
 See :doc:`c_extensions` for detailed documentation.
 
@@ -364,7 +363,7 @@ Typical workflow for spectral analysis:
 .. code-block:: text
 
    1. Create Graph
-      └─ Lattice2D(side=64, pflip=0.3, geo='sqr')
+      └─ Lattice2D(64, geo='sqr', pflip=0.3)
          └─ Applies sign flips to edges
 
    2. Compute Spectrum
@@ -385,7 +384,7 @@ Typical workflow for dynamics simulation:
 .. code-block:: text
 
    1. Create Graph
-      └─ Lattice2D(side=64, pflip=0.3)
+      └─ Lattice2D(64, geo='sqr', pflip=0.3)
 
    2. Initialize Dynamics
       └─ IsingDynamics(sg=lattice, T=2.0, runlang='C1b')

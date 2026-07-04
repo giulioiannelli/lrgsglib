@@ -20,13 +20,7 @@ from .Lattice3DNX import (
     load_or_compute_Lattice3D,
 )
 
-# LatticeNDNX is referenced but not implemented yet - create a placeholder
-# Until the abstract base class is implemented, point to Lattice2DNX as a workaround
-LatticeNDNX = Lattice2DNX
-
 __all__ = [
-    # Abstract base (placeholder)
-    "LatticeNDNX",
     # 2D
     "Lattice2DNX",
     "Lattice2D",

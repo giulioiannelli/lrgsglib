@@ -1,6 +1,20 @@
 import sys
 import warnings
 
+# Package version. setuptools_scm writes ``_version.py`` at build time
+# (single source of truth = annotated git tags ``vX.Y.Z``). Fall back to the
+# installed distribution metadata, then to a sentinel, so ``__version__`` is
+# always defined at runtime even in an uninstalled / source checkout.
+try:
+    from ._version import version as __version__
+except Exception:  # pragma: no cover - depends on build/install state
+    from importlib.metadata import version as _pkg_version
+
+    try:
+        __version__ = _pkg_version("lrgsglib")
+    except Exception:  # pragma: no cover - not installed as a distribution
+        __version__ = "0.0.0+unknown"
+
 from .shared import (
     # Core libraries users expect at top level
     np, nx, plt, pd, cp, scipy,

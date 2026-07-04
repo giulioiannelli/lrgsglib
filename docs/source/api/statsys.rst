@@ -68,6 +68,32 @@ VecDynSys (Vector State)
    :undoc-members:
    :show-inheritance:
 
+Solver Registry
+---------------
+
+Every dynamics model dispatches its ``run()`` through a solver backend
+selected via ``runlang=``. The registry maps a ``(model, backend)`` pair to a
+:class:`~lrgsglib.statsys.Solver` implementation; the available backends are
+enumerated by :class:`~lrgsglib.statsys.SolverBackend` (``py``, ``pb``,
+``np``, ``cu``, ``c``). New backends can be registered without modifying the
+model classes.
+
+.. autoclass:: lrgsglib.statsys.Solver
+   :members:
+
+.. autoclass:: lrgsglib.statsys.SolverBackend
+   :members:
+
+.. autofunction:: lrgsglib.statsys.get_solver
+
+.. autofunction:: lrgsglib.statsys.register_solver
+
+.. autofunction:: lrgsglib.statsys.list_solvers_for_model
+
+.. autofunction:: lrgsglib.statsys.list_solver_models
+
+.. autofunction:: lrgsglib.statsys.is_backend_available
+
 Binary State Models
 -------------------
 

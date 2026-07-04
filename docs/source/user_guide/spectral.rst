@@ -17,19 +17,23 @@ The **signed Laplacian** is defined as:
 
 .. math::
 
-   L_s = D - A_s
+   L_s = \bar{D} - A_s
 
-where :math:`D` is the degree matrix and :math:`A_s` is the signed adjacency matrix
-(with entries :math:`\pm 1`). Unlike unsigned graphs, signed graphs can have
-**negative eigenvalues**, which are signatures of frustration—the inability to
-satisfy all edge constraints simultaneously.
+where :math:`\bar{D}` is the diagonal **absolute-degree** matrix
+(:math:`\bar{D}_{ii} = \sum_k |A_{s,ik}|`) and :math:`A_s` is the signed adjacency
+matrix (with entries :math:`\pm 1`). The signed Laplacian is **positive semidefinite**
+for every signed graph, so all eigenvalues are non-negative. Its smallest eigenvalue is
+the frustration signal: it equals :math:`0` if and only if the graph is balanced and is
+strictly positive (the matrix becomes positive-definite) when the graph is frustrated —
+that is, when the edge constraints cannot all be satisfied simultaneously (Kunegis
+et al., *Proc. SIAM SDM*, 559 (2010); Iannelli et al., arXiv:2504.00144 (2026)).
 
 Key concepts:
 
 - **Spectrum**: The set of eigenvalues :math:`\{\lambda_1, \lambda_2, ..., \lambda_N\}`
 - **Spectral gap**: :math:`\lambda_2 - \lambda_1`, related to mixing time
-- **Frustration**: Indicated by negative eigenvalues
-- **Full spectrum**: Required for entropy calculations (use ``howmany=0``)
+- **Frustration**: Indicated by a strictly positive smallest eigenvalue (:math:`\lambda_1 > 0`; :math:`\lambda_1 = 0` iff balanced)
+- **Full spectrum**: Required for entropy calculations (returned by default; force a dense solve with ``keep_sparse=False``)
 
 Computing the Spectrum
 ----------------------
@@ -361,7 +365,8 @@ Project nodes into a low-dimensional spectral space:
 Frustration Analysis
 --------------------
 
-Negative eigenvalues indicate frustration in signed graphs.
+The smallest eigenvalue of the (positive-semidefinite) signed Laplacian signals
+frustration: it is zero for a balanced graph and strictly positive for a frustrated one.
 
 Detecting Frustration
 ~~~~~~~~~~~~~~~~~~~~~
@@ -369,19 +374,22 @@ Detecting Frustration
 .. code-block:: python
 
    from lrgsglib.graphs import ErdosRenyi
+   import numpy as np
 
-   # Create signed Erdos-Renyi graph
-   er = ErdosRenyi(nnodes=100, prob=0.1, pflip=0.3, seed=42)
+   # Create a signed Erdos-Renyi graph (30% of edges negative)
+   er = ErdosRenyi(n=100, p=0.1, pflip=0.3, seed=42)
    er.flip_random_fract_edges()
 
-   # Compute spectrum
+   # Compute the (positive-semidefinite) signed-Laplacian spectrum
    er.compute_laplacian_spectrum()
+   eigvals = np.sort(er.eigv)
 
-   # Count negative eigenvalues
-   negative_eigvals = er.eigv[er.eigv < 0]
-   print(f"Number of negative eigenvalues: {len(negative_eigvals)}")
-   print(f"Most negative eigenvalue: {er.eigv.min():.4f}")
-   print(f"Frustration indicator: {len(negative_eigvals) / er.N:.2%}")
+   # Frustration signal: the smallest eigenvalue.
+   #   lambda_min == 0  -> structurally balanced
+   #   lambda_min  > 0  -> frustrated (edge signs cannot all be satisfied)
+   lambda_min = eigvals[0]
+   print(f"Smallest eigenvalue (frustration signal): {lambda_min:.4f}")
+   print(f"Balanced: {np.isclose(lambda_min, 0.0, atol=1e-8)}")
 
 Frustration and Balance
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -395,14 +403,16 @@ Frustration prevents perfect balance:
 
 .. code-block:: python
 
-   # Spectral gap indicates balance
-   # Small gap near zero → high frustration
-   spectral_gap = er.eigv[1] - er.eigv[0]
-   print(f"Spectral gap: {spectral_gap:.4f}")
+   import numpy as np
+   eigvals = np.sort(er.eigv)
 
-   # Large negative eigenvalue magnitude → more frustration
-   max_frustration = abs(er.eigv.min())
-   print(f"Max frustration magnitude: {max_frustration:.4f}")
+   # The smallest eigenvalue is the frustration order parameter:
+   # it grows away from 0 as the graph becomes more frustrated.
+   print(f"Frustration (smallest eigenvalue): {eigvals[0]:.4f}")
+
+   # The gap above the smallest eigenvalue relates to relaxation/mixing.
+   spectral_gap = eigvals[1] - eigvals[0]
+   print(f"Spectral gap: {spectral_gap:.4f}")
 
 Working with Different Graph Types
 ----------------------------------
@@ -443,7 +453,7 @@ Lattice2D/3D (Regular Grids)
    l2d.compute_laplacian_spectrum()
 
    # 3D cubic lattice
-   l3d = Lattice3D(side1=10, geo='cub', pflip=0.1, seed=42)
+   l3d = Lattice3D(dim=10, geo='sc', pflip=0.1, seed=42)
    l3d.flip_random_fract_edges()
    l3d.compute_laplacian_spectrum()
 
@@ -472,7 +482,7 @@ Best Practices
    - Large sparse graphs: ``'scipy'`` with ``keep_sparse=True``
    - GPU available: ``'cupy'`` for maximum performance
 
-4. **Full spectrum for entropy**: Use ``keep_sparse=False`` or ``howmany=0``
+4. **Full spectrum for entropy**: Use ``keep_sparse=False`` to force a dense solve
 
 5. **Call** ``flip_random_fract_edges()`` **after creating lattices with** ``pflip``:
 

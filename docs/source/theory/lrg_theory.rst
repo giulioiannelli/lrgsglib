@@ -34,15 +34,18 @@ where:
 - :math:`A` is the signed adjacency matrix with :math:`A_{ij} = \pm 1` for connected nodes
 - :math:`D` is the degree matrix with :math:`D_{ii} = \sum_j |A_{ij}|`
 
-Unlike the standard Laplacian, the signed Laplacian can have **negative eigenvalues**
-when the graph contains frustration.
+With the absolute-value degree :math:`D_{ii} = \sum_j |A_{ij}|`, the signed
+Laplacian is **positive semidefinite** for any signed graph. Frustration (an
+unbalanced graph) lifts the smallest eigenvalue strictly above zero
+(:math:`\lambda_{\min} > 0`), whereas a balanced graph has
+:math:`\lambda_{\min} = 0`.
 
 Properties
 ~~~~~~~~~~
 
 1. **Symmetry**: :math:`L = L^T` (for undirected graphs)
 2. **Row sum**: :math:`\sum_j L_{ij} = D_{ii} - \sum_j A_{ij}`
-3. **Eigenvalue bounds**: For unfrustrated graphs, :math:`0 \leq \lambda_i \leq 2D_{max}`
+3. **Eigenvalue bounds**: For any signed graph, :math:`0 \leq \lambda_i \leq 2D_{max}`
 
 Spectral Decomposition
 ----------------------
@@ -67,7 +70,8 @@ Eigenvalues are typically ordered by magnitude:
 
    \lambda_1 \leq \lambda_2 \leq \cdots \leq \lambda_N
 
-For signed graphs, :math:`\lambda_1` may be negative (frustrated) or zero (balanced).
+For signed graphs, :math:`\lambda_1` is strictly positive when the graph is
+frustrated (unbalanced) and zero when it is balanced.
 
 Spectral Gap
 ~~~~~~~~~~~~
@@ -130,18 +134,20 @@ The **spectral specific heat**:
 
 .. math::
 
-   C(\tau) = \frac{dS}{d\log\tau}
+   C(\tau) = -\frac{dS}{d\log\tau}
 
 measures the rate of information change across scales.
 
 Spectral Dimension
 ~~~~~~~~~~~~~~~~~~
 
-The **spectral dimension** :math:`d_s` characterizes how entropy scales:
+The **spectral dimension** :math:`d_s` characterizes the entropy scaling in the
+intermediate, scale-invariant regime (the entropy itself decreases toward
+:math:`S(\tau) \to 0` as :math:`\tau \to \infty`):
 
 .. math::
 
-   S(\tau) \sim \frac{d_s}{2} \log \tau \quad \text{as } \tau \to \infty
+   S(\tau) \sim \text{const} - \frac{d_s}{2} \log \tau
 
 For regular lattices, :math:`d_s` equals the embedding dimension.
 Hierarchical networks often have non-integer :math:`d_s`.
@@ -253,12 +259,12 @@ Implementation in lrgsglib
    from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
    from lrgsglib.utils.lrg.infocomm import compute_entropy_observables_from_eigenvalues
 
-   # Create frustrated lattice
-   lattice = Lattice2D(side=32, pflip=0.3, seed=42)
+   # Create frustrated lattice (first positional arg is the side length)
+   lattice = Lattice2D(32, pflip=0.3, seed=42)
    lattice.flip_random_fract_edges()
 
-   # Compute full spectrum
-   L, eigenvalues = get_graph_lspectrum(lattice.gr['G'], library='scipy')
+   # Compute the full signed-Laplacian spectrum (abs-degree L = D - A, PSD)
+   L, eigenvalues = get_graph_lspectrum(lattice.gr['G'], library='scipy', signed=True)
 
    # Compute entropy observables
    entropy, heat, variance, time_grid = compute_entropy_observables_from_eigenvalues(
@@ -266,8 +272,10 @@ Implementation in lrgsglib
        num_nodes=lattice.N
    )
 
-   # Spectral dimension from specific heat
-   d_s = 2 * heat[-1]  # Asymptotic value
+   # Spectral dimension from specific heat: read 2*C on the scale-invariant
+   # plateau (the peak of C), not the tau -> inf tail where a single ground
+   # mode dominates and C -> 0
+   d_s = 2 * heat.max()
 
 See Also
 --------

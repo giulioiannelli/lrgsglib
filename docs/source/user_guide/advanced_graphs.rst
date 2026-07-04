@@ -546,9 +546,8 @@ Hierarchical graphs can have signed edges added:
    # Apply the edge flips
    mc.flip_random_fract_edges()
 
-   # Count negative edges
-   n_neg = sum(1 for u, v in mc.gr['G'].edges()
-               if mc.gr['G'][u][v].get('sign', 1) == -1)
+   # Count negative edges (negative links are marked by weight < 0)
+   n_neg = mc.Ne_n
    print(f"Negative edges: {n_neg} / {mc.Ne}")
 
 

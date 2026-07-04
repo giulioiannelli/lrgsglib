@@ -35,7 +35,7 @@ For basic graph drawing, use NetworkX's built-in functions with lrgsglib graphs:
    from lrgsglib.graphs import ErdosRenyi
 
    # Create signed graph
-   er = ErdosRenyi(nnodes=50, prob=0.15, pflip=0.3, seed=42)
+   er = ErdosRenyi(n=50, p=0.15, pflip=0.3, seed=42)
    er.flip_random_fract_edges()
 
    # Get the NetworkX graph
@@ -284,7 +284,7 @@ For 3D lattices, use Matplotlib's 3D plotting:
    from lrgsglib.graphs import Lattice3D
 
    # Create 3D lattice
-   lattice3d = Lattice3D(side1=6, geo='cub', pflip=0.2, seed=42)
+   lattice3d = Lattice3D(dim=6, geo='sc', pflip=0.2, seed=42)
    lattice3d.flip_random_fract_edges()
 
    # Extract node positions and edge signs

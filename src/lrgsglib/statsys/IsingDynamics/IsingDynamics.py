@@ -1921,7 +1921,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.topo_met_best_energy = float(best_E)
 
     # =========================================================================
-    # Pybind11 Topological CEM  (pb_topo_cem) — stub
+    # Pybind11 Topological CEM  (pb_topo_cem)
     # =========================================================================
 
     def _run_pybind_topo_cem(self) -> None:

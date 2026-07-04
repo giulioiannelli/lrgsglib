@@ -192,48 +192,45 @@ Defined in ``build/cprogn.mk``:
 
 .. code-block:: make
 
-   # Program list
-   PROGS = $(LRGSG_CCORE_BIN)/IsingSimulator0 \
-           $(LRGSG_CCORE_BIN)/IsingSimulator1b \
-           $(LRGSG_CCORE_BIN)/IsingSimulator3b \
-           $(LRGSG_CCORE_BIN)/IsingSimulator4b \
-           $(LRGSG_CCORE_BIN)/VoterSimulator0 \
-           $(LRGSG_CCORE_BIN)/VoterSimulator1 \
-           $(LRGSG_CCORE_BIN)/ContactSimulator1c \
-           ...
+   # Per-model program lists (unified binaries, runtime-selectable via flags),
+   # each emitted into its own per-model bin/ directory
+   PROGS_ISING := $(addprefix $(LRGSG_STATSYS_ISING_BIN)/, \
+       IsingMetropolis IsingSimulatedAnnealing IsingParallelTempering)
+   PROGS_VM    := $(addprefix $(LRGSG_STATSYS_VM_BIN)/, VoterSimulator)
+   PROGS_CP    := $(addprefix $(LRGSG_STATSYS_CP_BIN)/, \
+       ContactProcessEI ContactProcessSIR)
+   # ... plus PROGS_KUR, PROGS_RD, PROGS_CODE, PROGS_POTTS, PROGS_XY,
+   #     PROGS_HBERG, PROGS_MSPEC (continuous / vector dynamics)
 
-   # Source file paths
-   PATH_SRCC_FILES = $(LRGSG_LIB_CCORE)/LRGSG_utils.c \
-                     $(LRGSG_LIB_CCORE)/sfmtrng.c
-   PATH_SFMT_FILES = $(LRGSG_CCORE_SFMT)/SFMT.c
+   # Aggregate list of everything to build
+   PROGS := $(PROGS_ISING) $(PROGS_VM) $(PROGS_CP) \
+            $(PROGS_KUR) $(PROGS_RD) $(PROGS_CODE) \
+            $(PROGS_POTTS) $(PROGS_XY) $(PROGS_HBERG) $(PROGS_MSPEC)
 
-Pattern Rules
-~~~~~~~~~~~~~
+   # Shared source file paths
+   PATH_SRCC_FILES = $(addprefix $(LRGSG_STATSYS_CCORE)/, \
+       LRGSG_utils.c sfmtrng.c)
+   PATH_SFMT_FILES = $(addprefix $(LRGSG_CCORE_SFMT)/, SFMT.c)
 
-The Makefile uses pattern rules for similar programs:
+Simulator Build Rules
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The Makefile defines an explicit per-model recipe for each simulator, linking
+it against its pre-compiled object files:
 
 .. code-block:: make
 
-   # Generic IsingSimulator pattern
-   $(LRGSG_CCORE_BIN)/IsingSimulator%: \
-           $(LRGSG_RBIM_SIMC)/IsingSimulator%.c \
-           $(PATH_SRCC_FILES) \
-           $(PATH_SRCC_RBIM) \
-           $(PATH_SFMT_FILES) \
-           $(PATH_SRCC_BINDYNSYS)
-       @printf "Compiling IsingSimulator%s...\n" "$*"
-       $(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+   # Unified Metropolis simulator
+   $(LRGSG_STATSYS_ISING_BIN)/IsingMetropolis: \
+           $(LRGSG_STATSYS_ISING)/IsingMetropolis.c $(OBJS_ISING)
+       @printf "  [CC] IsingMetropolis\n"
+       @$(GCC) $(ALLFLAGS) $(INC_ISING) -o $@ $< $(OBJS_ISING) $(LMFLAG)
 
-   # Simulated Annealing variants (need LRGSG_sa)
-   $(LRGSG_CCORE_BIN)/IsingSimulator3b: \
-           $(LRGSG_RBIM_SIMC)/IsingSimulator3b.c \
-           $(PATH_SRCC_FILES) \
-           $(PATH_SRCC_RBIM) \
-           $(PATH_SRCC_SA) \
-           $(PATH_SFMT_FILES) \
-           $(PATH_SRCC_BINDYNSYS)
-       @printf "Compiling IsingSimulator3b (SA)...\n"
-       $(GCC) $(ALLFLAGS) -o $@ $^ $(LMFLAG)
+   # Simulated Annealing variant (extra LRGSG_sa objects)
+   $(LRGSG_STATSYS_ISING_BIN)/IsingSimulatedAnnealing: \
+           $(LRGSG_STATSYS_ISING)/IsingSimulatedAnnealing.c $(OBJS_ISING_SA)
+       @printf "  [CC] IsingSimulatedAnnealing\n"
+       @$(GCC) $(ALLFLAGS) $(INC_ISING) -o $@ $< $(OBJS_ISING_SA) $(LMFLAG)
 
 Conda Environment
 -----------------
@@ -274,8 +271,12 @@ After building, install the Python package:
 
 Optional extras (from ``pyproject.toml``):
 
-- ``dev`` - Development tools (black, isort, mypy, pytest)
-- ``docs`` - Documentation tools (sphinx, sphinx-rtd-theme)
+- ``dev`` - Development tools (pytest, black, isort, flake8, mypy)
+- ``docs`` - Documentation tools (sphinx, pydata-sphinx-theme, sphinx-design,
+  sphinx-autodoc-typehints, myst-parser, sphinx-copybutton, sphinxcontrib-bibtex,
+  sphinx-autobuild)
+- ``gpu`` - GPU acceleration (cupy)
+- ``jupyter`` - Notebook tools (jupyter, ipykernel, ipywidgets)
 
 Build Workflow
 --------------
@@ -284,28 +285,39 @@ Complete build from scratch:
 
 .. code-block:: bash
 
-   # 1. Clone repository
-   git clone https://github.com/giulioiannelli/lrgsglib
+   # 1. Clone repository (with submodules)
+   git clone --recursive https://github.com/giulioiannelli/lrgsglib
    cd lrgsglib
 
-   # 2. Initialize submodules
-   git submodule init
-   git submodule update
+   # (if you cloned without --recursive)
+   git submodule update --init --recursive
 
-   # 3. Create conda environment
+   # 2. Create conda environment
    conda env create -f lrgsgenv.yml
    conda activate lrgsgenv
 
-   # 4. Build everything
-   make all
-
-   # 5. Install Python package
+   # 3. Build and install
    pip install -e .
 
-   # 6. Verify
+   # 4. Verify
    pytest test/
 
-For submodule usage:
+The editable install drives the primary build system (CMake +
+scikit-build-core, see ``CMakeLists.txt``), which compiles **both** the C
+simulator executables **and** the pybind11 extension modules. No separate
+``make all`` step is required.
+
+The Makefile is a supported alternative for users who prefer it. Note that
+``make all`` additionally runs ``env-config``, which pins absolute paths into
+the generated configuration files:
+
+.. code-block:: bash
+
+   make all
+   pip install -e .
+
+For submodule usage, ``make`` can override the path layout so data, notebooks,
+and logs land in the outer project:
 
 .. code-block:: bash
 

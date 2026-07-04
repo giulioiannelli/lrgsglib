@@ -296,8 +296,7 @@ def compute_pareto_point(
 
     Parameters
     ----------
-    graph_factory, graph_params, p_range, n_realizations, which,
-    seed_base, backend, include_outer_face, verbose :
+    graph_factory, graph_params, p_range, n_realizations, which, seed_base, backend, include_outer_face, verbose :
         Forwarded to :func:`dual_percolation_sweep`.
     threshold_method : str
         Forwarded to :func:`find_threshold`.

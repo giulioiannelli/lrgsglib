@@ -40,8 +40,11 @@ where D is the absolute degree matrix: :math:`D_{ii} = \sum_j |A_{ij}|`.
 Key properties:
 
 - Symmetric for undirected graphs
-- Can have negative eigenvalues (unlike standard Laplacian)
-- Negative eigenvalues indicate frustration
+- Positive semidefinite for every signed graph: :math:`x^{T} L x = \sum_{(i,j) \in E} (x_i - \sigma_{ij}\, x_j)^2 \ge 0`, so all eigenvalues are non-negative
+- The smallest eigenvalue equals :math:`0` if and only if the graph is balanced, and is strictly positive (the matrix becomes positive-definite) when the graph is frustrated
+
+The positive-(semi)definiteness of the signed Laplacian is established in Kunegis
+et al., *Proc. SIAM SDM*, 559 (2010) and Iannelli et al., arXiv:2504.00144 (2026).
 
 Balance Theory
 --------------
@@ -57,8 +60,7 @@ Characterization Theorem
 A signed graph is balanced if and only if:
 
 1. It contains no cycles with an odd number of negative edges
-2. All eigenvalues of the signed Laplacian are non-negative
-3. The smallest eigenvalue λ₁ = 0
+2. The smallest eigenvalue of the signed Laplacian vanishes, λ₁ = 0 (it is strictly positive when the graph is frustrated)
 
 Balanced Partition
 ~~~~~~~~~~~~~~~~~~
@@ -108,8 +110,8 @@ Spectral Frustration
 The smallest eigenvalue λ₁ indicates frustration:
 
 - λ₁ = 0: Balanced graph
-- λ₁ < 0: Frustrated graph
-- ``|λ₁|``: Magnitude of frustration
+- λ₁ > 0: Frustrated graph
+- ``λ₁``: Magnitude of frustration (it grows as frustration increases)
 
 Triangle Frustration
 ~~~~~~~~~~~~~~~~~~~~
@@ -207,7 +209,7 @@ Regular lattices with random sign assignment:
    from lrgsglib.graphs import Lattice2D
 
    # Create lattice with 30% negative edges
-   lattice = Lattice2D(side=32, pflip=0.3, seed=42)
+   lattice = Lattice2D(32, geo='squared', pflip=0.3, seed=42)
    lattice.flip_random_fract_edges()
 
 The parameter ``pflip`` controls the fraction of edges flipped to negative.
@@ -220,9 +222,9 @@ Eigenvalue Distribution
 
 For random signed graphs:
 
-- **Balanced** (pflip=0): All eigenvalues ≥ 0, semicircular bulk
-- **Frustrated** (pflip>0): Negative eigenvalues appear
-- **Maximum frustration** (pflip=0.5): Symmetric distribution around 0
+- **Balanced** (pflip=0): all eigenvalues ≥ 0 with the smallest exactly 0, semicircular bulk
+- **Frustrated** (pflip>0): the spectrum stays non-negative but the smallest eigenvalue lifts off 0 — a spectral gap opens
+- **Maximum frustration** (pflip=0.5): the spectral gap (smallest eigenvalue) is largest, while the whole spectrum remains ≥ 0
 
 Localization
 ~~~~~~~~~~~~
@@ -280,17 +282,13 @@ Creating Signed Graphs
 
 .. code-block:: python
 
-   from lrgsglib.graphs import SignedGraph
-   from lrgsglib.graphs.ErdosRenyi import signed_erdos_renyi
-   import networkx as nx
+   from lrgsglib.graphs import ErdosRenyi
 
-   # From existing NetworkX graph
-   G = nx.erdos_renyi_graph(100, 0.1, seed=42)
-   sg = SignedGraph(G, pflip=0.3, seed=42)
+   # Signed Erdős-Rényi graph via the canonical factory. Any SignedGraph
+   # subclass auto-flips a pflip fraction of edges uniformly to negative at
+   # construction; the explicit flip below is idempotent.
+   sg = ErdosRenyi(n=100, p=0.1, pflip=0.3, seed=42, engine='nx')
    sg.flip_random_fract_edges()
-
-   # Direct construction
-   sg = signed_erdos_renyi(n=100, p=0.1, pflip=0.3, seed=42)
 
 Analyzing Frustration
 ~~~~~~~~~~~~~~~~~~~~~
@@ -300,15 +298,17 @@ Analyzing Frustration
    # Compute spectrum
    sg.compute_laplacian_spectrum_weigV()
 
-   # Check for frustration
+   # The signed Laplacian is positive semidefinite, so its smallest eigenvalue
+   # is 0 for a balanced graph and strictly positive when the graph is frustrated.
    lambda_min = sg.eigv[0]
-   if lambda_min < -1e-10:
-       print(f"Graph is frustrated: λ₁ = {lambda_min:.4f}")
+   if lambda_min > 1e-10:
+       print(f"Graph is frustrated (unbalanced): lambda_min = {lambda_min:.4f}")
    else:
        print("Graph is balanced")
 
-   # Count frustrated triangles
-   n_frustrated = sg.count_frustrated_triangles()
+   # Fraction of frustrated triangles (0 on a balanced graph)
+   from lrgsglib.utils.lrg.spectral_rg import frustration_index
+   f_index = frustration_index(sg.gr['G'])
 
 See Also
 --------

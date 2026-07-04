@@ -45,15 +45,16 @@ Compute Laplacian eigenvalues/eigenvectors for 2D lattices.
 .. code-block:: bash
 
    # Full spectrum (all eigenvalues)
-   python src/L2D_SlaplSpect.py 16 0.3 --mode eigvals --howmany 0 -na 5 -g sqr
+   python src/L2D_SlaplSpect.py 16 -p 0.3 --mode eigvals --howmany 0 -na 5 -g sqr
 
    # With GT backend
-   python src/L2D_SlaplSpect.py 16 0.3 --mode eigvals --howmany 0 -na 2 -ge gt
+   python src/L2D_SlaplSpect.py 16 -p 0.3 --mode eigvals --howmany 0 -na 2 -ge gt
 
    # Entropy mode
-   python src/L2D_SlaplSpect.py 32 0.0 --mode entropy -na 3 --backend scipy
+   python src/L2D_SlaplSpect.py 32 -p 0.0 --mode entropy -na 3 --backend scipy
 
-**Positional args:** ``side`` (lattice size), ``pflip`` (frustration fraction)
+**Positional args:** ``side``/``L`` (lattice size).
+**Key flags:** ``-p``/``--pflip`` (frustration fraction, default 0.0)
 
 MCG_SlaplSpect.py
 ~~~~~~~~~~~~~~~~~
@@ -85,19 +86,19 @@ Run Ising model simulations on 2D lattices.
 .. code-block:: bash
 
    # Python backend
-   python src/L2D_IsingDynamics.py 16 0.0 -T 2.27 -rl py -na 1 -ic random
+   python src/L2D_IsingDynamics.py 16 -p 0.0 -T 2.27 -rl py -na 1 -ic random
 
    # C backend with energy/magnetization output
-   python src/L2D_IsingDynamics.py 16 0.0 -T 2.27 -rl C1b -na 1 -ic random -rf
+   python src/L2D_IsingDynamics.py 16 -p 0.0 -T 2.27 -rl C1b -na 1 -ic random -rf
 
    # Pybind11 backend
-   python src/L2D_IsingDynamics.py 16 0.0 -T 2.0 -rl pb_met -na 1
+   python src/L2D_IsingDynamics.py 16 -p 0.0 -T 2.0 -rl pb_met -na 1
 
    # GT engine with pybind11
-   python src/L2D_IsingDynamics.py 16 0.0 -T 2.0 -rl pb_met -na 1 -ge gt
+   python src/L2D_IsingDynamics.py 16 -p 0.0 -T 2.0 -rl pb_met -na 1 -ge gt
 
    # Cluster algorithms
-   python src/L2D_IsingDynamics.py 16 0.0 -T 2.27 -rl wolff -na 1
+   python src/L2D_IsingDynamics.py 16 -p 0.0 -T 2.27 -rl wolff -na 1
 
 **Key flags:** ``-T`` (temperature), ``-rl`` (runlang backend),
 ``-ic`` (initial condition: ``random``, ``ground_state_0``, etc.)
@@ -124,13 +125,13 @@ Contact process dynamics (excitation-inhibition or SIR) on 2D lattices.
 .. code-block:: bash
 
    # C backend (EI dynamics)
-   python src/L2D_ContactProcess.py 16 0.0 -dy EI -rl C1c -ga 1.5 -na 3 -rf
+   python src/L2D_ContactProcess.py 16 -p 0.0 -dy EI -rl C1c -ga 1.5 -na 3 -rf
 
    # Python backend
-   python src/L2D_ContactProcess.py 16 0.0 -dy EI -rl py -ga 1.5 -na 2
+   python src/L2D_ContactProcess.py 16 -p 0.0 -dy EI -rl py -ga 1.5 -na 2
 
    # GT engine
-   python src/L2D_ContactProcess.py 16 0.0 -dy EI -rl py -ga 1.5 -na 2 -ge gt
+   python src/L2D_ContactProcess.py 16 -p 0.0 -dy EI -rl py -ga 1.5 -na 2 -ge gt
 
 **Key flags:** ``-dy`` (dynamics type: ``EI`` or ``SIR``),
 ``-ga`` (coupling gamma), ``-rl`` (runlang)
@@ -146,13 +147,13 @@ Compute transient cluster distributions and order parameters on 2D lattices.
 .. code-block:: bash
 
    # Cluster distribution mode
-   python src/L2D_TransCluster.py 16 0.3 --mode pCluster -na 10 -g sqr -c rand
+   python src/L2D_TransCluster.py 16 -p 0.3 --mode pCluster -na 10 -g sqr -c rand
 
    # Order parameter mode
-   python src/L2D_TransCluster.py 16 0.3 --mode ordParam -na 10 -g sqr -c rand
+   python src/L2D_TransCluster.py 16 -p 0.3 --mode ordParam -na 10 -g sqr -c rand
 
    # GT engine
-   python src/L2D_TransCluster.py 16 0.3 --mode pCluster -na 5 -ge gt
+   python src/L2D_TransCluster.py 16 -p 0.3 --mode pCluster -na 5 -ge gt
 
 **Modes:** ``pCluster`` (cluster size distribution), ``ordParam`` (Pinf, gap)
 
@@ -175,16 +176,25 @@ L2D_Recon.py / L3D_Recon.py
 
 Reconstruct Laplacian eigenmodes from Ising dynamics spin configurations.
 
+.. warning::
+
+   ``L2D_Recon.py`` and ``L3D_Recon.py`` currently fail at parser-build time
+   with ``argparse.ArgumentError: argument -sf/--save_frequency: conflicting
+   option string: --save_frequency`` (the Recon-specific ``-sFQ/--save_frequency``
+   binding collides with the Ising-dynamics ``-sf/--save_frequency`` binding).
+   The commands below are the intended invocation once the option-string
+   collision is resolved.
+
 .. code-block:: bash
 
    # 2D lattice reconstruction
-   python src/L2D_Recon.py 16 0.0 -T 0.1 -rl C1b -na 5
+   python src/L2D_Recon.py 16 -p 0.0 -T 0.1 -rl C1b -na 5
 
    # 3D lattice reconstruction
-   python src/L3D_Recon.py 8 0.0 -T 0.1 -rl C1b -na 3
+   python src/L3D_Recon.py 8 -p 0.0 -T 0.1 -rl C1b -na 3
 
    # GT engine (uses pybind11 automatically)
-   python src/L2D_Recon.py 16 0.0 -T 0.1 -rl pb_met -na 3 -ge gt
+   python src/L2D_Recon.py 16 -p 0.0 -T 0.1 -rl pb_met -na 3 -ge gt
 
 Graph Engine Compatibility
 --------------------------

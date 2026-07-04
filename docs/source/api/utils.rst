@@ -64,6 +64,30 @@ Information Theory
    :undoc-members:
    :show-inheritance:
 
+Percolation
+~~~~~~~~~~~
+
+.. automodule:: lrgsglib.utils.lrg.percolation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Spectral Renormalization Group
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: lrgsglib.utils.lrg.spectral_rg
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Topology Screening
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: lrgsglib.utils.lrg.screening
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Basic Utilities
 ---------------
 

@@ -424,10 +424,10 @@ and graph-tool (``gt``) backends for standalone programs:
 .. code-block:: bash
 
    # Default: NetworkX
-   python src/L2D_IsingDynamics.py 16 0.0 -T 2.0 -rl py -na 1
+   python src/L2D_IsingDynamics.py 16 -p 0.0 -T 2.0 -rl py -na 1
 
    # graph-tool backend
-   python src/L2D_IsingDynamics.py 16 0.0 -T 2.0 -rl py -na 1 -ge gt
+   python src/L2D_IsingDynamics.py 16 -p 0.0 -T 2.0 -rl py -na 1 -ge gt
 
 When using the GT engine:
 
@@ -550,9 +550,8 @@ Maps to the optimized C1* backends:
        sg=lattice,           # SignedGraph instance
        gamma=1.5,            # Coupling strength (critical point ~1.65)
        steps=5000,           # Number of time steps
-       runlang='C1c',        # C backend with snapshot output
-       ic='random',          # Initial condition: 'random', 'all_active', 'single'
-       rho_init=0.5,         # Initial density for 'random' IC
+       runlang='C1',         # C backend, final state only
+       ic='random',          # 'random'/'uniform', 'homogeneous' (all active), 'delta' (single active), 'custom'
        seed=42,              # Random seed
    )
 
@@ -572,16 +571,17 @@ C Backend Options for Contact Process
 
    * - runlang
      - Description
-   * - ``C1a``
-     - Final state only
-   * - ``C1b``
-     - Time series of active fraction
-   * - ``C1c``
-     - Periodic snapshots of configuration
-   * - ``C1d``
-     - Cluster statistics
-   * - ``C1e``
-     - Extended diagnostics
+   * - ``C1``
+     - Final state only (bare digit, no output letter)
+   * - ``C1D``
+     - Active-density time series :math:`\rho(t)` (output letter ``D``)
+   * - ``C1S``
+     - Periodic configuration snapshots (output letter ``S``)
+
+The update-mode variants (``naive``, ``cached``, ``adaptive``, ``gillespie``)
+are selected via the ``--update-mode`` CLI flag on the standalone programs.
+Legacy codes (``C1A``–``C1G``) are still accepted but emit a
+``DeprecationWarning``; prefer the canonical ``C1`` / ``C1D`` / ``C1S`` forms.
 
 ContactProcessSIR
 ~~~~~~~~~~~~~~~~~
@@ -623,7 +623,7 @@ Basic Usage
    voter = VoterModel(
        sg=lattice,
        steps=10000,
-       save_magnetization=True,  # Track magnetization over time
+       savemagn=True,            # Track magnetization over time
        runlang='C1',             # C backend
    )
 
@@ -724,10 +724,10 @@ Command-Line Programs
 .. code-block:: bash
 
    # Ising dynamics on 2D lattice
-   python src/L2D_IsingDynamics.py --side 128 --pflip 0.3 --temp 2.0 --steps 10000
+   python src/L2D_IsingDynamics.py 128 -p 0.3 -T 2.0 -es 10000
 
    # Contact process scan
-   python src/L2D_ContactProcess.py --side 64 --gamma 1.5 --steps 5000
+   python src/L2D_ContactProcess.py 64 --gamma 1.5 --steps 5000
 
 Temperature Sweep Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~
