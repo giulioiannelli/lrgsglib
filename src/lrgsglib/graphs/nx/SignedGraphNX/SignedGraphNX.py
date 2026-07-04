@@ -241,7 +241,7 @@ class SignedGraphNX:
         init_nw_dict: bool = SG_INIT_NW_DICT,
         init_weights_val: Union[float, Dict[str, float]] = SG_INIT_WVAL,
         export_mode: str = SG_EXPORT_M,
-        make_dir_tree: bool = True,
+        make_dir_tree: bool = False,
         imported: bool = SG_IMPORT_ON,
         import_fname: str = '',
         import_mode: str = SG_LOAD_M,
@@ -805,7 +805,7 @@ class SignedGraphNX:
             self,
             path_data: Optional[Path] = None, 
             path_plot: Optional[Path] = None,
-            make_dir_tree: bool = True,
+            make_dir_tree: bool = False,
             exist_ok: bool = True
     ) -> None:
         """
@@ -875,7 +875,12 @@ class SignedGraphNX:
             pfname = Path(p, self.syshapePth)
             setattr(self, f"path_{p}", self.path_sgdata / pfname)
         #
-        if make_dir_tree: self.__init_dirs__(exist_ok)
+        # Lazy by default: graph/spectral dirs are created on first write
+        # (see nx/SignedGraphNX/_exports.py and the eigenspace helpers), so a
+        # bare graph construction no longer scatters empty dirs on disk. Pass
+        # make_dir_tree=True to force eager creation of the whole tree.
+        if make_dir_tree:
+            self.__init_dirs__(exist_ok)
     #
     def __init_reprdict__(self):
         """
