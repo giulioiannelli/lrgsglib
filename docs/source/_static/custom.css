@@ -60,16 +60,17 @@ html[data-theme="dark"] {
 
 .navbar-brand img,
 img.logo__image {
-    height: 2.9rem;
+    height: 2.5rem;
     width: auto;
 }
 
 .navbar-brand .logo__title,
 p.title.logo__title {
-    font-size: 1.45rem;
+    font-size: 1.35rem;
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--pst-color-primary);
+    white-space: nowrap;
 }
 
 /* Rounder, softer code blocks and admonitions */

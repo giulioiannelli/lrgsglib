@@ -184,7 +184,9 @@ html_theme_options = {
         },
     ],
     'use_edit_page_button': True,
-    'header_links_before_dropdown': 6,
+    # Collapse surplus section links into a "More" dropdown so the navbar
+    # stays on a single line (brand + links + switchers + icons).
+    'header_links_before_dropdown': 4,
     'pygments_light_style': 'default',
     'pygments_dark_style': 'monokai',
     # Version switcher. The dropdown is populated from switcher.json fetched
