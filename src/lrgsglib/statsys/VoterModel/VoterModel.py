@@ -998,10 +998,7 @@ class VoterModel(CBackendMixin, BinDynSys):
 
     def _build_c_arglist(self) -> list[str]:
         """Build argument list for unified VoterSimulator."""
-        try:
-            datdir = self.sg.path_sgdata.relative_to(Path.cwd())
-        except ValueError:
-            datdir = self.sg.path_sgdata
+        datdir = self._get_datdir_arg()
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
         self.out_id = self.out_suffix
         self.magn_path = self.dynpath / self.sg.get_p_fname('m', self.out_id)

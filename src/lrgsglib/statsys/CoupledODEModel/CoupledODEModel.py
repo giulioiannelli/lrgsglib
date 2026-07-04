@@ -199,11 +199,7 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
     def _build_c_arglist(self) -> list[str]:
         coupling_str = self.coupling_type if isinstance(self.coupling_type, str) else "custom"
         local_str = self.local_type if isinstance(self.local_type, str) else "custom"
-        try:
-            datdir = self.sg.path_sgdata.relative_to(Path.cwd())
-        except (ValueError, AttributeError):
-            datdir = getattr(self.sg, 'path_sgdata',
-                             getattr(self.sg, 'path_data', Path.cwd()))
+        datdir = self._get_datdir_arg()
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
         return [
             f"{self.N}",

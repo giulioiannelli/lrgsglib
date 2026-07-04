@@ -60,7 +60,7 @@ from .defaults import (
 )
 
 if TYPE_CHECKING:
-    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
 
 
 # ========================================================================

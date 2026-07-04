@@ -380,16 +380,19 @@ class CBackendMixin:
     def _get_datdir_arg(self: "DynSys") -> str:
         """Get data directory path suitable for C program arguments.
 
-        Attempts to make the path relative to cwd for cleaner output.
+        Attempts to make the path relative to cwd for cleaner output. The C
+        binary writes its outputs under this directory; dirs are lazy, so it
+        is created here (the single funnel every C arglist goes through).
 
         Returns
         -------
         str
             Data directory path as string.
         """
+        path = getattr(self.sg, 'path_sgdata',
+                       getattr(self.sg, 'path_data', Path.cwd()))
+        Path(path).mkdir(parents=True, exist_ok=True)
         try:
-            return str(self.sg.path_sgdata.relative_to(Path.cwd()))
-        except (ValueError, AttributeError):
-            # Fall back to absolute path or default
-            path = getattr(self.sg, 'path_sgdata', getattr(self.sg, 'path_data', Path.cwd()))
+            return str(Path(path).relative_to(Path.cwd()))
+        except ValueError:
             return str(path)

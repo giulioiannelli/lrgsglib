@@ -27,7 +27,7 @@ from ..DynSys import DynSys
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ...graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
 
 
 class ContDynSys(DynSys):
@@ -206,6 +206,7 @@ class ContDynSys(DynSys):
         """Write the float64 state to a binary file for C backend."""
         out_suffix = self.run_id or ''
         fname = self.sg.get_p_fname('s', out_suffix=out_suffix)
+        self._ensure_dynpath_exists()
         self.sfout = self.dynpath / fname
         self.s.astype(np.float64).tofile(open(self.sfout, 'wb'))
         self.s_0 = self.s.copy()

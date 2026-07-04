@@ -20,7 +20,7 @@ from ...utils.statsys import boltzmann_factor
 from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
-    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
 
 # Type aliases for cooling/ladder schedules
 CoolingSchedule = Literal["linear", "exponential", "logarithmic", "custom"]

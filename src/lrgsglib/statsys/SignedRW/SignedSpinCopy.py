@@ -19,7 +19,7 @@ from .._solver_engine import get_solver
 from .defaults import SRW_COPY_SOLVER_NAME
 
 if TYPE_CHECKING:
-    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
 
 
 class SignedSpinCopy(BinDynSys):
