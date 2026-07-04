@@ -209,13 +209,13 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
     **Other backends:**
 
-    ========= ========================================
-    backend   description
-    ========= ========================================
-    ``pb_met``  pybind11 Metropolis (fastest, any graph)
-    ``cu_met``  CUDA GPU Metropolis (lattices only)
-    ``py``      Pure-Python Metropolis
-    ========= ========================================
+    ========== ========================================
+    backend    description
+    ========== ========================================
+    ``pb_met`` pybind11 Metropolis (fastest, any graph)
+    ``cu_met`` CUDA GPU Metropolis (lattices only)
+    ``py``     Pure-Python Metropolis
+    ========== ========================================
 
     Parameters
     ----------

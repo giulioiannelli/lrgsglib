@@ -109,7 +109,7 @@ The smallest eigenvalue λ₁ indicates frustration:
 
 - λ₁ = 0: Balanced graph
 - λ₁ < 0: Frustrated graph
-- |λ₁|: Magnitude of frustration
+- ``|λ₁|``: Magnitude of frustration
 
 Triangle Frustration
 ~~~~~~~~~~~~~~~~~~~~

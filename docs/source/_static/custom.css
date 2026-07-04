@@ -26,13 +26,50 @@ html[data-theme="dark"] {
     --pst-color-target: #26224a;
 }
 
-/* Subtle gradient accent on the top navbar brand + a little polish */
+/* ---- Top navbar: shorter + bigger, NumPy-like brand ---- */
 .bd-header {
     box-shadow: 0 1px 6px rgba(91, 75, 255, 0.12);
 }
 
-.navbar-brand img {
-    height: 2.2rem;
+/* Trim vertical padding so the bar is compact, not tall. */
+.bd-header.navbar,
+.bd-header .bd-header__inner {
+    padding-top: 0.15rem;
+    padding-bottom: 0.15rem;
+    min-height: unset;
+}
+
+.bd-header .navbar-header-items,
+.bd-header .navbar-header-items__start,
+.bd-header .navbar-header-items__end {
+    align-items: center;
+}
+
+/* Tighter nav links so they don't inflate the bar height. */
+.bd-header .navbar-nav li.nav-item > a.nav-link {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+/* Bigger logo, name on the side (like numpy). */
+.navbar-brand.logo {
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+    gap: 0.55rem;
+}
+
+.navbar-brand img,
+img.logo__image {
+    height: 2.9rem;
+    width: auto;
+}
+
+.navbar-brand .logo__title,
+p.title.logo__title {
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--pst-color-primary);
 }
 
 /* Rounder, softer code blocks and admonitions */

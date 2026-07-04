@@ -1,10 +1,12 @@
 [build-system]
-requires = ["scikit-build-core>=0.11", "pybind11>=2.12", "numpy>=1.19"]
+requires = ["scikit-build-core>=0.11", "pybind11>=2.12", "numpy>=1.19", "setuptools_scm>=8"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "lrgsglib"
-version = "0.1.0"
+# Version is derived from git tags (setuptools_scm) — see [tool.setuptools_scm]
+# and docs/source/dev_guide/versioning.rst. Tag vX.Y.Z to cut a release.
+dynamic = ["version"]
 authors = [
   { name="Giulio Iannelli", email="giulioiannelli.w@gmail.com" },
   { name="Pablo Villegas", email="pablo.villegas@cref.it" },
@@ -55,6 +57,7 @@ jupyter = [
 docs = [
     "sphinx>=7.0.0",
     "pydata-sphinx-theme>=0.15.0",
+    "sphinx-design>=0.5.0",
     "sphinx-autodoc-typehints>=1.24.0",
     "myst-parser>=2.0.0",
     "sphinx-copybutton>=0.5.0",
@@ -71,6 +74,9 @@ docs = [
 [tool.scikit-build]
 cmake.build-type = "Release"
 wheel.packages = ["src/lrgsglib"]
+# Derive the project version from git tags at build time.
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+sdist.include = ["src/lrgsglib/_version.py"]
 
 # CMake install() DESTINATIONs are already relative to the wheel root (e.g.
 # "lrgsglib/statsys/.../ccore"), so map them onto platlib ("") -> the compiled
@@ -80,6 +86,15 @@ wheel.install-dir = ""
 
 [tool.scikit-build.cmake.define]
 # Pass any custom CMake variables here if needed
+
+[tool.setuptools_scm]
+# Single source of truth = annotated git tags "vX.Y.Z" on this repo.
+#   - on a tag            -> clean release version (e.g. 0.2.0)
+#   - between tags        -> 0.2.1.devN+g<sha>  (the "working" version)
+# _version.py is written into the package so `lrgsglib.__version__` is
+# available at runtime; it is git-ignored (regenerated on every build).
+version_file = "src/lrgsglib/_version.py"
+fallback_version = "0.1.0"
 
 [tool.black]
 line-length = 80

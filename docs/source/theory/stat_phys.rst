@@ -66,7 +66,7 @@ Phase Transition
 In the thermodynamic limit:
 
 - **High T** (β → 0): Disordered, m ≈ 0
-- **Low T** (β → ∞): Ordered, |m| > 0
+- **Low T** (β → ∞): Ordered, :math:`|m| > 0`
 - **Critical T = Tc**: Phase transition
 
 For 2D square lattice without frustration: :math:`T_c = 2/\ln(1+\sqrt{2}) \approx 2.269`

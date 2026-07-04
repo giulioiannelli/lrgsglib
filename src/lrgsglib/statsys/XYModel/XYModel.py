@@ -113,7 +113,7 @@ class XYModel(CBackendMixin, VecDynSys):
         return E
 
     def magnetisation(self, s: NDArray | None = None) -> float:
-        """Order parameter m = |1/N sum exp(i*theta)|."""
+        """Order parameter ``m = |1/N sum exp(i*theta)|``."""
         if s is None:
             s = self.s
         return float(np.abs(np.mean(np.exp(1j * s))))

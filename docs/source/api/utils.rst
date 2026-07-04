@@ -67,18 +67,10 @@ Information Theory
 Basic Utilities
 ---------------
 
-Linear Algebra
-~~~~~~~~~~~~~~
+Arithmetic
+~~~~~~~~~~
 
-.. automodule:: lrgsglib.utils.basic.linalg
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Matrix Operations
-~~~~~~~~~~~~~~~~~
-
-.. automodule:: lrgsglib.utils.basic.matrix
+.. automodule:: lrgsglib.utils.basic.arithmetic
    :members:
    :undoc-members:
    :show-inheritance:
@@ -91,42 +83,10 @@ Calculus
    :undoc-members:
    :show-inheritance:
 
-Probability
-~~~~~~~~~~~
+I/O Operations
+~~~~~~~~~~~~~~
 
-.. automodule:: lrgsglib.utils.basic.probability
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Numeric Operations
-~~~~~~~~~~~~~~~~~~
-
-.. automodule:: lrgsglib.utils.basic.numeric
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Arithmetic
-~~~~~~~~~~
-
-.. automodule:: lrgsglib.utils.basic.arithmetic
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Geometry
-~~~~~~~~
-
-.. automodule:: lrgsglib.utils.basic.geometry
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Functions
-~~~~~~~~~
-
-.. automodule:: lrgsglib.utils.basic.functions
+.. automodule:: lrgsglib.utils.basic.io
    :members:
    :undoc-members:
    :show-inheritance:
@@ -139,10 +99,26 @@ Iterables
    :undoc-members:
    :show-inheritance:
 
-Signals
+Linear Algebra
+~~~~~~~~~~~~~~
+
+.. automodule:: lrgsglib.utils.basic.linalg
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Matrix
+~~~~~~
+
+.. automodule:: lrgsglib.utils.basic.matrix
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Numeric
 ~~~~~~~
 
-.. automodule:: lrgsglib.utils.basic.signals
+.. automodule:: lrgsglib.utils.basic.numeric
    :members:
    :undoc-members:
    :show-inheritance:
@@ -155,26 +131,26 @@ Paths
    :undoc-members:
    :show-inheritance:
 
-I/O Operations
-~~~~~~~~~~~~~~
+Probability
+~~~~~~~~~~~
 
-.. automodule:: lrgsglib.utils.basic.io
+.. automodule:: lrgsglib.utils.basic.probability
    :members:
    :undoc-members:
    :show-inheritance:
 
-Common Utilities
-~~~~~~~~~~~~~~~~
+Signals
+~~~~~~~
 
-.. automodule:: lrgsglib.utils.basic.common
+.. automodule:: lrgsglib.utils.basic.signals
    :members:
    :undoc-members:
    :show-inheritance:
 
-Operations
-~~~~~~~~~~
+Strings
+~~~~~~~
 
-.. automodule:: lrgsglib.utils.basic.operations
+.. automodule:: lrgsglib.utils.basic.strings
    :members:
    :undoc-members:
    :show-inheritance:

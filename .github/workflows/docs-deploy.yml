@@ -1,0 +1,104 @@
+name: Deploy Documentation
+
+# Multi-version docs deploy to GitHub Pages.
+#   - push to main  -> builds the in-development docs, published under /dev/
+#   - push a tag v* -> builds that release, published under /<version>/
+# On every run switcher.json is regenerated from the repo's git tags and the
+# site root redirects to the newest release (see docs/gen_switcher.py).
+#
+# Requirements (one-time): enable GitHub Pages for this repo with source
+# "Deploy from a branch" -> branch "gh-pages" / root.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Allow the workflow to push to the gh-pages branch.
+permissions:
+  contents: write
+
+# Never let two deploys race on the gh-pages branch.
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
+
+env:
+  # Deployed site root. Change if the Pages URL differs.
+  BASE_URL: https://giulioiannelli.github.io/lrgsglib
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0   # full history + tags: setuptools_scm + switcher need them
+
+      - name: Set up environment (graph-tool + build toolchain)
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: lrgsgenv.yml
+          cache-environment: true
+
+      - name: Install package + docs dependencies
+        shell: bash -el {0}
+        run: pip install -e ".[docs]"
+
+      - name: Determine version slug
+        id: slug
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "slug=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "slug=dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build documentation
+        shell: bash -el {0}
+        env:
+          DOCS_BASEURL: ${{ env.BASE_URL }}
+          DOCS_SWITCHER_URL: ${{ env.BASE_URL }}/switcher.json
+          DOCS_VERSION_MATCH: ${{ steps.slug.outputs.slug }}
+        run: cd docs && make html
+
+      - name: Check out existing gh-pages (to preserve other versions)
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+        continue-on-error: true
+
+      - name: Assemble multi-version site
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          SLUG="${{ steps.slug.outputs.slug }}"
+          mkdir -p gh-pages
+          rm -rf "gh-pages/${SLUG}"
+          mkdir -p "gh-pages/${SLUG}"
+          cp -r docs/build/html/. "gh-pages/${SLUG}/"
+          # Regenerate the version list from git tags.
+          python docs/gen_switcher.py --base-url "${BASE_URL}" \
+              --output gh-pages/switcher.json
+          # Root index redirects to the newest release (or dev if no tags yet).
+          STABLE=$(python - <<'PY'
+          import json
+          data = json.load(open("gh-pages/switcher.json"))
+          pref = [e for e in data if e.get("preferred")]
+          print((pref[0] if pref else data[0])["version"])
+          PY
+          )
+          printf '<!doctype html><meta http-equiv="refresh" content="0; url=./%s/">\n' \
+              "$STABLE" > gh-pages/index.html
+          touch gh-pages/.nojekyll
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages
+          publish_branch: gh-pages
+          force_orphan: true

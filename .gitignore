@@ -38,3 +38,6 @@ data/plot/*/
 /tools/bash/unconfig_env.sh
 
 test/.tmp/
+
+# setuptools_scm generated version file
+src/lrgsglib/_version.py

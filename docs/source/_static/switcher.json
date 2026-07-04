@@ -1,0 +1,13 @@
+[
+  {
+    "name": "dev",
+    "version": "dev",
+    "url": "https://giulioiannelli.github.io/lrgsglib/dev/"
+  },
+  {
+    "name": "0.1.0 (stable)",
+    "version": "0.1.0",
+    "url": "https://giulioiannelli.github.io/lrgsglib/0.1.0/",
+    "preferred": true
+  }
+]

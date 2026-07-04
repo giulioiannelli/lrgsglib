@@ -167,11 +167,3 @@ Signed Random Walks
    :members:
    :undoc-members:
    :show-inheritance:
-
-Common Utilities
-----------------
-
-.. automodule:: lrgsglib.statsys.common
-   :members:
-   :undoc-members:
-   :show-inheritance:

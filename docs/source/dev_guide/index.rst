@@ -10,6 +10,7 @@ This guide is for developers who want to contribute to lrgsglib or understand it
    build_system
    c_extensions
    testing
+   versioning
    contributing
    style_guide
 

@@ -1,11 +1,73 @@
-lrgsglib Documentation
-======================
+lrgsglib documentation
+=======================
 
-**lrgsglib** is a Python library implementing the theoretical tools of the **Laplacian Renormalization Group for Signed Graphs**. It provides utilities for building signed networks, running renormalization flows, and simulating statistical physics models such as the Ising model, contact process, and voter dynamics.
+**Version**: |release|
 
-The library combines high-level Python interfaces with performance-critical C/C++ extensions for efficient simulations on large networks.
+**Useful links**:
+`Installation <installation.html>`_ |
+`Source repository <https://github.com/giulioiannelli/lrgsglib>`_ |
+`Issue tracker <https://github.com/giulioiannelli/lrgsglib/issues>`_
 
-Project Scope
+**lrgsglib** is a Python library implementing the theoretical tools of the
+**Laplacian Renormalization Group for Signed Graphs**: building signed
+networks, running renormalization flows, and simulating statistical-physics
+models (Ising, contact process, voter dynamics) on top of them. It pairs
+high-level Python interfaces with performance-critical C/C++ extensions for
+efficient simulations on large networks.
+
+.. grid:: 1 2 2 2
+    :gutter: 3
+    :class-container: sd-text-center sd-mt-4
+
+    .. grid-item-card::
+        :link: quickstart
+        :link-type: doc
+        :class-card: sd-rounded-3 sd-shadow-md
+
+        :octicon:`rocket;3em;sd-text-primary`
+
+        **Getting started**
+        ^^^
+        New to lrgsglib? Install it, build your first signed graph and run a
+        simulation in a handful of lines.
+
+    .. grid-item-card::
+        :link: user_guide/index
+        :link-type: doc
+        :class-card: sd-rounded-3 sd-shadow-md
+
+        :octicon:`book;3em;sd-text-primary`
+
+        **User guide**
+        ^^^
+        In-depth tutorials on graphs, lattices, spectral analysis, dynamics
+        and plotting, with worked examples.
+
+    .. grid-item-card::
+        :link: api/index
+        :link-type: doc
+        :class-card: sd-rounded-3 sd-shadow-md
+
+        :octicon:`code-square;3em;sd-text-primary`
+
+        **API reference**
+        ^^^
+        Detailed description of every module, class and function: graphs,
+        statsys dynamics, spectral utilities and bindings.
+
+    .. grid-item-card::
+        :link: dev_guide/index
+        :link-type: doc
+        :class-card: sd-rounded-3 sd-shadow-md
+
+        :octicon:`tools;3em;sd-text-primary`
+
+        **Developer guide**
+        ^^^
+        Architecture, the build system, C/C++ extensions, testing and the
+        contribution conventions.
+
+Project scope
 -------------
 
 This project analyzes (signed) graph structure through the lens of the
@@ -21,96 +83,56 @@ so users can simulate stochastic processes on the same underlying graphs
 and compare how diffusion modes influence macroscopic behavior. For speed,
 several dynamics have optimized C backends.
 
-Project Layout
---------------
-
-- ``src/lrgsglib`` contains the reusable Python package (graph objects,
-  dynamics classes, utilities, plotting helpers, and bindings).
-- ``src/`` contains standalone or compound programs used to compute or
-  reproduce specific experiments and data products.
-- ``src/lrgsglib/statsys/<Model>/ccore/`` hosts performance-critical C/C++
-  extensions co-located with their Python dynamics classes.
-
-.. note::
-   This documentation is for version |release|. For the latest development version,
-   see the `GitHub repository <https://github.com/giulioiannelli/lrgsglib>`_.
-
 Features
 --------
 
-- **Signed Graph Generation**: Create and manipulate signed networks (Erdős-Rényi, lattices, custom topologies)
-- **Spectral Analysis**: Compute Laplacian spectra, frustration measures, and renormalization flows
-- **Statistical Physics Simulations**: Efficient implementations of Ising dynamics, contact process, and voter models
-- **Lattice Support**: 2D and 3D lattices with various boundary conditions
-- **Visualization**: Specialized plotting functions for signed graphs and lattices
-- **C/C++ Extensions**: High-performance simulators built with pybind11
+- **Signed graph generation**: create and manipulate signed networks (Erdős-Rényi, lattices, custom topologies)
+- **Spectral analysis**: compute Laplacian spectra, frustration measures, and renormalization flows
+- **Statistical-physics simulations**: efficient implementations of Ising dynamics, contact process, and voter models
+- **Lattice support**: 2D and 3D lattices with various boundary conditions
+- **Visualization**: specialized plotting functions for signed graphs and lattices
+- **C/C++ extensions**: high-performance simulators built with pybind11
 
-Quick Links
------------
-
-- **Installation** - :doc:`installation` - Get started with installation instructions
-- **Quick Start** - :doc:`quickstart` - Jump right in with a quick tutorial
-- **User Guide** - :doc:`user_guide/index` - Comprehensive tutorials and examples
-- **API Reference** - :doc:`api/index` - Detailed documentation of all modules
-
-Table of Contents
------------------
+.. Hidden top-level toctrees: they populate the navbar dropdowns and the
+   (expandable) left sidebar without printing a long list on this page. Each
+   section index owns the deeper pages, so nav expands one level at a time.
 
 .. toctree::
-   :maxdepth: 2
+   :hidden:
    :caption: Getting Started
 
    installation
    quickstart
 
 .. toctree::
-   :maxdepth: 2
+   :hidden:
    :caption: User Guide
 
    user_guide/index
-   user_guide/graphs
-   user_guide/lattices
-   user_guide/spectral
-   user_guide/dynamics
-   user_guide/plotting
-   user_guide/examples
 
 .. toctree::
-   :maxdepth: 2
+   :hidden:
    :caption: API Reference
 
    api/index
 
 .. toctree::
-   :maxdepth: 2
+   :hidden:
    :caption: Developer Guide
 
    dev_guide/index
-   dev_guide/architecture
-   dev_guide/build_system
-   dev_guide/c_extensions
-   dev_guide/testing
-   dev_guide/contributing
-   dev_guide/style_guide
 
 .. toctree::
-   :maxdepth: 2
+   :hidden:
    :caption: Theory
 
    theory/index
 
 .. toctree::
-   :maxdepth: 1
+   :hidden:
    :caption: Additional Information
 
    changelog
-
-Indices and tables
-------------------
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
 
 Citation
 --------

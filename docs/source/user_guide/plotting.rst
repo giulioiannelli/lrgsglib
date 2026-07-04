@@ -454,7 +454,7 @@ For time-evolving visualizations, create animations:
    plt.show()
 
 High-Level Animation API
-^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For convenience, lrgsglib provides a high-level animation API. The simplest
 entry points are the ``lat.animate`` / ``lat.plot`` accessors on the lattice

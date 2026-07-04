@@ -59,7 +59,8 @@ class SierpinskiNX(FractalGraphNX):
     Notes
     -----
     The Sierpinski gasket has exact spectral solutions. The eigenvalues
-    follow a hierarchical pattern related to the self-similar structure.
+    follow a hierarchical pattern related to the self-similar structure
+    [RammalToulouse1983]_.
 
     The spectral dimension d_s approx 1.365 (for gasket) governs diffusion:
     - Mean square displacement ~ t^(2/d_w) where d_w = ln(5)/ln(2)
@@ -67,8 +68,9 @@ class SierpinskiNX(FractalGraphNX):
 
     References
     ----------
-    .. [1] Rammal, R., & Toulouse, G. (1983). Random walks on fractal
-           structures and percolation clusters. J. Physique Lett., 44(1), 13-22.
+    .. [RammalToulouse1983] Rammal, R., & Toulouse, G. (1983). Random walks on
+           fractal structures and percolation clusters. J. Physique Lett.,
+           44(1), 13-22.
     """
 
     # Spectral dimension for standard Sierpinski gasket

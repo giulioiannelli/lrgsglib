@@ -24,6 +24,22 @@ except Exception:
     release = '0.1.0'
 version = '.'.join(release.split('.')[:2])
 
+# -- Version switcher wiring -------------------------------------------------
+# Base URL where the built site (and its _static/switcher.json) is served.
+# Local livehtml serves at the root of 127.0.0.1:8000; CI overrides this with
+# the deployed site root so the dropdown links resolve in production.
+DOCS_BASEURL = os.environ.get('DOCS_BASEURL', 'http://127.0.0.1:8000').rstrip('/')
+
+# Which switcher.json entry to highlight. A dev/unreleased build (setuptools_scm
+# emits e.g. "0.1.1.dev3+g<sha>") maps to the "dev" entry; a clean tagged
+# release maps to its "MAJOR.MINOR" entry. Override with DOCS_VERSION_MATCH.
+if 'DOCS_VERSION_MATCH' in os.environ:
+    switcher_version_match = os.environ['DOCS_VERSION_MATCH']
+elif 'dev' in release or '+' in release:
+    switcher_version_match = 'dev'
+else:
+    switcher_version_match = version
+
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
@@ -41,6 +57,7 @@ extensions = [
 
     # Third-party extensions
     'sphinx_copybutton',            # Copy button for code blocks
+    'sphinx_design',                # Grid cards / panels for the landing page
     'myst_parser',                  # Markdown support
     'sphinxcontrib.bibtex',         # Bibliography support
 ]
@@ -75,7 +92,9 @@ napoleon_include_special_with_doc = True
 napoleon_use_admonition_for_examples = False
 napoleon_use_admonition_for_notes = False
 napoleon_use_admonition_for_references = False
-napoleon_use_ivar = False
+napoleon_use_ivar = True  # render Attributes as :ivar: fields, not duplicate
+                          # object descriptions (avoids clashes with the real
+                          # annotated class attributes documented by autodoc)
 napoleon_use_param = True
 napoleon_use_rtype = True
 napoleon_preprocess_types = False
@@ -133,16 +152,21 @@ html_css_files = ['custom.css']
 # Branding
 html_logo = '_static/logo.svg'
 html_favicon = '_static/favicon.svg'
-html_title = f'{project} {version}'
+html_title = project
 
 # Theme options (pydata-sphinx-theme)
 html_theme_options = {
-    # Start in the reader's OS preference, offer a light/dark toggle.
-    'default_mode': 'auto',
-    # Top navbar: title on the left, icons on the right.
+    # Logo image + library name shown side-by-side in the navbar.
+    'logo': {
+        'image_light': '_static/logo.svg',
+        'image_dark': '_static/logo.svg',
+        'text': 'lrgsglib',
+        'alt_text': 'lrgsglib',
+    },
+    # Top navbar: brand left, section nav center, switchers + icons right.
     'navbar_start': ['navbar-logo'],
     'navbar_center': ['navbar-nav'],
-    'navbar_end': ['theme-switcher', 'navbar-icon-links'],
+    'navbar_end': ['version-switcher', 'theme-switcher', 'navbar-icon-links'],
     'navbar_persistent': ['search-button'],
     # Left sidebar: show two levels expanded, collapse deeper.
     'show_nav_level': 1,
@@ -163,6 +187,17 @@ html_theme_options = {
     'header_links_before_dropdown': 6,
     'pygments_light_style': 'default',
     'pygments_dark_style': 'monokai',
+    # Version switcher. The dropdown is populated from switcher.json fetched
+    # at `json_url` by the browser, so it must be an ABSOLUTE URL reachable
+    # from every page. Locally it defaults to the livehtml server root; in CI
+    # set DOCS_BASEURL to the deployed site root (see docs.yml / release_docs).
+    'switcher': {
+        'json_url': os.environ.get(
+            'DOCS_SWITCHER_URL', f"{DOCS_BASEURL}/_static/switcher.json"),
+        'version_match': switcher_version_match,
+    },
+    # Don't fail the build if the switcher JSON is momentarily unreachable.
+    'check_switcher': False,
 }
 
 # HTML context — powers the "Edit on GitHub" button.

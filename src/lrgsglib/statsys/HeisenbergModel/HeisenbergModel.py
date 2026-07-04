@@ -142,7 +142,7 @@ class HeisenbergModel(CBackendMixin, VecDynSys):
         return E
 
     def magnetisation(self, s: NDArray | None = None) -> float:
-        """Magnitude of mean spin: |1/N sum n_i|."""
+        """Magnitude of mean spin: ``|1/N sum n_i|``."""
         if s is None:
             s = self.s
         m_vec = np.mean(s, axis=0)

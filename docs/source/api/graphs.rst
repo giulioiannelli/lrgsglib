@@ -230,6 +230,7 @@ NetworkX Module
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 graph-tool Module
 ~~~~~~~~~~~~~~~~~
@@ -238,6 +239,7 @@ graph-tool Module
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Module Structure
 ----------------

@@ -53,23 +53,26 @@ Parameters
 The cascade is controlled by four seed probabilities that define the
 hierarchical edge probabilities:
 
-+-------------+----------------------------------------------+
-| Parameter   | Description                                  |
-+=============+==============================================+
-| ``p1``      | Top-left quadrant probability (default: 0.9) |
-+-------------+----------------------------------------------+
-| ``p2``      | Top-right quadrant probability (default: 0.7)|
-+-------------+----------------------------------------------+
-| ``p3``      | Bottom-left quadrant probability (default: 0.7)|
-+-------------+----------------------------------------------+
-| ``p4``      | Bottom-right quadrant probability (default: 0.5)|
-+-------------+----------------------------------------------+
-| ``fraction``| Fraction of nodes to sample (default: 1.0)   |
-+-------------+----------------------------------------------+
-| ``iterations``| Number of cascade iterations (default: 10) |
-+-------------+----------------------------------------------+
-| ``variant`` | Algorithm: "exp_clocks" (fast) or "standard" |
-+-------------+----------------------------------------------+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Parameter
+     - Description
+   * - ``p1``
+     - Top-left quadrant probability (default: 0.9)
+   * - ``p2``
+     - Top-right quadrant probability (default: 0.7)
+   * - ``p3``
+     - Bottom-left quadrant probability (default: 0.7)
+   * - ``p4``
+     - Bottom-right quadrant probability (default: 0.5)
+   * - ``fraction``
+     - Fraction of nodes to sample (default: 1.0)
+   * - ``iterations``
+     - Number of cascade iterations (default: 10)
+   * - ``variant``
+     - Algorithm: "exp_clocks" (fast) or "standard"
 
 Algorithm Variants
 ^^^^^^^^^^^^^^^^^^
@@ -154,19 +157,22 @@ Basic Usage
 Parameters
 ^^^^^^^^^^
 
-+-------------+----------------------------------------------+
-| Parameter   | Description                                  |
-+=============+==============================================+
-| ``N``       | Target number of nodes                       |
-+-------------+----------------------------------------------+
-| ``k``       | Number of Kronecker product iterations       |
-+-------------+----------------------------------------------+
-| ``pij``     | Custom initial measure matrix (optional)     |
-+-------------+----------------------------------------------+
-| ``m``       | Dimension of auto-generated measure matrix   |
-+-------------+----------------------------------------------+
-| ``symmetric``| Symmetrize the initial measure             |
-+-------------+----------------------------------------------+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Parameter
+     - Description
+   * - ``N``
+     - Target number of nodes
+   * - ``k``
+     - Number of Kronecker product iterations
+   * - ``pij``
+     - Custom initial measure matrix (optional)
+   * - ``m``
+     - Dimension of auto-generated measure matrix
+   * - ``symmetric``
+     - Symmetrize the initial measure
 
 Custom Initial Measure
 ^^^^^^^^^^^^^^^^^^^^^^

@@ -131,7 +131,7 @@ Key Results
 ~~~~~~~~~~~
 
 - **Balanced graphs**: All eigenvalues ≥ 0, λ₁ = 0
-- **Frustrated graphs**: Negative eigenvalues, |λ₁| measures frustration
+- **Frustrated graphs**: Negative eigenvalues, ``|λ₁|`` measures frustration
 - **Spectral gap**: Controls relaxation times: τ ∼ 1/Δλ
 - **Localization**: Frustration can localize eigenvectors
 

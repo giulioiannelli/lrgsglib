@@ -45,7 +45,7 @@ def quantum_walk_probabilities(
 ) -> NDArray:
     """Compute quantum walk probability distribution at time t.
 
-    Returns P_j(t) = |<j|U(t)|i>|^2 starting from ``init_node``.
+    Returns ``P_j(t) = |<j|U(t)|i>|^2`` starting from ``init_node``.
     """
     if not hasattr(self, "eigv") or not hasattr(self, "eigV"):
         raise ValueError(

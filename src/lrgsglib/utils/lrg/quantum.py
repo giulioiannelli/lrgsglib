@@ -13,13 +13,16 @@ Key differences:
 - Classical: eigenvalues decay as exp(-τλ) → spreads diffusively
 - Quantum: eigenvalues oscillate as exp(-itλ) → coherent interference
 
-Quantum density matrix evolution:
+Quantum density matrix evolution::
+
     ρ(t) = U(t) ρ₀ U†(t)
 
-Quantum probability distribution (localized initial state at node i):
+Quantum probability distribution (localized initial state at node i)::
+
     P_j(t) = |⟨j|U(t)|i⟩|² = |∑ₙ exp(-itλₙ) vₙ(j) vₙ(i)|²
 
-Interference effects arise from cross-terms between eigenmodes:
+Interference effects arise from cross-terms between eigenmodes::
+
     P(j,t) = ∑ₙ |vₙ(j)|²|vₙ(i)|²  +  2∑ₙ<ₘ cos((λₙ-λₘ)t) vₙ(j)vₙ(i)vₘ(j)vₘ(i)
              ^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
              Classical (incoherent)     Quantum interference (coherent)
@@ -263,7 +266,7 @@ def quantum_probability_distribution(
     init_node: int,
 ) -> NDArray:
     """
-    Compute quantum walk probability distribution P_j(t) = |⟨j|U(t)|i⟩|².
+    Compute quantum walk probability distribution ``P_j(t) = |⟨j|U(t)|i⟩|²``.
 
     Parameters
     ----------
@@ -279,14 +282,15 @@ def quantum_probability_distribution(
     Returns
     -------
     probabilities : NDArray, shape (N,)
-        Quantum probability at each node: P_j(t) = |amplitude_j(t)|²
+        Quantum probability at each node: ``P_j(t) = |amplitude_j(t)|²``
 
     Notes
     -----
-    The quantum amplitude at node j starting from node i:
+    The quantum amplitude at node j starting from node i::
+
         ψ_j(t) = ⟨j|U(t)|i⟩ = ∑ₙ exp(-i*t*λₙ) vₙ(j) vₙ(i)
 
-    Probability: P_j(t) = |ψ_j(t)|²
+    Probability: ``P_j(t) = |ψ_j(t)|²``
 
     Probability is conserved: ∑_j P_j(t) = 1
 
@@ -338,7 +342,8 @@ def compute_quantum_coherence(rho_t: NDArray) -> float:
     - C = 0: Classical (diagonal density matrix)
     - C > 0: Quantum (off-diagonal coherences present)
 
-    For a pure state |ψ⟩ = ∑_i c_i |i⟩:
+    For a pure state ``|ψ⟩ = ∑_i c_i |i⟩``:
+
     - Maximally coherent: C ≈ N-1 (equal superposition)
     - Minimally coherent: C = 0 (localized state after long time)
 
@@ -455,7 +460,7 @@ def quantum_classical_divergence(
 
     Notes
     -----
-    Computes D = ||ρ_Q(t) - ρ_C(τ)||
+    Computes ``D = ||ρ_Q(t) - ρ_C(τ)||``
 
     When divergence is large, quantum interference effects dominate.
     At long times, quantum and classical may converge (depends on graph).
@@ -536,7 +541,7 @@ def compute_interference_visibility(
     Returns
     -------
     transition_prob : NDArray
-        |⟨j|U(t)|i⟩|² for each t in t_array.
+        ``|⟨j|U(t)|i⟩|²`` for each t in t_array.
     visibility : float
         Fringe visibility: V = (P_max - P_min) / (P_max + P_min)
 
@@ -783,16 +788,21 @@ def compute_ldos_entropy(
     eigenvector-based spatial detection into a single object parametrized
     by diffusion time tau.
 
-    The local density of states (LDOS) at node i is:
+    The local density of states (LDOS) at node i is::
+
         rho_i(E) = sum_k |v_k(i)|^2 delta(E - lambda_k)
 
-    The LDOS-weighted entropy at scale tau is:
-        S(tau, i) = -sum_k w_k(tau,i) log w_k(tau,i)
-    where:
-        w_k(tau, i) = |v_k(i)|^2 exp(-tau|lambda_k|) / Z_i(tau)
-        Z_i(tau) = sum_k |v_k(i)|^2 exp(-tau|lambda_k|)
+    The LDOS-weighted entropy at scale tau is::
 
-    Reductions:
+        S(tau, i) = -sum_k w_k(tau,i) log w_k(tau,i)
+
+    where::
+
+        w_k(tau, i) = |v_k(i)|^2 exp(-tau|lambda_k|) / Z_i(tau)
+        Z_i(tau)    = sum_k |v_k(i)|^2 exp(-tau|lambda_k|)
+
+    Reductions::
+
         - tau -> 0: S(0, i) = S_spec(i) = -sum_k |v_k(i)|^2 log|v_k(i)|^2
           (spectral entropy, purely eigenvector-based)
         - Uniform eigenvectors: S(tau, i) = S_classical(tau) for all i
@@ -816,10 +826,10 @@ def compute_ldos_entropy(
           dominates
         - Large tau: low-eigenvalue modes dominate -> scale detection
     use_abs : bool, optional
-        If True (default), use |lambda_k| in the Boltzmann factor.
+        If True (default), use ``|lambda_k|`` in the Boltzmann factor.
         This ensures the function works for signed graphs where
         eigenvalues may be negative.  For unsigned graphs (all
-        lambda >= 0), |lambda| = lambda and the result is identical
+        lambda >= 0), ``|lambda| = lambda`` and the result is identical
         to the classical LRG.
 
     Returns
@@ -833,12 +843,13 @@ def compute_ldos_entropy(
 
     Notes
     -----
-    The global entropy is computed from eigenvalues only:
+    The global entropy is computed from eigenvalues only::
+
         p_k(tau) = exp(-tau|lambda_k|) / sum_m exp(-tau|lambda_m|)
         S_global = -sum_k p_k log p_k / log(N)
 
     This is identical to the classical von Neumann entropy of the LRG
-    because sum_i |v_k(i)|^2 = 1 (eigenvector normalization), so the
+    because ``sum_i |v_k(i)|^2 = 1`` (eigenvector normalization), so the
     eigenvectors drop out when the LDOS is averaged over nodes.
 
     The difference S_global - <S_local> measures the spatial
@@ -911,7 +922,7 @@ def compute_ldos_specific_heat(
     tau_grid : NDArray, shape (n_tau,)
         Array of tau values (typically log-spaced).
     use_abs : bool, optional
-        Use |lambda| in Boltzmann weights (default True).
+        Use ``|lambda|`` in Boltzmann weights (default True).
 
     Returns
     -------

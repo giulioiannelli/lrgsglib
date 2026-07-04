@@ -172,7 +172,8 @@ class SignedGraphNX:
     The signed Laplacian is defined as L_s = D_s - A, where D_s is the
     diagonal matrix of absolute degree values and A is the signed adjacency
     matrix. This formulation is particularly useful for studying frustration,
-    balance theory, and spin-glass dynamics on networks [1]_ [2]_.
+    balance theory, and spin-glass dynamics on networks [Cucuringu2016]_
+    [SK1978]_.
 
     Edge weights are expected to be ±1 or arbitrary real values. Negative
     edges represent antagonistic or frustrated interactions, while positive
@@ -218,12 +219,12 @@ class SignedGraphNX:
     
     References
     ----------
-    .. [1] Cucuringu, M. (2016). "Sync-Rank: Robust Ranking, Constrained 
-           Ranking and Rank Aggregation via Eigenvector and SDP 
-           Synchronization." IEEE Transactions on Network Science and 
+    .. [Cucuringu2016] Cucuringu, M. (2016). "Sync-Rank: Robust Ranking,
+           Constrained Ranking and Rank Aggregation via Eigenvector and SDP
+           Synchronization." IEEE Transactions on Network Science and
            Engineering.
-    .. [2] Kirkpatrick, S., & Sherrington, D. (1978). "Infinite-ranged models 
-           of spin-glasses." Physical Review B, 17(11), 4384.
+    .. [SK1978] Kirkpatrick, S., & Sherrington, D. (1978). "Infinite-ranged
+           models of spin-glasses." Physical Review B, 17(11), 4384.
     """
     sgpathn = "signed_graph"
     

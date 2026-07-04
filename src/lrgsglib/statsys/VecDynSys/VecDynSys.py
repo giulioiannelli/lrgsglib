@@ -91,10 +91,10 @@ class VecDynSys(DynSys):
 
         Modes
         -----
-        uniform / random: Random uniform in [0, q) for discrete,
-                          U(0, 2*pi) for continuous.
-        zero / zeros:     All zeros.
-        custom:           User-supplied array.
+        - ``uniform`` / ``random``: random uniform in ``[0, q)`` for discrete,
+          ``U(0, 2*pi)`` for continuous.
+        - ``zero`` / ``zeros``: all zeros.
+        - ``custom``: user-supplied array.
         """
         match self.ic:
             case "uniform" | "random" | "rand":
