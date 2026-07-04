@@ -169,8 +169,10 @@ def test_capability_errors_at_setup(tmp_path):
     sg = make_lattice(tmp_path)
     with pytest.raises(NotImplementedError):
         IsingMetropolis(sg, T=1.0, upd_mode="sync")
-    with pytest.raises(NotImplementedError):
-        IsingMetropolis(sg, T=1.0, move="wolff")
+    # move='wolff' is wired since Phase 2; its axis interactions are the
+    # capability surface now (full coverage in test_ising_moves.py).
+    with pytest.raises(ValueError):
+        IsingMetropolis(sg, T=1.0, move="wolff", rule="glauber")
     with pytest.raises(ValueError):
         IsingMetropolis(sg, T=1.0, rule="glauber", tie_flip_p=0.5)
     with pytest.raises(ValueError):

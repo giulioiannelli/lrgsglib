@@ -19,7 +19,12 @@ from lrgsglib.statsys.ContactProcess.defaults import (
     CP_OBS_DENSITY,
     CP_OBS_SNAPSHOTS,
 )
-from lrgsglib.statsys.IsingDynamics import IsingMetropolis
+from lrgsglib.statsys.IsingDynamics import (
+    IsingCEM,
+    IsingMetropolis,
+    IsingParallelTempering,
+    IsingSimulatedAnnealing,
+)
 from lrgsglib.statsys.IsingDynamics.defaults import (
     ISING_OBS_ENERGY,
     ISING_OBS_MAGN,
@@ -95,10 +100,84 @@ def _ising_case() -> ParityCase:
     )
 
 
+def _ising_sa_case() -> ParityCase:
+    # SA's horizon is schedule-derived (run() rejects steps=): shape the
+    # schedule so the record count equals PARITY_STEPS.
+    return ParityCase(
+        name="ising_sa",
+        make_model=lambda sg: IsingSimulatedAnnealing(
+            sg,
+            T_init=3.0,
+            T_final=0.1,
+            schedule="linear",
+            n_temperatures=PARITY_STEPS,
+            steps_per_T=1,
+            runlang="py",
+            savedisk=True,
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False),
+        expected_observables=(ISING_OBS_ENERGY, ISING_OBS_MAGN),
+        expected_lengths={
+            ISING_OBS_ENERGY: PARITY_STEPS,
+            ISING_OBS_MAGN: PARITY_STEPS,
+        },
+    )
+
+
+def _ising_pt_case() -> ParityCase:
+    return ParityCase(
+        name="ising_pt",
+        make_model=lambda sg: IsingParallelTempering(
+            sg,
+            n_replicas=3,
+            T_min=0.5,
+            T_max=3.0,
+            steps_per_exchange=1,
+            n_exchanges=PARITY_STEPS,
+            runlang="py",
+            savedisk=True,
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False),
+        expected_observables=(ISING_OBS_ENERGY, ISING_OBS_MAGN),
+        expected_lengths={
+            ISING_OBS_ENERGY: PARITY_STEPS,
+            ISING_OBS_MAGN: PARITY_STEPS,
+        },
+    )
+
+
+def _ising_cem_case() -> ParityCase:
+    return ParityCase(
+        name="ising_cem",
+        make_model=lambda sg: IsingCEM(
+            sg,
+            n_modes=4,
+            pop_size=8,
+            n_iter=PARITY_STEPS,
+            restarts=1,
+            greedy=False,
+            runlang="py",
+            savedisk=True,
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False),
+        expected_observables=(ISING_OBS_ENERGY, ISING_OBS_MAGN),
+        expected_lengths={
+            ISING_OBS_ENERGY: PARITY_STEPS,
+            ISING_OBS_MAGN: PARITY_STEPS,
+        },
+    )
+
+
 CASES = {
     "voter": _voter_case,
     "contact_process_sir": _cp_case,
     "ising_metropolis": _ising_case,
+    "ising_sa": _ising_sa_case,
+    "ising_pt": _ising_pt_case,
+    "ising_cem": _ising_cem_case,
 }
 
 
