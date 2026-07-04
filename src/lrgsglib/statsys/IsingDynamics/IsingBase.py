@@ -138,8 +138,13 @@ class IsingBase(RunHostMixin, CBackendMixin, BinDynSys):
         self._nbr_J: np.ndarray | None = None
         self._nbr_ptr: np.ndarray | None = None
         self._nbr_rows: np.ndarray | None = None
+        self._edge_u: np.ndarray | None = None
+        self._edge_v: np.ndarray | None = None
+        self._edge_J: np.ndarray | None = None
         # Running extensive energy, advanced by the engine's per-sweep ΔE.
         self._e_running: float | None = None
+        # The engine of the last run (per-move extras live on it).
+        self._engine: Any = None
         self.sini: np.ndarray | None = None
         self.reset_observables()
 
@@ -192,6 +197,11 @@ class IsingBase(RunHostMixin, CBackendMixin, BinDynSys):
         self._nbr_J = np.asarray(J, dtype=np.float64)
         self._nbr_ptr = ptr
         self._nbr_rows = rows
+        # Each undirected edge once (u < v), for the SW bond sweep.
+        upper = rows < idx
+        self._edge_u = rows[upper]
+        self._edge_v = idx[upper]
+        self._edge_J = self._nbr_J[upper]
 
     # ------------------------------------------------------------------
     # Substrate contract (consumed by statsys._thermal.ThermalEngine)
@@ -214,11 +224,64 @@ class IsingBase(RunHostMixin, CBackendMixin, BinDynSys):
     def order_parameter(self) -> float:
         return self.magnetization()
 
-    def bond_activation(self, u: int, v: int) -> float:
-        raise NotImplementedError(
-            "Cluster moves (wolff/sw) land in a later phase of the Ising "
-            "refactor; bond_activation is not wired yet."
+    # --- cluster contract (statsys._thermal.ClusterSubstrate) ---
+    def neighbor_indices(self, nd: int) -> np.ndarray:
+        lo, hi = self._nbr_ptr[nd], self._nbr_ptr[nd + 1]
+        return self._nbr_idx[lo:hi]
+
+    def bond_satisfaction(self, nd: int) -> tuple[np.ndarray, np.ndarray]:
+        """Neighbors of *nd* and each bond's satisfaction ``J_ij s_i s_j``
+        (> 0 = satisfied = activatable by the FK rule)."""
+        lo, hi = self._nbr_ptr[nd], self._nbr_ptr[nd + 1]
+        idx = self._nbr_idx[lo:hi]
+        sat = (
+            self._nbr_J[lo:hi]
+            * float(self.s[nd])
+            * self.s[idx].astype(np.float64, copy=False)
         )
+        return idx, sat
+
+    def edge_satisfactions(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        s = self.s.astype(np.float64, copy=False)
+        sat = self._edge_J * s[self._edge_u] * s[self._edge_v]
+        return self._edge_u, self._edge_v, sat
+
+    def flip_cluster(self, nodes: np.ndarray) -> float:
+        """Flip *nodes* in place; ΔE comes from the boundary bonds only
+        (within-cluster bonds are invariant under a joint flip) plus the
+        field term: ``ΔE = 2 Σ_{i∈C} s_i (Σ_{j∉C} J_ij s_j + h_i)``."""
+        nodes = np.asarray(nodes, dtype=np.intp)
+        mask = np.zeros(self.N, dtype=np.bool_)
+        mask[nodes] = True
+        s = self.s
+        field = np.asarray(self.field, dtype=np.float64)
+        dE = 0.0
+        for nd in nodes:
+            lo, hi = self._nbr_ptr[nd], self._nbr_ptr[nd + 1]
+            idx = self._nbr_idx[lo:hi]
+            out = ~mask[idx]
+            coupling_out = float(self._nbr_J[lo:hi][out] @ s[idx[out]])
+            dE += 2.0 * float(s[nd]) * (coupling_out + float(field[nd]))
+        self.s[nodes] = -self.s[nodes]
+        return dE
+
+    # --- exchange contract (statsys._thermal.ExchangeSubstrate) ---
+    def swap_delta_E(self, u: int, v: int) -> float:
+        """ΔE of swapping opposite spins at *u*, *v* (= flipping both):
+        ``ΔE_u + ΔE_v − 4 J_uv s_u s_v`` — the shared bond is invariant
+        under the joint flip, so its two single-flip contributions cancel."""
+        dE_u = self.delta_E(u, int(-self.s[u]))
+        dE_v = self.delta_E(v, int(-self.s[v]))
+        lo, hi = self._nbr_ptr[u], self._nbr_ptr[u + 1]
+        row = self._nbr_idx[lo:hi]
+        pos = np.flatnonzero(row == v)
+        J_uv = float(self._nbr_J[lo:hi][pos[0]]) if len(pos) else 0.0
+        return dE_u + dE_v - 4.0 * J_uv * float(self.s[u]) * float(self.s[v])
+
+    def commit_swap(self, u: int, v: int) -> None:
+        self.s[u], self.s[v] = self.s[v], self.s[u]
 
     # ------------------------------------------------------------------
     # Energy (same J as delta_E, by construction)
@@ -379,6 +442,7 @@ class IsingBase(RunHostMixin, CBackendMixin, BinDynSys):
         (the Voter/CP cadence), advance one compiled sweep, track the energy
         incrementally from the sweep's ΔE (no per-sweep full recompute)."""
         engine = self._make_engine()
+        self._engine = engine  # scheme leaves mirror per-move extras off it
         sweep = engine.compile_step()
         self._e_running = self.total_energy()
         iterator = (

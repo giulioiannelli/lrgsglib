@@ -90,3 +90,69 @@ ISING_SNAPSHOTS_FBASE: str = "sout"
 # trajectory would exceed the byte cap.
 ISING_SNAPSHOT_EVERY_DEFAULT: int = 1
 ISING_SNAPSHOT_MAX_BYTES: int = 512 * 1024 * 1024  # 512 MiB, as CP
+
+# ---------------------------------------------------------------------------
+# Simulated annealing (IsingSimulatedAnnealing; legacy ctor values preserved)
+# ---------------------------------------------------------------------------
+# Cooling schedules: 'linear' interpolates T_init → T_final over the stages;
+# 'exponential' is T_init · rate^k (T_final unused, as in the legacy code);
+# 'logarithmic' is T_init / ln(2 + k).
+ISING_SA_SCHEDULES: tuple[str, ...] = (
+    "linear",
+    "exponential",
+    "logarithmic",
+)
+ISING_SA_SCHEDULE_DEFAULT: str = "exponential"
+ISING_SA_T_INIT_DEFAULT: float = 10.0
+ISING_SA_T_FINAL_DEFAULT: float = 0.01
+ISING_SA_COOLING_RATE_DEFAULT: float = 0.95
+ISING_SA_N_TEMPERATURES_DEFAULT: int = 100
+ISING_SA_STEPS_PER_T_DEFAULT: int = 100
+
+# External-field construction axis on the annealing scheme (plan §10):
+# 'uniform' uses whatever field vector the user passed (default zero);
+# 'spectral' builds the softmax-weighted eigenvector field at init (the
+# legacy TFCA field) via statsys._spectral.build_spectral_field.
+ISING_FIELD_MODES: tuple[str, ...] = ("uniform", "spectral")
+ISING_FIELD_MODE_DEFAULT: str = "uniform"
+
+# ---------------------------------------------------------------------------
+# Spectral capability (move='spectral', field='spectral', IsingCEM subspace)
+# ---------------------------------------------------------------------------
+ISING_SPECTRAL_N_MODES_DEFAULT: int = 40
+# Softmax temperature + magnitude of the spectral (TFCA) field.
+ISING_SPECTRAL_TAU_DEFAULT: float = 1.0
+ISING_SPECTRAL_FIELD_STRENGTH_DEFAULT: float = 1.0
+# Spectral Metropolis move: initial per-mode proposal width, adaptation
+# cadence (proposals between σ updates), and the optional T=0 greedy polish.
+ISING_SPECTRAL_SIGMA_INIT_DEFAULT: float = 0.15
+ISING_SPECTRAL_CHUNK_SIZE_DEFAULT: int = 5000
+ISING_SPECTRAL_POLISH_DEFAULT: bool = True
+ISING_SPECTRAL_POLISH_SWEEPS_DEFAULT: int = 50
+
+# ---------------------------------------------------------------------------
+# Parallel tempering (IsingParallelTempering; legacy ctor values preserved)
+# ---------------------------------------------------------------------------
+ISING_PT_N_REPLICAS_DEFAULT: int = 8
+ISING_PT_T_MIN_DEFAULT: float = 0.5
+ISING_PT_T_MAX_DEFAULT: float = 5.0
+# Ladder spacings: 'geometric' = T_min (T_max/T_min)^(r/(R−1)) (uniform in
+# ln T — the standard choice); 'linear' = uniform in T.
+ISING_PT_LADDERS: tuple[str, ...] = ("geometric", "linear")
+ISING_PT_LADDER_DEFAULT: str = "geometric"
+ISING_PT_STEPS_PER_EXCHANGE_DEFAULT: int = 10
+ISING_PT_N_EXCHANGES_DEFAULT: int = 1000
+
+# ---------------------------------------------------------------------------
+# Cross-entropy method (IsingCEM; legacy ctor values preserved)
+# ---------------------------------------------------------------------------
+ISING_CEM_ITER_DEFAULT: int = 30
+ISING_CEM_POP_SIZE_DEFAULT: int = 128
+ISING_CEM_ELITE_FRAC_DEFAULT: float = 0.2
+ISING_CEM_INIT_SIGMA_DEFAULT: float = 1.2
+ISING_CEM_SMOOTHING_DEFAULT: float = 0.6
+ISING_CEM_SIGMA_FLOOR_DEFAULT: float = 1e-3
+ISING_CEM_SIGMA_CEILING_DEFAULT: float = 5.0
+ISING_CEM_RESTARTS_DEFAULT: int = 10
+ISING_CEM_GREEDY_DEFAULT: bool = True
+ISING_CEM_GREEDY_SWEEPS_DEFAULT: int = 120
