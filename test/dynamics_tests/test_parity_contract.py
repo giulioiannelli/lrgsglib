@@ -19,6 +19,12 @@ from lrgsglib.statsys.ContactProcess.defaults import (
     CP_OBS_DENSITY,
     CP_OBS_SNAPSHOTS,
 )
+from lrgsglib.statsys.HeisenbergModel import HeisenbergMetropolis
+from lrgsglib.statsys.HeisenbergModel.defaults import (
+    HEISENBERG_OBS_ENERGY,
+    HEISENBERG_OBS_MAGN,
+    HEISENBERG_OBS_SNAPSHOTS,
+)
 from lrgsglib.statsys.IsingDynamics import (
     IsingCEM,
     IsingMetropolis,
@@ -212,6 +218,34 @@ def _potts_case() -> ParityCase:
     )
 
 
+def _heisenberg_case() -> ParityCase:
+    return ParityCase(
+        name="heisenberg_metropolis",
+        make_model=lambda sg: HeisenbergMetropolis(
+            sg,
+            T=1.0,
+            runlang="py",
+            savedisk=True,
+            observables=(
+                HEISENBERG_OBS_ENERGY,
+                HEISENBERG_OBS_MAGN,
+                HEISENBERG_OBS_SNAPSHOTS,
+            ),
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False, steps=PARITY_STEPS),
+        expected_observables=(
+            HEISENBERG_OBS_ENERGY,
+            HEISENBERG_OBS_MAGN,
+            HEISENBERG_OBS_SNAPSHOTS,
+        ),
+        expected_lengths={
+            HEISENBERG_OBS_ENERGY: PARITY_STEPS,
+            HEISENBERG_OBS_MAGN: PARITY_STEPS,
+        },
+    )
+
+
 def _xy_case() -> ParityCase:
     return ParityCase(
         name="xy_metropolis",
@@ -241,6 +275,7 @@ CASES = {
     "ising_cem": _ising_cem_case,
     "potts_metropolis": _potts_case,
     "xy_metropolis": _xy_case,
+    "heisenberg_metropolis": _heisenberg_case,
 }
 
 
