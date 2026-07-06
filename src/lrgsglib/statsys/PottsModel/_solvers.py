@@ -4,6 +4,11 @@ Each solver is a stateless wrapper that invokes the corresponding kernel method,
 preserving the exact call sequence the old ``run()`` if/elif chain used so that
 dispatching through the registry is behavior-preserving -- the registry just
 becomes the single front door. Mirrors ``VoterModel/_solvers.py``.
+
+ONE registry key ("potts") serves BOTH the legacy ``PottsModel`` and the new
+scheme classes (``PottsBase`` leaves): the solver polymorphs on the instance
+(statsys unification D-B4), exactly as ``IsingDynamics/_solvers.py`` does.
+The C-subprocess backend stays legacy-only (decision D-B5, frozen argv).
 """
 
 from __future__ import annotations
@@ -20,6 +25,14 @@ if TYPE_CHECKING:
 __all__ = ["register_potts_solvers"]
 
 
+def _is_new_style(model) -> bool:
+    """True for the new scheme classes (PottsBase & leaves); the ONE registry
+    key polymorphs on the instance (D-B4)."""
+    from .PottsBase import PottsBase
+
+    return isinstance(model, PottsBase)
+
+
 class _PottsPySolver:
     """Pure-Python Metropolis reference loop."""
 
@@ -28,7 +41,18 @@ class _PottsPySolver:
     def supports(self, model: "PottsModel") -> None:
         return None
 
-    def execute(self, model: "PottsModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "PottsModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
+        if _is_new_style(model):
+            # New scheme classes (PottsBase leaves): the compiled shared
+            # ThermalEngine loop. ONE registry key, instance polymorphism.
+            model._sample_py(tqdm_on=tqdm_on, verbose=verbose)
+            return
         model.run_py(verbose=verbose)
 
     def is_available(self) -> bool:
@@ -41,14 +65,28 @@ class _PottsPbSolver:
     backend = SolverBackend.PB
 
     def supports(self, model: "PottsModel") -> None:
+        if _is_new_style(model):
+            # New scheme classes: the leaf validates what the compiled
+            # kernel can faithfully represent (hard capability errors).
+            model._pb_check_supported()
         return None
 
-    def execute(self, model: "PottsModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "PottsModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
+        if _is_new_style(model):
+            model._run_pb(tqdm_on=tqdm_on, verbose=verbose)
+            return
         model._run_pybind()
 
     def is_available(self) -> bool:
         try:
             from .ccore import _potts_native  # noqa: F401
+
             return True
         except Exception:
             return False
@@ -60,9 +98,23 @@ class _PottsCSolver:
     backend = SolverBackend.C
 
     def supports(self, model: "PottsModel") -> None:
+        if _is_new_style(model):
+            # Hard capability error (invariant #3): the C subprocess stays
+            # on the untouched legacy class (D-B5) — never a silent fallback.
+            raise NotImplementedError(
+                "The C-subprocess backend is not wired for the new Potts "
+                "scheme classes; use runlang='py'/'pb' or the legacy "
+                "PottsModel."
+            )
         return None
 
-    def execute(self, model: "PottsModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "PottsModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model.build_cprogram_command()
         model.run_cprogram(verbose)
 
