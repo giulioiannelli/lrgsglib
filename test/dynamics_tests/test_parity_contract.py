@@ -30,6 +30,12 @@ from lrgsglib.statsys.IsingDynamics.defaults import (
     ISING_OBS_MAGN,
     ISING_OBS_SNAPSHOTS,
 )
+from lrgsglib.statsys.PottsModel import PottsMetropolis
+from lrgsglib.statsys.PottsModel.defaults import (
+    POTTS_OBS_ENERGY,
+    POTTS_OBS_MAGN,
+    POTTS_OBS_SNAPSHOTS,
+)
 from lrgsglib.statsys.VoterModel import VoterModel
 from lrgsglib.statsys.VoterModel.defaults import VOTER_OBS_MAGN, VOTER_OBS_SOUT
 
@@ -171,6 +177,35 @@ def _ising_cem_case() -> ParityCase:
     )
 
 
+def _potts_case() -> ParityCase:
+    return ParityCase(
+        name="potts_metropolis",
+        make_model=lambda sg: PottsMetropolis(
+            sg,
+            q=3,
+            T=2.0,
+            runlang="py",
+            savedisk=True,
+            observables=(
+                POTTS_OBS_ENERGY,
+                POTTS_OBS_MAGN,
+                POTTS_OBS_SNAPSHOTS,
+            ),
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False, steps=PARITY_STEPS),
+        expected_observables=(
+            POTTS_OBS_ENERGY,
+            POTTS_OBS_MAGN,
+            POTTS_OBS_SNAPSHOTS,
+        ),
+        expected_lengths={
+            POTTS_OBS_ENERGY: PARITY_STEPS,
+            POTTS_OBS_MAGN: PARITY_STEPS,
+        },
+    )
+
+
 CASES = {
     "voter": _voter_case,
     "contact_process_sir": _cp_case,
@@ -178,6 +213,7 @@ CASES = {
     "ising_sa": _ising_sa_case,
     "ising_pt": _ising_pt_case,
     "ising_cem": _ising_cem_case,
+    "potts_metropolis": _potts_case,
 }
 
 
