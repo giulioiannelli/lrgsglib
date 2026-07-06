@@ -12,6 +12,7 @@ Metropolis 1953, M2 Glauber 1963, M4 Newman & Barkema 1999).
 
 from __future__ import annotations
 
+from .._csr import COUPLING_NORMS
 from .._thermal import (  # noqa: F401  (re-exported vocabulary)
     ASYNC_ORDERS,
     THERMAL_RULES,
@@ -59,8 +60,9 @@ ISING_TIE_FLIP_DEFAULT: float = TIE_FLIP_PRESETS["standard"]
 # observable both derive from it. 'raw': J_ij = w_ij. 'sym': J_ij =
 # w_ij/sqrt(deg_i deg_j) (normalized-adjacency Ising). 'avg': J_ij =
 # w_ij (1/deg_i + 1/deg_j) (the per-site-averaged semantics today's
-# calc_full_energy uses, done consistently).
-ISING_COUPLING_NORMS: tuple[str, ...] = ("raw", "sym", "avg")
+# calc_full_energy uses, done consistently). The vocabulary is single-sourced
+# in the shared coupling builder (statsys._csr).
+ISING_COUPLING_NORMS: tuple[str, ...] = COUPLING_NORMS
 ISING_COUPLING_NORM_DEFAULT: str = "raw"
 
 # Temperature (k_B = 1 units). 0.0 = zero-temperature (quench) dynamics —

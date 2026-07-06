@@ -35,7 +35,7 @@ import tqdm
 
 from ...config.const import BIN
 from .._c_backend import CBackendMixin
-from .._csr import build_graph_csr
+from .._csr import build_coupling_csr
 from .._observables import ObservableSet, RowTrajectory, ScalarSeries
 from .._run_host import RunHostMixin
 from ..BinDynSys import BinDynSys
@@ -184,24 +184,15 @@ class IsingBase(RunHostMixin, CBackendMixin, BinDynSys):
     def _ensure_couplings(self) -> None:
         if self._nbr_J is not None:
             return
-        idx, wts, ptr = build_graph_csr(self.sg, self.N)
-        deg = np.diff(ptr)
-        rows = np.repeat(np.arange(self.N, dtype=np.int64), deg)
-        if self.coupling_norm == "raw":
-            J = wts
-        elif self.coupling_norm == "sym":
-            J = wts / np.sqrt(deg[rows] * deg[idx])
-        else:  # 'avg' — per-site-averaged, self-symmetrized
-            J = wts * (1.0 / deg[rows] + 1.0 / deg[idx])
-        self._nbr_idx = idx
-        self._nbr_J = np.asarray(J, dtype=np.float64)
-        self._nbr_ptr = ptr
-        self._nbr_rows = rows
+        c = build_coupling_csr(self.sg, self.N, self.coupling_norm)
+        self._nbr_idx = c.idx
+        self._nbr_J = c.J
+        self._nbr_ptr = c.ptr
+        self._nbr_rows = c.rows
         # Each undirected edge once (u < v), for the SW bond sweep.
-        upper = rows < idx
-        self._edge_u = rows[upper]
-        self._edge_v = idx[upper]
-        self._edge_J = self._nbr_J[upper]
+        self._edge_u = c.edge_u
+        self._edge_v = c.edge_v
+        self._edge_J = c.edge_J
 
     # ------------------------------------------------------------------
     # Substrate contract (consumed by statsys._thermal.ThermalEngine)

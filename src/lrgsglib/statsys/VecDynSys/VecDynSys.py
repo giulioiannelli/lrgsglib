@@ -56,12 +56,19 @@ class VecDynSys(DynSys):
         q: int = 2,
         discrete: bool = True,
         T: float = 1.0,
+        savedisk: bool = True,
         **kw: Any,
     ):
         super().__init__(sg, **kw)
         self.q = q
         self.discrete = discrete
         self.T = T
+        # Master switch for on-disk persistence of enabled observables
+        # (same semantics as BinDynSys.savedisk): subclasses on the shared
+        # observable lifecycle (PottsBase, ...) gate their streams on it;
+        # inert for subclasses that do not act on it (legacy PottsModel,
+        # XYModel, ...).
+        self.savedisk = savedisk
         self._state_dtype = np.int32 if discrete else np.float64
         self._adj: NDArray | None = None
 

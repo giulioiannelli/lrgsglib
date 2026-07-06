@@ -128,9 +128,15 @@ class ClusterSubstrate(ThermalSubstrate, Protocol):
     """
 
     def bond_satisfaction(self, nd: int) -> tuple[np.ndarray, np.ndarray]:
-        """``(neighbor_indices, satisfactions)`` of site *nd*; a bond's
-        satisfaction is its satisfied-coupling magnitude (> 0 activatable,
-        <= 0 never activated)."""
+        """``(neighbor_indices, satisfactions)`` of site *nd*.
+
+        A bond's satisfaction is HALF the energy cost of breaking it
+        (> 0 activatable, <= 0 never activated), so the engines' FK
+        activation ``p = 1 − e^{−2·sat/T}`` equals ``1 − e^{−cost/T}``:
+        Ising ``sat = J_ij s_i s_j`` (breaking a satisfied ±1 bond costs
+        ``2J``); Potts ``sat = J_ij δ(σ_i, σ_j)/2`` (breaking a same-label
+        bond costs ``J`` — ref M5's ``p = 1 − e^{−βJ}``).
+        """
         ...
 
     def edge_satisfactions(
