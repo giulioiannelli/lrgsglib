@@ -26,7 +26,8 @@ __all__ = ["register_contact_process_solvers"]
 
 
 class _CpPySolver:
-    """Pure-Python loop (SIR scalar sweep / EI numba lambda-cache, via ``run_py``)."""
+    """Pure-Python loop (SIR scalar sweep / EI numba lambda-cache, selected
+    polymorphically via ``_sample_py``)."""
 
     backend = SolverBackend.PY
 
@@ -35,7 +36,9 @@ class _CpPySolver:
 
     def execute(self, model: "ContactProcessBase", *, tqdm_on: bool = False,
                 verbose: bool = False) -> None:
-        model.run_py(tqdm_on)
+        # Bare sampling loop: the run() front door (RunHostMixin) owns the
+        # output lifecycle around the solver.
+        model._sample_py(tqdm_on=tqdm_on)
 
     def is_available(self) -> bool:
         return True

@@ -42,11 +42,10 @@ from numba import njit
 
 from .._c_backend import CBackendMixin
 from .._observables import ObservableSet, RowTrajectory, ScalarSeries
+from .._run_host import RunHostMixin
 from .._solver import SolverBackend
-from .._solver_engine import get_solver
 from ..BinDynSys import BinDynSys
 from ...config.const import BIN
-from ...utils.tools.chronometer import time_function_accumulate
 from .defaults import (
     CP_DENSITY_FBASE,
     CP_OBS_DENSITY,
@@ -178,7 +177,7 @@ def _activation_tanh(lambda_val: float) -> float:
     return (1.0 + np.tanh(lambda_val)) / 2.0
 
 
-class ContactProcessBase(CBackendMixin, BinDynSys):
+class ContactProcessBase(RunHostMixin, CBackendMixin, BinDynSys):
     """Shared utilities for contact-process dynamics.
 
     Parameters
@@ -192,6 +191,7 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
     """
 
     dyn_UVclass = "contact_process"
+    solver_name = CP_SOLVER_NAME
 
     # CBackendMixin configuration
     _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
@@ -377,19 +377,24 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
     # ------------------------------------------------------------------
     # Python dynamics
     # ------------------------------------------------------------------
-    def contact_sampling(self, tqdm_on: bool) -> None:
+    def _sample_py(self, tqdm_on: bool = False, verbose: bool = False) -> None:
+        """Bare Python sampling loop (no output lifecycle): the run() front
+        door (RunHostMixin) opens/persists the outputs around the solver."""
         dsNstep = self.dsNstep()
         nodes = np.arange(self.N)
         iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
-        self._begin_outputs()
         for _ in iterator:
             self._record()
             np.random.shuffle(nodes)
             dsNstep(nodes)
-        self._persist_observables()
 
     def run_py(self, tqdm_on: bool = False) -> None:
-        self.contact_sampling(tqdm_on)
+        """Direct Python-backend entry (the registry front door is run())."""
+        self._begin_outputs()
+        try:
+            self._sample_py(tqdm_on=tqdm_on)
+        finally:
+            self._persist_observables()
 
     # ------------------------------------------------------------------
     # C backend integration (via CBackendMixin)
@@ -443,41 +448,11 @@ class ContactProcessBase(CBackendMixin, BinDynSys):
         raise NotImplementedError("Subclasses must provide C argument lists.")
 
     # ------------------------------------------------------------------
-    # Public interface
+    # Public interface: run() comes from RunHostMixin (the shared skeleton
+    # this class's hand-copied version was hoisted into) — resolve the
+    # backend, fetch the registered solver, validate, open outputs, execute,
+    # persist, clean the C subprocess's transient exports.
     # ------------------------------------------------------------------
-    def _resolve_backend(self) -> SolverBackend:
-        """Map the runlang code to a solver family: a leading ``C`` selects the C
-        subprocess (``C0`` SIR / ``C1*`` EI), anything else the Python loop."""
-        return (
-            SolverBackend.C if self.runlang.upper().startswith("C")
-            else SolverBackend.PY
-        )
-
-    @time_function_accumulate(auto_log=False)
-    def run(
-        self,
-        tqdm_on: bool = True,
-        steps: int | None = None,
-        simref: float | None = None,
-        verbose: bool = False,
-        clean_export: bool = True,
-    ) -> None:
-        """Run contact-process dynamics through the shared solver registry.
-
-        Behaviour-preserving front door for the old runlang if/else: the runlang
-        resolves to a backend (``py`` Python loop / ``C`` subprocess), the
-        registry hands back its solver, and the C subprocess's transient export
-        files are cleaned afterwards when ``clean_export`` is set.
-        """
-        backend = self._resolve_backend()
-        solver = get_solver(CP_SOLVER_NAME, backend)
-        solver.supports(self)
-        self.check_attribute()
-        self.initialize_run_parameters(steps, simref)
-        solver.execute(self, tqdm_on=tqdm_on, verbose=verbose)
-        if backend is SolverBackend.C and clean_export:
-            self.remove_run_c_files()
-            self.sg.remove_exported_files()
 
 
 class ContactProcessSIR(ContactProcessBase):
@@ -901,15 +876,15 @@ class ContactProcessEI(ContactProcessBase):
             f"got '{self.runlang}'"
         )
 
-    def run_py(self, tqdm_on: bool = False) -> None:
-        """Python backend: the numba-optimized lambda-cache sweep (overrides the
-        base scalar ``contact_sampling`` loop).
+    def _sample_py(self, tqdm_on: bool = False, verbose: bool = False) -> None:
+        """Python backend: the numba-optimized lambda-cache sweep (overrides
+        the base scalar loop). Bare loop — the run() front door (RunHostMixin)
+        opens/persists the outputs around the solver.
 
         Run setup (``check_attribute`` / ``initialize_run_parameters``) is
         performed by the inherited ``run()`` dispatcher before this is invoked.
         """
         iterator = tqdm.tqdm(range(self.steps)) if tqdm_on else range(self.steps)
-        self._begin_outputs()
         for _ in iterator:
             self._record()
             # numba-optimized sweep (random node selection + incremental lambda)
@@ -926,7 +901,6 @@ class ContactProcessEI(ContactProcessBase):
                 int(self.active_state),
                 int(self.inactive_state),
             )
-        self._persist_observables()
 
 
 def ContactProcess(sg: "SignedGraph", *args: Any, **kwargs: Any):
