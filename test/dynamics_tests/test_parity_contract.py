@@ -36,6 +36,12 @@ from lrgsglib.statsys.IsingDynamics.defaults import (
     ISING_OBS_MAGN,
     ISING_OBS_SNAPSHOTS,
 )
+from lrgsglib.statsys.MultiSpeciesModel import MultiSpeciesMetropolis
+from lrgsglib.statsys.MultiSpeciesModel.defaults import (
+    MULTISPEC_OBS_ENERGY,
+    MULTISPEC_OBS_MAGN,
+    MULTISPEC_OBS_SNAPSHOTS,
+)
 from lrgsglib.statsys.PottsModel import PottsMetropolis
 from lrgsglib.statsys.PottsModel.defaults import (
     POTTS_OBS_ENERGY,
@@ -218,6 +224,36 @@ def _potts_case() -> ParityCase:
     )
 
 
+def _multispec_case() -> ParityCase:
+    return ParityCase(
+        name="multispec_metropolis",
+        make_model=lambda sg: MultiSpeciesMetropolis(
+            sg,
+            species=2,
+            q_per_species=3,
+            T=1.0,
+            runlang="py",
+            savedisk=True,
+            observables=(
+                MULTISPEC_OBS_ENERGY,
+                MULTISPEC_OBS_MAGN,
+                MULTISPEC_OBS_SNAPSHOTS,
+            ),
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False, steps=PARITY_STEPS),
+        expected_observables=(
+            MULTISPEC_OBS_ENERGY,
+            MULTISPEC_OBS_MAGN,
+            MULTISPEC_OBS_SNAPSHOTS,
+        ),
+        expected_lengths={
+            MULTISPEC_OBS_ENERGY: PARITY_STEPS,
+            MULTISPEC_OBS_MAGN: PARITY_STEPS,
+        },
+    )
+
+
 def _heisenberg_case() -> ParityCase:
     return ParityCase(
         name="heisenberg_metropolis",
@@ -276,6 +312,7 @@ CASES = {
     "potts_metropolis": _potts_case,
     "xy_metropolis": _xy_case,
     "heisenberg_metropolis": _heisenberg_case,
+    "multispec_metropolis": _multispec_case,
 }
 
 
