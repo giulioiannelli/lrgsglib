@@ -38,6 +38,12 @@ from lrgsglib.statsys.PottsModel.defaults import (
 )
 from lrgsglib.statsys.VoterModel import VoterModel
 from lrgsglib.statsys.VoterModel.defaults import VOTER_OBS_MAGN, VOTER_OBS_SOUT
+from lrgsglib.statsys.XYModel import XYMetropolis
+from lrgsglib.statsys.XYModel.defaults import (
+    XY_OBS_ENERGY,
+    XY_OBS_MAGN,
+    XY_OBS_SNAPSHOTS,
+)
 
 from .parity_harness import (
     PARITY_SEED,
@@ -206,6 +212,26 @@ def _potts_case() -> ParityCase:
     )
 
 
+def _xy_case() -> ParityCase:
+    return ParityCase(
+        name="xy_metropolis",
+        make_model=lambda sg: XYMetropolis(
+            sg,
+            T=1.0,
+            runlang="py",
+            savedisk=True,
+            observables=(XY_OBS_ENERGY, XY_OBS_MAGN, XY_OBS_SNAPSHOTS),
+            seed=PARITY_SEED,
+        ),
+        run_kwargs=dict(tqdm_on=False, steps=PARITY_STEPS),
+        expected_observables=(XY_OBS_ENERGY, XY_OBS_MAGN, XY_OBS_SNAPSHOTS),
+        expected_lengths={
+            XY_OBS_ENERGY: PARITY_STEPS,
+            XY_OBS_MAGN: PARITY_STEPS,
+        },
+    )
+
+
 CASES = {
     "voter": _voter_case,
     "contact_process_sir": _cp_case,
@@ -214,6 +240,7 @@ CASES = {
     "ising_pt": _ising_pt_case,
     "ising_cem": _ising_cem_case,
     "potts_metropolis": _potts_case,
+    "xy_metropolis": _xy_case,
 }
 
 
