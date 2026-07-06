@@ -788,6 +788,18 @@ class KawasakiEngine:
         neighbor_indices = substrate.neighbor_indices
         swap_delta_E = substrate.swap_delta_E
         commit_swap = substrate.commit_swap
+        # Identity-swap check, resolved ONCE for the state shape: scalar
+        # states (Ising/Potts/XY) compare with ==; vector states (a row per
+        # site, e.g. Heisenberg) need an element-wise comparison.
+        if getattr(substrate.s, "ndim", 1) > 1:
+
+            def same_state(a, b) -> bool:
+                return bool(np.array_equal(a, b))
+
+        else:
+
+            def same_state(a, b) -> bool:
+                return a == b
 
         def sweep() -> float:
             s = substrate.s
@@ -798,7 +810,7 @@ class KawasakiEngine:
                 if len(nbrs) == 0:
                     continue
                 v = int(nbrs[rng.randint(0, len(nbrs))])
-                if s[u] == s[v]:
+                if same_state(s[u], s[v]):
                     continue  # identity swap
                 dE = swap_delta_E(u, v)
                 p = p_accept(dE)
