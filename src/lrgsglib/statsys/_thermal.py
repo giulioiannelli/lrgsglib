@@ -22,7 +22,11 @@ Citations (``.agents/ref/00-REFERENCES.md`` §"MCMC / spin-dynamics kernels"):
   conditional Gibbs distribution — for a two-state (±1) substrate this
   coincides with the Glauber acceptance, so both names resolve to the same
   kernel here.
-- ``upd_mode='gillespie'`` → M3 (Bortz–Kalos–Lebowitz 1975), Phase-2 wiring.
+- ``upd_mode='gillespie'`` → M3 (Bortz–Kalos–Lebowitz 1975): rejection-free
+  continuous-time kinetics from the per-site rate table.
+- ``upd_mode='sync'`` → M4 (Newman & Barkema 1999): sublattice-parallel
+  updates — color the interaction graph, update one independent set at a
+  time from the frozen state (checkerboard on a bipartite lattice).
 """
 
 from __future__ import annotations
@@ -53,10 +57,13 @@ __all__ = [
 #: Acceptance rules (see the module-docstring citation map).
 THERMAL_RULES: tuple[str, ...] = ("metropolis", "glauber", "heatbath")
 
-#: Update schedules (Ising plan §9): random-sequential single-site,
-#: checkerboard / sublattice-parallel, and rejection-free continuous-time
-#: (BKL) kinetics. Phase 1 implements ``async``; ``sync``/``gillespie`` are
-#: validated at setup and land with the native backends (Phase 2).
+#: Update schedules (Ising plan §9): ``async`` = random-sequential
+#: single-site attempts; ``sync`` = sublattice-parallel (greedy-color the
+#: interaction graph once, then update one independent set at a time from the
+#: frozen state — ref M4); ``gillespie`` = rejection-free continuous-time BKL
+#: kinetics (ref M3; one recorded step = one unit of time = one
+#: sweep-equivalent). ``sync``/``gillespie`` need ``neighbor_indices`` on the
+#: substrate and take no async ``order``.
 UPDATE_MODES: tuple[str, ...] = ("async", "sync", "gillespie")
 
 #: Site-visit orders for ``upd_mode='async'`` (plan §3b): ``random`` picks a
@@ -326,9 +333,11 @@ class ThermalEngine:
     rule : {'metropolis', 'glauber', 'heatbath'}
         Acceptance rule.
     upd_mode : {'async', 'sync', 'gillespie'}
-        Update schedule. Phase 1 implements ``async``; the others raise
-        ``NotImplementedError`` here at setup (hard capability error, no
-        silent fallback).
+        Update schedule (see :data:`UPDATE_MODES`): random-sequential
+        attempts, sublattice-parallel synchronous updates (ref M4), or
+        rejection-free continuous-time BKL kinetics (ref M3). ``sync`` and
+        ``gillespie`` require ``substrate.neighbor_indices`` and take no
+        async ``order`` (setup-time capability errors, no silent fallback).
     T : float
         Temperature (``k_B = 1``); mutable between sweeps via :attr:`T` +
         :meth:`compile_step` re-resolution (annealing recompiles per stage).
@@ -358,11 +367,21 @@ class ThermalEngine:
                 f"Unknown upd_mode {upd_mode!r}; expected one of {UPDATE_MODES}."
             )
         if upd_mode != "async":
-            raise NotImplementedError(
-                f"upd_mode={upd_mode!r} is not wired yet (Phase 2: 'sync' with "
-                "the native backends, 'gillespie' via the shared CTMC core, "
-                "ref M3). Use upd_mode='async'."
-            )
+            # sync (sublattice coloring) and gillespie (BKL rate refresh)
+            # both walk the adjacency, so the substrate must expose it. The
+            # arrays behind it are only touched at compile_step time (after
+            # the model's init), so hasattr is the right setup-time check.
+            if not hasattr(substrate, "neighbor_indices"):
+                raise NotImplementedError(
+                    f"upd_mode={upd_mode!r} needs the substrate to expose "
+                    f"neighbor_indices(nd); {type(substrate).__name__} "
+                    "does not."
+                )
+            if order != "random":
+                raise ValueError(
+                    "order applies to upd_mode='async' only; "
+                    f"upd_mode={upd_mode!r} has no site-visit order."
+                )
         if order not in ASYNC_ORDERS:
             raise ValueError(
                 f"Unknown async order {order!r}; expected one of {ASYNC_ORDERS}."
@@ -376,15 +395,26 @@ class ThermalEngine:
         self.order = order
         self.tie_flip_p = tie_flip_p
         self.rng = rng if rng is not None else np.random
+        #: Greedy color classes (sync mode only), cached across recompiles.
+        self.color_classes: list[np.ndarray] | None = None
 
     def compile_step(self) -> Callable[[], float]:
-        """Resolve (rule × T × order) ONCE into a sweep callable.
+        """Resolve (rule × T × upd_mode × order) ONCE into a sweep callable.
 
-        The returned zero-argument function performs ``N`` single-site update
-        attempts and returns the total energy change of the sweep, so the
-        caller can track the running energy incrementally instead of
-        recomputing the full Hamiltonian every sweep.
+        The returned zero-argument function advances the system by one
+        sweep-equivalent (N update attempts for ``async``/``sync``, one unit
+        of continuous time for ``gillespie``) and returns the total energy
+        change, so the caller can track the running energy incrementally
+        instead of recomputing the full Hamiltonian every sweep.
         """
+        if self.upd_mode == "sync":
+            return self._compile_sync()
+        if self.upd_mode == "gillespie":
+            return self._compile_gillespie()
+        return self._compile_async()
+
+    def _compile_async(self) -> Callable[[], float]:
+        """Random-sequential kinetics: N single-site attempts per sweep."""
         substrate = self.substrate
         rng = self.rng
         p_accept = resolve_acceptance(self.rule, self.T, self.tie_flip_p)
@@ -404,6 +434,118 @@ class ThermalEngine:
                 if p >= 1.0 or rng.random() < p:
                     commit(nd, proposal)
                     dE_sweep += dE
+            return dE_sweep
+
+        return sweep
+
+    def _greedy_color_classes(self) -> list[np.ndarray]:
+        """Greedy-color the interaction graph once: no two sites in a class
+        are adjacent, so their ΔE's from the frozen state are simultaneously
+        valid and the class updates as an independent block (ref M4). On a
+        bipartite lattice this recovers the checkerboard (2 classes)."""
+        substrate = self.substrate
+        n_sites = int(len(substrate.s))
+        # Presence was validated at setup; the base protocol stays minimal.
+        neighbor_indices = getattr(substrate, "neighbor_indices")
+        colors = np.full(n_sites, -1, dtype=np.int64)
+        for i in range(n_sites):
+            nbrs = np.asarray(neighbor_indices(i), dtype=np.intp)
+            used = {int(c) for c in colors[nbrs] if c >= 0}
+            c = 0
+            while c in used:
+                c += 1
+            colors[i] = c
+        return [
+            np.flatnonzero(colors == c) for c in range(int(colors.max()) + 1)
+        ]
+
+    def _compile_sync(self) -> Callable[[], float]:
+        """Sublattice-parallel synchronous kinetics (ref M4): per sweep,
+        visit each color class in turn — compute every ΔE in the class from
+        the frozen state first, then accept/commit independently. Each block
+        preserves the Gibbs measure, so the composition does too."""
+        substrate = self.substrate
+        rng = self.rng
+        p_accept = resolve_acceptance(self.rule, self.T, self.tie_flip_p)
+        if self.color_classes is None:
+            self.color_classes = self._greedy_color_classes()
+        classes = [[int(nd) for nd in cls] for cls in self.color_classes]
+        propose = substrate.propose_local
+        delta_E = substrate.delta_E
+        commit = substrate.commit
+
+        def sweep() -> float:
+            dE_sweep = 0.0
+            for cls in classes:
+                # Pass 1: proposals + ΔE for the whole class, state frozen.
+                proposals = [propose(nd) for nd in cls]
+                dEs = [delta_E(nd, prop) for nd, prop in zip(cls, proposals)]
+                # Pass 2: independent accept/commit (no intra-class bonds,
+                # so the pass-1 ΔE's stay exact as commits land).
+                for nd, prop, dE in zip(cls, proposals, dEs):
+                    p = p_accept(dE)
+                    if p >= 1.0 or rng.random() < p:
+                        commit(nd, prop)
+                        dE_sweep += dE
+            return dE_sweep
+
+        return sweep
+
+    def _compile_gillespie(self) -> Callable[[], float]:
+        """Rejection-free continuous-time (BKL, ref M3) kinetics.
+
+        Each site attempts at unit rate, so site *i* fires at
+        ``r_i = p_accept(ΔE_i)`` and one unit of simulated time is one
+        sweep-equivalent (N attempts on average). A sweep call advances time
+        by exactly 1.0: draw waiting times ``Δt ~ Exp(Σ r)``, pick the event
+        site ∝ ``r_i``, commit it (always accepted), refresh the rates of the
+        site and its neighbors; the exponential's memorylessness lets the
+        step truncate at the record boundary without executing the overshoot.
+        ``Σ r = 0`` is an absorbing state — the remaining time just elapses.
+        Assumes the local proposal is deterministic (two-state substrate);
+        multi-state models need per-channel rate tables.
+        """
+        substrate = self.substrate
+        rng = self.rng
+        p_accept = resolve_acceptance(self.rule, self.T, self.tie_flip_p)
+        n_sites = int(len(substrate.s))
+        propose = substrate.propose_local
+        delta_E = substrate.delta_E
+        commit = substrate.commit
+        # Presence was validated at setup; the base protocol stays minimal.
+        neighbor_indices = getattr(substrate, "neighbor_indices")
+        rates = np.zeros(n_sites, dtype=np.float64)
+        dE_all = np.zeros(n_sites, dtype=np.float64)
+
+        def refresh(nd: int) -> None:
+            dE = delta_E(nd, propose(nd))
+            dE_all[nd] = dE
+            rates[nd] = p_accept(dE)
+
+        def sweep() -> float:
+            # Rebuild the rate table at the step boundary (O(N), the same
+            # order as recording an observable): robust to any state change
+            # between recorded steps (re-init, annealing recompile).
+            for nd in range(n_sites):
+                refresh(nd)
+            dE_sweep = 0.0
+            t = 0.0
+            while True:
+                R = float(rates.sum())
+                if R <= 0.0:
+                    break  # absorbing: no event can fire
+                t += -math.log(1.0 - rng.random()) / R
+                if t >= 1.0:
+                    break  # overshoot past the record boundary (memoryless)
+                cum = np.cumsum(rates)
+                k = int(np.searchsorted(cum, rng.random() * R, side="right"))
+                if k >= n_sites:  # float-roundoff guard on the last bin
+                    k = n_sites - 1
+                commit(k, propose(k))
+                dE_sweep += dE_all[k]
+                refresh(k)
+                for j in neighbor_indices(k):
+                    refresh(int(j))
             return dE_sweep
 
         return sweep
