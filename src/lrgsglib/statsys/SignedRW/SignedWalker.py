@@ -38,7 +38,7 @@ from ._kernel import _kill_masks, run_walker, signed_lattice_tables
 from .defaults import SRW_WALKER_SOLVER_NAME
 
 if TYPE_CHECKING:
-    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
 
 
 def _load_srw_native():

@@ -198,11 +198,7 @@ class XYModel(CBackendMixin, VecDynSys):
     # C backend
     # ------------------------------------------------------------------
     def _build_c_arglist(self) -> list[str]:
-        try:
-            datdir = self.sg.path_sgdata.relative_to(Path.cwd())
-        except (ValueError, AttributeError):
-            datdir = getattr(self.sg, 'path_sgdata',
-                             getattr(self.sg, 'path_data', Path.cwd()))
+        datdir = self._get_datdir_arg()
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
         return [
             f"{self.N}",

@@ -12,7 +12,7 @@ from ..DynSys import DynSys
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
 
 StateType = Literal["bipolar", "binary"]
 
@@ -219,6 +219,7 @@ class BinDynSys(DynSys):
     def export_s_init(self) -> None:
         out_suffix = self.run_id or ''
         fname = self.sg.get_p_fname('s', out_suffix=out_suffix)
+        self._ensure_dynpath_exists()
         self.sfout = self.dynpath / fname
         self.s.astype('int8').tofile(open(self.sfout, 'wb'))
         self.s_0 = self.s.copy()

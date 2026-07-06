@@ -1,0 +1,558 @@
+"""XYBase — the planar-rotator (O(2)) substrate on the shared statsys spine.
+
+The Layer-0 model class of the XY modernization (statsys unification
+D-B8/D-B9; the first CONTINUOUS-state consumer of the shared engine, after
+Ising and Potts proved it on discrete states): it owns the Hamiltonian (ONE
+symmetric coupling matrix ``J`` built once by the shared
+``statsys._csr.build_coupling_csr``, from which BOTH ``delta_E`` and the
+energy observable derive — ΔE↔E consistency by construction, plan §3b), the
+substrate contracts consumed by the shared ``statsys._thermal`` engines
+(single-site + cluster + exchange), and the ObservableSet lifecycle.
+
+It owns NOTHING scheme-specific — temperature policy, acceptance rule and
+update axes live on the thin scheme leaves (``XYMetropolis``, ...).
+
+This class is NEW code beside the legacy ``XYModel`` (strangler pattern):
+the legacy class keeps working untouched; both dispatch through the same
+``"xy"`` solver-registry key, and the solver polymorphs on the instance.
+
+Hamiltonian (O(2) planar rotator; ``k_B = 1``)::
+
+    H = − Σ_{(i,j) ∈ E} J_ij cos(θ_i − θ_j),      θ_i ∈ [0, 2π)
+    ΔE(i: θ → θ') = Σ_j J_ij [cos(θ − θ_j) − cos(θ' − θ_j)]
+
+with ``J`` from the signed edge weights via ``coupling_norm``. The external-
+field term ``−h Σ cos(θ_i − φ_h)`` is NOT wired: the field must be zero
+(hard capability error, invariant #3).
+
+Cluster moves use the embedded-Ising construction of ref M6 (Wolff 1989):
+draw a random reflection direction ``φ``, treat ``ε_i = sign(cos(θ_i − φ))``
+as embedded Ising spins with effective couplings
+``K_ij = J_ij |cos(θ_i − φ)| |cos(θ_j − φ)|``, grow FK clusters on the bond
+satisfaction ``sat_ij = J_ij cos(θ_i − φ) cos(θ_j − φ)`` and flip a cluster
+by reflecting its angles, ``θ → 2φ + π − θ``. A reflection is an involution
+and flips the sign of ``cos(θ − φ)``, so the satisfaction is flip-covariant
+exactly as in the Ising case — cluster moves therefore stay valid on SIGNED
+couplings (unlike Potts, whose joint relabel is not an involution on bonds).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Sequence
+
+import numpy as np
+import tqdm
+
+from ...config.const import BIN
+from .._c_backend import CBackendMixin
+from .._csr import build_coupling_csr
+from .._observables import ObservableSet, RowTrajectory, ScalarSeries
+from .._run_host import RunHostMixin
+from ..VecDynSys import VecDynSys
+from .defaults import (
+    XY_COUPLING_NORM_DEFAULT,
+    XY_COUPLING_NORMS,
+    XY_DELTA_DEFAULT,
+    XY_DYN_SUBDIR,
+    XY_ENERGY_FBASE,
+    XY_MAGN_FBASE,
+    XY_OBS_DEFAULT,
+    XY_OBS_ENERGY,
+    XY_OBS_MAGN,
+    XY_OBS_SNAPSHOTS,
+    XY_SNAPSHOT_EVERY_DEFAULT,
+    XY_SNAPSHOT_MAX_BYTES,
+    XY_SNAPSHOTS_FBASE,
+    XY_SOLVER_NAME,
+    XY_T_DEFAULT,
+    XY_TWO_PI,
+)
+
+if TYPE_CHECKING:
+    from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
+
+__all__ = ["XYBase"]
+
+_KNOWN_OBSERVABLES = (XY_OBS_ENERGY, XY_OBS_MAGN, XY_OBS_SNAPSHOTS)
+
+
+class XYBase(RunHostMixin, CBackendMixin, VecDynSys):
+    """Planar-rotator substrate: symmetric-J Hamiltonian + observables + run host.
+
+    Parameters
+    ----------
+    sg : SignedGraph
+        The signed graph carrying the couplings ``w_ij``.
+    T : float
+        Temperature (``k_B = 1``; stored by ``VecDynSys``, the policy lives
+        on the scheme leaves).
+    delta : float
+        Maximum angular perturbation of the single-site proposal (radians):
+        uniform in ``[θ − delta, θ + delta]`` (mod 2π), a symmetric kernel.
+    coupling_norm : {'raw', 'sym', 'avg'}
+        How the symmetric ``J`` derives from the edge weights (shared
+        vocabulary, ``statsys._csr``).
+    observables : sequence of str
+        Which series to record: any of ``'energy'`` (intensive per-site
+        energy, tracked incrementally from the sweep ΔE), ``'magn'`` (the
+        magnetisation ``|Σ e^{iθ}|/N`` — the BKT order parameter) and
+        ``'snapshots'`` ((n_rec, N) float64 angle trajectory, subsampled by
+        *snapshot_every*).
+    snapshot_every : int
+        Keep every k-th sweep in the snapshot trajectory.
+    **kwargs
+        Forwarded to :class:`VecDynSys` (``ic``, ``runlang``,
+        ``steps``/``simref``, ``seed``, ``savedisk``, ...).
+    """
+
+    solver_name = XY_SOLVER_NAME
+
+    def __init__(
+        self,
+        sg: "SignedGraph",
+        *,
+        T: float = XY_T_DEFAULT,
+        delta: float = XY_DELTA_DEFAULT,
+        coupling_norm: str = XY_COUPLING_NORM_DEFAULT,
+        observables: Sequence[str] = XY_OBS_DEFAULT,
+        snapshot_every: int = XY_SNAPSHOT_EVERY_DEFAULT,
+        **kwargs: Any,
+    ) -> None:
+        if not (float(delta) > 0.0):
+            raise ValueError(f"delta must be > 0 (radians); got {delta}.")
+        if coupling_norm not in XY_COUPLING_NORMS:
+            raise ValueError(
+                f"coupling_norm must be one of {XY_COUPLING_NORMS}; "
+                f"got {coupling_norm!r}."
+            )
+        selected = tuple(observables)
+        unknown = [o for o in selected if o not in _KNOWN_OBSERVABLES]
+        if unknown:
+            raise ValueError(
+                f"Unknown observable(s) {unknown}; known: {_KNOWN_OBSERVABLES}."
+            )
+        self.observables = ObservableSet(
+            [
+                ScalarSeries(XY_OBS_ENERGY, dtype=np.float64),
+                ScalarSeries(XY_OBS_MAGN, dtype=np.float64),
+                RowTrajectory(XY_OBS_SNAPSHOTS, ncols=sg.N, dtype=np.float64),
+            ]
+        )
+        self._selected_obs = selected
+        self.delta = float(delta)
+        self.coupling_norm = coupling_norm
+        self.snapshot_every = max(1, int(snapshot_every))
+
+        dynpath = getattr(sg, "path_data", None)
+        if dynpath is not None:
+            dynpath = Path(dynpath) / XY_DYN_SUBDIR
+        super().__init__(
+            sg,
+            q=1,
+            discrete=False,
+            T=float(T),
+            dynpath=dynpath,
+            **kwargs,
+        )
+        # The XY field term −h Σ cos(θ_i − φ_h) needs a field DIRECTION on
+        # top of DynSys's per-site amplitude vector; it is not wired.
+        if np.any(np.asarray(self.field, dtype=np.float64) != 0.0):
+            raise NotImplementedError(
+                "The XY external-field term −h Σ cos(θ_i − φ_h) is not "
+                "wired; the field must be zero."
+            )
+
+        # Configure-then-run: the recorder list is compiled once here; the
+        # per-sweep _record only iterates it.
+        recorders = []
+        if XY_OBS_ENERGY in selected:
+            recorders.append(self._record_energy)
+        if XY_OBS_MAGN in selected:
+            recorders.append(self._record_magn)
+        if XY_OBS_SNAPSHOTS in selected:
+            recorders.append(self._record_snapshot)
+        self._recorders = tuple(recorders)
+
+        # Substrate arrays (built once in init_dynamics)
+        self._nbr_idx: np.ndarray | None = None
+        self._nbr_J: np.ndarray | None = None
+        self._nbr_ptr: np.ndarray | None = None
+        self._nbr_rows: np.ndarray | None = None
+        self._edge_u: np.ndarray | None = None
+        self._edge_v: np.ndarray | None = None
+        self._edge_J: np.ndarray | None = None
+        # Embedded-Ising reflection direction for the cluster moves (M6):
+        # the leaf draws it per cluster (wolff) or per sweep (sw).
+        self._refl_dir: float = 0.0
+        self._redraw_dir_on_flip: bool = False
+        # Running extensive energy, advanced by the engine's per-sweep ΔE.
+        self._e_running: float | None = None
+        # The engine of the last run (per-move extras live on it).
+        self._engine: Any = None
+        self.sini: np.ndarray | None = None
+        self.reset_observables()
+
+    # ------------------------------------------------------------------
+    # Disk-backed observables (lazy views over the ObservableSet)
+    # ------------------------------------------------------------------
+    @property
+    def ene(self) -> list:
+        """Intensive per-site energy series e(t) = E(t)/N."""
+        return self.observables[XY_OBS_ENERGY].data
+
+    @ene.setter
+    def ene(self, value) -> None:
+        self.observables[XY_OBS_ENERGY].set_values(value)
+
+    @property
+    def magn(self) -> list:
+        """Magnetisation series m(t) = |Σ e^{iθ}|/N."""
+        return self.observables[XY_OBS_MAGN].data
+
+    @magn.setter
+    def magn(self, value) -> None:
+        self.observables[XY_OBS_MAGN].set_values(value)
+
+    @property
+    def s_t(self):
+        """Angle trajectory: RAM list pre-persist, read-only memmap after."""
+        return self.observables[XY_OBS_SNAPSHOTS].data
+
+    @s_t.setter
+    def s_t(self, value) -> None:
+        self.observables[XY_OBS_SNAPSHOTS].set_rows(value)
+
+    # ------------------------------------------------------------------
+    # Couplings (ONE symmetric J, built once — plan §3b, shared builder)
+    # ------------------------------------------------------------------
+    def _ensure_couplings(self) -> None:
+        if self._nbr_J is not None:
+            return
+        c = build_coupling_csr(self.sg, self.N, self.coupling_norm)
+        self._nbr_idx = c.idx
+        self._nbr_J = c.J
+        self._nbr_ptr = c.ptr
+        self._nbr_rows = c.rows
+        # Each undirected edge once (u < v), for the SW bond sweep + energy.
+        self._edge_u = c.edge_u
+        self._edge_v = c.edge_v
+        self._edge_J = c.edge_J
+
+    # ------------------------------------------------------------------
+    # Substrate contract (consumed by statsys._thermal.ThermalEngine)
+    # ------------------------------------------------------------------
+    def propose_local(self, nd: int) -> float:
+        """A uniform random perturbation of the current angle within
+        ``±delta`` (mod 2π) — the same symmetric kernel as the legacy loop
+        and the native kernel."""
+        return float(
+            (self.s[nd] + np.random.uniform(-self.delta, self.delta))
+            % XY_TWO_PI
+        )
+
+    def delta_E(self, nd: int, proposal: float) -> float:
+        """``Σ_j J_nd,j [cos(θ_nd − θ_j) − cos(θ' − θ_j)]``."""
+        lo, hi = self._nbr_ptr[nd], self._nbr_ptr[nd + 1]
+        th_nbr = self.s[self._nbr_idx[lo:hi]]
+        J = self._nbr_J[lo:hi]
+        cur = float(self.s[nd])
+        return float(
+            (J * (np.cos(cur - th_nbr) - np.cos(proposal - th_nbr))).sum()
+        )
+
+    def commit(self, nd: int, proposal: float) -> None:
+        self.s[nd] = proposal
+
+    def order_parameter(self, s: np.ndarray | None = None) -> float:
+        """Magnetisation ``m = |Σ e^{iθ}|/N`` — 1 for aligned rotators, of
+        order ``N^{−1/2}`` in the disordered phase."""
+        state = self.s if s is None else np.asarray(s)
+        return float(np.abs(np.mean(np.exp(1j * state))))
+
+    # --- cluster contract (statsys._thermal.ClusterSubstrate) ---
+    def _draw_reflection(self) -> None:
+        """Draw a fresh embedded-Ising reflection direction φ (ref M6)."""
+        self._refl_dir = float(np.random.uniform(0.0, XY_TWO_PI))
+
+    def neighbor_indices(self, nd: int) -> np.ndarray:
+        lo, hi = self._nbr_ptr[nd], self._nbr_ptr[nd + 1]
+        return self._nbr_idx[lo:hi]
+
+    def bond_satisfaction(self, nd: int) -> tuple[np.ndarray, np.ndarray]:
+        """Neighbors of *nd* and each bond's embedded-Ising satisfaction
+        ``J_ij cos(θ_i − φ) cos(θ_j − φ)`` (ref M6) — HALF the energy cost
+        of reflecting one endpoint, so the engines' FK activation
+        ``1 − e^{−2·sat/T}`` is exactly M6's O(n) bond probability.
+        Reflecting an endpoint flips the sign of its ``cos(θ − φ)``, so the
+        satisfaction is flip-covariant and signed couplings are valid."""
+        lo, hi = self._nbr_ptr[nd], self._nbr_ptr[nd + 1]
+        idx = self._nbr_idx[lo:hi]
+        phi = self._refl_dir
+        proj_nd = float(np.cos(self.s[nd] - phi))
+        return idx, self._nbr_J[lo:hi] * proj_nd * np.cos(self.s[idx] - phi)
+
+    def edge_satisfactions(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Per-sweep bond sweep (Swendsen–Wang): ONE fresh reflection
+        direction for the whole sweep — every cluster grown and flipped this
+        sweep shares it (the embedded-Ising decomposition is per-sweep)."""
+        self._draw_reflection()
+        phi = self._refl_dir
+        proj = np.cos(self.s - phi)
+        return (
+            self._edge_u,
+            self._edge_v,
+            self._edge_J * proj[self._edge_u] * proj[self._edge_v],
+        )
+
+    def flip_cluster(self, nodes: np.ndarray) -> float:
+        """Reflect the cluster's angles about the current direction φ
+        (``θ → 2φ + π − θ``, mod 2π), in place; return the energy change.
+
+        ΔE comes from the boundary bonds only — a joint reflection preserves
+        every within-cluster angle difference (``θ'_i − θ'_j = θ_j − θ_i``
+        and cos is even). In wolff mode a fresh φ is drawn AFTER the flip
+        (one direction per cluster, M6); in sw mode the sweep's φ is kept
+        (one direction per sweep, drawn in :meth:`edge_satisfactions`).
+        """
+        nodes = np.asarray(nodes, dtype=np.intp)
+        phi = self._refl_dir
+        theta = self.s
+        reflected = np.mod(2.0 * phi + np.pi - theta[nodes], XY_TWO_PI)
+        mask = np.zeros(self.N, dtype=np.bool_)
+        mask[nodes] = True
+        dE = 0.0
+        for k, nd in enumerate(nodes):
+            lo, hi = self._nbr_ptr[nd], self._nbr_ptr[nd + 1]
+            idx = self._nbr_idx[lo:hi]
+            out = ~mask[idx]
+            J_out = self._nbr_J[lo:hi][out]
+            th_out = theta[idx[out]]
+            dE += float(
+                (
+                    J_out
+                    * (
+                        np.cos(theta[nd] - th_out)
+                        - np.cos(reflected[k] - th_out)
+                    )
+                ).sum()
+            )
+        self.s[nodes] = reflected
+        if self._redraw_dir_on_flip:
+            self._draw_reflection()
+        return dE
+
+    # --- exchange contract (statsys._thermal.ExchangeSubstrate) ---
+    def swap_delta_E(self, u: int, v: int) -> float:
+        """ΔE of swapping the angles at *u*, *v*: the two single-move ΔE's
+        each count the shared bond as moving to the aligned value (−J_uv),
+        but a swap leaves the pair's angle difference invariant (cos is
+        even) — hence the ``+2 J_uv (1 − cos(θ_u − θ_v))`` correction."""
+        dE = self.delta_E(u, float(self.s[v])) + self.delta_E(
+            v, float(self.s[u])
+        )
+        lo, hi = self._nbr_ptr[u], self._nbr_ptr[u + 1]
+        row = self._nbr_idx[lo:hi]
+        pos = np.flatnonzero(row == v)
+        J_uv = float(self._nbr_J[lo:hi][pos[0]]) if len(pos) else 0.0
+        return dE + 2.0 * J_uv * (1.0 - float(np.cos(self.s[u] - self.s[v])))
+
+    def commit_swap(self, u: int, v: int) -> None:
+        su = float(self.s[u])
+        self.s[u] = self.s[v]
+        self.s[v] = su
+
+    # ------------------------------------------------------------------
+    # Energy (same J as delta_E, by construction)
+    # ------------------------------------------------------------------
+    def total_energy(self, s: np.ndarray | None = None) -> float:
+        """Extensive ``H = −Σ_{(i,j)} J_ij cos(θ_i − θ_j)`` (each undirected
+        edge once)."""
+        self._ensure_couplings()
+        state = self.s if s is None else np.asarray(s)
+        return float(
+            -(
+                self._edge_J * np.cos(state[self._edge_u] - state[self._edge_v])
+            ).sum()
+        )
+
+    def energy_intensive(self, s: np.ndarray | None = None) -> float:
+        """Per-site energy (the default reporting convention, plan §3b)."""
+        return self.total_energy(s) / float(self.N)
+
+    # ------------------------------------------------------------------
+    # Lifecycle (RunHostMixin front-door requirements + hooks)
+    # ------------------------------------------------------------------
+    def init_dynamics(self, custom: Any = None) -> None:
+        """Initialise the state and the coupling arrays."""
+        self.reset_observables()
+        self.init_state(custom)
+        self.s = np.asarray(self.s, dtype=np.float64) % XY_TWO_PI
+        self._ensure_couplings()
+        self.sini = self.s.copy()
+
+    def check_attribute(self) -> None:
+        if getattr(self, "sini", None) is None:
+            self.init_dynamics()
+
+    def initialize_run_parameters(
+        self, steps: int | None = None, simref: float | None = None
+    ) -> None:
+        self._set_time_controls(steps=steps, simref=simref)
+
+    def _reset_run_state(self) -> None:
+        self._snap_seen = 0
+        self._e_running = None
+
+    def _is_py_runlang(self) -> bool:
+        return not self.runlang.startswith("C")
+
+    def _record_energy(self) -> None:
+        self.observables[XY_OBS_ENERGY].append(self._e_running / float(self.N))
+
+    def _record_magn(self) -> None:
+        self.observables[XY_OBS_MAGN].append(self.order_parameter())
+
+    def _record_snapshot(self) -> None:
+        snap = self.observables[XY_OBS_SNAPSHOTS]
+        if snap.streaming:
+            if self._snap_seen % self.snapshot_every == 0:
+                snap.stream_row(self.s)
+            self._snap_seen += 1
+        else:
+            snap.append_row(self.s.copy())
+
+    def _record(self) -> None:
+        for record in self._recorders:
+            record()
+
+    def _guard_snapshot_size(self) -> None:
+        n_rec_est = -(-int(self.steps) // self.snapshot_every)  # ceil
+        nbytes = n_rec_est * self.N * np.dtype(np.float64).itemsize
+        if nbytes > XY_SNAPSHOT_MAX_BYTES:
+            raise ValueError(
+                f"snapshot trajectory would be ~{nbytes / 2**20:.0f} MiB "
+                f"({n_rec_est} snapshots x N={self.N}, float64), exceeding "
+                f"XY_SNAPSHOT_MAX_BYTES="
+                f"{XY_SNAPSHOT_MAX_BYTES / 2**20:.0f} MiB. Increase "
+                f"snapshot_every (currently {self.snapshot_every}), reduce "
+                f"steps, or raise the cap in XYModel/defaults.py."
+            )
+
+    def _begin_outputs(self) -> None:
+        snap = self.observables[XY_OBS_SNAPSHOTS]
+        snap.reset_stream()
+        self._snap_seen = 0
+        if not self.savedisk or not self._is_py_runlang():
+            return
+        suf = self.out_suffix
+        if XY_OBS_ENERGY in self._selected_obs:
+            self.observables[XY_OBS_ENERGY].set_path(
+                self.dynpath
+                / self.sg.get_p_fname(XY_ENERGY_FBASE, suf, ext=BIN)
+            )
+        if XY_OBS_MAGN in self._selected_obs:
+            self.observables[XY_OBS_MAGN].set_path(
+                self.dynpath / self.sg.get_p_fname(XY_MAGN_FBASE, suf, ext=BIN)
+            )
+        if XY_OBS_SNAPSHOTS in self._selected_obs:
+            snap.set_path(
+                self.dynpath
+                / self.sg.get_p_fname(XY_SNAPSHOTS_FBASE, suf, ext=BIN)
+            )
+            self._guard_snapshot_size()
+            snap.open_stream()
+
+    def _persist_observables(self) -> None:
+        if not self.savedisk or not self._is_py_runlang():
+            return
+        snap = self.observables[XY_OBS_SNAPSHOTS]
+        snap.close_stream()
+        if XY_OBS_SNAPSHOTS in self._selected_obs and snap.path is not None:
+            snap.finalize_batch(subsample=self.snapshot_every)
+        if XY_OBS_ENERGY in self._selected_obs:
+            self.observables[XY_OBS_ENERGY].persist()
+        if XY_OBS_MAGN in self._selected_obs:
+            self.observables[XY_OBS_MAGN].persist()
+
+    # ------------------------------------------------------------------
+    # Engine plumbing (schemes provide the engine; the base runs it)
+    # ------------------------------------------------------------------
+    def _make_engine(self):
+        raise NotImplementedError(
+            "Scheme classes (XYMetropolis, ...) must implement _make_engine()."
+        )
+
+    def _sample_py(self, tqdm_on: bool = False, verbose: bool = False) -> None:
+        """Python-backend sampling loop: record at sweep times 0..steps-1,
+        advance one compiled sweep, track the energy incrementally from the
+        sweep's ΔE (no per-sweep full recompute)."""
+        engine = self._make_engine()
+        self._engine = engine  # scheme leaves mirror per-move extras off it
+        sweep = engine.compile_step()
+        self._e_running = self.total_energy()
+        iterator = (
+            tqdm.tqdm(range(self.steps), desc=type(self).__name__)
+            if tqdm_on
+            else range(self.steps)
+        )
+        for _ in iterator:
+            self._record()
+            self._e_running += sweep()
+
+    # ------------------------------------------------------------------
+    # Native pybind backend hooks (the pb solver polymorphs on these)
+    # ------------------------------------------------------------------
+    def _pb_check_supported(self) -> None:
+        """Setup-time capability gate for ``runlang='pb'`` — the solver calls
+        this before any output stream opens. Default: not wired; pb-capable
+        scheme leaves override with their own axis validation."""
+        raise NotImplementedError(
+            f"runlang='pb' is not wired for {type(self).__name__}; use "
+            "runlang='py'."
+        )
+
+    def _pb_csr(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """The symmetric coupling CSR in the dtypes the kernel expects —
+        the SAME J as delta_E/total_energy (coupling_norm applied)."""
+        self._ensure_couplings()
+        return (
+            np.ascontiguousarray(self._nbr_idx, dtype=np.int64),
+            np.ascontiguousarray(self._nbr_J, dtype=np.float64),
+            np.ascontiguousarray(self._nbr_ptr, dtype=np.int64),
+        )
+
+    def _run_pb(self, tqdm_on: bool = False, verbose: bool = False) -> None:
+        """Execute the native kernel (pb-capable leaves override)."""
+        raise NotImplementedError(
+            f"runlang='pb' is not wired for {type(self).__name__}; use "
+            "runlang='py'."
+        )
+
+    def make_sweep_fn(self):
+        """Frame-producer hook (statsys._frames): one compiled engine sweep."""
+        self.check_attribute()
+        sweep = self._make_engine().compile_step()
+
+        def _sweep() -> None:
+            sweep()
+
+        return _sweep
+
+    def run_py(self, tqdm_on: bool = False, **kw: Any) -> None:
+        """Direct Python-backend entry (the registry front door is run())."""
+        self.check_attribute()
+        self._begin_outputs()
+        try:
+            self._sample_py(tqdm_on=tqdm_on)
+        finally:
+            self._persist_observables()
+
+    def run_c(self, **kw: Any) -> None:
+        raise NotImplementedError(
+            "The C-subprocess backend stays on the legacy XYModel class "
+            "(frozen interface, decision D-B5); use runlang='py'/'pb' or the "
+            "legacy XYModel."
+        )

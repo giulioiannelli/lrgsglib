@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 
 def __export_graph__(self: "SignedGraphNX", file_name: str = '', export_mode: str = SG_EXPORT_M):
+    self.path_graph.mkdir(parents=True, exist_ok=True)
     match export_mode:
         case 'pkl'|'pk'|'pickle':
             fname = file_name or self.std_fname + PKL 
@@ -46,6 +47,7 @@ def __export_data_tofile__(
     if not hasattr(self, who):
         raise AttributeError(f"SignedGraph instance has no attribute '{who}'")
     fname = file_name or self.get_p_fname(who=who, out_suffix=exName, ext=ext)
+    path_sgdata.mkdir(parents=True, exist_ok=True)
     export_func(self, path_sgdata / fname, **kwargs)
 #
 def _export_eigV(
@@ -132,6 +134,7 @@ def _export_edgel_bin(
         on_g: str = SG_REPR
 ) -> None:
     fname = build_p_fname('edgelist', self.pflip, out_suffix=exName, ext=BIN)
+    self.path_graph.mkdir(parents=True, exist_ok=True)
     self.path_exp_edgl = self.path_graph / fname
     #
     edges = self.gr[on_g].edges(data='weight')
@@ -166,6 +169,7 @@ def export_adj_bin(
 
     dense_adj = adj_matrix.toarray() if hasattr(adj_matrix, "toarray") else np.asarray(adj_matrix)
     dense_adj = np.asarray(dense_adj, dtype=np.float64)
+    self.path_graph.mkdir(parents=True, exist_ok=True)
     self.path_exp_adj = self.path_graph / self.get_p_fname('adj', out_suffix=exName)
 
     with open(self.path_exp_adj, "wb") as f:

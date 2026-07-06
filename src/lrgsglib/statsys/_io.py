@@ -61,6 +61,7 @@ def atomic_write_bytes(path, write_fn) -> Path:
     """Run ``write_fn(file_handle)`` on a temp file, then atomically rename it
     onto ``path``. The temp file is removed on any failure."""
     path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = tmp_sibling(path)
     try:
         with open(tmp, "wb") as fh:
@@ -100,6 +101,7 @@ def open_row_stream(path):
     file onto ``path``). Streaming keeps the full trajectory off-RAM.
     """
     path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = tmp_sibling(path)
     return open(tmp, "wb"), tmp
 

@@ -21,11 +21,9 @@ import tqdm
 
 from .._c_backend import CBackendMixin
 from .._csr import build_graph_csr
-from .._solver import SolverBackend
-from .._solver_engine import get_solver
+from .._run_host import RunHostMixin
 from ..BinDynSys import BinDynSys
 from ...config.const import BIN, NPZ
-from ...utils.tools.chronometer import time_function_accumulate
 from ...utils.statsys import (
     cluster_size_distribution,
     consensus_time_stats as _consensus_time_stats,
@@ -94,7 +92,7 @@ _VOTER_MODES_IMPLEMENTED: frozenset[str] = frozenset(VOTER_UPD_MODES)
 _VOTER_MODES_PLANNED: frozenset[str] = frozenset(VOTER_UPD_MODES_PLANNED)
 
 
-class VoterModel(CBackendMixin, BinDynSys):
+class VoterModel(RunHostMixin, CBackendMixin, BinDynSys):
     """Binary voter dynamics with optional C backend.
 
     In voter dynamics, each node copies the state of a randomly chosen
@@ -237,6 +235,7 @@ class VoterModel(CBackendMixin, BinDynSys):
     """
 
     dyn_UVclass = "voter_model"
+    solver_name = VOTER_SOLVER_NAME
 
     # CBackendMixin configuration
     _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
@@ -998,10 +997,7 @@ class VoterModel(CBackendMixin, BinDynSys):
 
     def _build_c_arglist(self) -> list[str]:
         """Build argument list for unified VoterSimulator."""
-        try:
-            datdir = self.sg.path_sgdata.relative_to(Path.cwd())
-        except ValueError:
-            datdir = self.sg.path_sgdata
+        datdir = self._get_datdir_arg()
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
         self.out_id = self.out_suffix
         self.magn_path = self.dynpath / self.sg.get_p_fname('m', self.out_id)
@@ -1357,7 +1353,6 @@ class VoterModel(CBackendMixin, BinDynSys):
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
-    @time_function_accumulate(auto_log=False)
     def run(
         self,
         tqdm_on: bool = False,
@@ -1368,6 +1363,11 @@ class VoterModel(CBackendMixin, BinDynSys):
         clean_export: bool = True,
     ) -> None:
         """Run voter model dynamics.
+
+        Thin wrapper over the shared ``RunHostMixin.run`` skeleton (this
+        class's hand-copied version was hoisted into the mixin); it only
+        resolves the legacy ``eqSTEP`` alias (``steps`` wins when both are
+        given, matching ``initialize_run_parameters``).
 
         Parameters
         ----------
@@ -1393,38 +1393,13 @@ class VoterModel(CBackendMixin, BinDynSys):
         disk-backed views; see the class docstring and ``load_sout`` /
         ``output_sizes``.
         """
-        # Resolve the solver family from the runlang code (same precedence the
-        # old if/elif chain used: C subprocess > pybind > NumPy > CuPy > Python;
-        # the C check is case-sensitive on a leading "C" to avoid catching "cu").
-        is_c = self.runlang.startswith("C")
-        is_pb = self.runlang.lower().startswith("pb")
-        is_np = self.runlang.lower().startswith("np")
-        is_cu = self.runlang.lower().startswith("cu")
-        if is_c:
-            backend = SolverBackend.C
-        elif is_pb:
-            backend = SolverBackend.PB
-        elif is_np:
-            backend = SolverBackend.NP
-        elif is_cu:
-            backend = SolverBackend.CU
-        else:
-            backend = SolverBackend.PY
-        solver = get_solver(VOTER_SOLVER_NAME, backend)
-        # Guard before any file export / kernel call so the native/vectorized
-        # backends never silently ignore rule / upd_mode / absorbing_check.
-        solver.supports(self)
-        self.check_attribute()
-        self.initialize_run_parameters(steps=steps, simref=simref, eqSTEP=eqSTEP)
-        self._begin_outputs()
-        try:
-            solver.execute(self, tqdm_on=tqdm_on, verbose=verbose)
-        finally:
-            # Finalize disk artifacts (and always close a streamed sout handle).
-            self._persist_observables()
-        if backend is SolverBackend.C and clean_export:
-            self.remove_run_c_files()
-            self.sg.remove_exported_files()
+        super().run(
+            tqdm_on=tqdm_on,
+            steps=steps if steps is not None else eqSTEP,
+            simref=simref,
+            verbose=verbose,
+            clean_export=clean_export,
+        )
 
 
 # Register VoterModel's solver backends (py/pb/np/cu/C) in the shared solver

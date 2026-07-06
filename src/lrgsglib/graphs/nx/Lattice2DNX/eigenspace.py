@@ -143,6 +143,7 @@ def load_or_compute_Lattice2DNX(
     fname = '_'.join([basename, peq_fstr(pflip)]) + seed_str
     #
     pname = tmp_l.path_graph / (fname + '.pkl')
+    tmp_l.path_graph.mkdir(parents=True, exist_ok=True)
     #
     if pname.exists():
         lattice = pk.load(open(pname, 'rb'))

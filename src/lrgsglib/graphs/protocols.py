@@ -211,7 +211,9 @@ class SignedGraphProtocol(Protocol):
         """Engine-agnostic graph-representation dict (``gr['G']`` / ``gr['H']``)."""
         ...
 
-    def get_node_attributes(self, attr: str = "pos", on_g: Optional[str] = None) -> dict:
+    def get_node_attributes(
+        self, attr: str = "pos", on_g: Optional[str] = None
+    ) -> dict:
         """Return a ``{node: value}`` dict for vertex attribute *attr*.
 
         Parameters
@@ -242,21 +244,68 @@ class DynamicsGraphProtocol(SignedGraphProtocol, Protocol):
         """Root data directory for this graph instance."""
         ...
 
-    def get_p_fname(self, prefix: str, out_suffix: str = "") -> str:
-        """Build a parametric filename.
+    @property
+    def path_data(self) -> "Path":
+        """Base data directory the graph's whole output tree hangs off."""
+        ...
+
+    def get_p_fname(
+        self, who: str, out_suffix: str = "", ext: str = ".bin"
+    ) -> "str | Path":
+        """Build a parametric filename (``<who>_p=<pflip>[_suffix]<ext>``).
 
         Parameters
         ----------
-        prefix : str
-            Filename prefix (e.g. ``'s'``, ``'h'``, ``'edgl'``).
+        who : str
+            Filename prefix (e.g. ``'s'``, ``'h'``, ``'m'``).
         out_suffix : str
             Additional suffix.
+        ext : str
+            File extension (default ``'.bin'``).
 
         Returns
         -------
-        str
+        str or Path
             Constructed filename.
         """
+        ...
+
+    def get_eigV_bin_check(
+        self,
+        which: int = 0,
+        reshaped: bool = False,
+        backend: Optional[str] = None,
+        typf: type = np.float64,
+        transpose: bool = True,
+        flip_to_pos: bool = True,
+    ) -> NDArray:
+        """Binarized eigenvector (computed on demand); used by spectral ICs."""
+        ...
+
+    def compute_k_eigvV(
+        self, k: int = 1, backend: Optional[str] = None
+    ) -> None:
+        """Compute the k lowest Laplacian eigenpairs (partial spectrum);
+        used by the spectral subspace machinery (statsys._spectral). Only
+        the parameters the shared callers use are declared here; concrete
+        engines accept more (solver, layout flags, ...) with defaults."""
+        ...
+
+    def get_eigV(
+        self,
+        which: int = 0,
+        binarize: bool = False,
+        reshape: bool = False,
+    ) -> NDArray:
+        """Eigenvector accessor with optional binarization/reshaping,
+        handling the engine's storage layout."""
+        ...
+
+    def compute_rbim_energy_eigV_all(self, **kwargs: Any) -> None:
+        """Fill the lazily-created ``energy_eigV_RBIM`` dict (RBIM energy
+        per binarized eigenvector, keyed by mode index) for every cached
+        eigenvector. The dict itself is not a protocol member — it appears
+        on the instance only after this call (access via ``getattr``)."""
         ...
 
     def _export_edgel_bin(self, exName: str = "") -> None:

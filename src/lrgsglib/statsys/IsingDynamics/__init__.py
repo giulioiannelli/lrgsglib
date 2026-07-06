@@ -1,3 +1,17 @@
+from ._facade import ising_from_legacy
+from .IsingBase import IsingBase
+from .IsingCEM import IsingCEM
 from .IsingDynamics import IsingDynamics
+from .IsingMetropolis import IsingMetropolis
+from .IsingParallelTempering import IsingParallelTempering
+from .IsingSimulatedAnnealing import IsingSimulatedAnnealing
 
-__all__ = ["IsingDynamics"]
+__all__ = [
+    "IsingDynamics",
+    "IsingBase",
+    "IsingMetropolis",
+    "IsingSimulatedAnnealing",
+    "IsingParallelTempering",
+    "IsingCEM",
+    "ising_from_legacy",
+]

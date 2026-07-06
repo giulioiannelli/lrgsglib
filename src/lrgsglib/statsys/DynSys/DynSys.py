@@ -31,7 +31,7 @@ from ...config.funcs import peq_fstr
 from ...utils.basic.strings import generate_random_id, join_non_empty
 
 if TYPE_CHECKING:
-    from ...graphs.protocols import SignedGraphProtocol as SignedGraph
+    from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
     from .._observables import ObservableSet
 
 ZERO_FIELD = lambda N: np.zeros(N, dtype=np.float64)
@@ -131,7 +131,9 @@ class DynSys(ABC):
             self.dynpath = Path(base_dynpath)
         else:
             self.dynpath = Path(dynpath)
-        self._ensure_dynpath_exists()
+        # dynpath is lazy: created on first write (state/field exports, the
+        # _io observable codecs, _get_datdir_arg for C runs) — constructing a
+        # dynamics object must not scatter empty dirs on disk.
 
     # ------------------------------------------------------------------
     # Abstract interface — subclasses MUST implement
@@ -312,5 +314,6 @@ class DynSys(ABC):
         """Write the external field to a binary file."""
         out_suffix = self.run_id or ''
         fname = self.sg.get_p_fname('h', out_suffix=out_suffix)
+        self._ensure_dynpath_exists()
         self.hfout = self.dynpath / fname
         self.field.astype('float64').tofile(open(self.hfout, 'wb'))

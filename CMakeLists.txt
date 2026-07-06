@@ -395,12 +395,16 @@ target_include_directories(ising_model_store PRIVATE ${RBIM_STORE})
 target_compile_options(ising_model_store PRIVATE -O3)
 install(TARGETS ising_model_store DESTINATION lrgsglib/statsys/IsingDynamics/ccore/storer)
 
-# Ising native kernels - pybind11 binding (Metropolis, SA, PT via numpy)
+# Ising native kernels - pybind11 binding (Metropolis, SA, PT via numpy).
+# LRGSG_cluster.c + LRGSG_uf.c mirror ccore/native/setup.py (the working
+# Makefile build) -- without them the module fails to link.
 pybind11_add_module(_ising_native
     ${ISING_CCORE}/ising_native.cpp
     ${SRC_RBIM}
     ${SRC_SA}
     ${SRC_PT}
+    ${ISING_CCORE}/LRGSG_cluster.c
+    ${CCORE}/LRGSG_uf.c
     ${COMMON_SOURCES}
 )
 target_include_directories(_ising_native PRIVATE
@@ -430,6 +434,75 @@ pybind11_add_module(random_walker
 )
 target_compile_options(random_walker PRIVATE -O3)
 install(TARGETS random_walker DESTINATION lrgsglib/statsys/SignedRW/ccore/Lattices)
+
+# ===========================================================================
+# In-process native kernels (one pybind module per model)
+# ===========================================================================
+# Folded here from the per-model ccore/native/{setup.py,Makefile} builds
+# (statsys unification, decision D-B7): ONE build system for every compiled
+# artifact. Source lists mirror each setup.py exactly. The per-model
+# Makefiles keep working for one-off local rebuilds.
+function(add_native_module NAME DEST)
+    cmake_parse_arguments(NAT "" "" "SOURCES;INCLUDES" ${ARGN})
+    pybind11_add_module(${NAME} ${NAT_SOURCES})
+    target_include_directories(${NAME} PRIVATE
+        ${COMMON_INCLUDES}
+        ${NAT_INCLUDES}
+        ${Python_NumPy_INCLUDE_DIRS}
+    )
+    target_compile_options(${NAME} PRIVATE -O3)
+    install(TARGETS ${NAME} DESTINATION ${DEST})
+endfunction()
+
+add_native_module(_potts_native lrgsglib/statsys/PottsModel/ccore
+    SOURCES ${POTTS_DIR}/potts_native.cpp ${SRC_POTTS} ${SRC_VECDYNSYS}
+            ${COMMON_SOURCES}
+    INCLUDES ${POTTS_DIR}
+)
+
+add_native_module(_xy_native lrgsglib/statsys/XYModel/ccore
+    SOURCES ${XY_DIR}/xy_native.cpp ${SRC_XY} ${SRC_CONTDYNSYS}
+            ${SRC_VECDYNSYS} ${COMMON_SOURCES}
+    INCLUDES ${XY_DIR}
+)
+
+add_native_module(_heisenberg_native lrgsglib/statsys/HeisenbergModel/ccore
+    SOURCES ${HBERG_DIR}/heisenberg_native.cpp ${SRC_HBERG}
+            ${SRC_VECDYNSYS} ${COMMON_SOURCES}
+    INCLUDES ${HBERG_DIR}
+)
+
+add_native_module(_multispec_native lrgsglib/statsys/MultiSpeciesModel/ccore
+    SOURCES ${MSPEC_DIR}/multispec_native.cpp ${SRC_MSPEC}
+            ${SRC_VECDYNSYS} ${COMMON_SOURCES}
+    INCLUDES ${MSPEC_DIR}
+)
+
+add_native_module(_kuramoto_native lrgsglib/statsys/KuramotoModel/ccore
+    SOURCES ${KUR_DIR}/kuramoto_native.cpp ${SRC_KURAMOTO}
+            ${SRC_CONTDYNSYS} ${COMMON_SOURCES}
+    INCLUDES ${KUR_DIR}
+)
+
+add_native_module(_rd_native lrgsglib/statsys/ReactionDiffusionModel/ccore
+    SOURCES ${RD_DIR}/rd_native.cpp ${SRC_RD} ${SRC_CONTDYNSYS}
+            ${COMMON_SOURCES}
+    INCLUDES ${RD_DIR}
+)
+
+add_native_module(_code_native lrgsglib/statsys/CoupledODEModel/ccore
+    SOURCES ${CODE_DIR}/code_native.cpp ${SRC_CODE} ${SRC_CONTDYNSYS}
+            ${COMMON_SOURCES}
+    INCLUDES ${CODE_DIR}
+)
+
+# SignedRW walker kernel: no BinDynSys dependency (its setup.py lists only
+# the walker + RNG sources).
+add_native_module(_srw_native lrgsglib/statsys/SignedRW/ccore
+    SOURCES ${SRW_CCORE}/srw_native.cpp ${SRW_CCORE}/LRGSG_srw.c
+            ${CCORE}/LRGSG_utils.c ${CCORE}/sfmtrng.c ${SFMT_DIR}/SFMT.c
+    INCLUDES ${SRW_CCORE}
+)
 
 # ===========================================================================
 # graph-tool C++ extensions (NOT built by CMake)

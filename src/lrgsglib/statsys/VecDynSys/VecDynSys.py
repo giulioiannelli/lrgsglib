@@ -28,7 +28,7 @@ from ..DynSys import DynSys
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ...graphs.nx import SignedGraphNX as SignedGraph
+    from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
 
 
 class VecDynSys(DynSys):
@@ -56,12 +56,19 @@ class VecDynSys(DynSys):
         q: int = 2,
         discrete: bool = True,
         T: float = 1.0,
+        savedisk: bool = True,
         **kw: Any,
     ):
         super().__init__(sg, **kw)
         self.q = q
         self.discrete = discrete
         self.T = T
+        # Master switch for on-disk persistence of enabled observables
+        # (same semantics as BinDynSys.savedisk): subclasses on the shared
+        # observable lifecycle (PottsBase, ...) gate their streams on it;
+        # inert for subclasses that do not act on it (legacy PottsModel,
+        # XYModel, ...).
+        self.savedisk = savedisk
         self._state_dtype = np.int32 if discrete else np.float64
         self._adj: NDArray | None = None
 
@@ -126,6 +133,7 @@ class VecDynSys(DynSys):
         """Write state to a binary file for C backend."""
         out_suffix = self.run_id or ''
         fname = self.sg.get_p_fname('s', out_suffix=out_suffix)
+        self._ensure_dynpath_exists()
         self.sfout = self.dynpath / fname
         self.s.astype(self._state_dtype).tofile(open(self.sfout, 'wb'))
         self.s_0 = self.s.copy()
