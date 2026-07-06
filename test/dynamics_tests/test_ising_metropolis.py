@@ -167,8 +167,10 @@ def test_seeded_reproducibility(tmp_path):
 
 def test_capability_errors_at_setup(tmp_path):
     sg = make_lattice(tmp_path)
-    with pytest.raises(NotImplementedError):
-        IsingMetropolis(sg, T=1.0, upd_mode="sync")
+    # upd_mode is wired since Phase 2; the async-only 'order' axis is its
+    # capability surface now (full coverage in test_ising_upd_modes.py).
+    with pytest.raises(ValueError):
+        IsingMetropolis(sg, T=1.0, upd_mode="sync", order="permutation")
     # move='wolff' is wired since Phase 2; its axis interactions are the
     # capability surface now (full coverage in test_ising_moves.py).
     with pytest.raises(ValueError):
@@ -181,8 +183,13 @@ def test_capability_errors_at_setup(tmp_path):
         IsingMetropolis(sg, T=1.0, tie_flip_p="unknown_preset")
     with pytest.raises(ValueError):
         IsingMetropolis(sg, T=1.0, observables=("energy", "bogus"))
-    # native backends: hard error for the new classes, at the front door
-    model = IsingMetropolis(sg, T=1.0, runlang="pb")
+    # native backends: what the compiled kernel cannot represent is a hard
+    # error at the front door, before any output opens (full pb coverage in
+    # test_ising_pb.py; runlang='cu' stays unwired for the new classes).
+    model = IsingMetropolis(sg, T=1.0, rule="glauber", runlang="pb")
+    with pytest.raises(NotImplementedError):
+        model.run()
+    model = IsingMetropolis(sg, T=1.0, runlang="cu")
     with pytest.raises(NotImplementedError):
         model.run()
 
