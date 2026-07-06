@@ -109,6 +109,13 @@ ISING_SA_COOLING_RATE_DEFAULT: float = 0.95
 ISING_SA_N_TEMPERATURES_DEFAULT: int = 100
 ISING_SA_STEPS_PER_T_DEFAULT: int = 100
 
+# Legacy TFCA ("topological field-cooling annealing") reproduction: the
+# legacy algorithm is a sudden quench at this constant temperature for
+# n_temperatures * steps_per_T sweeps under the spectral field; the strangler
+# facade maps it to IsingSimulatedAnnealing(field='spectral',
+# T_schedule=full(n_temperatures, ISING_TFCA_QUENCH_T)).
+ISING_TFCA_QUENCH_T: float = 1e-3
+
 # External-field construction axis on the annealing scheme (plan §10):
 # 'uniform' uses whatever field vector the user passed (default zero);
 # 'spectral' builds the softmax-weighted eigenvector field at init (the

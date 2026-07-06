@@ -1,3 +1,4 @@
+from ._facade import ising_from_legacy
 from .IsingBase import IsingBase
 from .IsingCEM import IsingCEM
 from .IsingDynamics import IsingDynamics
@@ -12,4 +13,5 @@ __all__ = [
     "IsingSimulatedAnnealing",
     "IsingParallelTempering",
     "IsingCEM",
+    "ising_from_legacy",
 ]

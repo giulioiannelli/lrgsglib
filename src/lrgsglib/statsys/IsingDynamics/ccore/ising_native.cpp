@@ -99,6 +99,10 @@ static void seed_rng(uint64_t seed_val) {
     seed_arr[3] = static_cast<uint32_t>(seed_val ^ 0xBE11AC1A0ULL);
     seed_rand = seed_arr;
     __set_seed_SFMT();
+    /* The asynchronous visit order (__gen_rand_u64_array in sfmtrng.c)
+     * derives each per-sweep sub-seed from libc rand(); seed that stream
+     * too, or seeded runs do not reproduce their site sequences. */
+    srand(static_cast<unsigned>(seed_val & 0xFFFFFFFF));
 }
 
 /* ==================================================================

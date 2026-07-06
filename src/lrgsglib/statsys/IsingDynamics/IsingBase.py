@@ -454,6 +454,86 @@ class IsingBase(RunHostMixin, CBackendMixin, BinDynSys):
             self._record()
             self._e_running += sweep()
 
+    # ------------------------------------------------------------------
+    # Native pybind backend hooks (the pb solver polymorphs on these)
+    # ------------------------------------------------------------------
+    def _pb_check_supported(self) -> None:
+        """Setup-time capability gate for ``runlang='pb'`` — the solver calls
+        this before any output stream opens. Default: not wired; pb-capable
+        scheme leaves override with their own axis validation."""
+        raise NotImplementedError(
+            f"runlang='pb' is not wired for {type(self).__name__}; use "
+            "runlang='py'."
+        )
+
+    def _pb_check_kinetics(
+        self,
+        *,
+        rule: str,
+        order: str,
+        tie_flip_p: float | None,
+        zero_T: bool = False,
+    ) -> None:
+        """Shared guards for the native single-site kernel
+        (``LRGSG_rbim.c::glauberMetropolis``): whatever the compiled kernel
+        cannot represent is a hard capability error, never a silent
+        approximation (plan invariant #3).
+
+        The kernel implements the Metropolis acceptance only, visits sites
+        in 'sequential' or 'asynchronous' order, bakes its tie policy
+        (``e^0 = 1`` at T > 0; frozen at T = 0), and — crucially — records
+        the pairwise-only energy while using the field in ΔE (the legacy
+        convention), so a nonzero field would silently corrupt the §3b
+        energy trace.
+        """
+        if rule != "metropolis":
+            raise NotImplementedError(
+                "runlang='pb': the native kernel implements the metropolis "
+                f"acceptance only; rule={rule!r} is python-only."
+            )
+        if order == "permutation":
+            raise NotImplementedError(
+                "runlang='pb': the native kernel visits sites in 'random' "
+                "or 'typewriter' order; order='permutation' is python-only."
+            )
+        expected_tie = 0.0 if zero_T else 1.0
+        if tie_flip_p is not None and float(tie_flip_p) != expected_tie:
+            raise NotImplementedError(
+                "runlang='pb': the native kernel bakes its ΔE=0 policy "
+                f"(accept with p={expected_tie} at this temperature); "
+                f"tie_flip_p={tie_flip_p} is python-only."
+            )
+        if np.any(np.asarray(self.field, dtype=np.float64) != 0.0):
+            raise NotImplementedError(
+                "runlang='pb': the native kernel records the pairwise-only "
+                "energy (field enters ΔE but not the recorded trace — the "
+                "legacy convention), which would break the field-first-class "
+                "energy invariant; use h = 0 or runlang='py'."
+            )
+        if ISING_OBS_SNAPSHOTS in self._selected_obs:
+            raise NotImplementedError(
+                "runlang='pb': the native kernel returns energy/magn traces "
+                "and the final state only; deselect 'snapshots' or use "
+                "runlang='py'."
+            )
+
+    def _pb_csr(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """The symmetric coupling CSR in the dtypes the kernel expects —
+        the SAME J as delta_E/total_energy (coupling_norm applied)."""
+        self._ensure_couplings()
+        return (
+            np.ascontiguousarray(self._nbr_idx, dtype=np.int64),
+            np.ascontiguousarray(self._nbr_J, dtype=np.float64),
+            np.ascontiguousarray(self._nbr_ptr, dtype=np.int64),
+        )
+
+    def _run_pb(self, tqdm_on: bool = False, verbose: bool = False) -> None:
+        """Execute the native kernel (pb-capable leaves override)."""
+        raise NotImplementedError(
+            f"runlang='pb' is not wired for {type(self).__name__}; use "
+            "runlang='py'."
+        )
+
     def make_sweep_fn(self):
         """Frame-producer hook (statsys._frames): one compiled engine sweep."""
         self.check_attribute()

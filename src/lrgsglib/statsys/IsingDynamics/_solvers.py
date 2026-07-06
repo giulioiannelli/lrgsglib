@@ -97,12 +97,21 @@ class _IsingPbSolver:
     backend = SolverBackend.PB
 
     def supports(self, model: "IsingDynamics") -> None:
-        _reject_new_style(model, "pybind (pb)")
+        if _is_new_style(model):
+            # New scheme classes: the leaf validates what the compiled
+            # kernel can faithfully represent (hard capability errors —
+            # IsingBase._pb_check_supported and overrides).
+            model._pb_check_supported()
         return None
 
     def execute(self, model: "IsingDynamics", *, tqdm_on: bool = True,
                 verbose: bool = False, sa_mode: bool = False,
                 pt_mode: bool = False) -> None:
+        if _is_new_style(model):
+            # ONE registry key, instance polymorphism: the leaf owns its
+            # kernel call (met/sa today; pt refused — buggy C criterion).
+            model._run_pb(tqdm_on=tqdm_on, verbose=verbose)
+            return
         rl, use_sa, use_pt = _resolve_modes(model, sa_mode, pt_mode)
         if "topo_cem" in rl:
             model._run_pybind_topo_cem()

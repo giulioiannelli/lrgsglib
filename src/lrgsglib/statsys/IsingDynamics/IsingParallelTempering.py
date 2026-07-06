@@ -181,6 +181,20 @@ class IsingParallelTempering(IsingBase):
         super().initialize_run_parameters()
 
     # ------------------------------------------------------------------
+    # Native pybind backend: deliberately refused
+    # ------------------------------------------------------------------
+    def _pb_check_supported(self) -> None:
+        raise NotImplementedError(
+            "runlang='pb' is deliberately not wired for "
+            "IsingParallelTempering: the native pt kernel's exchange "
+            "criterion (LRGSG_pt.c::pt_attempt_exchange) is a tautology — "
+            "every proposed swap is accepted (same bug as the legacy python "
+            "path, and it feeds intensive energies into Δβ·ΔE). The python "
+            "backend implements the correct min(1, e^{Δβ·ΔE}) criterion "
+            "(ref M7); use runlang='py'."
+        )
+
+    # ------------------------------------------------------------------
     # Engine + sampling
     # ------------------------------------------------------------------
     def _make_engine(self, T: float | None = None) -> ThermalEngine:

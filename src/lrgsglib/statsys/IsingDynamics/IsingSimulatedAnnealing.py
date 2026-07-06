@@ -27,6 +27,7 @@ from .._spectral import (
     rbim_subspace_energies,
 )
 from .._thermal import THERMAL_RULES, ThermalEngine, resolve_tie_flip
+from ._native import PB_ORDER_MAP, load_ising_native
 from .defaults import (
     ISING_FIELD_MODE_DEFAULT,
     ISING_FIELD_MODES,
@@ -169,6 +170,13 @@ class IsingSimulatedAnnealing(IsingBase):
             field_mode, field_arr = "uniform", field
 
         self.T_schedule = stage_T
+        # The schedule's identity (name + generator parameters), kept for
+        # the native backend: the C kernel regenerates the temperature grid
+        # itself, so the pb guard must know which named schedule this is.
+        self.schedule = "custom" if T_schedule is not None else schedule
+        self.T_init = float(T_init)
+        self.T_final = float(T_final)
+        self.cooling_rate = float(cooling_rate)
         self.n_temperatures = len(stage_T)
         self.steps_per_T = int(steps_per_T)
         if self.steps_per_T < 1:
@@ -261,6 +269,74 @@ class IsingSimulatedAnnealing(IsingBase):
         self.sa_temps = self.T_schedule.copy()
         self.sa_energy = stage_e
         self.sa_magn = stage_m
+
+    # ------------------------------------------------------------------
+    # Native pybind backend (sa kernel; guards in _pb_check_supported)
+    # ------------------------------------------------------------------
+    def _pb_check_supported(self) -> None:
+        if self.field_mode == "spectral":
+            raise NotImplementedError(
+                "runlang='pb': the native kernel records the pairwise-only "
+                "energy, so the spectral (TFCA) field would be dropped from "
+                "the trace; field='spectral' runs on the python backend."
+            )
+        if self.schedule != "exponential":
+            raise NotImplementedError(
+                "runlang='pb': only schedule='exponential' matches the C "
+                "cooling grid exactly (T_init·rate^k); the native "
+                f"linear/logarithmic grids differ — schedule="
+                f"{self.schedule!r} runs on the python backend."
+            )
+        if self.T_init <= 0.0:
+            raise NotImplementedError(
+                "runlang='pb': the native annealing loop stops at T <= 0, "
+                "so an all-zero exponential schedule (T_init=0) cannot run; "
+                "use runlang='py'."
+            )
+        self._pb_check_kinetics(
+            rule=self.rule,
+            order=self.order,
+            tie_flip_p=self.tie_flip_p,
+            zero_T=False,  # exponential stages are strictly positive
+        )
+
+    def _run_pb(self, tqdm_on: bool = False, verbose: bool = False) -> None:
+        """One native annealing run. ``T_final`` is passed as 0.0 to disable
+        the C early-exit (``T > T_final`` loop guard): the python schedule
+        generator runs ALL ``n_temperatures`` stages and ignores ``T_final``
+        under 'exponential' (legacy semantics), so this reproduces the
+        python-backend schedule exactly. Energies are the kernel's intensive
+        pairwise values (== full Hamiltonian; the field is zero by guard)."""
+        mod = load_ising_native()
+        ni, nw, nptr = self._pb_csr()
+        s_out, ene, magn, T_out = mod.sa_sampling(
+            np.ascontiguousarray(self.s, dtype=np.int8),
+            ni,
+            nw,
+            nptr,
+            np.asarray(self.field, dtype=np.float64),
+            float(self.T_init),
+            0.0,  # no early exit — run the full python-equivalent schedule
+            "exponential",
+            float(self.cooling_rate),
+            int(self.steps_per_T),
+            int(self.n_temperatures),
+            int(self.seed),
+            PB_ORDER_MAP[self.order],
+        )
+        self.s = np.asarray(s_out, dtype=np.int8)
+        ene = np.asarray(ene)
+        magn = np.asarray(magn)
+        self.ene = ene.tolist()
+        self.magn = magn.tolist()
+        self._e_running = self.total_energy()
+        # End-of-stage curve: the trace is recorded BEFORE each sweep, so
+        # stage k ends at the first record of stage k+1; the last stage
+        # ends at the final state.
+        k = self.steps_per_T
+        self.sa_temps = np.asarray(T_out)
+        self.sa_energy = np.append(ene[k::k], self.energy_intensive())
+        self.sa_magn = np.append(magn[k::k], self.magnetization())
 
     def sa_curve(self) -> dict:
         """The per-stage annealing curve: end-of-stage intensive energy and

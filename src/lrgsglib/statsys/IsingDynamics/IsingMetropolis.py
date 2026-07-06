@@ -7,10 +7,11 @@ subclasses: acceptance ``rule`` (metropolis M1 / glauber M2 / heatbath M4 —
 citations in ``.agents/ref/00-REFERENCES.md`` §MCMC), update schedule
 ``upd_mode`` + async ``order``, elementary ``move``.
 
-Phase-1 slice: ``move='single'`` and ``upd_mode='async'`` on the Python
-backend. The other axis values are validated here at construction and raise a
-hard capability error (invariant #3: never a silent fallback); they are wired
-in later phases (cluster moves, sync/gillespie, native backends).
+Phase-2 state: every move (single/wolff/sw/spectral/exchange) and every
+update mode (async/sync/gillespie, single-site moves only) is wired on the
+Python backend. Inapplicable axis combinations are validated here at
+construction and raise a hard capability error (invariant #3: never a silent
+fallback); the native backends land next.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from .._thermal import (
     WolffEngine,
     resolve_tie_flip,
 )
+from ._native import PB_ORDER_MAP, load_ising_native
 from .defaults import (
     ISING_MOVE_DEFAULT,
     ISING_MOVES,
@@ -68,11 +70,15 @@ class IsingMetropolis(IsingBase):
     rule : {'metropolis', 'glauber', 'heatbath'}
         Acceptance rule (module docstring for citations).
     upd_mode : {'async', 'sync', 'gillespie'}
-        Update schedule (single-site moves only).
+        Update schedule, ``move='single'`` only: random-sequential attempts;
+        sublattice-parallel synchronous updates (greedy graph coloring, M4);
+        rejection-free continuous-time BKL kinetics (M3, one recorded step =
+        one unit of time = one sweep-equivalent).
     order : {'random', 'permutation', 'typewriter'}
         Site-visit order for async kinetics (default ``'random'`` — the
         legacy fixed-order loop survives as ``'typewriter'``). Applies to
-        ``move='single'`` and ``move='exchange'``.
+        ``move='single'`` and ``move='exchange'`` under ``upd_mode='async'``
+        only.
     move : {'single', 'wolff', 'sw', 'spectral', 'exchange'}
         Elementary move: single-spin flip; Wolff single-cluster (M6) /
         Swendsen–Wang multi-cluster (M5) — zero-field only, per-sweep
@@ -134,6 +140,12 @@ class IsingMetropolis(IsingBase):
                     f"order does not apply to move={move!r}; leave order at "
                     f"{ISING_ORDER_DEFAULT!r}."
                 )
+        if move == "exchange" and upd_mode != ISING_UPD_MODE_DEFAULT:
+            raise ValueError(
+                "move='exchange' has asynchronous kinetics only (the swap-"
+                "attempt sequence is its schedule); leave upd_mode at "
+                f"{ISING_UPD_MODE_DEFAULT!r}."
+            )
         if move in ("wolff", "sw"):
             if rule != ISING_RULE_DEFAULT:
                 raise ValueError(
@@ -246,6 +258,50 @@ class IsingMetropolis(IsingBase):
             nbr_ptr=self._nbr_ptr,
             field=np.asarray(self.field, dtype=np.float64),
         )
+
+    # ------------------------------------------------------------------
+    # Native pybind backend (met kernel; guards in _pb_check_supported)
+    # ------------------------------------------------------------------
+    def _pb_check_supported(self) -> None:
+        if self.move != "single":
+            raise NotImplementedError(
+                "runlang='pb' is wired for move='single' only; "
+                f"move={self.move!r} runs on the python backend."
+            )
+        if self.upd_mode != "async":
+            raise NotImplementedError(
+                "runlang='pb': the native kernel is asynchronous only; "
+                f"upd_mode={self.upd_mode!r} runs on the python backend."
+            )
+        self._pb_check_kinetics(
+            rule=self.rule,
+            order=self.order,
+            tie_flip_p=self.tie_flip_p,
+            zero_T=(self.T == 0.0),
+        )
+
+    def _run_pb(self, tqdm_on: bool = False, verbose: bool = False) -> None:
+        """One fixed-T native run: same J (coupling_norm applied), same
+        record-then-sweep cadence, intensive energies (the kernel's
+        ``calc_totEnergy`` is already E/N; field is zero by the guard, so
+        pairwise == full Hamiltonian)."""
+        mod = load_ising_native()
+        ni, nw, nptr = self._pb_csr()
+        s_out, ene, magn = mod.metropolis_sampling(
+            np.ascontiguousarray(self.s, dtype=np.int8),
+            ni,
+            nw,
+            nptr,
+            np.asarray(self.field, dtype=np.float64),
+            float(self.T),
+            int(self.steps),
+            int(self.seed),
+            PB_ORDER_MAP[self.order],
+        )
+        self.s = np.asarray(s_out, dtype=np.int8)
+        self.ene = np.asarray(ene).tolist()
+        self.magn = np.asarray(magn).tolist()
+        self._e_running = self.total_energy()
 
     def _sample_py(self, tqdm_on: bool = False, verbose: bool = False) -> None:
         super()._sample_py(tqdm_on=tqdm_on, verbose=verbose)
