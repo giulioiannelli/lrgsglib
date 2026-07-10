@@ -22,7 +22,7 @@ from .ContDynSys import ContDynSys
 from .VecDynSys import VecDynSys
 
 # Binary-state dynamics
-from .IsingDynamics import IsingDynamics
+from .IsingDynamics import IsingDynamics, IsingModel
 from .ContactProcess import (
     ContactProcess,
     ContactProcessBase,
@@ -58,6 +58,7 @@ __all__ = [
     "ContDynSys",
     "VecDynSys",
     # Binary
+    "IsingModel",
     "IsingDynamics",
     "ContactProcess",
     "ContactProcessBase",
