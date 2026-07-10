@@ -12,6 +12,7 @@ nx = pytest.importorskip("networkx")
 np = pytest.importorskip("numpy")
 from unittest import mock
 
+
 class TestContactProcess(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -32,8 +33,13 @@ class TestContactProcess(unittest.TestCase):
         sys.modules["lrgsglib.config.lrgsg_env"] = env_module
 
         from lrgsglib.graphs.nx import SignedGraphNX as SignedGraph
-        from lrgsglib.statsys.ContactProcess import ContactProcessEI, ContactProcessSIR
-        from kernels.ContactProcessDynamics import initialize_contact_process_dict_args
+        from lrgsglib.statsys.ContactProcess import (
+            ContactProcessEI,
+            ContactProcessSIR,
+        )
+        from kernels.ContactProcessDynamics import (
+            initialize_contact_process_dict_args,
+        )
         from kernels import L2D_ContactProcess as cp_kernel
         from parsers import L2D_ContactProcess as cp_parser
 
@@ -237,7 +243,9 @@ class TestContactProcess(unittest.TestCase):
 
     def test_ei_run_allows_python_backend(self):
         sg = self._make_graph()
-        model = self.ContactProcessEI(sg, gamma=0.4, runlang="py", steps=1, seed=0)
+        model = self.ContactProcessEI(
+            sg, gamma=0.4, runlang="py", steps=1, seed=0
+        )
         model.init_contact_dynamics()
         model.run(tqdm_on=False, steps=2)
         unique = np.unique(model.s)
@@ -245,7 +253,9 @@ class TestContactProcess(unittest.TestCase):
 
     def test_c_backend_run_reads_stdout_state(self):
         sg = self._make_graph()
-        model = self.ContactProcessSIR(sg, mu=0.2, runlang="C0", steps=1, seed=0)
+        model = self.ContactProcessSIR(
+            sg, mu=0.2, runlang="C0", steps=1, seed=0
+        )
         model._set_time_controls(steps=5)
 
         ccore_dir = Path(self._tmp_dir.name) / "ccore_bin"
@@ -257,7 +267,9 @@ class TestContactProcess(unittest.TestCase):
 
         with mock.patch("subprocess.run") as run_mock:
             run_mock.return_value = subprocess.CompletedProcess(
-                args=[str(fake_binary)], returncode=0, stdout=stdout_state.tobytes()
+                args=[str(fake_binary)],
+                returncode=0,
+                stdout=stdout_state.tobytes(),
             )
             model.init_contact_dynamics()
             model.run(verbose=False, clean_export=False)
@@ -277,7 +289,16 @@ class TestContactProcess(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.cp_parser.parse_arguments(
                 self.cp_parser.parser,
-                ["4", "0.1", "--dynamics", "SIR", "--runlang", "C1D", "--mu", "0.5"],
+                [
+                    "4",
+                    "0.1",
+                    "--dynamics",
+                    "SIR",
+                    "--runlang",
+                    "C1D",
+                    "--mu",
+                    "0.5",
+                ],
             )
 
     def test_kernel_validates_backend_choice(self):
@@ -301,7 +322,17 @@ class TestContactProcess(unittest.TestCase):
     def test_l2d_contact_process_rejects_unwired_backends(self):
         args = self.cp_parser.parse_arguments(
             self.cp_parser.parser,
-            ["4", "-p", "0.1", "--dynamics", "EI", "--runlang", "C1S", "--gamma", "0.3"],
+            [
+                "4",
+                "-p",
+                "0.1",
+                "--dynamics",
+                "EI",
+                "--runlang",
+                "C1S",
+                "--gamma",
+                "0.3",
+            ],
         )
         with self.assertRaises(NotImplementedError):
             self.cp_kernel.run_simulation(args)
@@ -438,3 +469,66 @@ class TestContactProcess(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+# ===================================================================
+# EI C backend: density file convention + read-back (pytest-style)
+# ===================================================================
+
+
+@pytest.mark.integration
+def test_ei_c_density_written_as_rho_and_read_back(tmp_path):
+    """A ``C1D`` run writes ``rho_*`` (CP_DENSITY_FBASE) and populates
+    ``self.density``.
+
+    Regression: the C binary used to write ``dens_*`` while Python calls
+    the same observable ``rho``, and nothing ever read the file back —
+    after a C run the density attribute stayed empty ("orphaned output").
+    """
+    from lrgsglib.statsys.ContactProcess import _solvers as cp_solvers
+
+    bin_path = (
+        Path(cp_solvers.__file__).parent / "ccore" / "bin" / "ContactProcessEI"
+    )
+    if not bin_path.exists():
+        pytest.skip("ContactProcessEI binary not built")
+
+    from lrgsglib.graphs.nx import Lattice2DNX
+    from lrgsglib.statsys import ContactProcessEI
+
+    sg = Lattice2DNX(
+        side1=6,
+        geo="sqr",
+        pbc=True,
+        pflip=0.0,
+        seed=1,
+        path_data=tmp_path,
+        path_plot=tmp_path,
+        init_nw_dict=False,
+    )
+    model = ContactProcessEI(
+        sg,
+        gamma=0.8,
+        runlang="C1D",
+        steps=50,
+        seed=3,
+        num_log_samples=20,
+        out_suffix="rhosuff",
+    )
+    model.init_contact_dynamics()
+    model.run(verbose=False, clean_export=False)
+
+    rho = np.asarray(model.density, dtype=np.float64)
+    assert rho.size == 20
+    assert rho[0] > 0.0
+    assert np.all((rho >= 0.0) & (rho <= 1.0))
+
+    # Phase-C layout: the C exchange lands inside the per-run directory
+    # (out_suffix appended verbatim to the canonical tokens), and the
+    # binary's own rho_* filename is preserved inside it.
+    rundir = model._run_output_dir()
+    assert rundir.name.endswith("_rhosuff")
+    assert rundir.parent == Path(model.dynpath)
+    written = list(rundir.glob("rho_p=*gamma=*_rhosuff.bin"))
+    assert written, "C binary did not write the rho_* density file"
+    assert (rundir / "cfg.json").exists()

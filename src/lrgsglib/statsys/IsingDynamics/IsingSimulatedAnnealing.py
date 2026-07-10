@@ -209,6 +209,26 @@ class IsingSimulatedAnnealing(IsingBase):
         self._make_engine()
 
     # ------------------------------------------------------------------
+    # Run-dirname schema (Phase C)
+    # ------------------------------------------------------------------
+    _sch_token = "sa"
+
+    def _ns_token_value(self) -> int | None:
+        return None  # horizon derived from the scheme numerics
+
+    def _physics_tokens(self) -> list:
+        return [
+            ("Ti", float(self.T_init)),
+            ("Tf", float(self.T_final)),
+            ("nT", int(self.n_temperatures)),
+            ("spt", int(self.steps_per_T)),
+            self._field_token(),
+        ]
+
+    def _axis_tokens(self) -> list:
+        return [("sched", self.schedule, "exponential")]
+
+    # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
     def init_dynamics(self, custom: Any = None) -> None:

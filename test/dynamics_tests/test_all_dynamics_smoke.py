@@ -3,6 +3,7 @@
 Each test instantiates the model on a small lattice, initializes,
 runs a few steps, and verifies the state array has the right shape.
 """
+
 import numpy as np
 import pytest
 
@@ -10,9 +11,15 @@ from lrgsglib.graphs.nx import Lattice2DNX
 
 
 @pytest.fixture
-def small_lattice():
-    """8x8 square lattice with mild frustration."""
-    lat = Lattice2DNX(side1=8, geo="sqr", pflip=0.1, seed=42)
+def small_lattice(tmp_path):
+    """8x8 square lattice with mild frustration.
+
+    path_data=tmp_path: savedisk-enabled models (the flow trio) persist
+    per-run outputs, which must never land in the repo's data/.
+    """
+    lat = Lattice2DNX(
+        side1=8, geo="sqr", pflip=0.1, seed=42, path_data=tmp_path
+    )
     lat.flip_random_fract_edges()
     return lat
 
@@ -47,7 +54,9 @@ class TestKuramotoModel:
 
 class TestReactionDiffusionModel:
     def test_instantiation(self, small_lattice):
-        from lrgsglib.statsys.ReactionDiffusionModel import ReactionDiffusionModel
+        from lrgsglib.statsys.ReactionDiffusionModel import (
+            ReactionDiffusionModel,
+        )
 
         rd = ReactionDiffusionModel(
             sg=small_lattice, D=0.1, dt=0.01, steps=10, seed=42
@@ -57,7 +66,9 @@ class TestReactionDiffusionModel:
         assert len(rd.s) == small_lattice.N
 
     def test_run(self, small_lattice):
-        from lrgsglib.statsys.ReactionDiffusionModel import ReactionDiffusionModel
+        from lrgsglib.statsys.ReactionDiffusionModel import (
+            ReactionDiffusionModel,
+        )
 
         rd = ReactionDiffusionModel(
             sg=small_lattice, D=0.1, dt=0.01, steps=10, seed=42
@@ -170,7 +181,12 @@ class TestMultiSpeciesModel:
         from lrgsglib.statsys.MultiSpeciesModel import MultiSpeciesModel
 
         ms = MultiSpeciesModel(
-            sg=small_lattice, species=2, q_per_species=3, T=1.0, steps=10, seed=42
+            sg=small_lattice,
+            species=2,
+            q_per_species=3,
+            T=1.0,
+            steps=10,
+            seed=42,
         )
         ms.init_multispecies_dynamics()
         assert ms.s is not None
@@ -179,7 +195,12 @@ class TestMultiSpeciesModel:
         from lrgsglib.statsys.MultiSpeciesModel import MultiSpeciesModel
 
         ms = MultiSpeciesModel(
-            sg=small_lattice, species=2, q_per_species=3, T=1.0, steps=10, seed=42
+            sg=small_lattice,
+            species=2,
+            q_per_species=3,
+            T=1.0,
+            steps=10,
+            seed=42,
         )
         ms.init_multispecies_dynamics()
         ms.run(verbose=False)

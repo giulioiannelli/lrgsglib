@@ -144,6 +144,21 @@ class IsingCEM(IsingBase):
         # One record per CEM iteration (the incumbent trace).
         super().__init__(sg, steps=self.restarts * self.n_iter, **kwargs)
 
+    # ------------------------------------------------------------------
+    # Run-dirname schema (Phase C)
+    # ------------------------------------------------------------------
+    _sch_token = "cem"
+
+    def _ns_token_value(self) -> int | None:
+        return None  # horizon derived from the scheme numerics
+
+    def _physics_tokens(self) -> list:
+        return [
+            ("nrst", int(self.restarts)),
+            ("nit", int(self.n_iter)),
+            ("sig", float(self.init_sigma)),
+        ]
+
     def initialize_run_parameters(
         self, steps: int | None = None, simref: float | None = None
     ) -> None:

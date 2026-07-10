@@ -170,6 +170,34 @@ class MultiSpeciesMetropolis(MultiSpeciesBase):
         if move == "single":
             self._make_engine()
 
+    # ------------------------------------------------------------------
+    # Run-dirname schema (Phase C)
+    # ------------------------------------------------------------------
+    def _physics_tokens(self) -> list:
+        return super()._physics_tokens()
+
+    def _axis_tokens(self) -> list:
+        cluster = self.move in ("wolff", "sw")
+        return [
+            ("rule", None if cluster else self.rule, MULTISPEC_RULE_DEFAULT),
+            ("move", self.move, MULTISPEC_MOVE_DEFAULT),
+            ("upd", self.upd_mode, MULTISPEC_UPD_MODE_DEFAULT),
+            (
+                "ord",
+                self.order if self.upd_mode == "async" else None,
+                MULTISPEC_ORDER_DEFAULT,
+            ),
+            (
+                "tf",
+                (
+                    None
+                    if cluster or self.rule != "metropolis"
+                    else self.tie_flip_p
+                ),
+                1.0,
+            ),
+        ]
+
     def _make_engine(self):
         if self.move == "single":
             return ThermalEngine(

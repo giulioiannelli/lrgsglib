@@ -32,7 +32,13 @@ class _RDPySolver:
     def supports(self, model: "ReactionDiffusionModel") -> None:
         return None
 
-    def execute(self, model: "ReactionDiffusionModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "ReactionDiffusionModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model.run_py(verbose=verbose)
 
     def is_available(self) -> bool:
@@ -47,12 +53,19 @@ class _RDPbSolver:
     def supports(self, model: "ReactionDiffusionModel") -> None:
         return None
 
-    def execute(self, model: "ReactionDiffusionModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "ReactionDiffusionModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model._run_pybind()
 
     def is_available(self) -> bool:
         try:
             from .ccore import _rd_native  # noqa: F401
+
             return True
         except Exception:
             return False
@@ -66,7 +79,13 @@ class _RDCSolver:
     def supports(self, model: "ReactionDiffusionModel") -> None:
         return None
 
-    def execute(self, model: "ReactionDiffusionModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "ReactionDiffusionModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model.build_cprogram_command()
         model.run_cprogram(verbose)
 

@@ -92,6 +92,71 @@ class _XYPbSolver:
             return False
 
 
+class _XYNpSolver:
+    """Vectorized NumPy backend: sublattice-parallel sync sweeps
+    (VectorSyncEngine) — new scheme classes only."""
+
+    backend = SolverBackend.NP
+
+    def supports(self, model: "XYModel") -> None:
+        if not _is_new_style(model):
+            raise NotImplementedError(
+                "the legacy XYModel has no np backend; use the new "
+                "scheme classes (XYMetropolis, ...)."
+            )
+        model._np_check_supported()
+        return None
+
+    def execute(
+        self,
+        model: "XYModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+        **_: object,
+    ) -> None:
+        model._run_np(tqdm_on=tqdm_on)
+
+    def is_available(self) -> bool:
+        return True
+
+
+class _XYCuSolver:
+    """Vectorized CuPy (GPU) backend: the same VectorSyncEngine as np,
+    on the CuPy array module — new scheme classes only."""
+
+    backend = SolverBackend.CU
+
+    def supports(self, model: "XYModel") -> None:
+        if not _is_new_style(model):
+            raise NotImplementedError(
+                "the legacy XYModel has no cu backend; use the new "
+                "scheme classes (XYMetropolis, ...)."
+            )
+        model._np_check_supported()
+        return None
+
+    def execute(
+        self,
+        model: "XYModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+        **_: object,
+    ) -> None:
+        import cupy
+
+        model._run_np(tqdm_on=tqdm_on, xp=cupy)
+
+    def is_available(self) -> bool:
+        try:
+            import cupy  # noqa: F401
+
+            return True
+        except Exception:
+            return False
+
+
 class _XYCSolver:
     """C subprocess backend (file-transported state)."""
 
@@ -133,6 +198,8 @@ def model_c_binary_exists() -> bool:
 _XY_SOLVERS: tuple[Solver, ...] = (
     _XYPySolver(),
     _XYPbSolver(),
+    _XYNpSolver(),
+    _XYCuSolver(),
     _XYCSolver(),
 )
 

@@ -167,11 +167,18 @@ def assert_backend_agreement(
     """Statistical cross-backend agreement for stochastic kernels.
 
     Runs *n_replicas* per backend (distinct seeds), compares the mean of
-    *statistic* across backends within *atol*. Deterministic models can pass
-    ``n_replicas=1`` with a tight *atol*. Native backends use their own RNG
-    streams, so byte-equality across backends is NEVER asserted (D-B6).
+    *statistic* across backends within ``max(atol, 4 * SE_diff)`` where
+    ``SE_diff`` is the standard error of the difference of the two means
+    — the replica-to-replica scatter is REAL physics (each replica is a
+    distinct disorder realization, and short trajectories sit in
+    different metastable basins), so a fixed *atol* alone flakes on the
+    tail of that distribution. Deterministic models can pass
+    ``n_replicas=1`` with a tight *atol* (zero scatter -> pure *atol*).
+    Native backends use their own RNG streams, so byte-equality across
+    backends is NEVER asserted (D-B6).
     """
     means: dict[str, float] = {}
+    sems: dict[str, float] = {}
     for backend in backends:
         vals = []
         for rep in range(n_replicas):
@@ -182,10 +189,13 @@ def assert_backend_agreement(
             model.run(**case.run_kwargs)
             vals.append(statistic(model))
         means[backend] = float(np.mean(vals))
+        sems[backend] = float(np.std(vals) / np.sqrt(n_replicas))
     reference = means[backends[0]]
+    ref_sem = sems[backends[0]]
     for backend, mean in means.items():
-        assert abs(mean - reference) <= atol, (
+        tol = max(atol, 4.0 * float(np.hypot(sems[backend], ref_sem)))
+        assert abs(mean - reference) <= tol, (
             f"[{case.name}] backend {backend!r} mean statistic {mean} "
-            f"deviates from {backends[0]!r} ({reference}) beyond atol={atol}; "
-            f"all means: {means}"
+            f"deviates from {backends[0]!r} ({reference}) beyond "
+            f"tol={tol} (atol={atol}); all means: {means}"
         )

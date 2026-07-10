@@ -32,7 +32,13 @@ class _CodePySolver:
     def supports(self, model: "CoupledODEModel") -> None:
         return None
 
-    def execute(self, model: "CoupledODEModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "CoupledODEModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model.run_py(verbose=verbose)
 
     def is_available(self) -> bool:
@@ -47,12 +53,19 @@ class _CodePbSolver:
     def supports(self, model: "CoupledODEModel") -> None:
         return None
 
-    def execute(self, model: "CoupledODEModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "CoupledODEModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model._run_pybind()
 
     def is_available(self) -> bool:
         try:
             from .ccore import _code_native  # noqa: F401
+
             return True
         except Exception:
             return False
@@ -66,7 +79,13 @@ class _CodeCSolver:
     def supports(self, model: "CoupledODEModel") -> None:
         return None
 
-    def execute(self, model: "CoupledODEModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "CoupledODEModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model.build_cprogram_command()
         model.run_cprogram(verbose)
 

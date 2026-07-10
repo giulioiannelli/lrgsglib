@@ -61,9 +61,15 @@ class _IsingPySolver:
     def supports(self, model: "IsingDynamics") -> None:
         return None
 
-    def execute(self, model: "IsingDynamics", *, tqdm_on: bool = True,
-                verbose: bool = False, sa_mode: bool = False,
-                pt_mode: bool = False) -> None:
+    def execute(
+        self,
+        model: "IsingDynamics",
+        *,
+        tqdm_on: bool = True,
+        verbose: bool = False,
+        sa_mode: bool = False,
+        pt_mode: bool = False,
+    ) -> None:
         if _is_new_style(model):
             # New scheme classes (IsingBase leaves): the compiled
             # ThermalEngine loop. ONE registry key, instance polymorphism.
@@ -104,9 +110,15 @@ class _IsingPbSolver:
             model._pb_check_supported()
         return None
 
-    def execute(self, model: "IsingDynamics", *, tqdm_on: bool = True,
-                verbose: bool = False, sa_mode: bool = False,
-                pt_mode: bool = False) -> None:
+    def execute(
+        self,
+        model: "IsingDynamics",
+        *,
+        tqdm_on: bool = True,
+        verbose: bool = False,
+        sa_mode: bool = False,
+        pt_mode: bool = False,
+    ) -> None:
         if _is_new_style(model):
             # ONE registry key, instance polymorphism: the leaf owns its
             # kernel call (met/sa today; pt refused — buggy C criterion).
@@ -133,9 +145,39 @@ class _IsingPbSolver:
     def is_available(self) -> bool:
         try:
             from .ccore import _ising_native  # noqa: F401
+
             return True
         except Exception:
             return False
+
+
+class _IsingNpSolver:
+    """Vectorized NumPy backend: sublattice-parallel sync sweeps
+    (VectorSyncEngine) — new scheme classes only."""
+
+    backend = SolverBackend.NP
+
+    def supports(self, model: "IsingDynamics") -> None:
+        if not _is_new_style(model):
+            raise NotImplementedError(
+                "the legacy IsingDynamics has no np backend; use the new "
+                "scheme classes (IsingMetropolis, ...)."
+            )
+        model._np_check_supported()
+        return None
+
+    def execute(
+        self,
+        model: "IsingDynamics",
+        *,
+        tqdm_on: bool = True,
+        verbose: bool = False,
+        **_: object,
+    ) -> None:
+        model._run_np(tqdm_on=tqdm_on)
+
+    def is_available(self) -> bool:
+        return True
 
 
 class _IsingCuSolver:
@@ -144,12 +186,26 @@ class _IsingCuSolver:
     backend = SolverBackend.CU
 
     def supports(self, model: "IsingDynamics") -> None:
-        _reject_new_style(model, "CuPy (cu)")
+        if _is_new_style(model):
+            # Same vectorized sync engine as np, on the CuPy array module.
+            model._np_check_supported()
+            return None
         return None
 
-    def execute(self, model: "IsingDynamics", *, tqdm_on: bool = True,
-                verbose: bool = False, sa_mode: bool = False,
-                pt_mode: bool = False) -> None:
+    def execute(
+        self,
+        model: "IsingDynamics",
+        *,
+        tqdm_on: bool = True,
+        verbose: bool = False,
+        sa_mode: bool = False,
+        pt_mode: bool = False,
+    ) -> None:
+        if _is_new_style(model):
+            import cupy
+
+            model._run_np(tqdm_on=tqdm_on, xp=cupy)
+            return
         rl, use_sa, use_pt = _resolve_modes(model, sa_mode, pt_mode)
         if "topo_cem" in rl:
             model.cem_spectral_sampling(tqdm_on)
@@ -172,6 +228,7 @@ class _IsingCuSolver:
     def is_available(self) -> bool:
         try:
             import cupy  # noqa: F401
+
             return True
         except Exception:
             return False
@@ -186,9 +243,15 @@ class _IsingCSolver:
         _reject_new_style(model, "C subprocess")
         return None
 
-    def execute(self, model: "IsingDynamics", *, tqdm_on: bool = True,
-                verbose: bool = False, sa_mode: bool = False,
-                pt_mode: bool = False) -> None:
+    def execute(
+        self,
+        model: "IsingDynamics",
+        *,
+        tqdm_on: bool = True,
+        verbose: bool = False,
+        sa_mode: bool = False,
+        pt_mode: bool = False,
+    ) -> None:
         model.build_cprogram_command()
         model.run_cprogram(verbose)
 
@@ -200,6 +263,7 @@ class _IsingCSolver:
 _ISING_SOLVERS: tuple[Solver, ...] = (
     _IsingPySolver(),
     _IsingPbSolver(),
+    _IsingNpSolver(),
     _IsingCuSolver(),
     _IsingCSolver(),
 )

@@ -30,9 +30,12 @@ existing test nets.
 
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from ..utils.tools.chronometer import time_function_accumulate
+from ._naming import run_dirname, write_cfg_sidecar
 from ._solver import SolverBackend
 from ._solver_engine import get_solver
 
@@ -124,6 +127,85 @@ class RunHostMixin:
         """
 
     # ------------------------------------------------------------------
+    # Per-run output directory + cfg.json sidecar (Phase C naming)
+    # ------------------------------------------------------------------
+    def _name_tokens(self) -> list | None:
+        """Ordered ``(key, value[, default])`` schema for the run dirname.
+
+        ``None`` (default) keeps the model's flat legacy layout; the
+        new-style Bases override this to opt into per-run directories
+        (``<dynpath>/<run dirname>/{ene.bin, m.bin, sout.bin, cfg.json}``).
+        """
+        return None
+
+    def _lang_token(self) -> str:
+        """Backend provenance for the ``lang=`` token (resolved by run())."""
+        backend = getattr(self, "_active_backend", None)
+        if backend is not None:
+            return backend.value
+        return str(self.runlang).lower()
+
+    def _run_output_dir(self) -> Path | None:
+        """The run's output directory (``None`` -> flat legacy layout).
+
+        A non-empty ``out_suffix`` is appended verbatim as the last token,
+        so repeat runs a user labels by hand stay distinguishable.
+        """
+        tokens = self._name_tokens()
+        if tokens is None:
+            return None
+        name = run_dirname(tokens)
+        suffix = getattr(self, "out_suffix", "")
+        if suffix:
+            name = f"{name}_{suffix}"
+        return Path(cast(Any, self).dynpath) / name
+
+    def _cfg_graph_block(self) -> dict[str, Any]:
+        """Substrate identity: p names the disorder ENSEMBLE, the graph
+        seed pins the REALIZATION — both are needed to reproduce."""
+        sg = self.sg
+        return {
+            "class": type(sg).__name__,
+            "N": getattr(sg, "N", None),
+            "pflip": getattr(sg, "pflip", None),
+            "seed": getattr(sg, "seed", None),
+            "syshape": getattr(sg, "syshapePth", None),
+            "path_name": getattr(sg, "sgpathn", getattr(sg, "_sgpathn", None)),
+        }
+
+    def _cfg_model_block(self) -> dict[str, Any]:
+        """Every constructor argument (elided defaults included); the
+        new-style Bases override and extend."""
+        return {"class": type(self).__name__}
+
+    def _cfg_run_block(self) -> dict[str, Any]:
+        model = cast(Any, self)
+        try:
+            from importlib.metadata import version
+
+            _version = version("lrgsglib")
+        except Exception:
+            _version = "unknown"
+        return {
+            "steps": getattr(model, "steps", None),
+            "observables": sorted(getattr(model, "_selected_obs", ()) or ()),
+            "runlang": model.runlang,
+            "backend": self._lang_token(),
+            "seed": getattr(model, "seed", None),
+            "out_suffix": getattr(model, "out_suffix", ""),
+            "lrgsglib": _version,
+            "date": datetime.now().isoformat(timespec="seconds"),
+        }
+
+    def _write_cfg_sidecar(self, rundir: Path) -> None:
+        write_cfg_sidecar(
+            rundir,
+            graph=self._cfg_graph_block(),
+            model=self._cfg_model_block(),
+            run=self._cfg_run_block(),
+        )
+
+    # ------------------------------------------------------------------
     # The front door
     # ------------------------------------------------------------------
     @time_function_accumulate(auto_log=False)
@@ -161,6 +243,8 @@ class RunHostMixin:
             )
         model = cast("DynSys", self)
         backend = self._resolve_backend()
+        # Stashed for the lang= run-dirname token and the cfg sidecar.
+        self._active_backend = backend
         solver = get_solver(type(self).solver_name, backend)
         # Guard before any file export / kernel call so backends never
         # silently ignore an unsupported configuration.

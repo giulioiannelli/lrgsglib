@@ -165,3 +165,32 @@ ISING_CEM_SIGMA_CEILING_DEFAULT: float = 5.0
 ISING_CEM_RESTARTS_DEFAULT: int = 10
 ISING_CEM_GREEDY_DEFAULT: bool = True
 ISING_CEM_GREEDY_SWEEPS_DEFAULT: int = 120
+
+# ---------------------------------------------------------------------------
+# Scheme selector (the ``Ising()`` factory; same vocabulary as the ``sch=``
+# filename token)
+# ---------------------------------------------------------------------------
+ISING_SCHEME_METROPOLIS: str = "metropolis"
+ISING_SCHEME_SA: str = "sa"
+ISING_SCHEME_PT: str = "pt"
+ISING_SCHEME_CEM: str = "cem"
+ISING_SCHEMES: tuple[str, ...] = (
+    ISING_SCHEME_METROPOLIS,
+    ISING_SCHEME_SA,
+    ISING_SCHEME_PT,
+    ISING_SCHEME_CEM,
+)
+ISING_SCHEME_DEFAULT: str = ISING_SCHEME_METROPOLIS
+#: Accepted spellings -> canonical scheme name.
+ISING_SCHEME_ALIASES: dict[str, str] = {
+    "met": ISING_SCHEME_METROPOLIS,
+    "metropolis": ISING_SCHEME_METROPOLIS,
+    "sa": ISING_SCHEME_SA,
+    "simulated_annealing": ISING_SCHEME_SA,
+    "annealing": ISING_SCHEME_SA,
+    "pt": ISING_SCHEME_PT,
+    "parallel_tempering": ISING_SCHEME_PT,
+    "tempering": ISING_SCHEME_PT,
+    "cem": ISING_SCHEME_CEM,
+    "cross_entropy": ISING_SCHEME_CEM,
+}

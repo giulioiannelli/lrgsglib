@@ -9,6 +9,8 @@ their binaries under test.
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 np = pytest.importorskip("numpy")
@@ -61,6 +63,7 @@ from .parity_harness import (
     PARITY_SEED,
     PARITY_STEPS,
     ParityCase,
+    assert_backend_agreement,
     assert_seeded_reproducibility,
     run_record_output_contract,
 )
@@ -324,3 +327,110 @@ def test_run_record_output_contract(case_name, tmp_path):
 @pytest.mark.parametrize("case_name", sorted(CASES))
 def test_seeded_reproducibility(case_name, tmp_path):
     assert_seeded_reproducibility(CASES[case_name](), tmp_path)
+
+
+# ======================================================================
+# Cross-backend statistical agreement (wires assert_backend_agreement,
+# which was defined by the harness but never consumed — audit gap #4)
+# ======================================================================
+
+AGREEMENT_STEPS = 150
+AGREEMENT_TAIL = 40
+
+
+def _tail_energy(model) -> float:
+    return float(np.mean(np.asarray(model.ene)[-AGREEMENT_TAIL:]))
+
+
+def _spin_case_agreement(case_name, make_variant, tmp_path, atol=0.10):
+    case = dataclasses.replace(
+        CASES[case_name](),
+        run_kwargs=dict(tqdm_on=False, steps=AGREEMENT_STEPS),
+    )
+    assert_backend_agreement(
+        case,
+        make_variant,
+        ("py", "pb"),
+        tmp_path,
+        statistic=_tail_energy,
+        n_replicas=3,
+        atol=atol,
+    )
+
+
+def _needs_module(modname):
+    try:
+        __import__(modname)
+        return True
+    except Exception:
+        return False
+
+
+@pytest.mark.parametrize(
+    "case_name, modname, factory",
+    [
+        (
+            "ising_metropolis",
+            "lrgsglib.statsys.IsingDynamics.ccore._ising_native",
+            lambda sg, backend: IsingMetropolis(
+                sg,
+                T=1.5,
+                runlang=backend,
+                savedisk=False,
+                seed=PARITY_SEED,
+            ),
+        ),
+        (
+            "potts_metropolis",
+            "lrgsglib.statsys.PottsModel.ccore._potts_native",
+            lambda sg, backend: PottsMetropolis(
+                sg,
+                q=3,
+                T=1.0,
+                runlang=backend,
+                savedisk=False,
+                seed=PARITY_SEED,
+            ),
+        ),
+        (
+            "xy_metropolis",
+            "lrgsglib.statsys.XYModel.ccore._xy_native",
+            lambda sg, backend: XYMetropolis(
+                sg,
+                T=0.8,
+                runlang=backend,
+                savedisk=False,
+                seed=PARITY_SEED,
+            ),
+        ),
+        (
+            "heisenberg_metropolis",
+            "lrgsglib.statsys.HeisenbergModel.ccore._heisenberg_native",
+            lambda sg, backend: HeisenbergMetropolis(
+                sg,
+                T=0.8,
+                runlang=backend,
+                savedisk=False,
+                seed=PARITY_SEED,
+            ),
+        ),
+        (
+            "multispec_metropolis",
+            "lrgsglib.statsys.MultiSpeciesModel.ccore._multispec_native",
+            lambda sg, backend: MultiSpeciesMetropolis(
+                sg,
+                species=2,
+                q_per_species=3,
+                T=1.0,
+                runlang=backend,
+                savedisk=False,
+                observables=("energy",),
+                seed=PARITY_SEED,
+            ),
+        ),
+    ],
+)
+def test_backend_agreement(case_name, modname, factory, tmp_path):
+    if not _needs_module(modname):
+        pytest.skip(f"{modname} not built")
+    _spin_case_agreement(case_name, factory, tmp_path)

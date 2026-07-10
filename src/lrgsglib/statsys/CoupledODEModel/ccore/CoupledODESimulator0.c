@@ -25,8 +25,11 @@ int main(int argc, char *argv[]) {
     const char *local_str    = argv[7];
     const char *datdir       = argv[8];
     const char *syshape      = argv[9];
-    const char *run_id       = argv[10];
-    const char *out_id       = argv[11];
+    /* non-empty ids gain a leading '_' (build_str_id) so filenames match
+     * the Python side's join_non_empty('_', ...) convention */
+    char run_id[STRL256], out_id[STRL256];
+    build_str_id(argv[10], run_id, sizeof run_id);
+    build_str_id(argv[11], out_id, sizeof out_id);
     UNUSED(out_id);
 
     /* Read initial state */

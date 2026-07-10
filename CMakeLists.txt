@@ -496,6 +496,13 @@ add_native_module(_code_native lrgsglib/statsys/CoupledODEModel/ccore
     INCLUDES ${CODE_DIR}
 )
 
+# Contact-process SIR kernel: same source list as the ContactProcess
+# executables (LRGSG_cp.c rate helpers + the common core).
+add_native_module(_cp_native lrgsglib/statsys/ContactProcess/ccore
+    SOURCES ${CP_DIR}/cp_native.cpp ${SRC_CP} ${COMMON_SOURCES}
+    INCLUDES ${CP_DIR}
+)
+
 # SignedRW walker kernel: no BinDynSys dependency (its setup.py lists only
 # the walker + RNG sources).
 add_native_module(_srw_native lrgsglib/statsys/SignedRW/ccore

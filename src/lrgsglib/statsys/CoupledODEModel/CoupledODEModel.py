@@ -32,17 +32,29 @@ from numpy.typing import NDArray
 
 from .._c_backend import CBackendMixin
 from .._csr import build_graph_csr
-from .._solver import SolverBackend
-from .._solver_engine import get_solver
+from .._run_host import RunHostMixin
 from ..ContDynSys import ContDynSys
-from .defaults import CODE_SOLVER_NAME
-from ...utils.tools.chronometer import time_function_accumulate
+from .defaults import (
+    CODE_COUPLING_DEFAULT,
+    CODE_DYN_SUBDIR,
+    CODE_INTEGRATOR_DEFAULT,
+    CODE_LOCAL_DEFAULT,
+    CODE_SOLVER_NAME,
+)
 
 if TYPE_CHECKING:
     from ...graphs.nx import SignedGraphNX as SignedGraph
 
 
-class CoupledODEModel(CBackendMixin, ContDynSys):
+def _render_callable(value: Any) -> Any:
+    """Resolve a coupling/local spec for naming: callables become
+    ``"custom"``-style labels, strings pass through."""
+    if callable(value):
+        return f"custom:{getattr(value, '__name__', 'callable')}"
+    return value
+
+
+class CoupledODEModel(RunHostMixin, CBackendMixin, ContDynSys):
     """Generic coupled ODE system on a signed graph.
 
     Parameters
@@ -74,6 +86,8 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
 
     dyn_UVclass = "coupled_ode"
 
+    solver_name = CODE_SOLVER_NAME
+
     _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "CoupledODESimulator{}"
     _allowed_c_keys: tuple[str, ...] = ("C0",)
@@ -92,9 +106,13 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
         simref: float | None = None,
         **kw: Any,
     ) -> None:
-        dynpath = getattr(sg, 'path_data', None)
-        if dynpath is not None:
-            dynpath = Path(dynpath) / "coupled_ode"
+        # Graph-anchored dynamics tree (data/<graph>/coupled_ode/N=...),
+        # like path_ising; flat <path_data>/coupled_ode as a fallback.
+        dynpath = getattr(sg, "path_coupled_ode", None)
+        if dynpath is None:
+            base = getattr(sg, "path_data", None)
+            if base is not None:
+                dynpath = Path(base) / CODE_DYN_SUBDIR
         super().__init__(
             sg,
             dt=dt,
@@ -143,7 +161,9 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
                 case "product":
                     result = (A * s[np.newaxis, :]) @ s
                 case _:
-                    raise ValueError(f"Unknown coupling: {self.coupling_type!r}")
+                    raise ValueError(
+                        f"Unknown coupling: {self.coupling_type!r}"
+                    )
         return self.coupling_strength * result
 
     # ------------------------------------------------------------------
@@ -178,15 +198,15 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
     # Dynamics initialisation
     # ------------------------------------------------------------------
     def init_ode_dynamics(self, custom: Any = None, exName: str = "") -> None:
+        """Initialise the node states.
+
+        The C-backend file exchange (state / edgelist exports) now
+        happens inside ``run()`` (``_begin_outputs``), into the per-run
+        output directory; ``exName`` is kept for backward compatibility
+        and ignored (exports are named by ``run_id``).
+        """
         self._check_c_backend_or_fallback()
         self.init_state(custom)
-        if self.runlang.startswith("C"):
-            self.build_cprogram_command()
-            self.setup_stderr_logging()
-            self.export_state()
-            if self.rndStr and not exName:
-                exName = self.run_id
-            self.sg._export_edgel_bin(exName=exName or self.run_id)
         self.sini = self.s.copy()
 
     def check_attribute(self) -> None:
@@ -194,13 +214,66 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
             self.init_ode_dynamics()
 
     # ------------------------------------------------------------------
+    # Run-dirname schema + per-run outputs (Phase C)
+    # ------------------------------------------------------------------
+    def _name_tokens(self) -> list:
+        cpl = "custom" if callable(self.coupling_type) else self.coupling_type
+        loc = "custom" if callable(self.local_type) else self.local_type
+        return [
+            ("p", float(self.sg.pflip)),
+            ("K", float(self.coupling_strength)),
+            *(
+                (key, self.local_params[key])
+                for key in sorted(self.local_params)
+            ),
+            ("dt", float(self.dt)),
+            ("ns", int(self.steps)),
+            ("cpl", cpl, CODE_COUPLING_DEFAULT),
+            ("loc", loc, CODE_LOCAL_DEFAULT),
+            ("intg", self.integrator, CODE_INTEGRATOR_DEFAULT),
+            ("lang", self._lang_token()),
+            ("s", int(self.seed)),
+        ]
+
+    def _cfg_model_block(self) -> dict[str, Any]:
+        return {
+            "class": type(self).__name__,
+            "coupling_type": _render_callable(self.coupling_type),
+            "local_type": _render_callable(self.local_type),
+            "coupling_strength": self.coupling_strength,
+            "local_params": dict(self.local_params),
+            "dt": self.dt,
+            "integrator": self.integrator,
+            "steps": self.steps,
+            "ic": self.ic,
+        }
+
+    def _begin_outputs(self) -> None:
+        self._open_run_outputs()
+
+    def _persist_observables(self) -> None:
+        self._flush_run_outputs()
+
+    # ------------------------------------------------------------------
     # C backend
     # ------------------------------------------------------------------
     def _build_c_arglist(self) -> list[str]:
-        coupling_str = self.coupling_type if isinstance(self.coupling_type, str) else "custom"
-        local_str = self.local_type if isinstance(self.local_type, str) else "custom"
+        # The C CODE_DIR macro composes ``<datdir>/coupled_ode/<syshape>/``;
+        # ``<syshapePth>/<run dirname>`` redirects the C file exchange
+        # into the per-run directory.
+        coupling_str = (
+            self.coupling_type
+            if isinstance(self.coupling_type, str)
+            else "custom"
+        )
+        local_str = (
+            self.local_type if isinstance(self.local_type, str) else "custom"
+        )
         datdir = self._get_datdir_arg()
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
+        rundir = self._run_output_dir()
+        if rundir is not None:
+            syshape = f"{syshape}/{rundir.name}"
         return [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
@@ -216,7 +289,7 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
         ]
 
     def _get_cleanup_paths(self) -> list[Path | None]:
-        return [getattr(self, 'sfout', None)]
+        return [getattr(self, "sfout", None)]
 
     # ------------------------------------------------------------------
     # Native (pybind11) backend
@@ -246,42 +319,23 @@ class CoupledODEModel(CBackendMixin, ContDynSys):
         r = float(self.local_params.get("r", 1.0))
         K = float(self.local_params.get("K", 1.0))
         x = _code_native.code_sampling(
-            x0, ni, nw, nptr,
+            x0,
+            ni,
+            nw,
+            nptr,
             float(self.coupling_strength),
             str(self.coupling_type),
             str(self.local_type),
-            a, r, K,
-            float(self.dt), int(self.steps),
+            a,
+            r,
+            K,
+            float(self.dt),
+            int(self.steps),
         )
         self.s = x
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-    @time_function_accumulate(auto_log=False)
-    def run(
-        self,
-        verbose: bool = False,
-        clean_export: bool = True,
-        **kw: Any,
-    ) -> None:
-        self.check_attribute()
-        # Resolve the solver family from the runlang code (C check is
-        # case-sensitive on a leading "C" to avoid catching native prefixes).
-        if self.runlang.startswith("C"):
-            backend = SolverBackend.C
-        elif self.runlang.lower().startswith("pb"):
-            backend = SolverBackend.PB
-        else:
-            backend = SolverBackend.PY
-        solver = get_solver(CODE_SOLVER_NAME, backend)
-        solver.supports(self)
-        try:
-            solver.execute(self, verbose=verbose)
-        finally:
-            if backend is SolverBackend.C and clean_export:
-                self.remove_run_c_files()
-                self.sg.remove_exported_files()
+    # Public interface: ``run()`` is inherited from RunHostMixin (backend
+    # resolution, solver dispatch, output lifecycle, C-export cleanup).
 
 
 # Register CoupledODEModel's solver backends (py/pb/C) in the shared registry.

@@ -61,8 +61,11 @@ int main(int argc, char *argv[]) {
     size_t eqSTEP   = strtozu(argv[3]);
     const char *datdir  = argv[4];
     const char *syshape = argv[5];
-    const char *run_id  = argv[6];
-    const char *out_id  = argv[7];
+    /* non-empty ids gain a leading '_' (build_str_id) so filenames match
+     * the Python side's join_non_empty('_', ...) convention */
+    char run_id[STRL256], out_id[STRL256];
+    build_str_id(argv[6], run_id, sizeof run_id);
+    build_str_id(argv[7], out_id, sizeof out_id);
     voter_params vp;
     vp.rule  = (voter_rule_t)atoi(argv[8]);
     vp.q     = (size_t)strtozu(argv[9]);

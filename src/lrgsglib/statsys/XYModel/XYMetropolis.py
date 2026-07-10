@@ -195,6 +195,33 @@ class XYMetropolis(XYBase):
         if move == "single":
             self._make_engine()
 
+    # ------------------------------------------------------------------
+    # Run-dirname schema (Phase C)
+    # ------------------------------------------------------------------
+    def _physics_tokens(self) -> list:
+        return [
+            ("T", float(self.T)),
+            (
+                "d",
+                float(self.delta) if self.move == "single" else None,
+                XY_DELTA_DEFAULT,
+            ),
+        ]
+
+    def _axis_tokens(self) -> list:
+        cluster = self.move in ("wolff", "sw")
+        return [
+            ("rule", None if cluster else self.rule, XY_RULE_DEFAULT),
+            ("move", self.move, XY_MOVE_DEFAULT),
+            ("upd", self.upd_mode, XY_UPD_MODE_DEFAULT),
+            (
+                "ord",
+                self.order if self.upd_mode == "async" else None,
+                XY_ORDER_DEFAULT,
+            ),
+            ("tf", None),  # continuous spins: ties have measure zero
+        ]
+
     def _make_engine(self):
         if self.move == "single":
             return ThermalEngine(
@@ -222,6 +249,40 @@ class XYMetropolis(XYBase):
             T=self.T,
             order=self.order,
             tie_flip_p=None,
+        )
+
+    # ------------------------------------------------------------------
+    # Vectorized sync backend (np/cu) — capability gate + engine factory
+    # ------------------------------------------------------------------
+    def _np_check_supported(self) -> None:
+        """The vectorized backends implement the SYNC schedule only —
+        true async is inherently sequential (python/pb keep it)."""
+        if self.upd_mode != "sync":
+            raise NotImplementedError(
+                "np/cu backends vectorize upd_mode='sync' (sublattice-"
+                f"parallel); upd_mode={self.upd_mode!r} is sequential — "
+                "use runlang='py' or 'pb'."
+            )
+        if self.move != "single":
+            raise NotImplementedError(
+                f"np/cu backends implement move='single'; move="
+                f"{self.move!r} is python-only."
+            )
+        if self.rule not in ("metropolis", "glauber"):
+            raise NotImplementedError(
+                f"np/cu backends implement metropolis/glauber; rule="
+                f"{self.rule!r} is python-only."
+            )
+
+    def _make_vec_engine(self, xp):
+        from .._vectorized import VectorSyncEngine
+
+        return VectorSyncEngine(
+            self,
+            rule=self.rule,
+            T=self.T,
+            tie_flip_p=None,  # continuous spins: ties have measure zero
+            xp=xp,
         )
 
     # ------------------------------------------------------------------

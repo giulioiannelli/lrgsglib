@@ -6,7 +6,8 @@
 #define CP_DIR "%s/cntct/%s/"
 #define SINI_FNAME CP_DIR "s_" PSTR "%s" BINX
 #define SOUT_FNAME CP_DIR "sout_" PSTR "%s" BINX
-#define DENS_FNAME CP_DIR "dens_" PSTR "%s" BINX
+/* basename matches the Python side's CP_DENSITY_FBASE ("rho") */
+#define DENS_FNAME CP_DIR "rho_" PSTR "%s" BINX
 
 typedef struct cp_frontier_t cp_frontier_t;
 

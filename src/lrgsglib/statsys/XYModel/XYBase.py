@@ -49,6 +49,7 @@ from .._c_backend import CBackendMixin
 from .._csr import build_coupling_csr
 from .._observables import ObservableSet, RowTrajectory, ScalarSeries
 from .._run_host import RunHostMixin
+from .._vectorized import VectorSyncEngine  # noqa: F401  (leaves build it)
 from ..VecDynSys import VecDynSys
 from .defaults import (
     XY_COUPLING_NORM_DEFAULT,
@@ -144,9 +145,13 @@ class XYBase(RunHostMixin, CBackendMixin, VecDynSys):
         self.coupling_norm = coupling_norm
         self.snapshot_every = max(1, int(snapshot_every))
 
-        dynpath = getattr(sg, "path_data", None)
-        if dynpath is not None:
-            dynpath = Path(dynpath) / XY_DYN_SUBDIR
+        # Graph-anchored dynamics tree (data/<graph>/<model>/N=...),
+        # like path_ising; legacy classes keep the old flat location.
+        dynpath = getattr(sg, "path_xy", None)
+        if dynpath is None:
+            base = getattr(sg, "path_data", None)
+            if base is not None:
+                dynpath = Path(base) / XY_DYN_SUBDIR
         super().__init__(
             sg,
             q=1,
@@ -441,27 +446,140 @@ class XYBase(RunHostMixin, CBackendMixin, VecDynSys):
                 f"steps, or raise the cap in XYModel/defaults.py."
             )
 
+    # ------------------------------------------------------------------
+    # Vectorized sync backend (np/cu) — VectorSyncEngine hooks
+    # ------------------------------------------------------------------
+    def _vec_bind(self, xp) -> None:
+        """Stage the substrate arrays on the engine's array module
+        (zero-copy aliases for np; one host-to-device copy for cu)."""
+        self._ensure_couplings()
+        if xp is np:
+            self._v_s = self.s
+            self._v_nbr_J = self._nbr_J
+            self._v_nbr_idx = self._nbr_idx
+            self._v_nbr_rows = self._nbr_rows
+        else:
+            self._v_s = xp.asarray(self.s)
+            self._v_nbr_J = xp.asarray(self._nbr_J)
+            self._v_nbr_idx = xp.asarray(self._nbr_idx)
+            self._v_nbr_rows = xp.asarray(self._nbr_rows)
+
+    def _vec_sync_host(self, xp) -> None:
+        """Mirror the device state back into ``self.s`` (no-op for np,
+        where ``_v_s`` IS ``self.s``)."""
+        if xp is not np:
+            self.s = xp.asnumpy(self._v_s)
+
+    def _vec_propose(self, cls, xp, rng):
+        # Uniform perturbation in ±delta (mod 2π) — the same symmetric
+        # kernel as propose_local.
+        return (
+            self._v_s[cls] + rng.uniform(-self.delta, self.delta, cls.shape[0])
+        ) % XY_TWO_PI
+
+    def _vec_delta_E(self, cls, proposals, xp):
+        """With ``C_i = Σ_j J_ij cos θ_j`` and ``S_i = Σ_j J_ij sin θ_j``
+        the site coupling is ``Σ_j J_ij cos(θ_i − θ_j) = cos θ_i·C_i +
+        sin θ_i·S_i``, so ``ΔE_i = −[(cos θ'_i − cos θ_i)·C_i +
+        (sin θ'_i − sin θ_i)·S_i]`` — the sign matches ``delta_E``."""
+        contrib_c = self._v_nbr_J * xp.cos(self._v_s[self._v_nbr_idx])
+        contrib_s = self._v_nbr_J * xp.sin(self._v_s[self._v_nbr_idx])
+        C = xp.zeros(self.N, dtype=xp.float64)
+        S = xp.zeros(self.N, dtype=xp.float64)
+        xp.add.at(C, self._v_nbr_rows, contrib_c)
+        xp.add.at(S, self._v_nbr_rows, contrib_s)
+        theta = self._v_s[cls]
+        dcos = xp.cos(proposals) - xp.cos(theta)
+        dsin = xp.sin(proposals) - xp.sin(theta)
+        return -(dcos * C[cls] + dsin * S[cls])
+
+    def _vec_commit(self, cls, proposals, accept):
+        idx = cls[accept]
+        self._v_s[idx] = proposals[accept]
+
+    def _make_vec_engine(self, xp):
+        raise NotImplementedError(
+            "Scheme classes must implement _make_vec_engine() to enable "
+            "the vectorized np/cu backends."
+        )
+
+    def _np_check_supported(self) -> None:
+        raise NotImplementedError(
+            f"{type(self).__name__} has no vectorized (np/cu) backend."
+        )
+
+    def _run_np(self, tqdm_on: bool = False, xp=None) -> None:
+        """Vectorized sync sampling loop — same record cadence and
+        incremental-energy invariant as _sample_py. ``xp`` selects the
+        array module (numpy default; cupy for the cu backend)."""
+        xp = np if xp is None else xp
+        if xp is not np:
+            # Device runs draw from xp's global RNG; pin it to the run
+            # seed the same way DynSys pins numpy's.
+            xp.random.seed(self.seed)
+        engine = self._make_vec_engine(xp)
+        self._vec_bind(xp)
+        sweep = engine.compile_step()
+        self._e_running = self.total_energy()
+        iterator = (
+            tqdm.tqdm(range(self.steps), desc=type(self).__name__)
+            if tqdm_on
+            else range(self.steps)
+        )
+        for _ in iterator:
+            self._vec_sync_host(xp)
+            self._record()
+            self._e_running += sweep()
+        self._vec_sync_host(xp)
+
+    # ------------------------------------------------------------------
+    # Run-dirname schema (Phase C: one directory per run)
+    # ------------------------------------------------------------------
+    def _physics_tokens(self) -> list:
+        """Model numerics after p= — overridden per substrate."""
+        return [("T", float(self.T))]
+
+    def _axis_tokens(self) -> list:
+        """Dynamics axes (rule/move/upd/ord/tf) — leaf hook."""
+        return []
+
+    def _name_tokens(self) -> list:
+        snap_on = XY_OBS_SNAPSHOTS in self._selected_obs
+        return [
+            ("p", float(self.sg.pflip)),
+            *self._physics_tokens(),
+            ("ns", int(self.steps)),
+            (
+                "se",
+                int(self.snapshot_every) if snap_on else None,
+                XY_SNAPSHOT_EVERY_DEFAULT,
+            ),
+            *self._axis_tokens(),
+            ("cn", self.coupling_norm, XY_COUPLING_NORM_DEFAULT),
+            ("ic", self.ic, "uniform"),
+            ("lang", self._lang_token()),
+            ("s", int(self.seed)),
+        ]
+
     def _begin_outputs(self) -> None:
         snap = self.observables[XY_OBS_SNAPSHOTS]
         snap.reset_stream()
         self._snap_seen = 0
         if not self.savedisk or not self._is_py_runlang():
             return
-        suf = self.out_suffix
+        rundir = self._run_output_dir()
+        rundir.mkdir(parents=True, exist_ok=True)
+        self._write_cfg_sidecar(rundir)
         if XY_OBS_ENERGY in self._selected_obs:
             self.observables[XY_OBS_ENERGY].set_path(
-                self.dynpath
-                / self.sg.get_p_fname(XY_ENERGY_FBASE, suf, ext=BIN)
+                rundir / f"{XY_ENERGY_FBASE}{BIN}"
             )
         if XY_OBS_MAGN in self._selected_obs:
             self.observables[XY_OBS_MAGN].set_path(
-                self.dynpath / self.sg.get_p_fname(XY_MAGN_FBASE, suf, ext=BIN)
+                rundir / f"{XY_MAGN_FBASE}{BIN}"
             )
         if XY_OBS_SNAPSHOTS in self._selected_obs:
-            snap.set_path(
-                self.dynpath
-                / self.sg.get_p_fname(XY_SNAPSHOTS_FBASE, suf, ext=BIN)
-            )
+            snap.set_path(rundir / f"{XY_SNAPSHOTS_FBASE}{BIN}")
             self._guard_snapshot_size()
             snap.open_stream()
 

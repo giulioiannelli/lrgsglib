@@ -20,19 +20,23 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
+from ...config.const import BIN
 from .._c_backend import CBackendMixin
 from .._csr import build_graph_csr
-from .._solver import SolverBackend
-from .._solver_engine import get_solver
+from .._run_host import RunHostMixin
 from ..ContDynSys import ContDynSys
-from .defaults import KURAMOTO_SOLVER_NAME
-from ...utils.tools.chronometer import time_function_accumulate
+from .defaults import (
+    KURAMOTO_DYN_SUBDIR,
+    KURAMOTO_INTEGRATOR_DEFAULT,
+    KURAMOTO_ORDER_FBASE,
+    KURAMOTO_SOLVER_NAME,
+)
 
 if TYPE_CHECKING:
     from ...graphs.nx import SignedGraphNX as SignedGraph
 
 
-class KuramotoModel(CBackendMixin, ContDynSys):
+class KuramotoModel(RunHostMixin, CBackendMixin, ContDynSys):
     """Kuramoto coupled oscillators on a signed graph.
 
     Parameters
@@ -64,6 +68,8 @@ class KuramotoModel(CBackendMixin, ContDynSys):
 
     dyn_UVclass = "kuramoto"
 
+    solver_name = KURAMOTO_SOLVER_NAME
+
     # CBackendMixin configuration
     _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "KuramotoSimulator{}"
@@ -85,9 +91,13 @@ class KuramotoModel(CBackendMixin, ContDynSys):
         save_order_param: bool = False,
         **kw: Any,
     ) -> None:
-        dynpath = getattr(sg, 'path_data', None)
-        if dynpath is not None:
-            dynpath = Path(dynpath) / "kuramoto"
+        # Graph-anchored dynamics tree (data/<graph>/kuramoto/N=...),
+        # like path_ising; flat <path_data>/kuramoto as a fallback.
+        dynpath = getattr(sg, "path_kuramoto", None)
+        if dynpath is None:
+            base = getattr(sg, "path_data", None)
+            if base is not None:
+                dynpath = Path(base) / KURAMOTO_DYN_SUBDIR
         super().__init__(
             sg,
             dt=dt,
@@ -104,8 +114,11 @@ class KuramotoModel(CBackendMixin, ContDynSys):
         self.sini: NDArray | None = None
 
     def _init_omega(self, omega: float | NDArray | str) -> None:
-        """Set natural frequencies."""
+        """Set natural frequencies; remember the constructor's spec for
+        the ``om=`` run-dirname token (scalar float / mode string /
+        ``"custom"`` for an explicit array)."""
         if isinstance(omega, str):
+            self._omega_spec: float | str = omega
             match omega:
                 case "gaussian" | "normal":
                     self._omega = np.random.randn(self.N)
@@ -114,8 +127,10 @@ class KuramotoModel(CBackendMixin, ContDynSys):
                 case _:
                     raise ValueError(f"Unknown omega mode: {omega!r}")
         elif np.isscalar(omega):
+            self._omega_spec = float(omega)
             self._omega = np.full(self.N, float(omega), dtype=np.float64)
         else:
+            self._omega_spec = "custom"
             arr = np.asarray(omega, dtype=np.float64)
             if arr.shape != (self.N,):
                 raise ValueError(
@@ -135,8 +150,12 @@ class KuramotoModel(CBackendMixin, ContDynSys):
         """Kuramoto ODE: dtheta_i/dt = omega_i + (K/N) sum_j A_ij sin(theta_j - theta_i)."""
         A = self._get_adj_matrix()
         # sin(theta_j - theta_i) for all pairs, vectorised
-        diff = s[np.newaxis, :] - s[:, np.newaxis]  # diff[i, j] = theta_j - theta_i
-        coupling_term = (self.coupling / self.N) * np.sum(A * np.sin(diff), axis=1)
+        diff = (
+            s[np.newaxis, :] - s[:, np.newaxis]
+        )  # diff[i, j] = theta_j - theta_i
+        coupling_term = (self.coupling / self.N) * np.sum(
+            A * np.sin(diff), axis=1
+        )
         return self._omega + coupling_term
 
     def _apply_constraints(self, s: NDArray) -> NDArray:
@@ -161,24 +180,70 @@ class KuramotoModel(CBackendMixin, ContDynSys):
     # ------------------------------------------------------------------
     # Dynamics initialisation
     # ------------------------------------------------------------------
-    def init_kuramoto_dynamics(self, custom: Any = None, exName: str = "") -> None:
-        """Initialise phases and export data if C backend is selected."""
+    def init_kuramoto_dynamics(
+        self, custom: Any = None, exName: str = ""
+    ) -> None:
+        """Initialise phases.
+
+        The C-backend file exchange (state / hfield / edgelist exports)
+        now happens inside ``run()`` (``_begin_outputs``), into the
+        per-run output directory; ``exName`` is kept for backward
+        compatibility and ignored (exports are named by ``run_id``).
+        """
         self._check_c_backend_or_fallback()
         self.order_params = []
         self.init_state(custom)
-        if self.runlang.startswith("C"):
-            self.build_cprogram_command()
-            self.setup_stderr_logging()
-            self.export_state()
-            self.export_hfield()
-            if self.rndStr and not exName:
-                exName = self.run_id
-            self.sg._export_edgel_bin(exName=exName or self.run_id)
         self.sini = self.s.copy()
 
     def check_attribute(self) -> None:
         if self.sini is None:
             self.init_kuramoto_dynamics()
+
+    # ------------------------------------------------------------------
+    # Run-dirname schema + per-run outputs (Phase C)
+    # ------------------------------------------------------------------
+    def _name_tokens(self) -> list:
+        return [
+            ("p", float(self.sg.pflip)),
+            ("K", float(self.coupling)),
+            ("om", self._omega_spec),
+            ("dt", float(self.dt)),
+            ("ns", int(self.steps)),
+            ("intg", self.integrator, KURAMOTO_INTEGRATOR_DEFAULT),
+            ("lang", self._lang_token()),
+            ("s", int(self.seed)),
+        ]
+
+    def _cfg_model_block(self) -> dict[str, Any]:
+        return {
+            "class": type(self).__name__,
+            "coupling": self.coupling,
+            "omega": self._omega_spec,
+            "dt": self.dt,
+            "integrator": self.integrator,
+            "steps": self.steps,
+            "save_order_param": self.save_order_param,
+            "ic": self.ic,
+        }
+
+    def _begin_outputs(self) -> None:
+        self.order_params = []
+        self._open_run_outputs()
+
+    def _export_c_inputs(self) -> None:
+        super()._export_c_inputs()
+        # KuramotoSimulator reads the natural-frequency file from the
+        # hfield slot (the legacy convention: ``self.field`` is exported).
+        self.export_hfield()
+
+    def _persist_observables(self) -> None:
+        if self.savedisk and self.save_order_param and len(self.order_params):
+            rundir = self._run_output_dir()
+            rundir.mkdir(parents=True, exist_ok=True)
+            np.asarray(self.order_params, dtype=np.float64).tofile(
+                rundir / f"{KURAMOTO_ORDER_FBASE}{BIN}"
+            )
+        self._flush_run_outputs()
 
     # ------------------------------------------------------------------
     # Python backend override (adds order parameter recording)
@@ -212,9 +277,15 @@ class KuramotoModel(CBackendMixin, ContDynSys):
         theta0 = np.ascontiguousarray(self.s, dtype=np.float64)
         omega = np.ascontiguousarray(self._omega, dtype=np.float64)
         theta, order = _kuramoto_native.kuramoto_sampling(
-            theta0, ni, nw, nptr, omega,
-            float(self.coupling), float(self.dt),
-            int(self.steps), bool(self.save_order_param),
+            theta0,
+            ni,
+            nw,
+            nptr,
+            omega,
+            float(self.coupling),
+            float(self.dt),
+            int(self.steps),
+            bool(self.save_order_param),
         )
         self.s = theta
         if self.save_order_param:
@@ -224,9 +295,17 @@ class KuramotoModel(CBackendMixin, ContDynSys):
     # C backend integration
     # ------------------------------------------------------------------
     def _build_c_arglist(self) -> list[str]:
-        """Build argument list for KuramotoSimulator."""
+        """Build argument list for KuramotoSimulator.
+
+        The C ``KUR_DIR`` macro composes ``<datdir>/kuramoto/<syshape>/``;
+        passing ``<syshapePth>/<run dirname>`` as the syshape argument
+        redirects the whole C file exchange into the per-run directory.
+        """
         datdir = self._get_datdir_arg()
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
+        rundir = self._run_output_dir()
+        if rundir is not None:
+            syshape = f"{syshape}/{rundir.name}"
         return [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
@@ -242,53 +321,21 @@ class KuramotoModel(CBackendMixin, ContDynSys):
     def run_cprogram(self, verbose: bool = False) -> None:
         """Execute C backend and read order parameter output."""
         super().run_cprogram(verbose)
-        # Read order parameter file if it exists
-        op_path = self.dynpath / self.sg.get_p_fname('r', self.out_suffix)
+        # Read the C-written order-parameter file from the per-run dir.
+        op_path = self._c_exchange_dir() / self.sg.get_p_fname(
+            "r", self.out_suffix
+        )
         if op_path.exists():
             self.order_params = np.fromfile(op_path, dtype=np.float64).tolist()
 
     def _get_cleanup_paths(self) -> list[Path | None]:
         return [
-            getattr(self, 'sfout', None),
-            getattr(self, 'hfout', None),
+            getattr(self, "sfout", None),
+            getattr(self, "hfout", None),
         ]
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-    @time_function_accumulate(auto_log=False)
-    def run(
-        self,
-        verbose: bool = False,
-        clean_export: bool = True,
-        **kw: Any,
-    ) -> None:
-        """Run Kuramoto dynamics.
-
-        Parameters
-        ----------
-        verbose : bool
-            Verbose output.
-        clean_export : bool
-            Remove exported files after C run.
-        """
-        self.check_attribute()
-        # Resolve the solver family from the runlang code (C check is
-        # case-sensitive on a leading "C" to avoid catching native prefixes).
-        if self.runlang.startswith("C"):
-            backend = SolverBackend.C
-        elif self.runlang.lower().startswith("pb"):
-            backend = SolverBackend.PB
-        else:
-            backend = SolverBackend.PY
-        solver = get_solver(KURAMOTO_SOLVER_NAME, backend)
-        solver.supports(self)
-        try:
-            solver.execute(self, verbose=verbose)
-        finally:
-            if backend is SolverBackend.C and clean_export:
-                self.remove_run_c_files()
-                self.sg.remove_exported_files()
+    # Public interface: ``run()`` is inherited from RunHostMixin (backend
+    # resolution, solver dispatch, output lifecycle, C-export cleanup).
 
 
 # Register KuramotoModel's solver backends (py/pb/C) in the shared registry.

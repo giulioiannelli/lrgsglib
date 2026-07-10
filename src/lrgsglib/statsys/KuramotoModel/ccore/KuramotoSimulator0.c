@@ -22,8 +22,11 @@ int main(int argc, char *argv[]) {
     double dt      = strtod(argv[5], &ptr);
     const char *datdir  = argv[6];
     const char *syshape = argv[7];
-    const char *run_id  = argv[8];
-    const char *out_id  = argv[9];
+    /* non-empty ids gain a leading '_' (build_str_id) so filenames match
+     * the Python side's join_non_empty('_', ...) convention */
+    char run_id[STRL256], out_id[STRL256];
+    build_str_id(argv[8], run_id, sizeof run_id);
+    build_str_id(argv[9], out_id, sizeof out_id);
 
     /* --- Read initial state (float64) --- */
     char buf[STRL512];
