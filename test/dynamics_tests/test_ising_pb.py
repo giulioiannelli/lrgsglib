@@ -175,26 +175,33 @@ def test_pb_met_seeded_reproducibility(tmp_path, order):
 @needs_native
 def test_pb_met_agrees_with_py_in_equilibrium(tmp_path):
     """Same Gibbs state as the python engine (statistical check; the RNG
-    streams differ — SFMT vs numpy — so only the means can be compared)."""
+    streams differ — SFMT vs numpy — so only the means can be compared).
+    Averaged over a few seeds and judged against the seed-to-seed
+    scatter: a single-run comparison at a fixed abs tolerance sits on
+    the tail of the trajectory-to-trajectory distribution and flakes."""
     T = 2.0
+    seeds = (SEED, SEED + 1, SEED + 2)
 
-    def mean_tail_energy(runlang):
-        sg = make_lattice(tmp_path / runlang, pflip=0.0)
-        model = IsingMetropolis(
-            sg,
-            T=T,
-            steps=400,
-            seed=SEED,
-            runlang=runlang,
-            savedisk=False,
-            ic="uniform",
-        )
-        model.run()
-        return float(np.mean(model.ene[200:]))
+    def tail_energies(runlang):
+        vals = []
+        for seed in seeds:
+            sg = make_lattice(tmp_path / f"{runlang}{seed}", pflip=0.0)
+            model = IsingMetropolis(
+                sg,
+                T=T,
+                steps=400,
+                seed=seed,
+                runlang=runlang,
+                savedisk=False,
+                ic="uniform",
+            )
+            model.run()
+            vals.append(float(np.mean(model.ene[200:])))
+        return np.asarray(vals)
 
-    assert mean_tail_energy("pb") == pytest.approx(
-        mean_tail_energy("py"), abs=0.1
-    )
+    e_pb, e_py = tail_energies("pb"), tail_energies("py")
+    scatter = float(np.hypot(e_pb.std(), e_py.std()) / np.sqrt(len(seeds)))
+    assert abs(e_pb.mean() - e_py.mean()) <= max(0.1, 4.0 * scatter)
 
 
 @needs_native
