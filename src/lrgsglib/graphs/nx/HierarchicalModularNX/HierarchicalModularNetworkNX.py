@@ -108,6 +108,10 @@ class HierarchicalModularNetworkNX(MultispectralGraphNX):
         self.p_intra = p_intra
         self.p_ratio = p_ratio
         self.out_suffix = out_suffix
+        # Capture the seed BEFORE the graph is generated: _generate reads
+        # self.seed but runs ahead of the parent __init__, so it would
+        # otherwise always see None and draw irreproducibly.
+        self.seed = kwargs.get("seed")
 
         # Computed attributes
         self.n_modules = branching ** levels

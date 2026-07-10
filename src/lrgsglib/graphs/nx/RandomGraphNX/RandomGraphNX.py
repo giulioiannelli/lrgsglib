@@ -76,6 +76,11 @@ class RandomGraphNX(SignedGraphNX):
         self.extract_giant_component = extract_giant_component
         self.sgpathn = sgpathn
         self.std_fname = std_fname
+        # Capture the seed BEFORE the graph is drawn: _generate_graph runs ahead
+        # of SignedGraphNX.__init__, so subclasses reading a seed attribute
+        # (e.g. ExtendedBarabasiAlbertNX's np.random.default_rng(self._rng_seed))
+        # would otherwise always see None and draw irreproducibly.
+        self._rng_seed = kwargs.get("seed")
 
         if not only_const_mode:
             self._init_network()
@@ -93,7 +98,12 @@ class RandomGraphNX(SignedGraphNX):
         if self.extract_giant_component and not nx.is_connected(G):
             CC = nx.connected_components(G)
             GC = max(CC, key=len)
-            self.G = G.subgraph(GC).copy()
+            # Relabel the giant component to contiguous 0..N-1 integers (same
+            # invariant as ErdosRenyiNX): dropping the non-giant nodes otherwise
+            # leaves gaps in the labels, which breaks every positional consumer
+            # (the statsys sweepers index the state array by node id). Node
+            # attributes (e.g. 'pos') travel with the relabel.
+            self.G = nx.convert_node_labels_to_integers(G.subgraph(GC).copy())
         else:
             self.G = G
 
