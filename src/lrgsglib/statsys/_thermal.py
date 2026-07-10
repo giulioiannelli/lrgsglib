@@ -578,15 +578,20 @@ def _cluster_p_add(T: float) -> Callable[[float], float]:
 class WolffEngine:
     """Wolff single-cluster kinetics (ref M6) over a :class:`ClusterSubstrate`.
 
-    One "sweep" repeats single-cluster steps (grow from a random seed along
-    satisfied bonds with the FK probability, flip the whole cluster — always
-    accepted) until at least N sites have been flipped, so a sweep is
-    comparable to N single-site attempts. Requires zero external field (the
-    plain cluster rule breaks detailed balance under h; the ghost-spin
+    One "sweep" is ONE single-cluster step (grow from a random seed along
+    satisfied bonds with the FK probability, flip the whole cluster —
+    always accepted): Wolff's unit move. It must NOT be repeated "until N
+    sites have flipped": that stopping rule depends on the trajectory
+    (a large cluster ends the sweep), and sampling at such sweep
+    boundaries over-weights post-large-flip states — a stationarity
+    violation caught by exact enumeration on a 3x3 signed lattice
+    (test_cluster_boltzmann.py). Requires zero external field (the plain
+    cluster rule breaks detailed balance under h; the ghost-spin
     extension is not wired) — the SCHEME validates that, since the field
     lives on the model, not here.
 
-    Per-sweep flipped-site counts accumulate in :attr:`cluster_sizes`.
+    Per-sweep (= per-cluster) flipped-site counts accumulate in
+    :attr:`cluster_sizes`.
     """
 
     def __init__(
@@ -640,14 +645,9 @@ class WolffEngine:
             return flip_cluster(nodes), len(queue)
 
         def sweep() -> float:
-            dE_sweep = 0.0
-            flipped = 0
-            while flipped < n_sites:
-                dE, size = cluster_step()
-                dE_sweep += dE
-                flipped += size
-            cluster_sizes.append(flipped)
-            return dE_sweep
+            dE, size = cluster_step()
+            cluster_sizes.append(size)
+            return dE
 
         return sweep
 
