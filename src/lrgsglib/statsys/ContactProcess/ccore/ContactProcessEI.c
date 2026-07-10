@@ -160,8 +160,11 @@ int main(int argc, char *argv[]) {
     size_t steps = strtozu(argv[4]);
     const char *datdir = argv[5];
     const char *syshape = argv[6];
-    const char *run_id = argv[7];
-    const char *out_id = argv[8];
+    /* non-empty ids gain a leading '_' (build_str_id) so filenames match
+     * the Python side's join_non_empty('_', ...) convention */
+    char run_id[STRL256], out_id[STRL256];
+    build_str_id(argv[7], run_id, sizeof run_id);
+    build_str_id(argv[8], out_id, sizeof out_id);
     const char *activation_name = argv[9];
     update_mode_t update_mode = parse_update_mode(argv[10]);
     output_mode_t output_mode = parse_output_mode(argv[11]);
