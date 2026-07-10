@@ -32,7 +32,13 @@ class _KuramotoPySolver:
     def supports(self, model: "KuramotoModel") -> None:
         return None
 
-    def execute(self, model: "KuramotoModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "KuramotoModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model.run_py(verbose=verbose)
 
     def is_available(self) -> bool:
@@ -47,12 +53,19 @@ class _KuramotoPbSolver:
     def supports(self, model: "KuramotoModel") -> None:
         return None
 
-    def execute(self, model: "KuramotoModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "KuramotoModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model._run_pybind()
 
     def is_available(self) -> bool:
         try:
             from .ccore import _kuramoto_native  # noqa: F401
+
             return True
         except Exception:
             return False
@@ -66,7 +79,13 @@ class _KuramotoCSolver:
     def supports(self, model: "KuramotoModel") -> None:
         return None
 
-    def execute(self, model: "KuramotoModel", *, verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "KuramotoModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model.build_cprogram_command()
         model.run_cprogram(verbose)
 

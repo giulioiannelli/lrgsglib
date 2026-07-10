@@ -25,17 +25,20 @@ from numpy.typing import NDArray
 
 from .._c_backend import CBackendMixin
 from .._csr import build_graph_csr
-from .._solver import SolverBackend
-from .._solver_engine import get_solver
+from .._run_host import RunHostMixin
 from ..ContDynSys import ContDynSys
-from .defaults import RD_SOLVER_NAME
-from ...utils.tools.chronometer import time_function_accumulate
+from .defaults import (
+    RD_DYN_SUBDIR,
+    RD_INTEGRATOR_DEFAULT,
+    RD_REACTION_DEFAULT,
+    RD_SOLVER_NAME,
+)
 
 if TYPE_CHECKING:
     from ...graphs.nx import SignedGraphNX as SignedGraph
 
 
-class ReactionDiffusionModel(CBackendMixin, ContDynSys):
+class ReactionDiffusionModel(RunHostMixin, CBackendMixin, ContDynSys):
     """Reaction-diffusion on a signed graph.
 
     Parameters
@@ -66,6 +69,8 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
 
     dyn_UVclass = "reaction_diffusion"
 
+    solver_name = RD_SOLVER_NAME
+
     _c_bin_dir = Path(__file__).resolve().parent / "ccore" / "bin"
     _c_program_name_template = "ReactionDiffusionSimulator{}"
     _allowed_c_keys: tuple[str, ...] = ("C0",)
@@ -83,9 +88,13 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
         simref: float | None = None,
         **kw: Any,
     ) -> None:
-        dynpath = getattr(sg, 'path_data', None)
-        if dynpath is not None:
-            dynpath = Path(dynpath) / "reaction_diffusion"
+        # Graph-anchored dynamics tree (data/<graph>/reaction_diffusion/
+        # N=...), like path_ising; flat <path_data>/<subdir> as a fallback.
+        dynpath = getattr(sg, "path_reaction_diffusion", None)
+        if dynpath is None:
+            base = getattr(sg, "path_data", None)
+            if base is not None:
+                dynpath = Path(base) / RD_DYN_SUBDIR
         super().__init__(
             sg,
             dt=dt,
@@ -107,9 +116,7 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
     def _get_laplacian(self) -> NDArray:
         """Return the (cached) signed Laplacian matrix."""
         if self._laplacian is None:
-            self._laplacian = self.sg.get_signed_laplacian().astype(
-                np.float64
-            )
+            self._laplacian = self.sg.get_signed_laplacian().astype(np.float64)
         return self._laplacian
 
     # ------------------------------------------------------------------
@@ -174,7 +181,9 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
                     raise ValueError("Provide a custom state array.")
                 self.s = np.asarray(custom, dtype=np.float64).copy()
                 if self.s.shape != (self.N,):
-                    raise ValueError(f"Shape mismatch: {self.s.shape} != ({self.N},)")
+                    raise ValueError(
+                        f"Shape mismatch: {self.s.shape} != ({self.N},)"
+                    )
             case _:
                 raise ValueError(f"Unknown IC: {self.ic!r}")
 
@@ -191,15 +200,15 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
     # Dynamics initialisation
     # ------------------------------------------------------------------
     def init_rd_dynamics(self, custom: Any = None, exName: str = "") -> None:
+        """Initialise the concentration field.
+
+        The C-backend file exchange (state / edgelist exports) now
+        happens inside ``run()`` (``_begin_outputs``), into the per-run
+        output directory; ``exName`` is kept for backward compatibility
+        and ignored (exports are named by ``run_id``).
+        """
         self._check_c_backend_or_fallback()
         self.init_state(custom)
-        if self.runlang.startswith("C"):
-            self.build_cprogram_command()
-            self.setup_stderr_logging()
-            self.export_state()
-            if self.rndStr and not exName:
-                exName = self.run_id
-            self.sg._export_edgel_bin(exName=exName or self.run_id)
         self.sini = self.s.copy()
 
     def check_attribute(self) -> None:
@@ -207,11 +216,54 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
             self.init_rd_dynamics()
 
     # ------------------------------------------------------------------
+    # Run-dirname schema + per-run outputs (Phase C)
+    # ------------------------------------------------------------------
+    def _name_tokens(self) -> list:
+        return [
+            ("p", float(self.sg.pflip)),
+            ("D", float(self.D)),
+            *(
+                (key, self.reaction_params[key])
+                for key in sorted(self.reaction_params)
+            ),
+            ("dt", float(self.dt)),
+            ("ns", int(self.steps)),
+            ("rx", self.reaction, RD_REACTION_DEFAULT),
+            ("intg", self.integrator, RD_INTEGRATOR_DEFAULT),
+            ("lang", self._lang_token()),
+            ("s", int(self.seed)),
+        ]
+
+    def _cfg_model_block(self) -> dict[str, Any]:
+        return {
+            "class": type(self).__name__,
+            "D": self.D,
+            "reaction": self.reaction,
+            "reaction_params": dict(self.reaction_params),
+            "dt": self.dt,
+            "integrator": self.integrator,
+            "steps": self.steps,
+            "ic": self.ic,
+        }
+
+    def _begin_outputs(self) -> None:
+        self._open_run_outputs()
+
+    def _persist_observables(self) -> None:
+        self._flush_run_outputs()
+
+    # ------------------------------------------------------------------
     # C backend
     # ------------------------------------------------------------------
     def _build_c_arglist(self) -> list[str]:
+        # The C RD_DIR macro composes ``<datdir>/reaction_diffusion/
+        # <syshape>/``; ``<syshapePth>/<run dirname>`` redirects the C
+        # file exchange into the per-run directory.
         datdir = self._get_datdir_arg()
         syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
+        rundir = self._run_output_dir()
+        if rundir is not None:
+            syshape = f"{syshape}/{rundir.name}"
         return [
             f"{self.N}",
             f"{self.sg.pflip:.12g}",
@@ -226,7 +278,7 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
         ]
 
     def _get_cleanup_paths(self) -> list[Path | None]:
-        return [getattr(self, 'sfout', None)]
+        return [getattr(self, "sfout", None)]
 
     # ------------------------------------------------------------------
     # Native (pybind11) backend
@@ -249,42 +301,24 @@ class ReactionDiffusionModel(CBackendMixin, ContDynSys):
         a = float(self.reaction_params.get("a", 0.5))
         save_mean = bool(getattr(self, "savedyn", False))
         u, mean = _rd_native.rd_sampling(
-            u0, ni, nw, nptr,
-            float(self.D), float(self.dt),
-            str(self.reaction), r, a,
-            int(self.steps), save_mean,
+            u0,
+            ni,
+            nw,
+            nptr,
+            float(self.D),
+            float(self.dt),
+            str(self.reaction),
+            r,
+            a,
+            int(self.steps),
+            save_mean,
         )
         self.s = u
         if save_mean:
             self.mean_concentrations = mean.tolist()
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-    @time_function_accumulate(auto_log=False)
-    def run(
-        self,
-        verbose: bool = False,
-        clean_export: bool = True,
-        **kw: Any,
-    ) -> None:
-        self.check_attribute()
-        # Resolve the solver family from the runlang code (C check is
-        # case-sensitive on a leading "C" to avoid catching native prefixes).
-        if self.runlang.startswith("C"):
-            backend = SolverBackend.C
-        elif self.runlang.lower().startswith("pb"):
-            backend = SolverBackend.PB
-        else:
-            backend = SolverBackend.PY
-        solver = get_solver(RD_SOLVER_NAME, backend)
-        solver.supports(self)
-        try:
-            solver.execute(self, verbose=verbose)
-        finally:
-            if backend is SolverBackend.C and clean_export:
-                self.remove_run_c_files()
-                self.sg.remove_exported_files()
+    # Public interface: ``run()`` is inherited from RunHostMixin (backend
+    # resolution, solver dispatch, output lifecycle, C-export cleanup).
 
 
 # Register ReactionDiffusionModel's solver backends (py/pb/C) in the registry.
