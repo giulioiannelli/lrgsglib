@@ -168,6 +168,23 @@ class IsingParallelTempering(IsingBase):
         # Setup-time capability check on the coldest rung's engine.
         self._make_engine()
 
+    # ------------------------------------------------------------------
+    # Run-dirname schema (Phase C)
+    # ------------------------------------------------------------------
+    _sch_token = "pt"
+
+    def _ns_token_value(self) -> int | None:
+        return None  # horizon derived from the scheme numerics
+
+    def _physics_tokens(self) -> list:
+        return [
+            ("Tmin", float(self.T_ladder[0])),
+            ("Tmax", float(self.T_ladder[-1])),
+            ("nr", int(self.n_replicas)),
+            ("spx", int(self.steps_per_exchange)),
+            ("nx", int(self.n_exchanges)),
+        ]
+
     def initialize_run_parameters(
         self, steps: int | None = None, simref: float | None = None
     ) -> None:

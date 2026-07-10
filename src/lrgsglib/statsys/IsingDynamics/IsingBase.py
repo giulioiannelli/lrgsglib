@@ -38,6 +38,7 @@ from .._c_backend import CBackendMixin
 from .._csr import build_coupling_csr
 from .._observables import ObservableSet, RowTrajectory, ScalarSeries
 from .._run_host import RunHostMixin
+from .._vectorized import VectorSyncEngine  # noqa: F401  (leaves build it)
 from ..BinDynSys import BinDynSys
 from .defaults import (
     ISING_COUPLING_NORM_DEFAULT,
@@ -383,28 +384,155 @@ class IsingBase(RunHostMixin, CBackendMixin, BinDynSys):
                 f"steps, or raise the cap in IsingDynamics/defaults.py."
             )
 
+    # ------------------------------------------------------------------
+    # Vectorized sync backend (np/cu) — VectorSyncEngine hooks
+    # ------------------------------------------------------------------
+    def _vec_bind(self, xp) -> None:
+        """Stage the substrate arrays on the engine's array module.
+
+        ``xp is numpy``: zero-copy aliases of the live arrays (the np
+        path is byte-identical to before). Otherwise (cupy): one
+        host-to-device copy per run; the hooks then work entirely on
+        device and ``_vec_sync_host`` mirrors the state back for the
+        host-side observables.
+        """
+        self._ensure_couplings()
+        if xp is np:
+            self._v_s = self.s
+            self._v_nbr_J = self._nbr_J
+            self._v_nbr_idx = self._nbr_idx
+            self._v_nbr_rows = self._nbr_rows
+            self._v_field = np.asarray(self.field, dtype=np.float64)
+        else:
+            self._v_s = xp.asarray(self.s)
+            self._v_nbr_J = xp.asarray(self._nbr_J)
+            self._v_nbr_idx = xp.asarray(self._nbr_idx)
+            self._v_nbr_rows = xp.asarray(self._nbr_rows)
+            self._v_field = xp.asarray(np.asarray(self.field, dtype=np.float64))
+
+    def _vec_sync_host(self, xp) -> None:
+        """Mirror the device state back into ``self.s`` (no-op for np,
+        where ``_v_s`` IS ``self.s``)."""
+        if xp is not np:
+            self.s = xp.asnumpy(self._v_s)
+
+    def _vec_propose(self, cls, xp, rng):
+        return -self._v_s[cls]
+
+    def _vec_delta_E(self, cls, proposals, xp):
+        contrib = self._v_nbr_J * self._v_s[self._v_nbr_idx].astype(xp.float64)
+        coupling = xp.zeros(self.N, dtype=xp.float64)
+        xp.add.at(coupling, self._v_nbr_rows, contrib)
+        s_cls = self._v_s[cls].astype(xp.float64)
+        field = self._v_field[cls]
+        return 2.0 * s_cls * coupling[cls] + 2.0 * field * s_cls
+
+    def _vec_commit(self, cls, proposals, accept):
+        idx = cls[accept]
+        self._v_s[idx] = proposals[accept]
+
+    def _make_vec_engine(self, xp):
+        raise NotImplementedError(
+            "Scheme classes must implement _make_vec_engine() to enable "
+            "the vectorized np/cu backends."
+        )
+
+    def _np_check_supported(self) -> None:
+        raise NotImplementedError(
+            f"{type(self).__name__} has no vectorized (np/cu) backend."
+        )
+
+    def _run_np(self, tqdm_on: bool = False, xp=None) -> None:
+        """Vectorized sync sampling loop — same record cadence and
+        incremental-energy invariant as _sample_py. ``xp`` selects the
+        array module (numpy default; cupy for the cu backend)."""
+        xp = np if xp is None else xp
+        if xp is not np:
+            # Device runs draw from xp's global RNG; pin it to the run
+            # seed the same way DynSys pins numpy's.
+            xp.random.seed(self.seed)
+        engine = self._make_vec_engine(xp)
+        self._vec_bind(xp)
+        sweep = engine.compile_step()
+        self._e_running = self.total_energy()
+        iterator = (
+            tqdm.tqdm(range(self.steps), desc=type(self).__name__)
+            if tqdm_on
+            else range(self.steps)
+        )
+        for _ in iterator:
+            self._vec_sync_host(xp)
+            self._record()
+            self._e_running += sweep()
+        self._vec_sync_host(xp)
+
+    # ------------------------------------------------------------------
+    # Run-dirname schema (Phase C: one directory per run)
+    # ------------------------------------------------------------------
+    #: ``sch=`` token; the plain Metropolis leaf keeps None (elided).
+    _sch_token: str | None = None
+
+    def _physics_tokens(self) -> list:
+        """Scheme numerics (T / Ti,Tf / Tmin,Tmax,nr / ...) — leaf hook."""
+        return []
+
+    def _axis_tokens(self) -> list:
+        """Dynamics axes (rule/move/upd/ord/tf) — leaf hook."""
+        return []
+
+    def _field_token(self) -> tuple:
+        field = getattr(self, "field", None)
+        if field is None:
+            return ("h", None)
+        arr = np.asarray(field, dtype=np.float64)
+        if not arr.any():
+            return ("h", None)
+        vals = np.unique(arr)
+        return ("h", float(vals[0]) if vals.size == 1 else "custom")
+
+    def _ns_token_value(self) -> int | None:
+        """``ns=`` value; schemes whose horizon is derived from their own
+        numerics (SA: nT*spt, PT: nx, CEM: nrst*nit) return None."""
+        return int(self.steps)
+
+    def _name_tokens(self) -> list:
+        snap_on = ISING_OBS_SNAPSHOTS in self._selected_obs
+        return [
+            ("p", float(self.sg.pflip)),
+            *self._physics_tokens(),
+            ("ns", self._ns_token_value()),
+            (
+                "se",
+                int(self.snapshot_every) if snap_on else None,
+                ISING_SNAPSHOT_EVERY_DEFAULT,
+            ),
+            *self._axis_tokens(),
+            ("sch", self._sch_token),
+            ("cn", self.coupling_norm, ISING_COUPLING_NORM_DEFAULT),
+            ("ic", self.ic, "uniform"),
+            ("lang", self._lang_token()),
+            ("s", int(self.seed)),
+        ]
+
     def _begin_outputs(self) -> None:
         snap = self.observables[ISING_OBS_SNAPSHOTS]
         snap.reset_stream()
         self._snap_seen = 0
         if not self.savedisk or not self._is_py_runlang():
             return
-        suf = self.out_suffix
+        rundir = self._run_output_dir()
+        rundir.mkdir(parents=True, exist_ok=True)
+        self._write_cfg_sidecar(rundir)
         if ISING_OBS_ENERGY in self._selected_obs:
             self.observables[ISING_OBS_ENERGY].set_path(
-                self.dynpath
-                / self.sg.get_p_fname(ISING_ENERGY_FBASE, suf, ext=BIN)
+                rundir / f"{ISING_ENERGY_FBASE}{BIN}"
             )
         if ISING_OBS_MAGN in self._selected_obs:
             self.observables[ISING_OBS_MAGN].set_path(
-                self.dynpath
-                / self.sg.get_p_fname(ISING_MAGN_FBASE, suf, ext=BIN)
+                rundir / f"{ISING_MAGN_FBASE}{BIN}"
             )
         if ISING_OBS_SNAPSHOTS in self._selected_obs:
-            snap.set_path(
-                self.dynpath
-                / self.sg.get_p_fname(ISING_SNAPSHOTS_FBASE, suf, ext=BIN)
-            )
+            snap.set_path(rundir / f"{ISING_SNAPSHOTS_FBASE}{BIN}")
             self._guard_snapshot_size()
             snap.open_stream()
 

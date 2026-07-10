@@ -303,6 +303,67 @@ class IsingMetropolis(IsingBase):
         self.magn = np.asarray(magn).tolist()
         self._e_running = self.total_energy()
 
+    # ------------------------------------------------------------------
+    # Run-dirname schema (Phase C)
+    # ------------------------------------------------------------------
+    def _physics_tokens(self) -> list:
+        return [("T", float(self.T)), self._field_token()]
+
+    def _axis_tokens(self) -> list:
+        cluster = self.move in ("wolff", "sw")
+        # tie-flip policy default: accept ties at T>0, reject at T=0
+        tf_default = 1.0 if self.T > 0.0 else 0.0
+        return [
+            ("rule", None if cluster else self.rule, ISING_RULE_DEFAULT),
+            ("move", self.move, ISING_MOVE_DEFAULT),
+            ("upd", self.upd_mode, ISING_UPD_MODE_DEFAULT),
+            (
+                "ord",
+                self.order if self.upd_mode == "async" else None,
+                ISING_ORDER_DEFAULT,
+            ),
+            (
+                "tf",
+                (
+                    None
+                    if cluster or self.rule != "metropolis"
+                    else self.tie_flip_p
+                ),
+                tf_default,
+            ),
+        ]
+
+    def _np_check_supported(self) -> None:
+        """The vectorized backends implement the SYNC schedule only —
+        true async is inherently sequential (python/pb keep it)."""
+        if self.upd_mode != "sync":
+            raise NotImplementedError(
+                "np/cu backends vectorize upd_mode='sync' (sublattice-"
+                f"parallel); upd_mode={self.upd_mode!r} is sequential — "
+                "use runlang='py' or 'pb'."
+            )
+        if self.move != "single":
+            raise NotImplementedError(
+                f"np/cu backends implement move='single'; move="
+                f"{self.move!r} is python-only."
+            )
+        if self.rule not in ("metropolis", "glauber"):
+            raise NotImplementedError(
+                f"np/cu backends implement metropolis/glauber; rule="
+                f"{self.rule!r} is python-only."
+            )
+
+    def _make_vec_engine(self, xp):
+        from .._vectorized import VectorSyncEngine
+
+        return VectorSyncEngine(
+            self,
+            rule=self.rule,
+            T=self.T,
+            tie_flip_p=(self.tie_flip_p if self.rule == "metropolis" else None),
+            xp=xp,
+        )
+
     def _sample_py(self, tqdm_on: bool = False, verbose: bool = False) -> None:
         super()._sample_py(tqdm_on=tqdm_on, verbose=verbose)
         # Per-move extras, mirrored off the engine after the run.

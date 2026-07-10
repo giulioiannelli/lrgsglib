@@ -92,6 +92,71 @@ class _HeisenbergPbSolver:
             return False
 
 
+class _HeisenbergNpSolver:
+    """Vectorized NumPy backend: sublattice-parallel sync sweeps
+    (VectorSyncEngine) — new scheme classes only."""
+
+    backend = SolverBackend.NP
+
+    def supports(self, model: "HeisenbergModel") -> None:
+        if not _is_new_style(model):
+            raise NotImplementedError(
+                "the legacy HeisenbergModel has no np backend; use the new "
+                "scheme classes (HeisenbergMetropolis, ...)."
+            )
+        model._np_check_supported()
+        return None
+
+    def execute(
+        self,
+        model: "HeisenbergModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+        **_: object,
+    ) -> None:
+        model._run_np(tqdm_on=tqdm_on)
+
+    def is_available(self) -> bool:
+        return True
+
+
+class _HeisenbergCuSolver:
+    """Vectorized CuPy (GPU) backend: the same VectorSyncEngine as np,
+    on the CuPy array module — new scheme classes only."""
+
+    backend = SolverBackend.CU
+
+    def supports(self, model: "HeisenbergModel") -> None:
+        if not _is_new_style(model):
+            raise NotImplementedError(
+                "the legacy HeisenbergModel has no cu backend; use the new "
+                "scheme classes (HeisenbergMetropolis, ...)."
+            )
+        model._np_check_supported()
+        return None
+
+    def execute(
+        self,
+        model: "HeisenbergModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+        **_: object,
+    ) -> None:
+        import cupy
+
+        model._run_np(tqdm_on=tqdm_on, xp=cupy)
+
+    def is_available(self) -> bool:
+        try:
+            import cupy  # noqa: F401
+
+            return True
+        except Exception:
+            return False
+
+
 class _HeisenbergCSolver:
     """C subprocess backend (file-transported state)."""
 
@@ -133,6 +198,8 @@ def model_c_binary_exists() -> bool:
 _HEISENBERG_SOLVERS: tuple[Solver, ...] = (
     _HeisenbergPySolver(),
     _HeisenbergPbSolver(),
+    _HeisenbergNpSolver(),
+    _HeisenbergCuSolver(),
     _HeisenbergCSolver(),
 )
 

@@ -147,10 +147,11 @@ def test_run_records_and_persists(tmp_path):
     assert model._e_running == pytest.approx(model.total_energy(), abs=1e-6)
     traj = np.asarray(model.s_t)
     assert traj.shape == (10, N)
-    files = sorted(p.name for p in model.dynpath.iterdir())
-    assert any(f.startswith("ene") for f in files)
-    assert any(f.startswith("m_") for f in files)
-    assert any(f.startswith("sout") for f in files)
+    # Phase C layout: one directory per run, short names + cfg.json inside.
+    rundir = model._run_output_dir()
+    assert rundir.parent == model.dynpath
+    files = sorted(p.name for p in rundir.iterdir())
+    assert files == ["cfg.json", "ene.bin", "m.bin", "sout.bin"]
 
 
 def test_seeded_reproducibility(tmp_path):

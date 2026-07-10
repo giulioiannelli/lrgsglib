@@ -185,9 +185,13 @@ class MultiSpeciesBase(RunHostMixin, CBackendMixin, VecDynSys):
         self.coupling_norm = coupling_norm
         self.snapshot_every = max(1, int(snapshot_every))
 
-        dynpath = getattr(sg, "path_data", None)
-        if dynpath is not None:
-            dynpath = Path(dynpath) / MULTISPEC_DYN_SUBDIR
+        # Graph-anchored dynamics tree (data/<graph>/<model>/N=...),
+        # like path_ising; legacy classes keep the old flat location.
+        dynpath = getattr(sg, "path_multi_species", None)
+        if dynpath is None:
+            base = getattr(sg, "path_data", None)
+            if base is not None:
+                dynpath = Path(base) / MULTISPEC_DYN_SUBDIR
         super().__init__(
             sg,
             q=max(self._q_per_species),
@@ -507,28 +511,62 @@ class MultiSpeciesBase(RunHostMixin, CBackendMixin, VecDynSys):
                 f"steps, or raise the cap in MultiSpeciesModel/defaults.py."
             )
 
+    # ------------------------------------------------------------------
+    # Run-dirname schema (Phase C: one directory per run)
+    # ------------------------------------------------------------------
+    def _physics_tokens(self) -> list:
+        qs = list(self._q_per_species)
+        q_val = qs[0] if len(set(qs)) == 1 else tuple(qs)
+        M = self.interaction_matrix
+        identity = bool(np.allclose(M, np.eye(self.species)))
+        return [
+            ("k", int(self.species)),
+            ("q", q_val),
+            ("T", float(self.T)),
+            ("M", None if identity else "custom"),
+        ]
+
+    def _axis_tokens(self) -> list:
+        """Dynamics axes (rule/move/upd/ord/tf) — leaf hook."""
+        return []
+
+    def _name_tokens(self) -> list:
+        snap_on = MULTISPEC_OBS_SNAPSHOTS in self._selected_obs
+        return [
+            ("p", float(self.sg.pflip)),
+            *self._physics_tokens(),
+            ("ns", int(self.steps)),
+            (
+                "se",
+                int(self.snapshot_every) if snap_on else None,
+                MULTISPEC_SNAPSHOT_EVERY_DEFAULT,
+            ),
+            *self._axis_tokens(),
+            ("cn", self.coupling_norm, MULTISPEC_COUPLING_NORM_DEFAULT),
+            ("ic", self.ic, "uniform"),
+            ("lang", self._lang_token()),
+            ("s", int(self.seed)),
+        ]
+
     def _begin_outputs(self) -> None:
         snap = self.observables[MULTISPEC_OBS_SNAPSHOTS]
         snap.reset_stream()
         self._snap_seen = 0
         if not self.savedisk or not self._is_py_runlang():
             return
-        suf = self.out_suffix
+        rundir = self._run_output_dir()
+        rundir.mkdir(parents=True, exist_ok=True)
+        self._write_cfg_sidecar(rundir)
         if MULTISPEC_OBS_ENERGY in self._selected_obs:
             self.observables[MULTISPEC_OBS_ENERGY].set_path(
-                self.dynpath
-                / self.sg.get_p_fname(MULTISPEC_ENERGY_FBASE, suf, ext=BIN)
+                rundir / f"{MULTISPEC_ENERGY_FBASE}{BIN}"
             )
         if MULTISPEC_OBS_MAGN in self._selected_obs:
             self.observables[MULTISPEC_OBS_MAGN].set_path(
-                self.dynpath
-                / self.sg.get_p_fname(MULTISPEC_MAGN_FBASE, suf, ext=BIN)
+                rundir / f"{MULTISPEC_MAGN_FBASE}{BIN}"
             )
         if MULTISPEC_OBS_SNAPSHOTS in self._selected_obs:
-            snap.set_path(
-                self.dynpath
-                / self.sg.get_p_fname(MULTISPEC_SNAPSHOTS_FBASE, suf, ext=BIN)
-            )
+            snap.set_path(rundir / f"{MULTISPEC_SNAPSHOTS_FBASE}{BIN}")
             self._guard_snapshot_size()
             snap.open_stream()
 
