@@ -60,10 +60,21 @@ PATHNSPEC = 'spect'
 PATHNVM = 'voter'
 PATHNCP = 'cntct'
 PATHNSRW = 'srw'
+PATHNPOTTS = 'potts'
+PATHNXY = 'xy'
+PATHNHEIS = 'heisenberg'
+PATHNMS = 'multi_species'
+PATHNKURA = 'kuramoto'
+PATHNRD = 'reaction_diffusion'
+PATHNCODE = 'coupled_ode'
 # Graph-related paths (created by SignedGraph)
 PATHN_GRAPH_LIST = [PATHNGRPH, PATHNLRGS, PATHNPHTR, PATHNSPEC]
 # Dynamics-related paths (created by respective dynamics classes)
-PATHN_DYNAMICS_LIST = [PATHNISNG, PATHNVM, PATHNCP, PATHNSRW]
+PATHN_DYNAMICS_LIST = [
+    PATHNISNG, PATHNVM, PATHNCP, PATHNSRW,
+    PATHNPOTTS, PATHNXY, PATHNHEIS, PATHNMS,
+    PATHNKURA, PATHNRD, PATHNCODE,
+]
 # All paths (for backward compatibility)
 PATHN_LIST = PATHN_GRAPH_LIST + PATHN_DYNAMICS_LIST
 #
