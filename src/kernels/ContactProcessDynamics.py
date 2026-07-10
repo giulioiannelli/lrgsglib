@@ -10,6 +10,8 @@ Supported C1 backends for EI dynamics: C1c, C1d, C1e, C1f, C1g
 - C1g: C1e with configuration snapshots at log-spaced intervals
 """
 
+import shutil
+
 from typing import Any
 from pathlib import Path
 import numpy as np
@@ -139,27 +141,20 @@ def _process_EI_C1c(cp, args):
     pdir, agg_prefix, sp_token = _output_components(cp.sg, args)
     if _last_saved_index == 0:
         _last_saved_index = _latest_saved_index(pdir, agg_prefix, sp_token)
-    # Collect per-run density for this batch.
-    dens_files = [
-        f for f in pdir.glob("dens_*.bin") if cp.out_id in f.name or (getattr(cp, "rand_str", None) and cp.rand_str in f.name)
-    ]
-    if not dens_files:
-        dens_files = sorted(
-            [f for f in pdir.glob("dens_*.bin") if "_na=" not in f.name], key=lambda p: p.name
-        )
-    arr = None
-    if dens_files:
-        dens_file = dens_files[0]
-        try:
-            arr = np.fromfile(dens_file, dtype=np.float64)
-        except Exception:
-            arr = None
-        try:
-            dens_file.unlink()
-        except Exception:
-            pass
-    if arr is not None:
+    # Collect this run's density series off the model object: after a C
+    # run, run_cprogram() reads the per-run rho_* file back into the
+    # density observable, so the object is the single source across
+    # backends and output layouts (the old flat dens_* glob predates the
+    # per-run-directory contract and matches nothing under it).
+    arr = np.asarray(cp.density, dtype=np.float64)
+    if arr.size:
         _batch_densities.append(arr)
+    # The per-run directory is transient in this averaging program (only
+    # the cumulative _na= aggregate survives) — remove it exactly as the
+    # old flat per-run dens_* file was unlinked after collection.
+    rundir = getattr(cp, "_c_rundir", None)
+    if rundir is not None:
+        shutil.rmtree(rundir, ignore_errors=True)
     # Save at batch boundary or last run
     is_batch_end = (i % batch_size == 0) or (i == na)
     if is_batch_end and _batch_densities:
