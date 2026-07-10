@@ -29,15 +29,24 @@ _STEPS = 25
 
 
 def _lattice():
-    return Lattice2D(side1=_SIDE, side2=_SIDE, geo="squared", pbc=True,
-                     init_nw_dict=False)
+    return Lattice2D(
+        side1=_SIDE, side2=_SIDE, geo="squared", pbc=True, init_nw_dict=False
+    )
 
 
 def _sir(savedisk, dynpath=None, **kw):
     np.random.seed(123)
-    cp = ContactProcessSIR(_lattice(), mu=0.6, runlang="py", ic="homogeneous",
-                           state_type="binary", seed=123, steps=_STEPS,
-                           savedisk=savedisk, **kw)
+    cp = ContactProcessSIR(
+        _lattice(),
+        mu=0.6,
+        runlang="py",
+        ic="homogeneous",
+        state_type="binary",
+        seed=123,
+        steps=_STEPS,
+        savedisk=savedisk,
+        **kw,
+    )
     if dynpath is not None:
         cp.dynpath = dynpath
         cp._ensure_dynpath_exists()
@@ -47,7 +56,9 @@ def _sir(savedisk, dynpath=None, **kw):
 
 
 def test_observable_set_registered():
-    cp = ContactProcessSIR(_lattice(), mu=0.5, runlang="py", state_type="binary")
+    cp = ContactProcessSIR(
+        _lattice(), mu=0.5, runlang="py", state_type="binary"
+    )
     assert cp.observables is not None
     assert CP_OBS_DENSITY in cp.observables
     assert CP_OBS_SNAPSHOTS in cp.observables
@@ -72,10 +83,12 @@ def test_ram_density_and_snapshots():
 def test_disk_parity_with_ram(tmp_path):
     ram = _sir(savedisk=False, savedyn=True, savedensity=True)
     dsk = _sir(savedisk=True, dynpath=tmp_path, savedyn=True, savedensity=True)
-    # Files land under the stable out_suffix-based names.
-    written = {p.name for p in tmp_path.glob("*")}
-    assert any(n.startswith("rho") for n in written)
-    assert any(n.startswith("sout") for n in written)
+    # Phase-C layout: one per-run directory under dynpath holding the short
+    # canonical observable names + the cfg.json sidecar.
+    rundir = dsk._run_output_dir()
+    assert rundir.parent == tmp_path
+    written = {p.name for p in rundir.iterdir()}
+    assert written == {"rho.bin", "sout.bin", "cfg.json"}
     # On disk the trajectory is a read-only memmap; values match the RAM run.
     assert np.asarray(dsk.s_t).shape == (_STEPS, _N)
     assert np.array_equal(np.asarray(ram.s_t), np.asarray(dsk.s_t))
@@ -91,7 +104,9 @@ def test_savedisk_false_writes_nothing(tmp_path):
 
 def test_snapshot_subsampling(tmp_path):
     every = 5
-    cp = _sir(savedisk=True, dynpath=tmp_path, savedyn=True, snapshot_every=every)
+    cp = _sir(
+        savedisk=True, dynpath=tmp_path, savedyn=True, snapshot_every=every
+    )
     # Streaming keeps every k-th of the _STEPS recorded sweeps.
     expected = -(-_STEPS // every)  # ceil
     assert np.asarray(cp.s_t).shape == (expected, _N)
@@ -99,8 +114,15 @@ def test_snapshot_subsampling(tmp_path):
 
 def test_snapshot_size_guard(tmp_path):
     # A trajectory exceeding the byte cap must raise before writing.
-    cp = ContactProcessSIR(_lattice(), mu=0.5, runlang="py", state_type="binary",
-                           seed=1, savedyn=True, savedisk=True)
+    cp = ContactProcessSIR(
+        _lattice(),
+        mu=0.5,
+        runlang="py",
+        state_type="binary",
+        seed=1,
+        savedyn=True,
+        savedisk=True,
+    )
     cp.dynpath = tmp_path
     cp._ensure_dynpath_exists()
     cp.init_contact_dynamics()

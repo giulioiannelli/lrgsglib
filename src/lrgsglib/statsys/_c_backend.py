@@ -72,6 +72,7 @@ def _c_backend_available() -> bool:
     bin_dir = _get_ccore_bin()
     return bin_dir.is_dir()
 
+
 if TYPE_CHECKING:
     from .DynSys import DynSys
 
@@ -104,6 +105,9 @@ class CBackendMixin:
     cprogram: list[str | Path] = []
     stderr_path: Path | None = None
     stderr_fopen: Any = None
+    #: Per-run output directory of the ACTIVE C exchange (Phase-C naming);
+    #: ``None`` keeps the legacy flat layout. Stashed by ``_c_syshape_arg``.
+    _c_rundir: Path | None = None
 
     # ------------------------------------------------------------------
     # C backend availability check
@@ -136,7 +140,9 @@ class CBackendMixin:
         # CuPy uses underscore format (cu_met), C subprocess uses C<digit> format
         if not upper.startswith("C"):
             return
-        if "_" in self.runlang and (upper.startswith("CU_") or upper.startswith("PB_")):
+        if "_" in self.runlang and (
+            upper.startswith("CU_") or upper.startswith("PB_")
+        ):
             return
         # C subprocess codes are C<digit>...; skip aliases like "cem"
         if len(upper) < 2 or not upper[1].isdigit():
@@ -189,7 +195,9 @@ class CBackendMixin:
             If runlang doesn't start with 'C' or isn't in _allowed_c_keys.
         """
         if not self.runlang or not self.runlang.upper().startswith("C"):
-            raise ValueError("C backend requested but runlang is not a C variant.")
+            raise ValueError(
+                "C backend requested but runlang is not a C variant."
+            )
         suffix = self.runlang[1:]
         key = "C0" if suffix == "" or suffix == "0" else f"C{suffix.upper()}"
         if self._allowed_c_keys and key not in self._allowed_c_keys:
@@ -237,7 +245,9 @@ class CBackendMixin:
         list[str]
             Command-line arguments for the C program.
         """
-        raise NotImplementedError("Subclasses must implement _build_c_arglist()")
+        raise NotImplementedError(
+            "Subclasses must implement _build_c_arglist()"
+        )
 
     # ------------------------------------------------------------------
     # Stderr logging
@@ -248,16 +258,19 @@ class CBackendMixin:
         Creates a log file in LRGSG_LOG directory with format:
         err{CbaseName}_{N}_{run_id}_{out_suffix}.log
         """
-        fname = join_non_empty(
-            '_',
-            f"err{self.CbaseName}",
-            f"{self.N}",
-            getattr(self, 'run_id', ''),
-            getattr(self, 'out_suffix', ''),
-        ) + LOG
+        fname = (
+            join_non_empty(
+                "_",
+                f"err{self.CbaseName}",
+                f"{self.N}",
+                getattr(self, "run_id", ""),
+                getattr(self, "out_suffix", ""),
+            )
+            + LOG
+        )
         self.stderr_path = Path(LRGSG_LOG) / fname
         self.stderr_path.parent.mkdir(parents=True, exist_ok=True)
-        self.stderr_fopen = open(self.stderr_path, 'w')
+        self.stderr_fopen = open(self.stderr_path, "w")
 
     def _close_stderr_handle(self: "DynSys") -> None:
         """Close stderr file handle if open."""
@@ -307,10 +320,10 @@ class CBackendMixin:
         )
         self._close_stderr_handle()
 
-        dtype = getattr(self, '_state_dtype', np.int8)
+        dtype = getattr(self, "_state_dtype", np.int8)
         state = np.frombuffer(result.stdout, dtype=dtype)
 
-        expected_shape = getattr(self, '_state_shape', (self.N,))
+        expected_shape = getattr(self, "_state_shape", (self.N,))
         expected_size = 1
         for d in expected_shape:
             expected_size *= d
@@ -355,7 +368,7 @@ class CBackendMixin:
         list[Path | None]
             Paths to remove during cleanup.
         """
-        return [getattr(self, 'sfout', None)]
+        return [getattr(self, "sfout", None)]
 
     def _remove_stderr(self: "DynSys") -> None:
         """Remove the stderr log file."""
@@ -375,6 +388,84 @@ class CBackendMixin:
             self._remove_stderr()
 
     # ------------------------------------------------------------------
+    # Per-run output directory redirection (Phase-C naming)
+    # ------------------------------------------------------------------
+    def _c_syshape_arg(self: "DynSys") -> str:
+        """The ``syshape`` positional argument for the C arglist.
+
+        The C binaries compose EVERY file path as
+        ``sprintf(FNAME, datdir, syshape, p, id)`` with a hard-coded DIR
+        macro (e.g. ``"%s/voter/%s/"``), so they cannot be pointed at an
+        arbitrary directory. When the model publishes a per-run naming
+        schema (``_name_tokens``), the run dirname is COMPOSED into the
+        syshape (``"<syshapePth>/<run dirname>"``): the whole C exchange —
+        transient ``s_*`` input and observable outputs — then lands inside
+        ``<dynpath>/<run dirname>/`` (and the graph-side ``edgelist_*``
+        input inside the ``<path_graph>/<run dirname>/`` mirror, because
+        its DIR macro is ``"%s/graph/%s/"``).
+
+        Side effects: creates the run directory (exports during
+        ``init_*_dynamics`` write into it) and stashes it as
+        ``self._c_rundir`` so the read-back paths, the cfg sidecar and the
+        cleanup all target the SAME directory even if run parameters are
+        mutated afterwards. Models without a naming schema fall back to the
+        flat legacy layout (``self._c_rundir = None``).
+        """
+        syshape = getattr(self.sg, "syshapePth", f"N={self.N}")
+        run_output_dir = getattr(self, "_run_output_dir", None)
+        rundir = run_output_dir() if run_output_dir is not None else None
+        if rundir is None:
+            self._c_rundir = None
+            return str(syshape)
+        rundir.mkdir(parents=True, exist_ok=True)
+        self._c_rundir = rundir
+        return f"{syshape}/{rundir.name}"
+
+    def _c_export_graph_inputs(
+        self: "DynSys", exName: str = "", adj: bool = False
+    ) -> None:
+        """Export the C subprocess's graph inputs (edgelist [+ adjacency]).
+
+        With a per-run directory active (``self._c_rundir``), the C binary
+        reads the edgelist from ``<path_graph>/<run dirname>/`` (the
+        composed-syshape mirror of the rundir), so the graph-side exports
+        are redirected there; the flat legacy location is used otherwise.
+        The exported paths stay registered on the graph
+        (``path_exp_edgl`` / ``path_exp_adj``), so
+        ``sg.remove_exported_files()`` keeps cleaning them up.
+        """
+        sg = self.sg
+        rundir = self._c_rundir
+        if rundir is None:
+            sg._export_edgel_bin(exName=exName)
+            if adj:
+                sg.export_adj_bin(exName=exName)
+            return
+        orig_path_graph = sg.path_graph
+        sg.path_graph = Path(orig_path_graph) / rundir.name
+        try:
+            sg._export_edgel_bin(exName=exName)
+            if adj:
+                sg.export_adj_bin(exName=exName)
+        finally:
+            sg.path_graph = orig_path_graph
+
+    def _c_prune_rundir(self: "DynSys") -> None:
+        """Drop the per-run directory of a non-persisting C run if empty.
+
+        Called after ``remove_run_c_files``: with ``savedisk=False`` every
+        C-written file has been removed, so the rundir (created only for
+        the file exchange) is empty and should not linger.
+        """
+        rundir = self._c_rundir
+        if rundir is None or getattr(self, "savedisk", True):
+            return
+        try:
+            rundir.rmdir()
+        except OSError:
+            pass
+
+    # ------------------------------------------------------------------
     # Utility methods
     # ------------------------------------------------------------------
     def _get_datdir_arg(self: "DynSys") -> str:
@@ -389,8 +480,9 @@ class CBackendMixin:
         str
             Data directory path as string.
         """
-        path = getattr(self.sg, 'path_sgdata',
-                       getattr(self.sg, 'path_data', Path.cwd()))
+        path = getattr(
+            self.sg, "path_sgdata", getattr(self.sg, "path_data", Path.cwd())
+        )
         Path(path).mkdir(parents=True, exist_ok=True)
         try:
             return str(Path(path).relative_to(Path.cwd()))

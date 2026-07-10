@@ -12,12 +12,13 @@ and the C backend self-seeds from wall-clock/PID (its RNG is not yet threaded
 to the Python ``seed=``).
 """
 
-import pytest
 import numpy as np
+import pytest
 
 
 def _voter_c_binary_missing() -> bool:
     from lrgsglib.statsys.VoterModel import VoterModel
+
     return not (VoterModel._c_bin_dir / "VoterSimulator").exists()
 
 
@@ -36,8 +37,13 @@ def test_voter_c_isolated_node_no_sigfpe(tmp_path):
     from lrgsglib.statsys import VoterModel
 
     g = ErdosRenyiNX(
-        n=8, p=0.0, seed=1, pflip=0.0,
-        path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
+        n=8,
+        p=0.0,
+        seed=1,
+        pflip=0.0,
+        path_data=tmp_path,
+        path_plot=tmp_path,
+        init_nw_dict=False,
     )
     assert min(dict(g.gr["G"].degree()).values()) == 0  # degree-0 node present
 
@@ -57,7 +63,11 @@ def test_voter_c_isolated_node_no_sigfpe(tmp_path):
 
 def _run_collect_magn(VoterModel, sg, steps, runlang, save):
     v = VoterModel(
-        sg=sg, steps=steps, runlang=runlang, seed=1, savemagn=save,
+        sg=sg,
+        steps=steps,
+        runlang=runlang,
+        seed=1,
+        savemagn=save,
         # Isolate the savemagn contract from early-stop: a balanced graph
         # otherwise absorbs at consensus before ``steps`` sweeps, making the
         # recorded length backend-RNG-dependent rather than exactly ``steps``.
@@ -77,12 +87,20 @@ def test_voter_savemagn_contract_py(tmp_path):
 
     def make():
         return Lattice2DNX(
-            side1=6, geo="sqr", pbc=True, pflip=0.0, seed=1,
-            path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
+            side1=6,
+            geo="sqr",
+            pbc=True,
+            pflip=0.0,
+            seed=1,
+            path_data=tmp_path,
+            path_plot=tmp_path,
+            init_nw_dict=False,
         )
 
     assert len(_run_collect_magn(VoterModel, make(), steps, "py", False)) == 0
-    assert len(_run_collect_magn(VoterModel, make(), steps, "py", True)) == steps
+    assert (
+        len(_run_collect_magn(VoterModel, make(), steps, "py", True)) == steps
+    )
 
 
 @pytest.mark.physical
@@ -97,13 +115,21 @@ def test_voter_savemagn_contract_c(tmp_path):
 
     def make():
         return Lattice2DNX(
-            side1=6, geo="sqr", pbc=True, pflip=0.0, seed=1,
-            path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
+            side1=6,
+            geo="sqr",
+            pbc=True,
+            pflip=0.0,
+            seed=1,
+            path_data=tmp_path,
+            path_plot=tmp_path,
+            init_nw_dict=False,
         )
 
     # Previously the C backend always populated magn, ignoring the flag.
     assert len(_run_collect_magn(VoterModel, make(), steps, "C0", False)) == 0
-    assert len(_run_collect_magn(VoterModel, make(), steps, "C0", True)) == steps
+    assert (
+        len(_run_collect_magn(VoterModel, make(), steps, "C0", True)) == steps
+    )
 
 
 # ===================================================================
@@ -127,32 +153,40 @@ def test_voter_martingale_and_py_c_agreement(tmp_path):
     R, steps, tol = 150, 100, 0.30
 
     g = FullyConnectedNX(
-        N=N, pflip=0.0, seed=0,
-        path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
+        N=N,
+        pflip=0.0,
+        seed=0,
+        path_data=tmp_path,
+        path_plot=tmp_path,
+        init_nw_dict=False,
     )
 
     def mean_final_M(runlang):
         acc = 0.0
         for r in range(R):
-            v = VoterModel(sg=g, ic="custom", steps=steps, runlang=runlang, seed=r)
+            v = VoterModel(
+                sg=g, ic="custom", steps=steps, runlang=runlang, seed=r
+            )
             v.init_voter_dynamics(custom=ic)
             v.run(tqdm_on=False)
             acc += float(np.mean(v.s))
         return acc / R
 
     m_py = mean_final_M("py")
-    assert abs(m_py - M_init) < tol, (
-        f"Python voter violates martingale: <M_final>={m_py:.3f}, M_init={M_init}"
-    )
+    assert (
+        abs(m_py - M_init) < tol
+    ), f"Python voter violates martingale: <M_final>={m_py:.3f}, M_init={M_init}"
 
     if _voter_c_binary_missing():
-        pytest.skip("VoterSimulator binary not built; Python martingale verified")
+        pytest.skip(
+            "VoterSimulator binary not built; Python martingale verified"
+        )
     # Both backends agreeing with theory (E[M]=M_init) implies they agree with
     # each other, without the flakier direct py-vs-C mean comparison.
     m_c = mean_final_M("C0")
-    assert abs(m_c - M_init) < tol, (
-        f"C voter violates martingale: <M_final>={m_c:.3f}, M_init={M_init}"
-    )
+    assert (
+        abs(m_c - M_init) < tol
+    ), f"C voter violates martingale: <M_final>={m_c:.3f}, M_init={M_init}"
 
 
 # ===================================================================
@@ -165,8 +199,14 @@ def test_voter_upd_mode_validation(tmp_path):
     from lrgsglib.statsys import VoterModel
 
     lat = Lattice2DNX(
-        side1=4, geo="sqr", pbc=True, pflip=0.0, seed=1,
-        path_data=tmp_path, path_plot=tmp_path, init_nw_dict=False,
+        side1=4,
+        geo="sqr",
+        pbc=True,
+        pflip=0.0,
+        seed=1,
+        path_data=tmp_path,
+        path_plot=tmp_path,
+        init_nw_dict=False,
     )
 
     # Phase 3/4: asynchronous / synchronous / link / gillespie are implemented
@@ -178,7 +218,58 @@ def test_voter_upd_mode_validation(tmp_path):
         VoterModel(sg=lat, steps=5, runlang="py", upd_mode="bogus")
     # link / gillespie are copy operations -> only defined for the linear rule.
     with pytest.raises(ValueError):
-        VoterModel(sg=lat, steps=5, runlang="py", upd_mode="link", rule="majority")
+        VoterModel(
+            sg=lat, steps=5, runlang="py", upd_mode="link", rule="majority"
+        )
     with pytest.raises(ValueError):
-        VoterModel(sg=lat, steps=5, runlang="py", upd_mode="gillespie",
-                   rule="majority")
+        VoterModel(
+            sg=lat, steps=5, runlang="py", upd_mode="gillespie", rule="majority"
+        )
+
+
+# ===================================================================
+# py<->C filename convention with a NON-empty suffix (build_str_id)
+# ===================================================================
+
+
+@pytest.mark.integration
+def test_voter_c_filenames_match_python_with_suffix(tmp_path):
+    """C-written filenames match ``get_p_fname`` when out_suffix is set.
+
+    Regression for the systemic py<->C mismatch: the simulators used to
+    glue the id straight onto the ``p=`` token (``m_p=0foo.bin``), while
+    Python inserts an underscore (``m_p=0_foo.bin``) — so with any
+    non-empty suffix the read-back missed the C-written file entirely.
+    The mains now route ids through ``build_str_id``.
+    """
+    if _voter_c_binary_missing():
+        pytest.skip("VoterSimulator binary not built")
+    from lrgsglib.graphs.nx import Lattice2DNX
+    from lrgsglib.statsys import VoterModel
+
+    steps = 12
+    sg = Lattice2DNX(
+        side1=6,
+        geo="sqr",
+        pbc=True,
+        pflip=0.0,
+        seed=1,
+        path_data=tmp_path,
+        path_plot=tmp_path,
+        init_nw_dict=False,
+    )
+    v = VoterModel(
+        sg=sg,
+        steps=steps,
+        runlang="C0",
+        seed=1,
+        savemagn=True,
+        absorbing_check=False,
+        out_suffix="suffcheck",
+    )
+    v.init_voter_dynamics()
+    v.run(tqdm_on=False)
+
+    assert "_suffcheck" in v.magn_path.name
+    assert v.magn_path.exists()
+    assert len(v.magn) == steps
