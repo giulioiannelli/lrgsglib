@@ -1,10 +1,19 @@
+from functools import lru_cache
+
 import numpy as np
 from sklearn.datasets import fetch_openml
 
 
+@lru_cache(maxsize=1)
+def _fetch_mnist():
+    """Load mnist_784 once per process — the 70000×784 frame is expensive
+    to materialize even from the local sklearn cache."""
+    return fetch_openml("mnist_784", version=1)
+
+
 def init_mnist_patterns(digit=None, n_samples=1, threshold=127):
     """Return MNIST patterns converted to bipolar arrays."""
-    mnist = fetch_openml("mnist_784", version=1)
+    mnist = _fetch_mnist()
     X = mnist.data.astype(np.float32)
     y = mnist.target.astype(np.int64)
 
