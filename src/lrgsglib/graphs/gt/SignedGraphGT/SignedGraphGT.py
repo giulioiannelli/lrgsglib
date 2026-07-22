@@ -1159,6 +1159,15 @@ class SignedGraphGT:
         tuple[ndarray, ndarray]
             (eigenvalues, eigenvectors) with k values.
         """
+        # Same routing rule as the NX driver: past half the spectrum ARPACK is
+        # slower than one dense eigh — and eigsh(k=N) is a hard scipy error —
+        # so large-k 'SM' requests go through the full dense solve (which
+        # stores the identical ascending, column-major layout).
+        if which == "SM" and k > self.N // 2:
+            return self.compute_laplacian_spectrum_weigV(
+                laplacian_type=laplacian_type
+            )
+
         L, is_sym = self._laplacian_operator(laplacian_type)
         L_sparse = csr_matrix(L)
 
