@@ -33,6 +33,13 @@ class HofieldNNNX(FullyConnectedNX):
             # Calculate the weight matrix using the Hebbian learning rule
             self.compute_hebbian_weights(self.patterns)
             fast_set_weights_from_matrix(self.G, self.weights)
+            # The Hebbian matrix just overwrote every edge weight, clobbering
+            # the disorder the base class realized on the all-(+1) complete
+            # graph — re-apply it on top of the learned couplings. The support
+            # edges are already realized (fleset / nwDict), so this is
+            # deterministic and a no-op when no disorder was requested.
+            if self.disorder is not None:
+                self._apply_disorder(self.disorder)
 
     def __repr__(self):
         return f"HofieldNNNX(N={self.N}, patterns_stored={len(self.patterns)})"
