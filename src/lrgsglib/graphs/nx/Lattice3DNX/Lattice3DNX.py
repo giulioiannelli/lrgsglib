@@ -203,10 +203,42 @@ class Lattice3DNX(SignedGraphNX):
         cnode = (self.dimL[0]//2-1, self.dimL[1]//2, self.dimL[2]//2)
         cnode_t = (self.dimL[0]//2, self.dimL[1]//2, self.dimL[2]//2)
         edge_t = (cnode, cnode_t)
+        if not self.H.has_edge(*edge_t):
+            # bcc/fcc have no axis-step NN bonds — fall back to the bulk edge
+            # nearest the geometric centre (same rule as the GT engine's
+            # geometric_central_edge; H labels ARE the coordinates)
+            edge_t = self._geometric_central_edge_H()
         if on_g == 'H':
             return edge_t
         elif on_g == 'G':
-            return self.map_edge['G']['H'][edge_t]
+            emap = self.map_edge['G']['H']
+            if edge_t in emap:
+                return emap[edge_t]
+            return emap[(edge_t[1], edge_t[0])]
+
+    def _geometric_central_edge_H(self) -> tuple:
+        """Bulk edge of ``H`` nearest the geometric centre of the lattice.
+
+        Centroid-nearest node, then its incident edge with the centroid-nearest
+        midpoint — deterministic and translation-stable.
+        """
+        nodes = list(self.H.nodes())
+        pos = np.array([[float(c) for c in n] for n in nodes], dtype=float)
+        centroid = pos.mean(axis=0)
+        central = nodes[int(np.argmin(((pos - centroid) ** 2).sum(axis=1)))]
+        nbrs = list(self.H.neighbors(central))
+        if not nbrs:
+            raise ValueError(
+                "central node has no neighbours; cannot pick a central edge"
+            )
+        c_arr = np.array(central, dtype=float)
+        nb = min(
+            nbrs,
+            key=lambda j: (
+                (0.5 * (c_arr + np.array(j, dtype=float)) - centroid) ** 2
+            ).sum(),
+        )
+        return (central, nb)
 
     nwContainer = Lattice3DNXnwContainer
 

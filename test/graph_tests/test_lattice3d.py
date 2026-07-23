@@ -358,8 +358,10 @@ class TestLattice3DGeometries(unittest.TestCase):
 
     def test_all_geometries_create_valid_graphs(self):
         """Test that all geometry options create valid graphs."""
-        # Note: FCC with small dim may not be connected, so we only test SC and BCC
-        geometries = ["sc", "bcc", "simple_cubic", "body_centered"]
+        geometries = [
+            "sc", "bcc", "fcc",
+            "simple_cubic", "body_centered", "face_centered",
+        ]
 
         for geo in geometries:
             with self.subTest(geometry=geo):

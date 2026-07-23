@@ -111,11 +111,10 @@ def test_lattice3d_sc_coordination(tmp_path):
 
 
 @pytest.mark.physical
-@pytest.mark.parametrize("geo", ["bcc", "fcc"])
-def test_lattice3d_nonsc_coordination(geo, tmp_path):
-    """BCC/FCC: avg degree consistent between sizes (implementation-specific z)."""
+@pytest.mark.parametrize("geo,z_expected", [("bcc", 8.0), ("fcc", 12.0)])
+def test_lattice3d_nonsc_coordination(geo, z_expected, tmp_path):
+    """BCC/FCC under PBC: exact crystallographic coordination (z=8 / z=12)."""
     from lrgsglib.graphs.nx import Lattice3DNX
-    results = []
     for dim in [4, 6]:
         lat = Lattice3DNX(
             dim=dim, geo=geo, pbc=True, pflip=0.0,
@@ -123,13 +122,9 @@ def test_lattice3d_nonsc_coordination(geo, tmp_path):
             init_nw_dict=False,
         )
         avg_z = 2 * lat.Ne / lat.N
-        results.append(avg_z)
-        assert lat.N > 0
-        assert lat.Ne > 0
-    # Both sizes should have similar coordination (within 20%)
-    assert abs(results[0] - results[1]) / results[1] < 0.2, (
-        f"{geo}: z varies too much between dim=4 ({results[0]:.2f}) and dim=6 ({results[1]:.2f})"
-    )
+        assert np.isclose(avg_z, z_expected, atol=0.01), (
+            f"{geo} dim={dim}: expected z={z_expected}, got {avg_z:.2f}"
+        )
 
 
 @pytest.mark.physical
