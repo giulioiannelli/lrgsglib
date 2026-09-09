@@ -12,6 +12,16 @@ __all__ = [
     "load_or_compute_Lattice2DNX"
 ]
 #
+def _cache_has_payload(lattice: Any, compute: str) -> bool:
+    """True if an unpickled lattice actually carries the payload that
+    the given ``compute`` mode promises (guards against stale caches
+    saved before the computation ran)."""
+    if compute.startswith('energy'):
+        return bool(getattr(lattice, 'energy_eigV_RBIM', None))
+    if compute.startswith(('eigenmodes', 'eigV')):
+        return getattr(lattice, 'eigV', None) is not None
+    return getattr(lattice, 'eigv', None) is not None
+#
 def create_lattice_with_eigenspace(
     side: int,
     disorder_struct: str = 'random',
@@ -145,10 +155,15 @@ def load_or_compute_Lattice2DNX(
     pname = tmp_l.path_graph / (fname + '.pkl')
     tmp_l.path_graph.mkdir(parents=True, exist_ok=True)
     #
+    lattice = None
     if pname.exists():
         lattice = pk.load(open(pname, 'rb'))
         lattice.__init_loaded_graph__(path_data=kwargs.get('path_data', None))
-    else:
+        if not _cache_has_payload(lattice, compute):
+            # Cache written before the payload existed (e.g. by the lazy
+            # compute_rbim_energy_eigV_all) — recompute and overwrite.
+            lattice = None
+    if lattice is None:
         lattice = Lattice2DNX(side1, geo=geo, **kwargs)
         match cell_type:
             case 'rand':
@@ -174,6 +189,9 @@ def load_or_compute_Lattice2DNX(
                 lattice.compute_laplacian_spectrum_weigV(backend=routine)
             case _ if compute.startswith('energy'):
                 routine = compute.split('_')[1] if '_' in compute else 'numpy'
+                # compute_rbim_energy_eigV_all only walks already-cached
+                # modes (46425e1): materialize the full spectrum first.
+                lattice.compute_laplacian_spectrum_weigV(backend=routine)
                 lattice.compute_rbim_energy_eigV_all(backend=routine)
             case _:
                 raise ValueError(f"Unknown compute option '{compute}'.")

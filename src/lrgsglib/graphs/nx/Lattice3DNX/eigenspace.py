@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 from typing import Any, Union, Tuple
 #
 from ....config.funcs import peq_fstr
+from ..Lattice2DNX.eigenspace import _cache_has_payload
 from .Lattice3DNX import Lattice3DNX, L3D_ONREP
 #
 __all__ = [
@@ -78,10 +79,15 @@ def load_or_compute_Lattice3DNX(
     pname = tmp_l.path_graph / (fname + '.pkl')
     tmp_l.path_graph.mkdir(parents=True, exist_ok=True)
     #
+    lattice = None
     if pname.exists():
         lattice = pk.load(open(pname, 'rb'))
         lattice.__init_loaded_graph__(path_data=kwargs.get('path_data', None))
-    else:
+        if not _cache_has_payload(lattice, compute):
+            # Cache written before the payload existed (e.g. by the lazy
+            # compute_rbim_energy_eigV_all) — recompute and overwrite.
+            lattice = None
+    if lattice is None:
         lattice = Lattice3DNX(dim, geo=geo, **kwargs)
         match cell_type:
             case 'rand':
@@ -104,6 +110,9 @@ def load_or_compute_Lattice3DNX(
                 lattice.compute_laplacian_spectrum_weigV(backend=routine)
             case _ if compute.startswith('energy'):
                 routine = compute.split('_')[-1] if '_' in compute else 'cupy'
+                # compute_rbim_energy_eigV_all only walks already-cached
+                # modes (46425e1): materialize the full spectrum first.
+                lattice.compute_laplacian_spectrum_weigV(backend=routine)
                 lattice.compute_rbim_energy_eigV_all(backend=routine)
             case _ if compute.startswith('eigV'):
                 routine = compute.split('_')[-1] if '_' in compute else 'cupy'
