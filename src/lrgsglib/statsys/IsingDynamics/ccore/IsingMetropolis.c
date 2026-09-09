@@ -121,8 +121,11 @@ int main(int argc, char *argv[])
     build_str_id(_run_id, run_id, sizeof run_id);
     build_str_id(_out_id, out_id, sizeof out_id);
 
-    /* Snapshot frequency */
+    /* Snapshot frequency (clamped to 1: nSampleLog > T_STEPS would give
+     * freq = 0 and a division-by-zero SIGFPE in the t % freq checks) */
     freq = (nSampleLog > 0) ? (size_t)(T_STEPS / nSampleLog) : T_STEPS;
+    if (freq == 0)
+        freq = 1;
     logspc = logspace_int(log10((double)T_STEPS), &nSampleLog);
 
     /* modified out_id for cluster output filenames */
