@@ -1,5 +1,11 @@
-from lrgsglib.config.funcs import move_to_rootf
+from lrgsglib.config.funcs import (
+    move_to_rootf,
+    build_fname_or_pattern_direct,
+    build_pT_fname,
+)
 from IPython.display import clear_output, display, HTML
+from matplotlib.colors import ListedColormap
+from matplotlib.cm import ScalarMappable
 import py3Dmol
 import plotly.graph_objects as go
 
@@ -41,6 +47,13 @@ from .graphs import (
     DualBarabasiAlbert,
     ExtendedBarabasiAlbert,
     DGMgraph,
+)
+
+# Cached-eigenspace lattice loaders (NX engine), part of the historical
+# notebook API surface (same names as the top-level lrgsglib exports).
+from .graphs.nx import (
+    load_or_compute_Lattice2D,
+    load_or_compute_Lattice3D,
 )
 
 # LRG / spectral utilities most commonly needed alongside SignedGraph methods.
@@ -108,6 +121,7 @@ from .statsys.IsingDynamics import IsingDynamics
 from .config.const import (
     PATHDATA,
     PATHPLOT,
+    LRGSG_SRC,
     LRSG_ENTROPY_STEP,
     DEFAULT_ENTROPY_LEXPONENT,
     DEFAULT_ENTROPY_HEXPONENT,
@@ -499,7 +513,5 @@ def plot_lattice_slices_3d(spins, lattice_dim: tuple[int, int, int], *,
     fig.tight_layout()
     return fig, axes
 
-
 move_to_rootf()
 use_lab_style()
-warnings.filterwarnings('ignore', category=scipy.sparse.SparseEfficiencyWarning)
