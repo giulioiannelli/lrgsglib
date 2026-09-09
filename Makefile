@@ -27,7 +27,6 @@ include build/cconfig.mk
 # .env file
 ENV_FILE := .env
 ENV_PY := lrgsg_env.py
-GEN_ENV_PY := generate-env.py
 # formatting
 _BOLD := $(shell tput bold 2>/dev/null)
 _RST  := $(shell tput sgr0 2>/dev/null)
@@ -60,7 +59,7 @@ c-make-section:
 	@$(MAKE) --no-print-directory c-make
 
 path-config: rootp-file echo-paths  ## Set up path configuration
-env-config: dotenv-file py-env-file  ## Generate .env and lrgsg_env.py
+env-config: dotenv-file  ## Generate .env (lrgsg_env.py is relocatable and tracked; never regenerated)
 
 basic-config:  ## Paths + env + dirs
 	@echo ""
@@ -170,9 +169,6 @@ dotenv-file:
 	  $(foreach V,$(LIST),LRGSG_$(V)=$(LRGSG_$(V))) \
 	  LRGSG_LLIB=$(LRGSG_LLIB) \
 	> $(ENV_FILE)
-
-py-env-file:
-	@$(PYTHON3) $(LRGSG_TOOLS_PY)/$(GEN_ENV_PY)
 
 create-dirs:
 	@mkdir -p $(DIRS_TO_MAKE) $(OBJ_DIR)

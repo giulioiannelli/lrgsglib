@@ -27,38 +27,34 @@ __all__ = [
 #
 def move_to_rootf(print_tf: bool = True, pathname: str = None):
     """
-    Move to the root directory of the current working directory.
+    Move to the outer-repo root directory.
 
-    Parameters:
-    -----------
+    Walks up from the current working directory until a directory named
+    ``pathname`` (default ``PATHNLLIB``, the name of ``LRGSG_LLIB``) is
+    found. If the filesystem root is reached first, falls back to the
+    configured ``LRGSG_LLIB`` path. Raises ``FileNotFoundError`` only if
+    neither exists, so the call can never hang.
+
+    Parameters
+    ----------
     print_tf : bool, optional
-        If True, print the current working directory after moving to the root.
-        Default is True.
-
-    Notes:
-    ------
-    - The function continuously moves up the directory hierarchy ('../') until it reaches
-      a directory with the name specified by the 'PATH_ROOTF' constant.
-    - If 'print_tf' is set to True, it prints the current working directory after the move.
-
-    Example:
-    --------
-    To move to the root directory of the current working directory and print the path:
-    move_to_rootf(print_tf=True)
+        If True, print the current working directory after moving.
+    pathname : str, optional
+        Directory name to look for while walking up. Default ``PATHNLLIB``.
     """
-    pcwd = Path.cwd()
     if pathname is None:
         pathname = PATHNLLIB
-    try:
-        while Path.cwd().name != pathname:
-            chdir('../')
-            if Path.cwd().name == '/':
-                break
-        if Path.cwd().name == '/':
-            raise FileNotFoundError(f"Root directory '{pathname}' not found.")
-    except FileNotFoundError as e:
-        chdir(pcwd)
-        print(e)
+    target = Path.cwd()
+    while target.name != pathname and target.parent != target:
+        target = target.parent
+    if target.name != pathname:
+        target = Path(LRGSG_LLIB).resolve()
+        if not target.is_dir():
+            raise FileNotFoundError(
+                f"Root directory '{pathname}' not found above {Path.cwd()} "
+                f"and LRGSG_LLIB='{LRGSG_LLIB}' does not exist."
+            )
+    chdir(target)
     if print_tf:
         print("Current working directory:", Path.cwd())
 

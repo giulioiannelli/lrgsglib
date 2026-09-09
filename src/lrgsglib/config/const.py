@@ -42,7 +42,7 @@ ANIM_VIDEO_FPS = 12          # default playback fps for lattice animations
 # paths
 load_dotenv()
 #
-PATHNLLIB: str = Path(LRGSG_LLIB).name
+PATHNLLIB: str = Path(LRGSG_LLIB).resolve().name
 #
 PATHDATA = Path(LRGSG_DATA)#
 #
