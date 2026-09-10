@@ -1,152 +1,22 @@
-from lrgsglib.config.funcs import (
-    move_to_rootf,
-    build_fname_or_pattern_direct,
-    build_pT_fname,
-)
-from IPython.display import clear_output, display, HTML
-from matplotlib.colors import ListedColormap
-from matplotlib.cm import ScalarMappable
-import py3Dmol
-import plotly.graph_objects as go
+"""Ising / SignedRW notebook surface: entry points, defaults, CEM & SA helpers.
 
-
-from .shared import *
-from .core import *
-from .plotlib import *
-from .utils import *
-from .utils.ipy import *
-
-# Engine-agnostic graph factories (preferred interface in notebooks).
-from .graphs import (
-    SignedGraph,
-    Disorder,
-    CompositeDisorder,
-    register_coupling,
-    register_support,
-    registered_supports,
-    Lattice2D,
-    Lattice3D,
-    LatticeND,
-    ErdosRenyi,
-    StochasticBlockModel,
-    HierarchicalModular,
-    MultiplicativeCascade,
-    VicsekGraph,
-    DiracCombGraph,
-    DiracBrushGraph,
-    SierpinskiGraph,
-    BarabasiAlbert,
-    WattsStrogatz,
-    FullyConnected,
-    kRegularGraph,
-    BipartiteGraph,
-    RandomGeometric,
-    ConfigurationModel,
-    LFRBenchmark,
-    HolmeKim,
-    DualBarabasiAlbert,
-    ExtendedBarabasiAlbert,
-    DGMgraph,
-)
-
-# Cached-eigenspace lattice loaders (NX engine), part of the historical
-# notebook API surface (same names as the top-level lrgsglib exports).
-from .graphs.nx import (
-    load_or_compute_Lattice2D,
-    load_or_compute_Lattice3D,
-)
-
-# LRG / spectral utilities most commonly needed alongside SignedGraph methods.
-from .utils.lrg import (
-    get_graph_lspectrum,
-    compute_entropy_observables_from_eigenvalues,
-    specific_heat_tau_window,
-    lapl_dists,
-    extract_ultrametric_matrix,
-    MakeLinkageMatrix,
-    compute_normalized_linkage,
-    compute_optimal_threshold,
-    circular_layout_by_cluster,
-    log_dendrogram,
-    dendrogram_leaf_node_colors,
-    compute_signed_diffusion_distance,
-    compute_eigenmode_sign_distance,
-    agmon_geodesic_distance,
-)
-
-# Spectral-reconstruction kernel (used by CHL Chladni-state notebooks).
-from .utils.basic.linalg import compute_recon_ultra, compute_mse_from_recon
-
-# Protein-TMD primitives (CHL-SF04 family — see utils/recon/protein/).
-from .utils.recon.protein import (
-    SubstrateSpec,
-    build_substrate_basis,
-    substrate_signature,
-    spec_label,
-    DEFAULT_SUBSTRATES,
-    download_pdb,
-    extract_ca_coordinates,
-    extract_atoms_coordinates,
-    coords_to_pdb_string_with_structure,
-    assign_secondary_structure_from_coords,
-    pad_protein_coordinates,
-    safe_reconstruct_coordinates_from_features,
-    protein_to_coordinate_feature_vector,
-    kabsch_align,
-    kabsch_rmsd,
-    q3_score,
-    # nb_helpers — used by the CHL-SF04 notebook
-    load_protein_corpus,
-    load_tmd_bundles,
-    interp_mse_curve,
-    mse_per_substrate,
-    pflip_curves,
-    auc_per_substrate,
-    q3_curve_per_substrate,
-    q3_emergence_per_substrate,
-    ss_segments,
-    layout_positions_2d,
-    render_substrate_panel,
-    reconstruct_protein,
-)
-import json   # surfaced to labs/notebooks via the canonical import-* pattern
+The CEM / SA helpers compose `IsingDynamics` to produce standardized result
+dicts and a 3D-slice spin visualizer. They are the building blocks for any
+CHL/CEM-vs-SA report. No new physics primitives are introduced.
+"""
+from pathlib import Path as _Path
+import numpy as _np
 
 # SignedRW walker-side helpers (public API used by notebook diagnostics).
-from .statsys.SignedRW._kernel import signed_lattice_tables
+from ..statsys.SignedRW._kernel import signed_lattice_tables
 
 # IsingDynamics — direct interactive entry point for SA / CEM realizations.
-from .statsys.IsingDynamics import IsingDynamics
-
-# Most-used library defaults (symbolic, reusable).
-from .config.const import (
-    PATHDATA,
-    PATHPLOT,
-    LRGSG_SRC,
-    LRSG_ENTROPY_STEP,
-    DEFAULT_ENTROPY_LEXPONENT,
-    DEFAULT_ENTROPY_HEXPONENT,
-    L2D_SIDE1,
-    L2D_GEO_SQR,
-    L2D_GEO_TRI,
-    L2D_P_C_DICT,
-    # CHL-SF04 protein-TMD experiment grid.
-    PFLIP_SWEEP_GRID,
-    K_FRAC_GALLERY,
-    K_FRAC_Q3,
-    N_SEEDS_PFLIP,
-    CHL_SF04_MASTER_SEED,
-    CHL_SF04_RES_MIN,
-    CHL_SF04_RES_MAX,
-    CHL_SF04_CORPUS_SIZE,
-    CHL_SF04_N_FEATURES,
-    CHL_SF04_LOG_MSE_FLOOR,
-    Q3_EMERGENCE_THRESHOLD,
-)
+from ..statsys.IsingDynamics import IsingDynamics
 
 # IsingDynamics CEM / SA / topological defaults — surfaced at the
 # notebook layer so labs and reports can configure realizations without
 # importing deeper into the config tree.
-from .config.progargs.defs.IsingDynamics import (
+from ..config.progargs.defs.IsingDynamics import (
     DEFAULT_CEM_ITER,
     DEFAULT_CEM_POP_SIZE,
     DEFAULT_CEM_ELITE_FRAC,
@@ -174,112 +44,12 @@ from .config.progargs.defs.IsingDynamics import (
     DEFAULT_SA_STRONG_GREEDY_SWEEPS,
 )
 
-LINKAGE_METHOD = 'average'   # UPGMA — classical LRG choice
-CMAP_CLUSTERS  = 'tab20'
-
-
-# ======================================================================
-# Phase 2 interactive-environment helpers (`from lrgsglib.notebooks import *`)
-# ======================================================================
-#
-# These helpers back the canonical lab/report header described in
-# `.agents/rules/lab-hygiene.md` and `.agents/rules/notebook-hygiene.md`:
-#
-#     from lrgsglib.notebooks import *
-#     use_lab_style()
-#     paths = make_lab_paths("<CODE>")
-#     seed  = None
-#     rng   = resolved_rng(seed)
-#
-# The `nprint` / `nlog` shims respect module-level flags so diagnostic
-# output stays opt-in (default OFF).
-#
-# ----------------------------------------------------------------------
-
-from pathlib import Path as _Path
-import logging as _logging
-import numpy as _np
-
-verbose_print_nb: bool = False
-verbose_log_nb: bool = False
-
-
-def nprint(*args, **kwargs) -> None:
-    """`print` shim: emits only when ``lrgsglib.notebooks.verbose_print_nb`` is True.
-
-    Flip the flag in one cell to enable loud diagnostics within a lab
-    or notebook session; leave it off everywhere else. Default OFF.
-    """
-    if verbose_print_nb:
-        print(*args, **kwargs)
-
-
-def nlog(msg, level: int = _logging.INFO, *args, **kwargs) -> None:
-    """`logging` shim: emits only when ``lrgsglib.notebooks.verbose_log_nb`` is True.
-
-    Logs under the ``lrgsg.nb`` logger. Default OFF.
-    """
-    if verbose_log_nb:
-        _logging.getLogger("lrgsg.nb").log(level, msg, *args, **kwargs)
-
-
-def resolved_rng(seed=None) -> "_np.random.Generator":
-    """Return ``np.random.default_rng(seed)``. ``None`` → fresh entropy; int → reproducible.
-
-    Use this exactly once per lab header so every stochastic call threads the
-    same generator. Set ``seed`` to an int only when reproducing a specific
-    result — hardcoding seeds in iterative exploration introduces systematic
-    bias.
-    """
-    return _np.random.default_rng(seed)
-
-
-def make_lab_paths(code_id: str) -> dict:
-    """Canonical path dict for a project ``<code_id>``.
-
-    Returns four sub-paths rooted at ``data/<code_id>/``:
-
-        {"raw":     Path("data/<code_id>/raw"),
-         "figures": Path("data/<code_id>/figures"),
-         "cache":   Path("data/<code_id>/cache"),
-         "cfg":     Path("data/<code_id>/cfg")}
-
-    All parent directories are created on demand (``mkdir(parents=True,
-    exist_ok=True)``). The returned dict is fresh on every call — callers
-    may extend it with per-lab overrides.
-    """
-    root = _Path("data") / code_id
-    out = {
-        "raw":     root / "raw",
-        "figures": root / "figures",
-        "cache":   root / "cache",
-        "cfg":     root / "cfg",
-    }
-    for p in out.values():
-        p.mkdir(parents=True, exist_ok=True)
-    return out
-
-
-def use_lab_style() -> None:
-    """Apply the interactive-environment mpl style sheet (``ipy/nb_plotsheet.mplstyle``).
-
-    Safe to call multiple times; idempotent. Requires the current working
-    directory to be the outer-repo root (``move_to_rootf`` handles this
-    at module-import time).
-    """
-    import matplotlib.pyplot as _plt
-    _plt.style.use("ipy/nb_plotsheet.mplstyle")
-
 
 # ======================================================================
 # CEM hyperparameter exploration helpers (lab/notebook reuse)
 # ======================================================================
-#
-# These compose `IsingDynamics` to produce standardized result dicts and a
-# 3D-slice spin visualizer. They are the building blocks for any future
-# CHL/CEM-vs-SA report. No new physics primitives are introduced.
 
-from .config.progargs.defs.IsingDynamics import (
+from ..config.progargs.defs.IsingDynamics import (
     DEFAULT_SA_STRONG_T_INIT       as _SA_STRONG_T_INIT,
     DEFAULT_SA_STRONG_T_FINAL      as _SA_STRONG_T_FINAL,
     DEFAULT_SA_STRONG_N_TEMPERATURES as _SA_STRONG_N_TEMPERATURES,
@@ -512,6 +282,3 @@ def plot_lattice_slices_3d(spins, lattice_dim: tuple[int, int, int], *,
         fig.suptitle(title)
     fig.tight_layout()
     return fig, axes
-
-move_to_rootf()
-use_lab_style()
