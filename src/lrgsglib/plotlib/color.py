@@ -181,9 +181,9 @@ def get_opposite_color(
 def set_alpha_tocolor(
     color: ColorType, 
     alpha: float = 0.5,
-) -> tuple[int, int, int, float]:
+) -> tuple[float, float, float, float]:
     """
-    Convert a color to RGB, then set the alpha (transparency) channel.
+    Convert a color to matplotlib-style RGB floats, then set the alpha channel.
 
     Parameters
     ----------
@@ -197,17 +197,18 @@ def set_alpha_tocolor(
 
     Returns
     -------
-    tuple[int, int, int, float]
-        A new RGBA color tuple in the format (R, G, B, alpha).
+    tuple[float, float, float, float]
+        A new RGBA color tuple (R, G, B, alpha) with every channel in the
+        range [0.0, 1.0], directly usable as a matplotlib ``color=`` value.
 
     Examples
     --------
     >>> set_alpha_tocolor('red', 0.2)
-    (255, 0, 0, 0.2)
-    >>> set_alpha_tocolor((0.5, 0.5, 0.5), 0.8)
-    (128, 128, 128, 0.8)
+    (1.0, 0.0, 0.0, 0.2)
+    >>> set_alpha_tocolor('#0000ff', 0.8)
+    (0.0, 0.0, 1.0, 0.8)
     """
-    rgb = convert_to_RGB(color)
+    rgb = convert_to_rgb(color)
     return set_alpha_torgb(rgb, alpha)
 #
 

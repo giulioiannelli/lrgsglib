@@ -10,7 +10,7 @@ from matplotlib.cm import hsv, twilight, ScalarMappable
 from matplotlib.collections import PolyCollection
 from matplotlib.colorbar import ColorbarBase, Colorbar
 from matplotlib.colors import Colormap, ListedColormap, BoundaryNorm, \
-    LightSource, LinearSegmentedColormap, Normalize, SymLogNorm, to_rgb,\
+    LightSource, LinearSegmentedColormap, Normalize, LogNorm, SymLogNorm, to_rgb,\
     rgb2hex, to_hex
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
