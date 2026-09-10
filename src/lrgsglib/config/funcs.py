@@ -18,6 +18,7 @@ __all__ = [
     'peq_fstr',
     'Teq_fstr',
     'avgeq_fstr',
+    'avgeq_parse',
     'build_pT_fname',
     'build_fname_or_pattern_direct',
     'read_files_to_2d_array',
@@ -101,6 +102,15 @@ def Teq_fstr(T: float) -> str:
     """
     return f"T={T:.3g}"
 
+# Token carrying the number of averages in result filenames.  Kernels write
+# ``na=<n>``; files produced before 2025-12 carry ``avg=<n>`` instead.
+AVGEQ_KEY = 'na'
+AVGEQ_LEGACY_KEYS = ('avg',)
+# Glob fragment matching both spellings (two leading character classes keep
+# it tight: ``na=*`` and ``avg=*``).
+AVGEQ_GLOB = '[na][av]*=*'
+
+
 def avgeq_fstr(avg: int) -> str:
     """
     Format the number of averages as a string.
@@ -120,7 +130,26 @@ def avgeq_fstr(avg: int) -> str:
     >>> avgeq_fstr(10)
     'na=10'
     """
-    return f"na={avg:d}"
+    return f"{AVGEQ_KEY}={avg:d}"
+
+
+def avgeq_parse(name: str) -> int:
+    """
+    Extract the number of averages from a result filename or stem.
+
+    Understands the current ``na=<n>`` token and the legacy ``avg=<n>`` one
+    (``AVGEQ_LEGACY_KEYS``).  Returns 0 when no token is present.
+
+    Example
+    -------
+    >>> avgeq_parse('smatch_statistic_p=1_T=0_gs_0_30_1_na=100')
+    100
+    >>> avgeq_parse('smatch_statistic_p=1_T=0_gs_0_30_1_avg=20.npz')
+    20
+    """
+    keys = '|'.join((AVGEQ_KEY, *AVGEQ_LEGACY_KEYS))
+    match = re.search(rf"(?:^|_)(?:{keys})=(\d+)", name)
+    return int(match.group(1)) if match else 0
 
 def build_p_fname(
     base: str,
@@ -204,7 +233,7 @@ def build_fname_or_pattern_direct(
             from ..utils.basic.strings import join_non_empty
             fname = join_non_empty('_', fname_base, avg_str)
         case 'pattern':
-            fname = '_'.join([fname_base, 'avg=*'])
+            fname = '_'.join([fname_base, AVGEQ_GLOB])
         case _:
             raise ValueError(f"Unsupported mode '{mode}' for filename construction.")
     return fname + ext if ext else fname
