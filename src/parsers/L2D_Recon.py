@@ -2,6 +2,10 @@ from lrgsglib.proglib import *
 #
 optional_args_dict_tmp = L2D_ISDYN_opt_args.copy()
 optional_args_dict_tmp[tuple(['-rl', '--runlang'])]['default'] = 'C0ES'
+# The Ising checkpoint flag (-sf) shares the long option --save_frequency with
+# the reconstruction batching flag (-sFQ, recon_opt_args_dict); argparse rejects
+# duplicate option strings, so the Ising one is dropped from this parser.
+optional_args_dict_tmp.pop(tuple(['-sf', '--save_frequency']), None)
 
 optionalaction_args_dict = {
     **L2D_opt_args,

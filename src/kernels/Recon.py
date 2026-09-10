@@ -275,7 +275,9 @@ def compute_recon_prog_lattice_incr(
         # GT lattice — construct output dir from env + lattice info
         from lrgsglib.config.lrgsg_env import LRGSG_DATA
         save_dir = Path(LRGSG_DATA) / "lrgsg" / f"N={test_lattice.N}"
-        save_dir.mkdir(parents=True, exist_ok=True)
+    # Data directories are created lazily by the library; the kernel writes
+    # here directly with numpy, so make sure the target exists either way.
+    save_dir.mkdir(parents=True, exist_ok=True)
     needed_averages = check_existing_file_and_needed_averages(save_dir, args, loglogger)
 
     spinovp = []
