@@ -108,12 +108,14 @@ class IsingSimulatedAnnealing(IsingBase):
         External-field construction: an array is used as-is (the 'uniform'
         mode), ``'spectral'`` builds the softmax-weighted eigenvector field
         at init (the legacy TFCA field). Default: zero field.
-    spectral_n_modes, spectral_tau, spectral_field_strength
+    spectral_n_modes, spectral_tau, spectral_field_strength : int, float, float
         Parameters of the spectral field (``field='spectral'`` only).
     **kwargs
         Forwarded to :class:`IsingBase` (``observables``, ``coupling_norm``,
         ``ic``, ``seed``, ``savedisk``, ...).
 
+    Notes
+    -----
     After a run, the per-stage curve is available as :attr:`sa_temps`,
     :attr:`sa_energy` (intensive) and :attr:`sa_magn` (see :meth:`sa_curve`);
     the sweep-resolution traces are the standard observables.

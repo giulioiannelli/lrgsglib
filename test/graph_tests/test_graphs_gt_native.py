@@ -17,6 +17,8 @@ Tests the native GT implementations:
 import pytest
 import numpy as np
 
+pytest.importorskip("graph_tool")
+
 
 class TestVicsekGraphGT:
     """Tests for VicsekGraphGT native implementation."""

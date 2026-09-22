@@ -91,6 +91,36 @@ def pytest_runtest_makereport(item, call):
 
 
 # ---------------------------------------------------------------------------
+# Optional graph-tool engine: a missing import is a skip, not a failure
+# ---------------------------------------------------------------------------
+
+# graph-tool is conda-only, so pip-based CI runners never have it. Tests that
+# reach the GT engine (``engine='gt'`` params, ``*GT`` classes) raise either
+# ``ModuleNotFoundError: No module named 'graph_tool'`` or the library's own
+# ``ImportError: graph-tool is not installed``. Both become skips.
+_GRAPH_TOOL_MISSING = _re.compile(r"graph[_-]tool")
+
+
+def _skip_if_graph_tool_missing(exc: BaseException) -> None:
+    if isinstance(exc, ImportError) and _GRAPH_TOOL_MISSING.search(str(exc)):
+        pytest.skip(f"graph-tool not installed ({exc})")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_setup(item):
+    outcome = yield
+    if outcome.excinfo is not None:
+        _skip_if_graph_tool_missing(outcome.excinfo[1])
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item):
+    outcome = yield
+    if outcome.excinfo is not None:
+        _skip_if_graph_tool_missing(outcome.excinfo[1])
+
+
+# ---------------------------------------------------------------------------
 # Core mode fixtures
 # ---------------------------------------------------------------------------
 

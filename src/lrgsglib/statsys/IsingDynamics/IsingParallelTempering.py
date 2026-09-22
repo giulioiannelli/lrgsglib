@@ -92,11 +92,13 @@ class IsingParallelTempering(IsingBase):
     n_exchanges : int
         Number of exchange rounds; the recording horizon (``steps``) equals
         this, one record of the coldest rung per round.
-    rule, order, tie_flip_p
+    rule, order, tie_flip_p : str, str, float or str
         Same Layer-2 kinetics axes as :class:`IsingMetropolis`.
     **kwargs
         Forwarded to :class:`IsingBase`.
 
+    Notes
+    -----
     After a run: :attr:`pt_energy` / :attr:`pt_magn` are ``(K, n_exchanges)``
     intensive per-rung traces, :attr:`pt_final_states` the final ``(K, N)``
     configurations (``self.s`` is the coldest), :attr:`T_ladder` the rungs,

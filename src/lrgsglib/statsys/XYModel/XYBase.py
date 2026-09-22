@@ -212,7 +212,7 @@ class XYBase(RunHostMixin, CBackendMixin, VecDynSys):
 
     @property
     def magn(self) -> list:
-        """Magnetisation series m(t) = |Σ e^{iθ}|/N."""
+        """Magnetisation series ``m(t) = |Σ e^{iθ}|/N``."""
         return self.observables[XY_OBS_MAGN].data
 
     @magn.setter

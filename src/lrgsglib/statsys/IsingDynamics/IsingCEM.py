@@ -78,13 +78,15 @@ class IsingCEM(IsingBase):
         ``new = α·old + (1−α)·refit``.
     sigma_floor, sigma_ceiling : float
         Clip bounds on σ after each refit.
-    greedy, greedy_sweeps
+    greedy, greedy_sweeps : bool, int
         Zero-temperature greedy polish of every candidate.
-    polish, polish_sweeps
+    polish, polish_sweeps : bool, int
         Final greedy polish of each restart's best.
     **kwargs
         Forwarded to :class:`IsingBase`.
 
+    Notes
+    -----
     After a run: :attr:`cem_best_spins` / :attr:`cem_best_energy` (intensive)
     / :attr:`cem_best_coeffs` hold the global best (``self.s`` is set to it),
     :attr:`cem_restart_energies` the per-restart bests (intensive).

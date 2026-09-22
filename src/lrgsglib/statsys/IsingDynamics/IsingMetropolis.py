@@ -92,9 +92,10 @@ class IsingMetropolis(IsingBase):
         preset (``'standard'`` 1.0 / ``'glauberT0'`` 0.5 / ``'frozen'`` 0.0).
         Rejected for ``glauber``/``heatbath`` (they bake their tie rate) and
         for the cluster/spectral moves (the axis does not apply).
-    spectral_n_modes, spectral_sigma_init, spectral_chunk_size,
-    spectral_polish, spectral_polish_sweeps
+    spectral_n_modes, spectral_sigma_init, spectral_chunk_size : int, float, int
         Parameters of the spectral move (``move='spectral'`` only).
+    spectral_polish, spectral_polish_sweeps : bool, int
+        Final greedy polish of the spectral move (``move='spectral'`` only).
     **kwargs
         Forwarded to :class:`IsingBase` (``observables``, ``coupling_norm``,
         ``field``, ``ic``, ``steps``/``simref``, ``seed``, ``savedisk``, ...).

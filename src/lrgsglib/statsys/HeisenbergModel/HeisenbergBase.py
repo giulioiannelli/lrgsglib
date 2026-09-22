@@ -251,7 +251,7 @@ class HeisenbergBase(RunHostMixin, CBackendMixin, VecDynSys):
 
     @property
     def magn(self) -> list:
-        """Magnetisation series m(t) = |Σ n_i|/N."""
+        """Magnetisation series ``m(t) = |Σ n_i|/N``."""
         return self.observables[HEISENBERG_OBS_MAGN].data
 
     @magn.setter

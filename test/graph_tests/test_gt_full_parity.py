@@ -6,6 +6,8 @@ Covers all methods added in Phases 0-7 of the GT full feature parity plan.
 import numpy as np
 import pytest
 
+pytest.importorskip("graph_tool")
+
 from lrgsglib.graphs.nx.Lattice2DNX import Lattice2DNX
 from lrgsglib.graphs.gt.SignedGraphGT import SignedGraphGT
 from lrgsglib.graphs.gt._converters import nx_to_gt

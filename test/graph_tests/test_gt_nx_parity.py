@@ -7,6 +7,8 @@ compute the same observable on both, assert numerical equivalence.
 import numpy as np
 import pytest
 
+pytest.importorskip("graph_tool")
+
 from lrgsglib.graphs.nx.Lattice2DNX import Lattice2DNX
 from lrgsglib.graphs.gt.SignedGraphGT import SignedGraphGT
 

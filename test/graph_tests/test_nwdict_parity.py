@@ -17,6 +17,8 @@ Two kinds of check:
 """
 import pytest
 
+pytest.importorskip("graph_tool")
+
 from lrgsglib.graphs.nx.Lattice2DNX import Lattice2DNX
 from lrgsglib.graphs.gt.Lattice2DGT.Lattice2DGT import Lattice2DGT
 from lrgsglib.graphs.gt.Lattice3DGT.Lattice3DGT import Lattice3DGT

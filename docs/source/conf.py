@@ -81,6 +81,10 @@ autodoc_typehints_description_target = 'documented'
 # Suppress warnings
 suppress_warnings = [
     'autodoc.duplicate',  # Suppress duplicate object description warnings
+    # Sphinx>=9 cross-references every identifier in a numpydoc type field,
+    # so shape symbols like ``(N, N)`` hit both SignedGraphProtocol.N and
+    # DynSys.N. Only the 'more than one target' class is silenced here.
+    'ref.python',
 ]
 
 # Napoleon settings (NumPy style docstrings)
