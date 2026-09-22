@@ -159,7 +159,7 @@ class CBackendMixin:
                 RuntimeWarning,
                 stacklevel=3,
             )
-            self.runlang = "Python"
+            self.runlang = "py"
             return
 
         bin_dir = self._get_bin_dir()
@@ -173,7 +173,7 @@ class CBackendMixin:
             RuntimeWarning,
             stacklevel=3,
         )
-        self.runlang = "Python"
+        self.runlang = "py"
 
     # ------------------------------------------------------------------
     # C program key validation

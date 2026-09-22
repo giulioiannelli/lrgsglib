@@ -402,6 +402,8 @@ def save_with_na(
     ... )
     Saved data with 20 realizations to data/mc_eigvals_p=0.0_na=20.pkl
     """
+    working_path = Path(working_path)
+    working_path.mkdir(parents=True, exist_ok=True)
     fname = working_path / f"{fname_base}_na={current_na}.pkl"
     with open(fname, "wb") as f:
         pk.dump(data, f)

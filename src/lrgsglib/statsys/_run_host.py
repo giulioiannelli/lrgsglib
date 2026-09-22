@@ -242,6 +242,13 @@ class RunHostMixin:
                 "the class attribute 'solver_name' (its solver-registry key)."
             )
         model = cast("DynSys", self)
+        # Settle the C -> Python fallback BEFORE choosing a solver. Models
+        # that defer the check to their init hook (ContactProcess) would
+        # otherwise pick the C solver and only then, mid-run, discover
+        # the binaries are missing.
+        check = getattr(self, "_check_c_backend_or_fallback", None)
+        if check is not None:
+            check()
         backend = self._resolve_backend()
         # Stashed for the lang= run-dirname token and the cfg sidecar.
         self._active_backend = backend
