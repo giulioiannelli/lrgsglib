@@ -163,7 +163,7 @@ def enable_logging(
     >>> enable_logging(level=logging.DEBUG, console=True)
     # Also prints to console at DEBUG level
     """
-    global _logging_enabled, _active_handlers
+    global _logging_enabled
 
     # Clean up any existing handlers first
     disable_logging()
@@ -216,7 +216,7 @@ def disable_logging() -> None:
     Removes all active handlers added by enable_logging() and restores
     the silent NullHandler behavior.
     """
-    global _logging_enabled, _active_handlers
+    global _logging_enabled
 
     root_logger = logging.getLogger(_root_logger_name)
 

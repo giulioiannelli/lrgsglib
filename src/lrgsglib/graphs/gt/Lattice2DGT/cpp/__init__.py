@@ -10,12 +10,13 @@ from __future__ import annotations
 try:
     from .lattice_generators import create_triangular_lattice
 except ImportError as e:
+    _import_error = e
 
     def create_triangular_lattice(*args, **kwargs):
         raise ImportError(
             "triangular_lattice C++ extension not available. "
             "Build with 'make cpp-make' from the lrgsglib root directory."
-        ) from e
+        ) from _import_error
 
 
 __all__ = [

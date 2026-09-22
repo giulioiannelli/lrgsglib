@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import warnings as _warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 import tqdm
