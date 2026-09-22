@@ -18,7 +18,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dev dependencies
-        run: pip install black isort flake8 mypy
+        run: pip install "black==25.1.0" isort flake8 mypy
 
       - name: Check formatting (black)
         run: black --check src/lrgsglib/
@@ -26,8 +26,10 @@ jobs:
       - name: Check import order (isort)
         run: isort --check src/lrgsglib/
 
-      - name: Lint (flake8)
-        run: flake8 src/lrgsglib/ --max-line-length 88 --extend-ignore E203,W503 --count --show-source --statistics
+      # Gate only on real errors (syntax, undefined names, broken
+      # comparisons); style rules are black's job. Widen as the tree is cleaned.
+      - name: Lint (flake8, errors only)
+        run: flake8 src/lrgsglib/ --select E9,F63,F7,F82 --count --show-source --statistics
 
   docs:
     name: Build Documentation

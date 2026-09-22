@@ -1,0 +1,5 @@
+# git blame --ignore-revs-file .git-blame-ignore-revs
+# (GitHub applies this file automatically)
+
+# Apply black and isort to the library, no functional change
+c2517efc53a9ca65217364b62cedd3584a4c3ec6
