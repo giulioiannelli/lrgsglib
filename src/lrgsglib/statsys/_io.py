@@ -129,7 +129,9 @@ def save_rows(path, rows, dtype: DTypeLike) -> Path:
     return atomic_write_bytes(path, arr.tofile)
 
 
-def load_rows(path, ncols: int, dtype: DTypeLike, mmap: bool = False) -> np.ndarray:
+def load_rows(
+    path, ncols: int, dtype: DTypeLike, mmap: bool = False
+) -> np.ndarray:
     """Load a matrix written row-major as ``(n_rec, ncols)`` ``dtype``.
 
     With ``mmap=True`` the file is memory-mapped (read-only) and reshaped without

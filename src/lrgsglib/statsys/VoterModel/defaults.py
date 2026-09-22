@@ -66,9 +66,13 @@ DEFAULT_RULE: str = "linear"
 # Per-rule parameter defaults. Chosen identity-preserving where it matters:
 # ``alpha=1`` makes ``nonlinear`` coincide with the linear voter, and the noise
 # ``eps=0`` makes the rules deterministic-when-unanimous.
-DEFAULT_QVOTER_Q: int = 2           # neighbours sampled with replacement (q-voter)
-DEFAULT_NOISE_EPS: float = 0.0      # flip prob. when not unanimous (qvoter / nonlinear)
-DEFAULT_NONLIN_ALPHA: float = 1.0   # nonlinearity exponent (alpha=1 -> linear voter)
+DEFAULT_QVOTER_Q: int = 2  # neighbours sampled with replacement (q-voter)
+DEFAULT_NOISE_EPS: float = (
+    0.0  # flip prob. when not unanimous (qvoter / nonlinear)
+)
+DEFAULT_NONLIN_ALPHA: float = (
+    1.0  # nonlinearity exponent (alpha=1 -> linear voter)
+)
 
 # ---------------------------------------------------------------------------
 # Axis B -- update schedule / sampler (``upd_mode=``)
@@ -93,7 +97,10 @@ DEFAULT_NONLIN_ALPHA: float = 1.0   # nonlinearity exponent (alpha=1 -> linear v
 #                Implemented on all backends (Python, C subprocess, pybind) via
 #                the shared _ccore CTMC kernel (LRGSG_ctmc.{c,h}).
 VOTER_UPD_MODES: tuple[str, ...] = (
-    "asynchronous", "synchronous", "link", "gillespie",
+    "asynchronous",
+    "synchronous",
+    "link",
+    "gillespie",
 )
 VOTER_UPD_MODES_PLANNED: tuple[str, ...] = ()
 DEFAULT_UPD_MODE: str = "asynchronous"
@@ -135,7 +142,7 @@ UPD_MODE_CODE: dict[str, int] = {
 # p. 9). Detection here is the exact integer frustrated-edge count
 # (VoterModel.count_frustrated_edges); on a frustrated graph no absorbing state
 # exists and the dynamics never freezes.
-DEFAULT_ABSORBING_EVERY: int = 1     # check every N sweeps (1 = each sweep)
+DEFAULT_ABSORBING_EVERY: int = 1  # check every N sweeps (1 = each sweep)
 
 # Default order parameter for the ensemble susceptibility helper
 # (VoterModel.order_parameter_susceptibility); one of the per-run scalar
@@ -174,9 +181,13 @@ CLUSTER_MODE_CODE: dict[str, int] = {"satisfied": 0, "rawspin": 1}
 # File bases passed to ``sg.get_p_fname`` (filename ``<base>_p=<pflip>[_suf].<ext>``,
 # mirroring the C-backend convention so an analysis program can stream big output
 # to disk and load it back only when needed):
-VOTER_MAGN_FBASE: str = "m"         # per-spin magnetization series (float64 .bin)
-VOTER_SOUT_FBASE: str = "sout"      # spin-configuration trajectory (int8 .bin, (n_rec, N))
-VOTER_CLDIST_FBASE: str = "cldist"  # cluster-size-distribution time series (.npz)
+VOTER_MAGN_FBASE: str = "m"  # per-spin magnetization series (float64 .bin)
+VOTER_SOUT_FBASE: str = (
+    "sout"  # spin-configuration trajectory (int8 .bin, (n_rec, N))
+)
+VOTER_CLDIST_FBASE: str = (
+    "cldist"  # cluster-size-distribution time series (.npz)
+)
 # Logical names of the three observables in VoterModel.observables (the keys for
 # ``observables[...]`` and ``output_sizes()``; the magn name is "magn", NOT the
 # "m" file base above).
@@ -196,9 +207,11 @@ VOTER_OBS_CLDIST: str = "cldist"
 # in-process analogue of the C ``nSampleLog``). Override with ``sout_nlog=K``
 # (explicit count) or ``sout_force_full=True`` (force the full trajectory). The
 # C subprocess streams its own snapshots, sampled by ``nSampleLog``.
-DEFAULT_SOUT_EVERY: int = 1                       # 1 = every recorded sweep (full trajectory)
-VOTER_SOUT_MAX_BYTES: int = 4096 * 1024 * 1024    # 4 GiB soft cap for the sout trajectory
-VOTER_SOUT_NLOG_DEFAULT: int = 1000               # log-spaced snapshots used on fallback
+DEFAULT_SOUT_EVERY: int = 1  # 1 = every recorded sweep (full trajectory)
+VOTER_SOUT_MAX_BYTES: int = (
+    4096 * 1024 * 1024
+)  # 4 GiB soft cap for the sout trajectory
+VOTER_SOUT_NLOG_DEFAULT: int = 1000  # log-spaced snapshots used on fallback
 
 # Registry key under which VoterModel's solver backends are registered in
 # ``statsys._solver_engine`` (single-sourced so the model and its solvers agree).

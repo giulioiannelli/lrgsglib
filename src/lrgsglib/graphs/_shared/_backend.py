@@ -257,7 +257,8 @@ class NumpyBackend:
     def eigh(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         # Use divide-and-conquer driver for full spectrum (faster for N > 1000)
         from scipy import linalg
-        return linalg.eigh(a, driver='evd')
+
+        return linalg.eigh(a, driver="evd")
 
     @staticmethod
     def eigh_sparse(
@@ -266,30 +267,31 @@ class NumpyBackend:
         return_eigenvectors: bool = True,
     ) -> tuple[np.ndarray, np.ndarray | None]:
         """Sparse eigendecomposition using iterative methods."""
-        from scipy.sparse.linalg import eigsh
         from scipy.sparse import issparse
-        
+        from scipy.sparse.linalg import eigsh
+
         # Convert to sparse if needed
         if not issparse(a):
             from scipy.sparse import csr_matrix
+
             a = csr_matrix(a)
-        
+
         n = a.shape[0]
         if k is None or k >= n - 1:
             # Compute maximum possible (N-2 due to ARPACK limitation)
             k = min(n - 2, n)
-        
+
         # Use shift-invert mode for better convergence
         try:
             result = eigsh(
                 a,
                 k=k,
-                which='SM',
-                mode='normal',
+                which="SM",
+                mode="normal",
                 return_eigenvectors=return_eigenvectors,
             )
         except TypeError:
-            result = eigsh(a, k=k, which='SM', mode='normal')
+            result = eigsh(a, k=k, which="SM", mode="normal")
 
         if return_eigenvectors:
             eigvals, eigvecs = result
@@ -344,18 +346,21 @@ class ScipyBackend:
     def eigvalsh(a: np.ndarray) -> np.ndarray:
         # Use SciPy for better performance on large matrices
         from scipy import linalg
-        return linalg.eigvalsh(a, driver='evd')
+
+        return linalg.eigvalsh(a, driver="evd")
 
     @staticmethod
     def eigvals(a: np.ndarray) -> np.ndarray:
         from scipy import linalg
+
         return linalg.eigvals(a)
 
     @staticmethod
     def eigh(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         # Use SciPy with divide-and-conquer driver (2x faster for large matrices)
         from scipy import linalg
-        return linalg.eigh(a, driver='evd')
+
+        return linalg.eigh(a, driver="evd")
 
     @staticmethod
     def eigh_sparse(
@@ -364,30 +369,31 @@ class ScipyBackend:
         return_eigenvectors: bool = True,
     ) -> tuple[np.ndarray, np.ndarray | None]:
         """Sparse eigendecomposition using iterative methods."""
-        from scipy.sparse.linalg import eigsh
         from scipy.sparse import issparse
-        
+        from scipy.sparse.linalg import eigsh
+
         # Convert to sparse if needed
         if not issparse(a):
             from scipy.sparse import csr_matrix
+
             a = csr_matrix(a)
-        
+
         n = a.shape[0]
         if k is None or k >= n - 1:
             # Compute maximum possible (N-2 due to ARPACK limitation)
             k = min(n - 2, n)
-        
+
         # Use shift-invert mode for better convergence
         try:
             result = eigsh(
                 a,
                 k=k,
-                which='SM',
-                mode='normal',
+                which="SM",
+                mode="normal",
                 return_eigenvectors=return_eigenvectors,
             )
         except TypeError:
-            result = eigsh(a, k=k, which='SM', mode='normal')
+            result = eigsh(a, k=k, which="SM", mode="normal")
 
         if return_eigenvectors:
             eigvals, eigvecs = result
@@ -418,6 +424,7 @@ class CupyBackend:
         if cls._cupy_available is None:
             try:
                 import cupy as cp
+
                 try:
                     if cp.cuda.runtime.getDeviceCount() < 1:
                         cls._cp = None
@@ -536,6 +543,7 @@ class CupyBackend:
             else:
                 # Dense CPU array -> sparse GPU
                 from scipy.sparse import csr_matrix
+
                 a_cpu_sparse = csr_matrix(a)
                 a_gpu = cusp.csr_matrix(a_cpu_sparse)
 
@@ -544,11 +552,11 @@ class CupyBackend:
                 result = cusp_linalg.eigsh(
                     a_gpu,
                     k=k,
-                    which='SA',  # 'SA' = smallest algebraic
+                    which="SA",  # 'SA' = smallest algebraic
                     return_eigenvectors=return_eigenvectors,
                 )
             except TypeError:
-                result = cusp_linalg.eigsh(a_gpu, k=k, which='SA')
+                result = cusp_linalg.eigsh(a_gpu, k=k, which="SA")
 
             if return_eigenvectors:
                 eigvals_gpu, eigvecs_gpu = result
@@ -563,22 +571,27 @@ class CupyBackend:
 
         except Exception as e:
             import warnings
+
             warnings.warn(
                 f"GPU sparse eigsh failed ({e}), falling back to CPU scipy sparse",
                 RuntimeWarning,
-                stacklevel=2
+                stacklevel=2,
             )
 
             # Strategy 2: Fall back to optimized CPU sparse methods
             from scipy.sparse.linalg import eigsh
+
             if not issparse(a):
                 from scipy.sparse import csr_matrix
+
                 a = csr_matrix(a)
 
             try:
-                result = eigsh(a, k=k, which='SM', return_eigenvectors=return_eigenvectors)
+                result = eigsh(
+                    a, k=k, which="SM", return_eigenvectors=return_eigenvectors
+                )
             except TypeError:
-                result = eigsh(a, k=k, which='SM')
+                result = eigsh(a, k=k, which="SM")
 
             if return_eigenvectors:
                 eigvals, eigvecs = result
@@ -660,6 +673,7 @@ class BackendManager:
             if not CupyBackend._check_cupy():
                 if fallback:
                     import warnings
+
                     warnings.warn(
                         "CuPy not available, falling back to NumPy backend",
                         RuntimeWarning,

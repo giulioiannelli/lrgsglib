@@ -29,8 +29,10 @@ def kabsch_rmsd(P: np.ndarray, Q: np.ndarray) -> float:
     return float(np.sqrt((diff * diff).sum() / max(len(P), 1)))
 
 
-def q3_score(ss_pred: Sequence[str] | Iterable[str],
-             ss_true: Sequence[str] | Iterable[str]) -> float:
+def q3_score(
+    ss_pred: Sequence[str] | Iterable[str],
+    ss_true: Sequence[str] | Iterable[str],
+) -> float:
     """Fraction of residues where predicted SS class matches ground truth.
 
     Inputs are sequences of single-letter SS codes (``H``, ``E``, ``C`` per

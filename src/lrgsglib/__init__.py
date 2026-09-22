@@ -15,42 +15,63 @@ except Exception:  # pragma: no cover - depends on build/install state
     except Exception:  # pragma: no cover - not installed as a distribution
         __version__ = "0.0.0+unknown"
 
-from .shared import (
-    # Core libraries users expect at top level
-    np, nx, plt, pd, cp, scipy,
-    # Standard-library modules used by scripts/serializers
-    subprocess, warnings, os, sys, re, copy, random, time, pk,
-    # Common types
-    Graph, Path, NDArray, Iterable, tqdm,
-    # Commonly used constants
-    Fraction, Decimal, Number,
-    # Frequently used scipy.cluster / scipy.signal helpers
-    linkage, dendrogram, fcluster, cophenet, leaves_list,
-    squareform, pdist, find_peaks, expm,
-)
-from .core import *
-from .plotlib import *
-from .config.const import DEFAULT_RECURSION_LIMIT, PATHDATA
 from lrgsglib.config.funcs import move_to_rootf
 
+from .config.const import DEFAULT_RECURSION_LIMIT, PATHDATA
+from .core import *
 
 # Explicit public API: graph types
 from .graphs.nx import (
     Lattice2D,
     Lattice3D,
-    SignedGraph,
     MultiplicativeCascadeGraph,
     SCSGeneralizedNN,
+    SignedGraph,
     load_or_compute_Lattice2D,
     load_or_compute_Lattice3D,
+)
+from .plotlib import *
+from .shared import (  # Core libraries users expect at top level; Standard-library modules used by scripts/serializers; Common types; Commonly used constants; Frequently used scipy.cluster / scipy.signal helpers
+    Decimal,
+    Fraction,
+    Graph,
+    Iterable,
+    NDArray,
+    Number,
+    Path,
+    cophenet,
+    copy,
+    cp,
+    dendrogram,
+    expm,
+    fcluster,
+    find_peaks,
+    leaves_list,
+    linkage,
+    np,
+    nx,
+    os,
+    pd,
+    pdist,
+    pk,
+    plt,
+    random,
+    re,
+    scipy,
+    squareform,
+    subprocess,
+    sys,
+    time,
+    tqdm,
+    warnings,
 )
 
 # Explicit public API: dynamics models
 from .statsys import (
-    IsingDynamics,
     ContactProcess,
     ContactProcessEI,
     ContactProcessSIR,
+    IsingDynamics,
 )
 
 # Explicit public API: commonly used utilities

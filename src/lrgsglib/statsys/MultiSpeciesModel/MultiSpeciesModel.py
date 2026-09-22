@@ -19,13 +19,13 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
+from ...utils.tools.chronometer import time_function_accumulate
 from .._c_backend import CBackendMixin
 from .._csr import build_graph_csr
 from .._solver import SolverBackend
 from .._solver_engine import get_solver
 from ..VecDynSys import VecDynSys
 from .defaults import MULTISPEC_SOLVER_NAME
-from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
     from ...graphs.nx import SignedGraphNX as SignedGraph
@@ -77,7 +77,7 @@ class MultiSpeciesModel(CBackendMixin, VecDynSys):
         save_observables: bool = False,
         **kw: Any,
     ) -> None:
-        dynpath = getattr(sg, 'path_data', None)
+        dynpath = getattr(sg, "path_data", None)
         if dynpath is not None:
             dynpath = Path(dynpath) / "multi_species"
 
@@ -88,7 +88,9 @@ class MultiSpeciesModel(CBackendMixin, VecDynSys):
         else:
             self._q_per_species = list(q_per_species)
             if len(self._q_per_species) != species:
-                raise ValueError("q_per_species length must match species count.")
+                raise ValueError(
+                    "q_per_species length must match species count."
+                )
 
         q_total = max(self._q_per_species)  # used for VecDynSys.q
 
@@ -104,7 +106,9 @@ class MultiSpeciesModel(CBackendMixin, VecDynSys):
         )
 
         if interaction_matrix is not None:
-            self.interaction_matrix = np.asarray(interaction_matrix, dtype=np.float64)
+            self.interaction_matrix = np.asarray(
+                interaction_matrix, dtype=np.float64
+            )
             if self.interaction_matrix.shape != (species, species):
                 raise ValueError(
                     f"Interaction matrix shape {self.interaction_matrix.shape} "
@@ -206,13 +210,17 @@ class MultiSpeciesModel(CBackendMixin, VecDynSys):
                         - float(proposal == self.s[j, s2])
                     )
 
-        if dE <= 0 or (self.T > 0 and np.random.uniform() < np.exp(-dE / self.T)):
+        if dE <= 0 or (
+            self.T > 0 and np.random.uniform() < np.exp(-dE / self.T)
+        ):
             self.s[nd, comp] = np.int32(proposal)
 
     # ------------------------------------------------------------------
     # Dynamics
     # ------------------------------------------------------------------
-    def init_multispecies_dynamics(self, custom: Any = None, exName: str = "") -> None:
+    def init_multispecies_dynamics(
+        self, custom: Any = None, exName: str = ""
+    ) -> None:
         self._check_c_backend_or_fallback()
         self.ene = []
         self.init_state(custom)
@@ -258,9 +266,16 @@ class MultiSpeciesModel(CBackendMixin, VecDynSys):
         ni, nw, nptr = build_graph_csr(self.sg, self.N)
         s0 = np.ascontiguousarray(self.s, dtype=np.int32).reshape(-1)
         s, ene = _multispec_native.multispec_sampling(
-            s0, ni, nw, nptr,
-            int(self.N), int(self.species), int(self.q), float(self.T),
-            int(self.steps), int(self.seed),
+            s0,
+            ni,
+            nw,
+            nptr,
+            int(self.N),
+            int(self.species),
+            int(self.q),
+            float(self.T),
+            int(self.steps),
+            int(self.seed),
             bool(self.save_observables),
         )
         self.s = np.asarray(s, dtype=np.int32).reshape(self.N, self.species)
@@ -287,7 +302,7 @@ class MultiSpeciesModel(CBackendMixin, VecDynSys):
         ]
 
     def _get_cleanup_paths(self) -> list[Path | None]:
-        return [getattr(self, 'sfout', None)]
+        return [getattr(self, "sfout", None)]
 
     @time_function_accumulate(auto_log=False)
     def run(

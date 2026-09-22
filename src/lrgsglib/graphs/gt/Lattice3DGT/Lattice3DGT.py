@@ -3,19 +3,19 @@ Lattice3DGT: graph-tool implementation of 3D lattice signed graphs.
 
 Mirrors the API of Lattice3DNX for easy switching between backends.
 """
+
 from __future__ import annotations
 
 from typing import Literal, Optional, Tuple, Union
 
-import numpy as np
-
 import graph_tool.all as gt
 import graph_tool.generation as gen
+import numpy as np
 
 from ....config.const import L3D_ONREP, SG_INIT_NW_DICT
-from ..SignedGraphGT import SignedGraphGT
-from ..._shared.animation.lattice3d import _Lattice3DAnimate, _Lattice3DPlot
 from ..._shared._nw_container import geometric_central_edge
+from ..._shared.animation.lattice3d import _Lattice3DAnimate, _Lattice3DPlot
+from ..SignedGraphGT import SignedGraphGT
 from ._nw_container import Lattice3DGTnwContainer
 
 
@@ -70,7 +70,9 @@ class Lattice3DGT(SignedGraphGT):
     ):
         # Validate inputs
         if geo not in self.GEOMETRIES:
-            raise ValueError(f"geo must be one of {self.GEOMETRIES}, got '{geo}'")
+            raise ValueError(
+                f"geo must be one of {self.GEOMETRIES}, got '{geo}'"
+            )
         if not 0.0 <= pflip <= 1.0:
             raise ValueError(f"pflip must be in [0, 1], got {pflip}")
 
@@ -114,9 +116,14 @@ class Lattice3DGT(SignedGraphGT):
             self._syshapePth = f"{dim_part}_N={total_nodes}"
 
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed,
-                         sgpathn=f"l3d_{geo}_gt",
-                         init_nw_dict=init_nw_dict, **kwargs)
+        super().__init__(
+            G=G,
+            pflip=pflip,
+            seed=seed,
+            sgpathn=f"l3d_{geo}_gt",
+            init_nw_dict=init_nw_dict,
+            **kwargs,
+        )
 
     def get_central_edge(self, on_g: str = L3D_ONREP) -> Tuple[int, int]:
         """Return a bulk edge nearest the geometric centre of the lattice.
@@ -167,11 +174,19 @@ class Lattice3DGT(SignedGraphGT):
 
         for oz, oy, ox in offsets:
             for z in range(nz if self.periodic else nz - (1 if oz > 0 else 0)):
-                for y in range(ny if self.periodic else ny - (1 if oy > 0 else 0)):
-                    for x in range(nx if self.periodic else nx - (1 if ox > 0 else 0)):
+                for y in range(
+                    ny if self.periodic else ny - (1 if oy > 0 else 0)
+                ):
+                    for x in range(
+                        nx if self.periodic else nx - (1 if ox > 0 else 0)
+                    ):
                         coord = (x + ox, y + oy, z + oz)
                         v = G.add_vertex()
-                        pos[v] = [float(coord[0]), float(coord[1]), float(coord[2])]
+                        pos[v] = [
+                            float(coord[0]),
+                            float(coord[1]),
+                            float(coord[2]),
+                        ]
                         node_map[coord] = v
 
         # BCC connectivity: center connected to 8 corners
@@ -228,11 +243,19 @@ class Lattice3DGT(SignedGraphGT):
 
         for oz, oy, ox in offsets:
             for z in range(nz if self.periodic else nz - (1 if oz > 0 else 0)):
-                for y in range(ny if self.periodic else ny - (1 if oy > 0 else 0)):
-                    for x in range(nx if self.periodic else nx - (1 if ox > 0 else 0)):
+                for y in range(
+                    ny if self.periodic else ny - (1 if oy > 0 else 0)
+                ):
+                    for x in range(
+                        nx if self.periodic else nx - (1 if ox > 0 else 0)
+                    ):
                         coord = (x + ox, y + oy, z + oz)
                         v = G.add_vertex()
-                        pos[v] = [float(coord[0]), float(coord[1]), float(coord[2])]
+                        pos[v] = [
+                            float(coord[0]),
+                            float(coord[1]),
+                            float(coord[2]),
+                        ]
                         node_map[coord] = v
 
         def wrap_coord(coord, dims):
@@ -341,7 +364,9 @@ class Lattice3DGT(SignedGraphGT):
         elif projection == "yz":
             pos_2d = pos[:, 1:]
         else:
-            raise ValueError(f"projection must be 'xy', 'xz', 'yz', got {projection}")
+            raise ValueError(
+                f"projection must be 'xy', 'xz', 'yz', got {projection}"
+            )
 
         # Create 2D position property for drawing
         pos_prop = self.G.new_vertex_property("vector<double>")

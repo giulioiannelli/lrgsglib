@@ -27,6 +27,7 @@ import numpy as np
 
 try:  # optional GPU dependency
     import cupy as _cp  # noqa: F401
+
     CUPY_AVAILABLE = True
 except Exception:  # pragma: no cover - depends on the host
     _cp = None
@@ -65,7 +66,7 @@ def run_vectorized_sync(
     s = xp.asarray(s0, dtype=xp.int8)
     idx = xp.asarray(indices, dtype=xp.int64)
     w = xp.asarray(weights, dtype=xp.float64)
-    sgn = xp.where(w < 0, -1, 1).astype(xp.int8)          # per half-edge sign
+    sgn = xp.where(w < 0, -1, 1).astype(xp.int8)  # per half-edge sign
     p = xp.asarray(ptr, dtype=xp.int64)
 
     N = int(s.shape[0])
@@ -87,7 +88,7 @@ def run_vectorized_sync(
     def _sweep(state):
         """One synchronous sweep under ``rule``; returns the new state (int8)."""
         if rule == "linear":
-            off = (rng.random(N) * degf).astype(xp.int64)     # uniform in [0, deg)
+            off = (rng.random(N) * degf).astype(xp.int64)  # uniform in [0, deg)
             pick = xp.where(has, starts + off, 0)
             s_new = (sgn[pick] * state[idx[pick]]).astype(xp.int8)
             return xp.where(has, s_new, state)
@@ -96,19 +97,22 @@ def run_vectorized_sync(
             op = sgn.astype(xp.int64) * state[idx].astype(xp.int64)
             if rule == "majority":
                 h = xp.bincount(src, weights=op.astype(xp.float64), minlength=N)
-                new = xp.sign(h)                              # -1 / 0 / +1
+                new = xp.sign(h)  # -1 / 0 / +1
                 tie = new == 0
                 rnd = xp.where(rng.random(N) < 0.5, 1.0, -1.0)
                 new = xp.where(tie, rnd, new).astype(xp.int8)
                 return xp.where(has, new, state)
             # nonlinear: P(+1) = f₊^α / (f₊^α + f₋^α), f₊ = +1 neighbour fraction
-            nplus = xp.bincount(src, weights=(op > 0).astype(xp.float64),
-                                minlength=N)
+            nplus = xp.bincount(
+                src, weights=(op > 0).astype(xp.float64), minlength=N
+            )
             fp = xp.where(has, nplus / xp.where(has, degf, 1.0), 0.5)
             fm = 1.0 - fp
-            num = fp ** alpha
-            den = num + fm ** alpha
-            pplus = xp.where(den > 0.0, num / xp.where(den > 0.0, den, 1.0), 0.5)
+            num = fp**alpha
+            den = num + fm**alpha
+            pplus = xp.where(
+                den > 0.0, num / xp.where(den > 0.0, den, 1.0), 0.5
+            )
             new = xp.where(rng.random(N) < pplus, 1, -1).astype(xp.int8)
             return xp.where(has, new, state)
         if rule == "qvoter":
@@ -124,19 +128,25 @@ def run_vectorized_sync(
             unanimous = all_plus | all_minus
             unval = xp.where(all_plus, 1, -1).astype(xp.int8)
             flip = rng.random(N) < eps
-            new = xp.where(unanimous, unval,
-                           xp.where(flip, (-state).astype(xp.int8), state))
+            new = xp.where(
+                unanimous,
+                unval,
+                xp.where(flip, (-state).astype(xp.int8), state),
+            )
             return xp.where(has, new, state)
         raise ValueError(f"unsupported vectorized rule={rule!r}")
 
     for t in range(n_sweeps):
         if savemagn:
-            magn_dev[t] = s.mean()       # stays on device (no per-sweep sync)
+            magn_dev[t] = s.mean()  # stays on device (no per-sweep sync)
             nrec = t + 1
         if absorbing_check and (t % absorbing_every == 0):
-            prod = (sgn.astype(xp.int64) * s[src].astype(xp.int64)
-                    * s[idx].astype(xp.int64))
-            if int((prod < 0).sum()) == 0:   # zero frustrated edges => absorbing
+            prod = (
+                sgn.astype(xp.int64)
+                * s[src].astype(xp.int64)
+                * s[idx].astype(xp.int64)
+            )
+            if int((prod < 0).sum()) == 0:  # zero frustrated edges => absorbing
                 absorbed_at = t
                 break
         s = _sweep(s)

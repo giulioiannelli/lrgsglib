@@ -1,30 +1,34 @@
-import numpy as np
 #
 from typing import List, Tuple, Union
+
+import numpy as np
+
 #
 from numpy.typing import NDArray
 from scipy.interpolate import griddata
 from scipy.spatial.distance import cdist
 
 __all__ = [
-    'basis_random_combination',
-    'compute_recon',
-    'compute_recon_ultra',
-    'compute_mse_from_recon',
-    'compute_mse_from_basis',
-    'ultrametric_matrix_distance',
-    'is_orthonormal',
-    'matrix_projection',
-    'normalize_array',
-    'obtain_coeffs',
-    'reconstruct_from_projections',
-    'versor',
-    'interpolate_grid_data',
-    'project_3d_to_2d',
+    "basis_random_combination",
+    "compute_recon",
+    "compute_recon_ultra",
+    "compute_mse_from_recon",
+    "compute_mse_from_basis",
+    "ultrametric_matrix_distance",
+    "is_orthonormal",
+    "matrix_projection",
+    "normalize_array",
+    "obtain_coeffs",
+    "reconstruct_from_projections",
+    "versor",
+    "interpolate_grid_data",
+    "project_3d_to_2d",
 ]
+
+
 #
 def basis_random_combination(
-        basis: Union[List[NDArray], NDArray]
+    basis: Union[List[NDArray], NDArray],
 ) -> Tuple[NDArray, NDArray]:
     """
     Generate a random binary combination of the given basis vectors,
@@ -32,14 +36,14 @@ def basis_random_combination(
 
     Each basis vector is assumed to have entries in {+1, -1}. Instead of
     selecting each coefficient independently, this function chooses a random
-    odd number k (with k ≥ 3) and then randomly selects k distinct basis 
-    vectors. The resulting vector is computed as the elementwise product of 
+    odd number k (with k ≥ 3) and then randomly selects k distinct basis
+    vectors. The resulting vector is computed as the elementwise product of
     the chosen vectors.
 
     Parameters
     ----------
     basis : list of numpy.ndarray or numpy.matrix
-        A list of basis vectors, each represented as a NumPy array or matrix 
+        A list of basis vectors, each represented as a NumPy array or matrix
         with entries +1 or -1. The list must contain at least 3 vectors.
 
     Returns
@@ -49,7 +53,7 @@ def basis_random_combination(
           - result is a NumPy array containing the resulting vector.
           - coeffs is a NumPy array of binary coefficients (0 or 1) indicating
             which basis vectors were selected (with an odd count ≥ 3).
-    
+
     Raises
     ------
     ValueError
@@ -59,12 +63,12 @@ def basis_random_combination(
     if n < 3:
         raise ValueError("Basis must contain at least 3 vectors.")
 
-    # Determine possible odd numbers from 3 up to n 
+    # Determine possible odd numbers from 3 up to n
     # (if n is even, max odd is n-1)
     max_odd = n if n % 2 == 1 else n - 1
     possible_counts = np.arange(3, max_odd + 1, 2)
     k = int(np.random.choice(possible_counts))
-    
+
     coeffs = np.zeros(n, dtype=int)
     indices = np.random.choice(n, size=k, replace=False)
     coeffs[indices] = 1
@@ -74,11 +78,11 @@ def basis_random_combination(
         if c:
             result *= np.asarray(vec)
     return result, coeffs
+
+
 #
 def compute_recon(
-        vector: NDArray, 
-        basis: List[NDArray], 
-        binarize: bool = False
+    vector: NDArray, basis: List[NDArray], binarize: bool = False
 ) -> NDArray:
     """
     Compute the reconstruction from a given vector and basis.
@@ -100,11 +104,11 @@ def compute_recon(
     if binarize:
         recon = np.sign(recon)
     return recon
+
+
 #
 def compute_recon_ultra(
-    vec: NDArray,
-    B: NDArray,
-    mode: str = 'numpy'
+    vec: NDArray, B: NDArray, mode: str = "numpy"
 ) -> NDArray:
     """
     Compute cumulative reconstructions of vec onto prefixes of B.
@@ -125,8 +129,9 @@ def compute_recon_ultra(
     """
     # select array module
     try:
-        if mode == 'cupy':
+        if mode == "cupy":
             import cupy as cp
+
             xp = cp
         else:
             xp = np
@@ -138,13 +143,15 @@ def compute_recon_ultra(
     B_x = xp.asarray(B)
 
     # projections and weighted basis
-    proj = B_x.dot(vec_x)                # (K,)
-    weighted = proj[:, None] * B_x       # (K, N)
+    proj = B_x.dot(vec_x)  # (K,)
+    weighted = proj[:, None] * B_x  # (K, N)
 
     # cumulative reconstructions for prefixes
     recon = xp.cumsum(weighted, axis=0)[:-1]  # (K-1, N)
 
     return recon
+
+
 #
 def compute_mse_from_recon(recon: NDArray, pattern: NDArray) -> NDArray:
     """
@@ -166,12 +173,14 @@ def compute_mse_from_recon(recon: NDArray, pattern: NDArray) -> NDArray:
     recon_norm = recon / norm_factor
     diff = recon_norm - pattern[None, :]
     return (diff * diff).mean(axis=1)
+
+
 #
-def compute_mse_from_basis(patterns,
-                            basis: NDArray,
-                            use_tqdm: bool = False) -> NDArray:
+def compute_mse_from_basis(
+    patterns, basis: NDArray, use_tqdm: bool = False
+) -> NDArray:
     """
-    For each pattern, compute its cumulative reconstructions and MSEs using 
+    For each pattern, compute its cumulative reconstructions and MSEs using
     the provided basis.
 
     Parameters
@@ -186,13 +195,14 @@ def compute_mse_from_basis(patterns,
     Returns
     -------
     mse_matrix : ndarray, shape (M, K-1)
-        mse_matrix[i, j] is the MSE using the first j+1 basis vectors for 
+        mse_matrix[i, j] is the MSE using the first j+1 basis vectors for
         pattern i.
     """
     iterator = range(len(patterns))
     if use_tqdm:
         from tqdm import tqdm
-        iterator = tqdm(iterator, desc='computing MSE')
+
+        iterator = tqdm(iterator, desc="computing MSE")
 
     M = len(patterns)
     K_minus1 = basis.shape[0] - 1
@@ -204,20 +214,20 @@ def compute_mse_from_basis(patterns,
         mse_matrix[i] = compute_mse_from_recon(recon, vec)
 
     return mse_matrix
+
+
 #
 def ultrametric_matrix_distance(
-        D1: NDArray, 
-        D2: NDArray, 
-        metric: str = 'euclidean'
+    D1: NDArray, D2: NDArray, metric: str = "euclidean"
 ) -> float:
     """
-    Compute the distance between two symmetric matrices using their upper 
+    Compute the distance between two symmetric matrices using their upper
     triangular elements.
 
-    This function extracts the upper triangular elements (excluding the 
-    diagonal) from both matrices and computes the distance between these 
-    flattened vectors using the specified metric. This is particularly useful 
-    for comparing distance matrices or correlation matrices where only the 
+    This function extracts the upper triangular elements (excluding the
+    diagonal) from both matrices and computes the distance between these
+    flattened vectors using the specified metric. This is particularly useful
+    for comparing distance matrices or correlation matrices where only the
     upper triangle contains unique information.
 
     Parameters
@@ -227,21 +237,21 @@ def ultrametric_matrix_distance(
     D2 : NDArray
         Second symmetric matrix of shape (N, N). Must have the same shape as D1.
     metric : str, optional
-        Distance metric to use for comparing the flattened upper triangular 
-        elements. Any metric supported by scipy.spatial.distance.cdist can be 
-        used (e.g., 'euclidean', 'manhattan', 'cosine', 'correlation'). 
+        Distance metric to use for comparing the flattened upper triangular
+        elements. Any metric supported by scipy.spatial.distance.cdist can be
+        used (e.g., 'euclidean', 'manhattan', 'cosine', 'correlation').
         Default is 'euclidean'.
 
     Returns
     -------
     float
-        The distance between the two matrices based on their upper triangular 
+        The distance between the two matrices based on their upper triangular
         elements.
 
     Notes
     -----
-    The function assumes both matrices are symmetric and only uses the upper 
-    triangular portion (k=1, excluding diagonal) for comparison. This reduces 
+    The function assumes both matrices are symmetric and only uses the upper
+    triangular portion (k=1, excluding diagonal) for comparison. This reduces
     computational cost and avoids redundant comparisons for symmetric matrices.
 
     Examples
@@ -254,13 +264,15 @@ def ultrametric_matrix_distance(
     """
     # Extract upper triangular indices (excluding diagonal)
     triu_idx = np.triu_indices_from(D1, k=1)
-    
+
     # Flatten upper triangle elements
     v1 = D1[triu_idx]
     v2 = D2[triu_idx]
-    
+
     # Compute distance between flattened vectors
     return cdist([v1], [v2], metric=metric)[0, 0]
+
+
 #
 def is_orthonormal(basis: NDArray, axis: int = 0) -> bool:
     """
@@ -298,14 +310,16 @@ def is_orthonormal(basis: NDArray, axis: int = 0) -> bool:
     # Check if the dot product is close to the identity matrix
     identity = np.eye(basis.shape[0])
     return np.allclose(dot_product, identity)
+
+
 #
 def matrix_projection(M: NDArray, basis: List[NDArray]) -> List[float]:
     """
     Compute the projection of a matrix onto a set of basis matrices.
 
-    This function computes the projection of matrix M onto each matrix in the 
-    provided basis. The projection onto a basis matrix is defined as the 
-    normalized inner product, where the normalization is performed using the 
+    This function computes the projection of matrix M onto each matrix in the
+    provided basis. The projection onto a basis matrix is defined as the
+    normalized inner product, where the normalization is performed using the
     Frobenius norm of the basis matrix.
 
     Parameters
@@ -318,7 +332,7 @@ def matrix_projection(M: NDArray, basis: List[NDArray]) -> List[float]:
     Returns
     -------
     List[float]
-        A list of projection values, one for each basis matrix in the input 
+        A list of projection values, one for each basis matrix in the input
         list.
 
     Notes
@@ -336,6 +350,8 @@ def matrix_projection(M: NDArray, basis: List[NDArray]) -> List[float]:
         projection_i = inner_product / norm_Bi
         projections.append(projection_i)
     return projections
+
+
 #
 def normalize_array(array: NDArray, axis: int = None) -> NDArray:
     """
@@ -346,7 +362,7 @@ def normalize_array(array: NDArray, axis: int = None) -> NDArray:
     array : NDArray
         The input array to be normalized.
     axis : int, optional
-        The axis along which to normalize the array. If None, the array is 
+        The axis along which to normalize the array. If None, the array is
         flattened and normalized globally. Default is None.
 
     Returns
@@ -356,19 +372,21 @@ def normalize_array(array: NDArray, axis: int = None) -> NDArray:
 
     Notes
     -----
-    The normalization is performed by dividing the array by its L2 norm along 
+    The normalization is performed by dividing the array by its L2 norm along
     the specified axis. If the axis is None, the entire array is normalized.
     """
     norm = np.linalg.norm(array, axis=axis, keepdims=True)
     return array / norm
+
+
 #
 def obtain_coeffs(basis, vector):
     """
-    Obtain the coefficients of the linear combination of the basis vectors that 
+    Obtain the coefficients of the linear combination of the basis vectors that
     yields the given vector.
 
-    This function assumes that the basis vectors form an invertible set. It 
-    converts each basis vector to a NumPy array, constructs the matrix with 
+    This function assumes that the basis vectors form an invertible set. It
+    converts each basis vector to a NumPy array, constructs the matrix with
     these vectors as columns, and then solves the linear system
     columns, and then solves the linear system
 
@@ -381,7 +399,7 @@ def obtain_coeffs(basis, vector):
     basis : list of numpy.ndarray or numpy.matrix
         A list of basis vectors.
     vector : numpy.ndarray
-        The target vector assumed to be a linear combination of the basis 
+        The target vector assumed to be a linear combination of the basis
         vectors.
 
     Returns
@@ -392,21 +410,22 @@ def obtain_coeffs(basis, vector):
     Raises
     ------
     numpy.linalg.LinAlgError
-        If the matrix formed by the basis vectors is singular (i.e., 
+        If the matrix formed by the basis vectors is singular (i.e.,
         non-invertible).
     """
     basis_arrays = [np.asarray(vec) for vec in basis]
     B = np.column_stack(basis_arrays)
     return np.linalg.solve(B, vector)
+
+
 #
 def reconstruct_from_projections(
-        projections: List[float], 
-        basis: List[NDArray]
+    projections: List[float], basis: List[NDArray]
 ) -> NDArray:
     """
     Reconstruct a matrix from its projections onto a basis.
 
-    This function reconstructs a matrix by summing the product of each 
+    This function reconstructs a matrix by summing the product of each
     projection coefficient with its corresponding basis matrix.
 
     Parameters
@@ -425,6 +444,8 @@ def reconstruct_from_projections(
     for i, B_i in enumerate(basis):
         reconstructed_matrix += projections[i] * B_i
     return reconstructed_matrix
+
+
 #
 def versor(state_time: NDArray) -> NDArray:
     """
@@ -459,8 +480,8 @@ def interpolate_grid_data(
     y: NDArray,
     z: NDArray,
     num_points: int = 1000,
-    method: str = 'cubic',
-    fill_value: float = np.nan
+    method: str = "cubic",
+    fill_value: float = np.nan,
 ) -> Tuple[NDArray, NDArray, NDArray]:
     """
     Performs interpolation of z-data over a uniformly spaced grid.
@@ -488,10 +509,14 @@ def interpolate_grid_data(
     points = np.column_stack((x.ravel(), y.ravel()))
     grid_x, grid_y = np.meshgrid(
         np.linspace(x.min(), x.max(), num_points),
-        np.linspace(y.min(), y.max(), num_points)
+        np.linspace(y.min(), y.max(), num_points),
     )
     z_new = griddata(
-        points, z.ravel(), (grid_x, grid_y), method=method, fill_value=fill_value
+        points,
+        z.ravel(),
+        (grid_x, grid_y),
+        method=method,
+        fill_value=fill_value,
     )
     return grid_x, grid_y, z_new
 
@@ -499,7 +524,7 @@ def interpolate_grid_data(
 # --- Merged from geometry.py ---
 
 
-def project_3d_to_2d(x, y, z, theta=0., phi=0.):
+def project_3d_to_2d(x, y, z, theta=0.0, phi=0.0):
     """
     Projects a 3D point (x, y, z) onto a 2D plane using rotation angles.
 
@@ -517,16 +542,20 @@ def project_3d_to_2d(x, y, z, theta=0., phi=0.):
     tuple of float
         The (x, y) coordinates of the projected point.
     """
-    R_theta = np.array([
-        [np.cos(theta), 0, np.sin(theta)],
-        [0, 1, 0],
-        [-np.sin(theta), 0, np.cos(theta)]
-    ])
-    R_phi = np.array([
-        [1, 0, 0],
-        [0, np.cos(phi), -np.sin(phi)],
-        [0, np.sin(phi), np.cos(phi)]
-    ])
+    R_theta = np.array(
+        [
+            [np.cos(theta), 0, np.sin(theta)],
+            [0, 1, 0],
+            [-np.sin(theta), 0, np.cos(theta)],
+        ]
+    )
+    R_phi = np.array(
+        [
+            [1, 0, 0],
+            [0, np.cos(phi), -np.sin(phi)],
+            [0, np.sin(phi), np.cos(phi)],
+        ]
+    )
     position = np.array([x, y, z])
     position_rotated = R_phi @ R_theta @ position
     return position_rotated[0], position_rotated[1]

@@ -1,4 +1,4 @@
-from typing import Union, Callable
+from typing import Callable, Union
 
 import networkx as nx
 import numpy as np

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -52,10 +52,12 @@ def export_eigV_all(
 
     if binarize:
         # Column-major eigV: eigV[:, i] is i-th eigenvector
-        out = np.array([
-            np.sign(self.eigV[:, i]).astype(np.int8)
-            for i in range(self.eigV.shape[1])
-        ])
+        out = np.array(
+            [
+                np.sign(self.eigV[:, i]).astype(np.int8)
+                for i in range(self.eigV.shape[1])
+            ]
+        )
     else:
         # Row-major export: each row is an eigenvector
         out = self.eigV.T.astype(np.float64)

@@ -3,12 +3,13 @@ FullyConnectedGT: graph-tool implementation with C++ backend.
 
 Uses native C++ extension for high-performance complete graph generation.
 """
+
 from __future__ import annotations
 
 from typing import Callable, List, Optional, Tuple, Union
 
-import numpy as np
 import graph_tool.all as gt
+import numpy as np
 
 from ..SignedGraphGT import SignedGraphGT
 from .cpp import create_complete_graph
@@ -91,7 +92,6 @@ class FullyConnectedGT(SignedGraphGT):
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
-
     def _generate_graph(self) -> gt.Graph:
         """Generate complete graph using C++ extension."""
         G = gt.Graph(directed=False)
@@ -122,7 +122,9 @@ class FullyConnectedGT(SignedGraphGT):
             for v in G.vertices():
                 pos[v] = positions[int(v)]
         else:
-            raise ValueError(f"Unsupported mode_positions: {self.mode_positions}")
+            raise ValueError(
+                f"Unsupported mode_positions: {self.mode_positions}"
+            )
 
         G.vertex_properties["pos"] = pos
 

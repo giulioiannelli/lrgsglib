@@ -8,7 +8,6 @@ from ....config.const import DEFAULT_P_FSTR_FMT
 from ..MultispectralGraphNX import MultispectralGraphNX
 from .generators_hmn import hierarchical_modular_network
 
-
 # Default constants for HMN
 HMN_LEVELS = 3
 HMN_BRANCHING = 2
@@ -114,7 +113,7 @@ class HierarchicalModularNetworkNX(MultispectralGraphNX):
         self.seed = kwargs.get("seed")
 
         # Computed attributes
-        self.n_modules = branching ** levels
+        self.n_modules = branching**levels
 
         # Build syshapePth before calling parent
         fmtfunc = lambda x: f"{x:{DEFAULT_P_FSTR_FMT}}"
@@ -131,15 +130,11 @@ class HierarchicalModularNetworkNX(MultispectralGraphNX):
         if out_suffix:
             self.syshapePth += f"_{out_suffix}"
 
-        super().__init__(
-            stdFnameSFFX=stdFnameSFFX,
-            sgpathn=sgpathn,
-            **kwargs
-        )
+        super().__init__(stdFnameSFFX=stdFnameSFFX, sgpathn=sgpathn, **kwargs)
 
     def _generate(self) -> nx.Graph:
         """Generate hierarchical modular network."""
-        seed = getattr(self, 'seed', None)
+        seed = getattr(self, "seed", None)
         H = hierarchical_modular_network(
             levels=self.levels,
             branching=self.branching,

@@ -4,13 +4,14 @@ RandomGeometricGT: graph-tool implementation using native GT geometric_graph.
 Uses graph-tool's built-in geometric_graph for high-performance
 spatial graph generation with KD-tree acceleration.
 """
+
 from __future__ import annotations
 
 from typing import Optional, Tuple
 
-import numpy as np
 import graph_tool.all as gt
 import graph_tool.generation as gen
+import numpy as np
 
 from ..SignedGraphGT import SignedGraphGT
 
@@ -99,7 +100,6 @@ class RandomGeometricGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
-
 
     @staticmethod
     def _extract_gc(

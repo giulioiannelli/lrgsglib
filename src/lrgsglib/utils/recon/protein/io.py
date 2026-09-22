@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
 
 import numpy as np
 import requests
@@ -13,6 +13,7 @@ import requests
 # Bio.PDB imports for PDB processing
 try:
     from Bio.PDB import PDBParser
+
     BIO_PDB_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional dependency
     BIO_PDB_AVAILABLE = False
@@ -42,16 +43,22 @@ def download_pdb(pdb_id: str, storage_dir: Optional[Path] = None) -> str:
         pdb_file_path.write_text(response.text)
         print(f"  Downloaded {pdb_id} → {pdb_file_path}")
         return response.text
-    raise ConnectionError(f"Failed to download PDB {pdb_id}: HTTP {response.status_code}")
+    raise ConnectionError(
+        f"Failed to download PDB {pdb_id}: HTTP {response.status_code}"
+    )
 
 
 def extract_ca_coordinates(pdb_content: str) -> np.ndarray:
     """Extract CA (alpha carbon) coordinates from a PDB string."""
     if not BIO_PDB_AVAILABLE:
-        raise ImportError("Bio.PDB required for PDB parsing. Install with: pip install biopython")
+        raise ImportError(
+            "Bio.PDB required for PDB parsing. Install with: pip install biopython"
+        )
 
     parser = PDBParser(QUIET=True)
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".pdb", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".pdb", delete=False
+    ) as tmp:
         tmp.write(pdb_content)
         tmp_path = tmp.name
     try:
@@ -67,13 +74,19 @@ def extract_ca_coordinates(pdb_content: str) -> np.ndarray:
         os.unlink(tmp_path)
 
 
-def extract_atoms_coordinates(pdb_content: str) -> Tuple[np.ndarray, List[str], List[str], List[int]]:
+def extract_atoms_coordinates(
+    pdb_content: str,
+) -> Tuple[np.ndarray, List[str], List[str], List[int]]:
     """Extract all atom coordinates from PDB content with metadata."""
     if not BIO_PDB_AVAILABLE:
-        raise ImportError("Bio.PDB required for PDB parsing. Install with: pip install biopython")
+        raise ImportError(
+            "Bio.PDB required for PDB parsing. Install with: pip install biopython"
+        )
 
     parser = PDBParser(QUIET=True)
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".pdb", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".pdb", delete=False
+    ) as tmp:
         tmp.write(pdb_content)
         tmp_path = tmp.name
     try:
@@ -102,6 +115,7 @@ def extract_atoms_coordinates(pdb_content: str) -> Tuple[np.ndarray, List[str], 
 # PDB formatting utilities
 # ---------------------------------------------------------------------------
 
+
 def coords_to_pdb_string_with_structure(
     coords: np.ndarray,
     residue_types: Optional[List[str]] = None,
@@ -112,7 +126,10 @@ def coords_to_pdb_string_with_structure(
         residue_types = ["ALA"] * len(coords)
 
     if ss_assignments is None:
-        ss_assignments = ["H" if i % 8 < 4 else "E" if i % 8 < 6 else "C" for i in range(len(coords))]
+        ss_assignments = [
+            "H" if i % 8 < 4 else "E" if i % 8 < 6 else "C"
+            for i in range(len(coords))
+        ]
 
     pdb_lines: List[str] = []
     helix_count = 1
@@ -158,14 +175,22 @@ def coords_to_pdb_string_with_structure(
         if i > 0:
             prev_ca = coords[i - 1]
             direction = ca_coord - prev_ca
-            direction = direction / np.linalg.norm(direction) if np.linalg.norm(direction) > 0 else np.array([1, 0, 0])
+            direction = (
+                direction / np.linalg.norm(direction)
+                if np.linalg.norm(direction) > 0
+                else np.array([1, 0, 0])
+            )
             n_coord = ca_coord - direction * N_CA_BOND
         else:
             n_coord = ca_coord + np.array([-N_CA_BOND, 0, 0])
         if i < len(coords) - 1:
             next_ca = coords[i + 1]
             direction = next_ca - ca_coord
-            direction = direction / np.linalg.norm(direction) if np.linalg.norm(direction) > 0 else np.array([1, 0, 0])
+            direction = (
+                direction / np.linalg.norm(direction)
+                if np.linalg.norm(direction) > 0
+                else np.array([1, 0, 0])
+            )
             c_coord = ca_coord + direction * CA_C_BOND
         else:
             c_coord = ca_coord + np.array([CA_C_BOND, 0, 0])

@@ -26,13 +26,12 @@ import logging
 import os
 import warnings
 from pathlib import Path
+
 from .config.const import DEFAULT_LOG_DIR, LOG
 
 
 def setup_custom_logger(
-    name: str,
-    level: int = logging.INFO,
-    log_file: Path = None
+    name: str, level: int = logging.INFO, log_file: Path = None
 ) -> logging.Logger:
     """
     Configure a logger with a FileHandler whose filename is based on `name`.
@@ -60,14 +59,20 @@ def setup_custom_logger(
         DeprecationWarning,
         stacklevel=2,
     )
-    log_file = Path(log_file or os.environ.get("MYLIB_LOG_FILE") or Path(DEFAULT_LOG_DIR) / (name+LOG))
+    log_file = Path(
+        log_file
+        or os.environ.get("MYLIB_LOG_FILE")
+        or Path(DEFAULT_LOG_DIR) / (name + LOG)
+    )
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    if not any(isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file)
-               for h in logger.handlers):
+    if not any(
+        isinstance(h, logging.FileHandler) and h.baseFilename == str(log_file)
+        for h in logger.handlers
+    ):
         fh = logging.FileHandler(log_file, encoding="utf-8")
         fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
         fh.setFormatter(logging.Formatter(fmt))

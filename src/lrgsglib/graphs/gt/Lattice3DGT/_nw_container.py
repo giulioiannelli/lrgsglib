@@ -4,6 +4,7 @@ Mirrors ``Lattice3DNX.nwContainer``: a central single defect plus random XERR
 stars (``single`` / ``singleXERR`` / ``rand`` / ``randXERR``). No ZERR — the 3D
 NX container does not define loop patterns either.
 """
+
 from __future__ import annotations
 
 from ..._shared._nw_container import GTnwContainer

@@ -13,6 +13,7 @@ Example
 """
 
 from typing import Optional
+
 import networkx as nx
 import numpy as np
 
@@ -76,7 +77,7 @@ class SierpinskiNX(FractalGraphNX):
     # Spectral dimension for standard Sierpinski gasket
     SPECTRAL_DIMENSION_GASKET = 2 * np.log(3) / np.log(5)  # approx 1.365
     SPECTRAL_DIMENSION_CARPET = 2 * np.log(8) / np.log(8)  # = 2 (marginal)
-    SPECTRAL_DIMENSION_TETRA = 2 * np.log(4) / np.log(6)   # approx 1.547
+    SPECTRAL_DIMENSION_TETRA = 2 * np.log(4) / np.log(6)  # approx 1.547
 
     def __init__(
         self,
@@ -121,10 +122,10 @@ class SierpinskiNX(FractalGraphNX):
             return (3 ** (self.n + 1) + 3) // 2
         elif self.variant == "carpet":
             # Sierpinski carpet: 8^n nodes (roughly, depends on construction)
-            return 8 ** self.n if self.n > 0 else 8
+            return 8**self.n if self.n > 0 else 8
         else:  # tetrahedron
             # N = (4^(n+1) + 2*4) / 2 = 2 * 4^n + 2
-            return 2 * (4 ** self.n) + 2
+            return 2 * (4**self.n) + 2
 
     def _init_network(self) -> None:
         """Build the Sierpinski graph at iteration level n."""
@@ -236,7 +237,7 @@ class SierpinskiNX(FractalGraphNX):
     def _build_carpet_iterative(self, n: int) -> nx.Graph:
         """Build Sierpinski carpet iteratively."""
         # Start with 3x3 grid minus center
-        size = 3 ** n
+        size = 3**n
         G = nx.grid_2d_graph(size, size)
 
         # Remove nodes corresponding to "holes" at all scales
@@ -250,11 +251,11 @@ class SierpinskiNX(FractalGraphNX):
         holes = set()
 
         for level in range(1, n + 1):
-            block_size = 3 ** level
+            block_size = 3**level
             hole_size = 3 ** (level - 1)
 
-            for i in range(0, 3 ** n, block_size):
-                for j in range(0, 3 ** n, block_size):
+            for i in range(0, 3**n, block_size):
+                for j in range(0, 3**n, block_size):
                     # Hole is in the center third of each block
                     start_i = i + hole_size
                     start_j = j + hole_size
@@ -311,14 +312,18 @@ class SierpinskiNX(FractalGraphNX):
 
         for node1, node2 in joins:
             if node1 in new_G and node2 in new_G:
-                new_G = nx.contracted_nodes(new_G, node1, node2, self_loops=False)
+                new_G = nx.contracted_nodes(
+                    new_G, node1, node2, self_loops=False
+                )
 
         new_G = nx.convert_node_labels_to_integers(new_G)
 
         # Find new corners (4 outer vertices)
         degrees = dict(new_G.degree())
         min_deg = min(degrees.values())
-        new_corners = sorted([v for v, d in degrees.items() if d == min_deg])[:4]
+        new_corners = sorted([v for v, d in degrees.items() if d == min_deg])[
+            :4
+        ]
 
         return new_G, new_corners
 

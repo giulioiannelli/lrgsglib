@@ -42,6 +42,7 @@ class WattsStrogatzNX(SignedGraphNX):
     >>> ws = WattsStrogatzNX(n=100, k=4, p=0.3, pflip=0.2, seed=1)
     >>> ws.flip_random_fract_edges()  # apply sign flips
     """
+
     def __init__(
         self,
         n: int,

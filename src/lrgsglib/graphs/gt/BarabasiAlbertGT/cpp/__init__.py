@@ -6,6 +6,7 @@ graph construction using graph-tool's C++ backend.
 
 Build with: make cpp-make (from lrgsglib root)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,6 +20,7 @@ _SO_PATH = Path(__file__).parent / "barabasi_albert.so"
 
 try:
     from . import barabasi_albert as _ba_module
+
     _create_barabasi_albert_raw = _ba_module.create_barabasi_albert
 except ImportError as e:
     _ba_module = None

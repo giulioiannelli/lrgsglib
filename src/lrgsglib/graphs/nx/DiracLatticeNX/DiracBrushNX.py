@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import networkx as nx
 
-from ....config.const import DBRUSH_STDFN, DBRUSH_SGPATH
-from .DiracLatticeNX import DiracLatticeGraphNX
+from ....config.const import DBRUSH_SGPATH, DBRUSH_STDFN
 from ..MultispectralGraphNX.generators_msg import dirac_brush_graph
+from .DiracLatticeNX import DiracLatticeGraphNX
 
 
 class DiracBrushGraphNX(DiracLatticeGraphNX):
@@ -42,22 +42,19 @@ class DiracBrushGraphNX(DiracLatticeGraphNX):
             periodic=periodic,
             stdFnameSFFX=stdFnameSFFX,
             sgpathn=sgpathn,
-            **kwargs
+            **kwargs,
         )
 
     def _generate(self) -> nx.Graph:
         """Generate Dirac brush graph."""
         H, metadata = dirac_brush_graph(
-            self.base_x,
-            self.base_y,
-            self.fiber_nodes,
-            periodic=self.periodic
+            self.base_x, self.base_y, self.fiber_nodes, periodic=self.periodic
         )
 
         # Store Dirac metadata
         self.dirac_structure = metadata
-        self.base_graph = metadata['base_graph']
-        self.fiber_graph = metadata['fiber_graph']
+        self.base_graph = metadata["base_graph"]
+        self.fiber_graph = metadata["fiber_graph"]
         self.H = H
 
         return H

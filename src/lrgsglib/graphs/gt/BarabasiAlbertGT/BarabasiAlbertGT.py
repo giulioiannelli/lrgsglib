@@ -3,12 +3,13 @@ BarabasiAlbertGT: graph-tool implementation with C++ backend.
 
 Uses native C++ extension for high-performance graph generation.
 """
+
 from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-import numpy as np
 import graph_tool.all as gt
+import numpy as np
 
 from ..SignedGraphGT import SignedGraphGT
 from .cpp import create_barabasi_albert
@@ -89,7 +90,6 @@ class BarabasiAlbertGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
-
 
     def _generate_graph(self, seed: int) -> gt.Graph:
         """Generate Barabasi-Albert graph using C++ extension."""

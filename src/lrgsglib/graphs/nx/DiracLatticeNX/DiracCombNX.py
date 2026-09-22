@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import networkx as nx
 
-from ....config.const import DCOMB_STDFN, DCOMB_SGPATH
-from .DiracLatticeNX import DiracLatticeGraphNX
+from ....config.const import DCOMB_SGPATH, DCOMB_STDFN
 from ..MultispectralGraphNX.generators_msg import dirac_comb_graph
+from .DiracLatticeNX import DiracLatticeGraphNX
 
 
 class DiracCombGraphNX(DiracLatticeGraphNX):
@@ -42,7 +42,7 @@ class DiracCombGraphNX(DiracLatticeGraphNX):
             periodic=periodic,
             stdFnameSFFX=stdFnameSFFX,
             sgpathn=sgpathn,
-            **kwargs
+            **kwargs,
         )
 
     def _generate(self) -> nx.Graph:
@@ -51,13 +51,13 @@ class DiracCombGraphNX(DiracLatticeGraphNX):
             self.base_nodes,
             self.fiber_nodes,
             base_type=self.base_type,
-            periodic=self.periodic
+            periodic=self.periodic,
         )
 
         # Store Dirac metadata
         self.dirac_structure = metadata
-        self.base_graph = metadata['base_graph']
-        self.fiber_graph = metadata['fiber_graph']
+        self.base_graph = metadata["base_graph"]
+        self.fiber_graph = metadata["fiber_graph"]
         self.H = H
 
         return H

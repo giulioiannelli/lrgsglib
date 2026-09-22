@@ -66,7 +66,9 @@ DiracLatticeGraphNX.compute_fiber_laplacian = _spectral.compute_fiber_laplacian
 DiracLatticeGraphNX.compute_dirac_spectrum_separated = (
     _spectral.compute_dirac_spectrum_separated
 )
-DiracLatticeGraphNX.get_base_fiber_dimensions = _spectral.get_base_fiber_dimensions
+DiracLatticeGraphNX.get_base_fiber_dimensions = (
+    _spectral.get_base_fiber_dimensions
+)
 
 
 # Backward compatibility alias

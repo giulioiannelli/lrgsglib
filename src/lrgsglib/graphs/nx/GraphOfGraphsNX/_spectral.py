@@ -15,7 +15,9 @@ if TYPE_CHECKING:
     from .GraphOfGraphsNX import GraphOfGraphsNX
 
 
-def compute_base_spectrum(self: "GraphOfGraphsNX", typf: type = np.float64) -> np.ndarray:
+def compute_base_spectrum(
+    self: "GraphOfGraphsNX", typf: type = np.float64
+) -> np.ndarray:
     """Compute eigenvalues of the base graph Laplacian.
 
     Parameters
@@ -31,12 +33,16 @@ def compute_base_spectrum(self: "GraphOfGraphsNX", typf: type = np.float64) -> n
     if self._base_eigenvalues is not None:
         return self._base_eigenvalues
 
-    base_lap = nx.laplacian_matrix(self._base_graph_instance.G).astype(typf).todense()
+    base_lap = (
+        nx.laplacian_matrix(self._base_graph_instance.G).astype(typf).todense()
+    )
     self._base_eigenvalues = np.linalg.eigvalsh(base_lap)
     return self._base_eigenvalues
 
 
-def compute_fiber_laplacian(self: "GraphOfGraphsNX", typf: type = np.float64) -> np.ndarray:
+def compute_fiber_laplacian(
+    self: "GraphOfGraphsNX", typf: type = np.float64
+) -> np.ndarray:
     """Compute the fiber graph Laplacian matrix.
 
     Parameters
@@ -52,7 +58,9 @@ def compute_fiber_laplacian(self: "GraphOfGraphsNX", typf: type = np.float64) ->
     if self._fiber_laplacian is not None:
         return self._fiber_laplacian
 
-    fiber_lap = nx.laplacian_matrix(self._fiber_graph_instance.G).astype(typf).todense()
+    fiber_lap = (
+        nx.laplacian_matrix(self._fiber_graph_instance.G).astype(typf).todense()
+    )
     self._fiber_laplacian = np.asarray(fiber_lap, dtype=typf)
     return self._fiber_laplacian
 

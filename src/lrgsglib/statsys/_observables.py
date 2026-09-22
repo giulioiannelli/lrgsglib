@@ -160,7 +160,9 @@ class RowTrajectory(Observable):
     read-only memmap once the trajectory lives on disk, or an empty list.
     """
 
-    def __init__(self, name: str, ncols: int, dtype: DTypeLike = np.int8) -> None:
+    def __init__(
+        self, name: str, ncols: int, dtype: DTypeLike = np.int8
+    ) -> None:
         super().__init__(name)
         self.ncols = int(ncols)
         self.dtype = np.dtype(dtype)

@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import random
+from typing import Any, Dict, List, Sequence, Tuple
 
 import networkx as nx
 import numpy as np
-
-from typing import List, Sequence, Tuple, Dict, Any
-
 
 ProbabilityMatrix = np.ndarray
 Node2D = Tuple[int, int]
@@ -54,21 +52,28 @@ def _select_nodes(
             break
 
     if len(selected) < target and nodes:
-        remaining = sorted(nodes, key=lambda node: probabilities[node], reverse=True)
+        remaining = sorted(
+            nodes, key=lambda node: probabilities[node], reverse=True
+        )
         for node in remaining:
             selected.append(node)
             if len(selected) >= target:
                 break
 
     if not selected:
-        raise ValueError("Unable to select any node from the cascade probabilities.")
+        raise ValueError(
+            "Unable to select any node from the cascade probabilities."
+        )
 
     return selected
+
 
 def _validate_probabilities(probabilities: Sequence[float]) -> None:
     """Validate that probabilities are numeric and lie in ``[0, 1]``."""
     if len(probabilities) != 4:
-        raise ValueError("Exactly four probabilities are required for the cascade seed.")
+        raise ValueError(
+            "Exactly four probabilities are required for the cascade seed."
+        )
     for idx, value in enumerate(probabilities):
         if not isinstance(value, (int, float, np.floating)):
             raise TypeError(
@@ -100,7 +105,11 @@ def initial_measure(m: int, symmetric: bool = True) -> np.ndarray:
 
 def link_probabilities(pij: np.ndarray, k: int) -> np.ndarray:
     """Iterate the generating measure ``pij`` via Kronecker products ``k`` times."""
-    if not isinstance(pij, np.ndarray) or pij.ndim != 2 or pij.shape[0] != pij.shape[1]:
+    if (
+        not isinstance(pij, np.ndarray)
+        or pij.ndim != 2
+        or pij.shape[0] != pij.shape[1]
+    ):
         raise ValueError("pij must be a square 2D numpy array.")
     if not isinstance(k, (int, np.integer)) or k <= 0:
         raise ValueError("k must be a positive integer.")
@@ -156,12 +165,13 @@ def multiplicative_cascade_probability_matrix(
             A_new = np.zeros((L_new, L_new), dtype=float)
             for i in range(L_old):
                 for j in range(L_old):
-                    seed = np.random.choice(
-                        [p1, p2, p3, p4], (2, 2)
-                    ).astype(float)
-                    A_new[2 * i : 2 * i + 2, 2 * j : 2 * j + 2] += seed * A[i, j]
+                    seed = np.random.choice([p1, p2, p3, p4], (2, 2)).astype(
+                        float
+                    )
+                    A_new[2 * i : 2 * i + 2, 2 * j : 2 * j + 2] += (
+                        seed * A[i, j]
+                    )
     return A_new
-
 
 
 def multiplicative_cascade_graph(
@@ -200,8 +210,9 @@ def multiplicative_cascade_graph(
     return subgraph
 
 
-
-def palla_lovasz_vicksek_graph(N: int, pij: np.ndarray, k: int) -> Tuple[nx.Graph, np.ndarray]:
+def palla_lovasz_vicksek_graph(
+    N: int, pij: np.ndarray, k: int
+) -> Tuple[nx.Graph, np.ndarray]:
     """Generate a Vicsek graph and return the graph and final probability matrix.
 
     Steps:
@@ -255,13 +266,17 @@ def multiplicative_cascade_exp_clocks(
     periodic : bool, default=True
         Whether to use periodic boundary conditions (toroidal grid)
     """
-    if not isinstance(adj, np.ndarray) or adj.ndim != 2 or adj.shape[0] != adj.shape[1]:
+    if (
+        not isinstance(adj, np.ndarray)
+        or adj.ndim != 2
+        or adj.shape[0] != adj.shape[1]
+    ):
         raise ValueError("A_new must be a square 2D numpy array.")
     if not (0.0 < float(fraction) <= 1.0):
         raise ValueError("frazione must lie in the open interval (0, 1].")
 
     N = int(adj.shape[0])
-    k = int(round(float(fraction) * (N ** 2)))
+    k = int(round(float(fraction) * (N**2)))
     k = max(1, min(k, N * N))
 
     U = np.random.random((N, N))
@@ -414,9 +429,9 @@ def dirac_comb_graph(
     # Add base nodes with new labels
     base_node_mapping = {}
     for i, node in enumerate(base.nodes()):
-        new_label = ('base', i)
+        new_label = ("base", i)
         base_node_mapping[node] = new_label
-        G.add_node(new_label, layer='base', base_idx=i)
+        G.add_node(new_label, layer="base", base_idx=i)
 
     # Add base edges
     for u, v in base.edges():
@@ -424,33 +439,35 @@ def dirac_comb_graph(
 
     # Add fibers
     for base_idx in range(base_nodes):
-        base_node = ('base', base_idx)
+        base_node = ("base", base_idx)
 
         # Add fiber nodes
         fiber_node_mapping = {}
         for j, fnode in enumerate(fiber.nodes()):
-            fiber_label = ('fiber', base_idx, j)
+            fiber_label = ("fiber", base_idx, j)
             fiber_node_mapping[fnode] = fiber_label
-            G.add_node(fiber_label, layer='fiber', base_idx=base_idx, fiber_idx=j)
+            G.add_node(
+                fiber_label, layer="fiber", base_idx=base_idx, fiber_idx=j
+            )
 
         # Add fiber edges
         for u, v in fiber.edges():
             G.add_edge(fiber_node_mapping[u], fiber_node_mapping[v])
 
         # Connect fiber anchor (fiber_idx=0) to base node
-        anchor_node = ('fiber', base_idx, 0)
+        anchor_node = ("fiber", base_idx, 0)
         G.add_edge(base_node, anchor_node)
 
     # Metadata
     metadata = {
-        'base_nodes': base_nodes,
-        'fiber_nodes': fiber_nodes,
-        'total_nodes': G.number_of_nodes(),
-        'base_graph': base,
-        'fiber_graph': fiber,
-        'structure': 'dirac_comb',
-        'base_type': base_type,
-        'periodic': periodic,
+        "base_nodes": base_nodes,
+        "fiber_nodes": fiber_nodes,
+        "total_nodes": G.number_of_nodes(),
+        "base_graph": base,
+        "fiber_graph": fiber,
+        "structure": "dirac_comb",
+        "base_type": base_type,
+        "periodic": periodic,
     }
 
     return G, metadata
@@ -529,9 +546,9 @@ def dirac_brush_graph(
     base_node_mapping = {}
     for node in base.nodes():
         i, j = node  # node is already a tuple (i, j)
-        new_label = ('base', i, j)
+        new_label = ("base", i, j)
         base_node_mapping[node] = new_label
-        G.add_node(new_label, layer='base', base_i=i, base_j=j)
+        G.add_node(new_label, layer="base", base_i=i, base_j=j)
 
     # Add base edges
     for u, v in base.edges():
@@ -540,35 +557,41 @@ def dirac_brush_graph(
     # Add fibers
     for node in base.nodes():
         base_i, base_j = node
-        base_node_label = ('base', base_i, base_j)
+        base_node_label = ("base", base_i, base_j)
 
         # Add fiber nodes
         fiber_node_mapping = {}
         for k, fnode in enumerate(fiber.nodes()):
-            fiber_label = ('fiber', base_i, base_j, k)
+            fiber_label = ("fiber", base_i, base_j, k)
             fiber_node_mapping[fnode] = fiber_label
-            G.add_node(fiber_label, layer='fiber', base_i=base_i, base_j=base_j, fiber_idx=k)
+            G.add_node(
+                fiber_label,
+                layer="fiber",
+                base_i=base_i,
+                base_j=base_j,
+                fiber_idx=k,
+            )
 
         # Add fiber edges
         for u, v in fiber.edges():
             G.add_edge(fiber_node_mapping[u], fiber_node_mapping[v])
 
         # Connect fiber anchor (fiber_idx=0) to base node
-        anchor_node = ('fiber', base_i, base_j, 0)
+        anchor_node = ("fiber", base_i, base_j, 0)
         G.add_edge(base_node_label, anchor_node)
 
     # Metadata
     base_total = base_x * base_y
     metadata = {
-        'base_x': base_x,
-        'base_y': base_y,
-        'base_nodes': base_total,
-        'fiber_nodes': fiber_nodes,
-        'total_nodes': G.number_of_nodes(),
-        'base_graph': base,
-        'fiber_graph': fiber,
-        'structure': 'dirac_brush',
-        'periodic': periodic,
+        "base_x": base_x,
+        "base_y": base_y,
+        "base_nodes": base_total,
+        "fiber_nodes": fiber_nodes,
+        "total_nodes": G.number_of_nodes(),
+        "base_graph": base,
+        "fiber_graph": fiber,
+        "structure": "dirac_brush",
+        "periodic": periodic,
     }
 
     return G, metadata

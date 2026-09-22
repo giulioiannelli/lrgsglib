@@ -52,12 +52,14 @@ def load_protein_corpus(
         pdb_id = entry["pdb_id"]
         coords = extract_ca_fn(download_pdb_fn(pdb_id, pdb_dir))
         ss = assign_secondary_structure_from_coords(coords)
-        proteins.append({
-            "pdb_id": pdb_id,
-            "n_residues": int(len(coords)),
-            "coords": coords - coords.mean(axis=0),
-            "ss": ss,
-        })
+        proteins.append(
+            {
+                "pdb_id": pdb_id,
+                "n_residues": int(len(coords)),
+                "coords": coords - coords.mean(axis=0),
+                "ss": ss,
+            }
+        )
     return proteins
 
 
@@ -66,14 +68,16 @@ def load_tmd_bundles(tmd_dir: Path) -> List[Dict[str, Any]]:
     bundles: List[Dict[str, Any]] = []
     for npz_path in sorted(tmd_dir.glob("*.npz")):
         attrs = json.loads(npz_path.with_suffix(".json").read_text())
-        bundles.append({
-            "npz": npz_path,
-            "attrs": attrs,
-            "label": attrs["label"],
-            "spec": attrs["spec"],
-            "pdb_id": attrs["pdb_id"],
-            "N": attrs["N"],
-        })
+        bundles.append(
+            {
+                "npz": npz_path,
+                "attrs": attrs,
+                "label": attrs["label"],
+                "spec": attrs["spec"],
+                "pdb_id": attrs["pdb_id"],
+                "N": attrs["N"],
+            }
+        )
     return bundles
 
 
@@ -190,7 +194,9 @@ def reconstruct_protein(
     k = max(1, int(round(k_frac * sg.N)))
     recon_full = basis[:k].T @ (basis[:k] @ x_padded)
     recon = recon_full[:n_dof].reshape(n_res, 3)
-    return kabsch_align(recon, protein["coords"]), kabsch_rmsd(recon, protein["coords"])
+    return kabsch_align(recon, protein["coords"]), kabsch_rmsd(
+        recon, protein["coords"]
+    )
 
 
 def q3_curve_per_substrate(
@@ -205,9 +211,13 @@ def q3_curve_per_substrate(
     matrix: List[List[float]] = []
     for protein in proteins:
         spec_dict = next(
-            (b["spec"] for b in bundles
-             if b["pdb_id"] == protein["pdb_id"] and b["label"] == label
-             and float(b["spec"]["pflip"]) == 0.0),
+            (
+                b["spec"]
+                for b in bundles
+                if b["pdb_id"] == protein["pdb_id"]
+                and b["label"] == label
+                and float(b["spec"]["pflip"]) == 0.0
+            ),
             None,
         )
         if spec_dict is None:
@@ -223,7 +233,9 @@ def q3_curve_per_substrate(
         row: List[float] = []
         for k_frac in k_frac_grid:
             k = max(1, int(round(k_frac * sg.N)))
-            recon = (basis[:k].T @ (basis[:k] @ x_padded))[:n_dof].reshape(n_res, 3)
+            recon = (basis[:k].T @ (basis[:k] @ x_padded))[:n_dof].reshape(
+                n_res, 3
+            )
             ss_pred = assign_secondary_structure_from_coords(recon)
             row.append(q3_score(ss_pred, protein["ss"]))
         matrix.append(row)
@@ -257,7 +269,9 @@ def q3_emergence_per_substrate(
 # ---------------------------------------------------------------------------
 
 
-def ss_segments(coords: np.ndarray, ss: Sequence[str], ss_colours: Dict[str, str]):
+def ss_segments(
+    coords: np.ndarray, ss: Sequence[str], ss_colours: Dict[str, str]
+):
     """Backbone segments + per-segment colours for a Line3DCollection."""
     pts = np.asarray(coords)
     segs = [(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
@@ -301,11 +315,15 @@ def render_substrate_panel(
         seg = (pos[u], pos[v])
         (edge_neg if d.get("weight", 1) < 0 else edge_pos).append(seg)
     if edge_pos:
-        ax.add_collection(LineCollection(
-            edge_pos, colors="0.6", linewidths=0.4, alpha=0.7))
+        ax.add_collection(
+            LineCollection(edge_pos, colors="0.6", linewidths=0.4, alpha=0.7)
+        )
     if edge_neg:
-        ax.add_collection(LineCollection(
-            edge_neg, colors="#d62728", linewidths=0.6, alpha=0.9))
+        ax.add_collection(
+            LineCollection(
+                edge_neg, colors="#d62728", linewidths=0.6, alpha=0.9
+            )
+        )
     pts = np.array([pos[n] for n in G.nodes])
     ax.scatter(pts[:, 0], pts[:, 1], s=4, c="#222222", zorder=3)
     ax.set_xticks([])

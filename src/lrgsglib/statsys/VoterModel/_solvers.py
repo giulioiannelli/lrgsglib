@@ -29,8 +29,13 @@ class _VoterPySolver:
     def supports(self, model: "VoterModel") -> None:
         return None
 
-    def execute(self, model: "VoterModel", *, tqdm_on: bool = False,
-                verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "VoterModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model.voter_sampling(tqdm_on)
 
     def is_available(self) -> bool:
@@ -45,13 +50,19 @@ class _VoterPbSolver:
     def supports(self, model: "VoterModel") -> None:
         model._assert_native_supports_config("pybind")
 
-    def execute(self, model: "VoterModel", *, tqdm_on: bool = False,
-                verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "VoterModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model._run_pybind()
 
     def is_available(self) -> bool:
         try:
             from .ccore import _voter_native  # noqa: F401
+
             return True
         except Exception:
             return False
@@ -65,8 +76,13 @@ class _VoterNpSolver:
     def supports(self, model: "VoterModel") -> None:
         model._assert_vectorized_supports_config("NumPy vectorized")
 
-    def execute(self, model: "VoterModel", *, tqdm_on: bool = False,
-                verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "VoterModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model._run_vectorized(gpu=False)
 
     def is_available(self) -> bool:
@@ -81,13 +97,19 @@ class _VoterCuSolver:
     def supports(self, model: "VoterModel") -> None:
         model._assert_vectorized_supports_config("CuPy")
 
-    def execute(self, model: "VoterModel", *, tqdm_on: bool = False,
-                verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "VoterModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model._run_vectorized(gpu=True)
 
     def is_available(self) -> bool:
         try:
             import cupy  # noqa: F401
+
             return True
         except Exception:
             return False
@@ -101,13 +123,19 @@ class _VoterCSolver:
     def supports(self, model: "VoterModel") -> None:
         model._assert_native_supports_config("C subprocess")
 
-    def execute(self, model: "VoterModel", *, tqdm_on: bool = False,
-                verbose: bool = False) -> None:
+    def execute(
+        self,
+        model: "VoterModel",
+        *,
+        tqdm_on: bool = False,
+        verbose: bool = False,
+    ) -> None:
         model.build_cprogram_command()
         model.run_cprogram(verbose)
 
     def is_available(self) -> bool:
         from ...config.lrgsg_env import LRGSG_STATSYS_VM_BIN
+
         return LRGSG_STATSYS_VM_BIN.exists()
 
 

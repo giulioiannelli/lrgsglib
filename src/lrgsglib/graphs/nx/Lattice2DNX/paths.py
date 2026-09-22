@@ -1,10 +1,13 @@
-from .Lattice2DNX import L2D_PATH_DICT, L2D_SHRT_GEO_DICT
 from typing import Dict
+
+from .Lattice2DNX import L2D_PATH_DICT, L2D_SHRT_GEO_DICT
+
+
 #
 def get_lattice_path(
     geo: str,
     path_dict: Dict[str, str] = L2D_PATH_DICT,
-    alias_dict: Dict[str, str] = L2D_SHRT_GEO_DICT
+    alias_dict: Dict[str, str] = L2D_SHRT_GEO_DICT,
 ) -> str:
     """
     Resolve a geometry key or its abbreviation to the corresponding lattice path.
@@ -42,4 +45,6 @@ def get_lattice_path(
     try:
         return path_dict[full_geo]
     except KeyError:
-        raise KeyError(f"No path defined for geometry '{full_geo}' (alias '{geo}')")
+        raise KeyError(
+            f"No path defined for geometry '{full_geo}' (alias '{geo}')"
+        )

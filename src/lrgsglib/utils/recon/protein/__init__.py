@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
-from . import io as _io
 from . import feature_extraction as _feature
+from . import io as _io
+from . import metrics as _metrics
+from . import nb_helpers as _nb
 from . import reconstruction as _recon
 from . import spectral as _spectral
-from . import metrics as _metrics
 from . import substrate as _substrate
-from . import nb_helpers as _nb
-
-from .io import *
 from .feature_extraction import *
+from .io import *
+from .metrics import *
+from .nb_helpers import *
 from .reconstruction import *
 from .spectral import *
-from .metrics import *
 from .substrate import *
-from .nb_helpers import *
 
 __all__ = (
     _io.__all__

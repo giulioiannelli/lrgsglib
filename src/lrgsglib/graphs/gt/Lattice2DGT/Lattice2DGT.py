@@ -3,32 +3,32 @@ Lattice2DGT: graph-tool implementation of 2D lattice signed graphs.
 
 Mirrors the API of Lattice2DNX for easy switching between backends.
 """
+
 from __future__ import annotations
 
 from typing import Literal, Optional, Tuple, Union
-import numpy as np
 
 import graph_tool.all as gt
+import numpy as np
 
 from ....config.const import (
-    L2D_PBC,
-    L2D_WITH_POS,
-    L2D_ONREP,
-    L2D_GEO_SHRT_LIST,
-    L2D_SHRT_GEO_DICT,
-    L2D_GEO_SHRT_DICT,
     L2D_ERRMSG_GEO,
+    L2D_GEO_SHRT_DICT,
+    L2D_GEO_SHRT_LIST,
+    L2D_ONREP,
+    L2D_PBC,
+    L2D_SHRT_GEO_DICT,
+    L2D_WITH_POS,
     SG_INIT_NW_DICT,
 )
 from ....utils.basic.arithmetic import adjust_to_even
-from ..SignedGraphGT import SignedGraphGT
 from ..._shared._draw import draw as _draw_lattice2d
-from ..._shared.animation.lattice2d import _Lattice2DAnimate, _Lattice2DPlot
-from . import _generators as _gen2d
-from ._nw_container import Lattice2DGTnwContainer
 from ..._shared._nw_container import geometric_central_edge
 from ..._shared._nw_geometry import oriented_cell_edges
-
+from ..._shared.animation.lattice2d import _Lattice2DAnimate, _Lattice2DPlot
+from ..SignedGraphGT import SignedGraphGT
+from . import _generators as _gen2d
+from ._nw_container import Lattice2DGTnwContainer
 
 _SW_SUFFIX = "_sw"  # small-world variant marker (mirrors Lattice2DNX)
 
@@ -36,12 +36,12 @@ _SW_SUFFIX = "_sw"  # small-world variant marker (mirrors Lattice2DNX)
 # NX engines are interchangeable. Maps a base geo to its `_generators` builder;
 # the lambda adapts to each generator's ``(side1, side2)`` / ``(n, m)`` order.
 _GENERATORS = {
-    'sqr': lambda s1, s2, per: _gen2d.squared(s1, s2, per),
-    'tri': lambda s1, s2, per: _gen2d.triangular(s1, s2, per),
-    'hex': lambda s1, s2, per: _gen2d.hexagonal(s1, s2, per),
-    'oct_sqr': lambda s1, s2, per: _gen2d.rhomb_octagonal(s1, s2, per),
-    'kgm': lambda s1, s2, per: _gen2d.kagome(s1, s2, per),
-    'tri_hex': lambda s1, s2, per: _gen2d.tri_hexagonal(s1, s2, per),
+    "sqr": lambda s1, s2, per: _gen2d.squared(s1, s2, per),
+    "tri": lambda s1, s2, per: _gen2d.triangular(s1, s2, per),
+    "hex": lambda s1, s2, per: _gen2d.hexagonal(s1, s2, per),
+    "oct_sqr": lambda s1, s2, per: _gen2d.rhomb_octagonal(s1, s2, per),
+    "kgm": lambda s1, s2, per: _gen2d.kagome(s1, s2, per),
+    "tri_hex": lambda s1, s2, per: _gen2d.tri_hexagonal(s1, s2, per),
 }
 
 
@@ -105,7 +105,7 @@ class Lattice2DGT(SignedGraphGT):
         self,
         side1: int,
         side2: Optional[int] = None,
-        geo: str = 'sqr',
+        geo: str = "sqr",
         pflip: float = 0.0,
         periodic: bool = L2D_PBC,
         prew: float = 0.0,
@@ -127,7 +127,8 @@ class Lattice2DGT(SignedGraphGT):
         self.with_positions = with_positions
         # Resolve side lengths exactly as Lattice2DNX does (swap + hex rescale)
         self.side1, self.side2 = self._resolve_sides(
-            side1, side2, base, periodic)
+            side1, side2, base, periodic
+        )
 
         # Set seed (np.random drives the small-world rewiring, matching NX)
         if seed is not None:
@@ -136,7 +137,8 @@ class Lattice2DGT(SignedGraphGT):
 
         # Build the base graph through the shared native-generator path
         G, pos = self._assemble(
-            *_GENERATORS[base](self.side1, self.side2, self.periodic))
+            *_GENERATORS[base](self.side1, self.side2, self.periodic)
+        )
 
         # Optional small-world rewiring (mirrors nx rewire_edges_optimized)
         if prew > 0.0:
@@ -156,9 +158,14 @@ class Lattice2DGT(SignedGraphGT):
         self._syshapePth = f"N={G.num_vertices()}"
 
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed,
-                         sgpathn=f"l2d_{geo_label}_gt",
-                         init_nw_dict=init_nw_dict, **kwargs)
+        super().__init__(
+            G=G,
+            pflip=pflip,
+            seed=seed,
+            sgpathn=f"l2d_{geo_label}_gt",
+            init_nw_dict=init_nw_dict,
+            **kwargs,
+        )
 
     @classmethod
     def _normalise_geo(cls, geo: str, prew: float) -> Tuple[str, str]:
@@ -168,9 +175,9 @@ class Lattice2DGT(SignedGraphGT):
         An explicit ``_sw`` suffix or ``prew > 0`` flags the small-world variant
         used only for the on-disk path label.
         """
-        if geo in L2D_SHRT_GEO_DICT:        # already a short alias
+        if geo in L2D_SHRT_GEO_DICT:  # already a short alias
             short = geo
-        elif geo in L2D_GEO_SHRT_DICT:      # full name -> short alias
+        elif geo in L2D_GEO_SHRT_DICT:  # full name -> short alias
             short = L2D_GEO_SHRT_DICT[geo]
         else:
             raise ValueError(
@@ -198,7 +205,7 @@ class Lattice2DGT(SignedGraphGT):
         """
         if side2 is not None:
             return (side2, side1) if side2 > side1 else (side1, side2)
-        if base == 'hex':
+        if base == "hex":
             s2 = side1
             s1 = adjust_to_even(side1 / np.sqrt(3))
             if (s1 % 2 or s2 % 2) and periodic:

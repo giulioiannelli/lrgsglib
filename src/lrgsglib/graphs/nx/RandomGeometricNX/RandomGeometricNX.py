@@ -16,7 +16,6 @@ import networkx as nx
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
 
-
 # Constants
 RGG_PHTABB = "rgg"
 RGG_SGPATH = ""
@@ -129,6 +128,7 @@ class RandomGeometricNX(RandomGraphNX):
             Critical radius r_c ~ sqrt(log(n) / (pi * n)).
         """
         import numpy as np
+
         if self.dim != 2:
             raise NotImplementedError("Critical radius formula only for dim=2")
         return float(np.sqrt(np.log(self.n) / (np.pi * self.n)))
@@ -142,4 +142,4 @@ class RandomGeometricNX(RandomGraphNX):
         dict
             Dictionary mapping node to (x, y, ...) position tuple.
         """
-        return nx.get_node_attributes(self.G, 'pos')
+        return nx.get_node_attributes(self.G, "pos")

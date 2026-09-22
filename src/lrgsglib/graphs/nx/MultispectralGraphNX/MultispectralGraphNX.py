@@ -12,13 +12,12 @@ from __future__ import annotations
 import networkx as nx
 
 from ....config.const import (
-    MSG_STDFN,
-    MSG_SGPATH,
     MSG_ONLY_CONST_MODE,
     MSG_PHTABB,
+    MSG_SGPATH,
+    MSG_STDFN,
 )
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
-
 
 __all__ = ["MultispectralGraphNX"]
 
@@ -58,7 +57,9 @@ class MultispectralGraphNX(SignedGraphNX):
         self.with_positions = with_positions
         self.positions: dict[int, tuple[float, float]] | None = None
         self.H: nx.Graph | None = None
-        self.std_fname = f"{MSG_PHTABB}{stdFnameSFFX}" if stdFnameSFFX else MSG_PHTABB
+        self.std_fname = (
+            f"{MSG_PHTABB}{stdFnameSFFX}" if stdFnameSFFX else MSG_PHTABB
+        )
         self.sgpathn = sgpathn or MSG_SGPATH
 
         self._verify_pflip(kwargs.get("pflip", 0.0))
@@ -71,7 +72,7 @@ class MultispectralGraphNX(SignedGraphNX):
             self.G = nx.Graph()
 
         # Set system shape path (only if not already set by subclass)
-        if not hasattr(self, 'syshapePth') or self.syshapePth is None:
+        if not hasattr(self, "syshapePth") or self.syshapePth is None:
             try:
                 self.syshapePth = f"N={self.G.number_of_nodes()}"
             except Exception:
@@ -115,7 +116,9 @@ class MultispectralGraphNX(SignedGraphNX):
             f"{self.__class__.__name__} must implement get_expected_num_nodes()"
         )
 
-    def _relabel_with_metadata(self, H: nx.Graph, with_positions: bool) -> nx.Graph:
+    def _relabel_with_metadata(
+        self, H: nx.Graph, with_positions: bool
+    ) -> nx.Graph:
         """Relabel nodes to integers and optionally attach positions.
 
         Parameters
@@ -135,7 +138,7 @@ class MultispectralGraphNX(SignedGraphNX):
         nx.set_node_attributes(
             G_int,
             {idx: node for node, idx in mapping.items()},
-            "original_label"
+            "original_label",
         )
 
         if with_positions:

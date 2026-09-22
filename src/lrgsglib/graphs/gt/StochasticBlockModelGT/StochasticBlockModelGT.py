@@ -3,15 +3,15 @@ StochasticBlockModelGT: graph-tool implementation of Stochastic Block Model grap
 
 Mirrors the API of StochasticBlockModelNX for easy switching between backends.
 """
+
 from __future__ import annotations
 
 from typing import Optional, Sequence
 
-import numpy as np
-
 import graph_tool.all as gt
 import graph_tool.generation as gen
 import graph_tool.topology as topo
+import numpy as np
 
 from ..SignedGraphGT import SignedGraphGT
 
@@ -302,5 +302,6 @@ class StochasticBlockModelGT(SignedGraphGT):
             f"StochasticBlockModelGT(n={self.N}, communities={self.num_communities}, "
             f"edges={self.num_edges}, negative={neg})"
         )
+
 
 __all__ = ["StochasticBlockModelGT"]

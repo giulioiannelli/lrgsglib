@@ -14,14 +14,14 @@ import numpy as np
 try:
     import graph_tool as gt
     from graph_tool import Graph
+
     GT_AVAILABLE = True
 except ImportError:
     GT_AVAILABLE = False
     Graph = object
 
-from ....config.const import DBRUSH_STDFN, DBRUSH_SGPATH
+from ....config.const import DBRUSH_SGPATH, DBRUSH_STDFN
 from .DiracLatticeGT import DiracLatticeGraphGT
-
 
 __all__ = ["DiracBrushGraphGT", "DiracBrushGraph"]
 
@@ -178,13 +178,13 @@ class DiracBrushGraphGT(DiracLatticeGraphGT):
 
         # Store metadata
         self.dirac_structure = {
-            'base_x': self.base_x,
-            'base_y': self.base_y,
-            'base_nodes': base_total,
-            'fiber_nodes': self.fiber_nodes,
-            'total_nodes': total_nodes,
-            'structure': 'dirac_brush',
-            'periodic': self.periodic,
+            "base_x": self.base_x,
+            "base_y": self.base_y,
+            "base_nodes": base_total,
+            "fiber_nodes": self.fiber_nodes,
+            "total_nodes": total_nodes,
+            "structure": "dirac_brush",
+            "periodic": self.periodic,
         }
 
         return G

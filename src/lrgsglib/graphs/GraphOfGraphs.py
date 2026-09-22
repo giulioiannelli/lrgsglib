@@ -31,8 +31,8 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .protocols import SignedGraphProtocol
     from .nx.GraphOfGraphsNX import GraphOfGraphsNX
+    from .protocols import SignedGraphProtocol
 
 
 # === Lazy imports to avoid circular dependencies ===

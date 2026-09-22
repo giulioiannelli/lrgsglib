@@ -6,6 +6,7 @@ with two attachment modes.
 
 Build with: make cpp-make (from lrgsglib root)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,6 +20,7 @@ _SO_PATH = Path(__file__).parent / "dual_barabasi_albert.so"
 
 try:
     from . import dual_barabasi_albert as _dba_module
+
     _create_dual_barabasi_albert_raw = _dba_module.create_dual_barabasi_albert
 except ImportError as e:
     _dba_module = None

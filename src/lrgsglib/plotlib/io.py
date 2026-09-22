@@ -6,6 +6,7 @@ parent-directory creation that labs/notebooks otherwise re-implement inline. All
 cosmetic defaults are named constants in :mod:`lrgsglib.config.const`
 (``SAVEFIG_*``), so they are tuned in one place rather than per call site.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -9,6 +9,7 @@ same cells node-for-node. This replaces the old bespoke per-geometry container
 (``get_links_square`` / ``_triangle`` / ``_hexagon``), which broke cross-engine
 reproducibility and raised ``KeyError`` on the ``oct_sqr`` / ``kgm`` geometries.
 """
+
 from __future__ import annotations
 
 from ..._shared._nw_container import NwContainer

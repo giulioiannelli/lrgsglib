@@ -1,58 +1,58 @@
 from .common import *
-#
-from .phelp.SignedGraph import *
-from .phelp.Lattice2D import *
+from .defs.Lattice2D import *
+
 #
 from .defs.SignedGraph import *
-from .defs.Lattice2D import *
+from .phelp.Lattice2D import *
+
+#
+from .phelp.SignedGraph import *
+
 #
 L2D_args = {
-    'L': {
-        'help': phelp_L,
-        'type': int
-    },
+    "L": {"help": phelp_L, "type": int},
 }
 L2D_opt_args = {
-    tuple(['-p', '--pflip']): {
-        'help': phelp_p,
-        'type': float,
-        'default': 0.0,
-        'dest': 'p',
+    tuple(["-p", "--pflip"]): {
+        "help": phelp_p,
+        "type": float,
+        "default": 0.0,
+        "dest": "p",
     },
-    tuple(['-c', '--cell_type']): {
-        'help': phelp_cell,
-        'type': str,
-        'default': DEFAULT_CELL
+    tuple(["-c", "--cell_type"]): {
+        "help": phelp_cell,
+        "type": str,
+        "default": DEFAULT_CELL,
     },
-    tuple(['-g', '--geometry']): {
-        'help': phelp_geo,
-        'type': str,
-        'default': DEFAULT_GEO
+    tuple(["-g", "--geometry"]): {
+        "help": phelp_geo,
+        "type": str,
+        "default": DEFAULT_GEO,
     },
-    tuple(['-na', '--number_of_averages']): {
-        'help': phelp_navg,
-        'type': int,
-        'default': DEFAULT_NAVG
+    tuple(["-na", "--number_of_averages"]): {
+        "help": phelp_navg,
+        "type": int,
+        "default": DEFAULT_NAVG,
     },
-    tuple(['-wd', '--workdir']): {
-        'help': phelp_workdir,
-        'type': str,
-        'default': DEFAULT_WORKDIR
+    tuple(["-wd", "--workdir"]): {
+        "help": phelp_workdir,
+        "type": str,
+        "default": DEFAULT_WORKDIR,
     },
-    tuple(['-cpt', '--compute']): {
-        'help': phelp_compute,
-        'type': str,
-        'default': DEFAULT_COMPUTE
+    tuple(["-cpt", "--compute"]): {
+        "help": phelp_compute,
+        "type": str,
+        "default": DEFAULT_COMPUTE,
     },
-    tuple(['--prew']): {
-        'help': phelp_prew,
-        'type': float,
-        'default': DEFAULT_L2D_PREW,
+    tuple(["--prew"]): {
+        "help": phelp_prew,
+        "type": float,
+        "default": DEFAULT_L2D_PREW,
     },
-    tuple(['-ge', '--graph_engine']): {
-        'help': phelp_graph_engine,
-        'type': str,
-        'default': DEFAULT_GRAPH_ENGINE,
-        'choices': ['nx', 'gt'],
+    tuple(["-ge", "--graph_engine"]): {
+        "help": phelp_graph_engine,
+        "type": str,
+        "default": DEFAULT_GRAPH_ENGINE,
+        "choices": ["nx", "gt"],
     },
 }

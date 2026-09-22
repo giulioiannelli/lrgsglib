@@ -20,7 +20,6 @@ import numpy as np
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
 
-
 # Constants
 CM_PHTABB = "cm"
 CM_SGPATH = ""
@@ -125,8 +124,8 @@ class ConfigurationModelNX(RandomGraphNX):
             Dictionary with mean, std, min, max of degree sequence.
         """
         return {
-            'mean': float(np.mean(self.degree_sequence)),
-            'std': float(np.std(self.degree_sequence)),
-            'min': int(np.min(self.degree_sequence)),
-            'max': int(np.max(self.degree_sequence)),
+            "mean": float(np.mean(self.degree_sequence)),
+            "std": float(np.std(self.degree_sequence)),
+            "min": int(np.min(self.degree_sequence)),
+            "max": int(np.max(self.degree_sequence)),
         }

@@ -1,9 +1,11 @@
 from typing import Union
+
 import networkx as nx
 import numpy as np
+
 from ....plotlib import Colormap
-from ..SignedGraphNX import SignedGraphNX
 from ..funcs import signed_spectral_layout
+from ..SignedGraphNX import SignedGraphNX
 
 
 def make_animation(

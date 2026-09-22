@@ -4,13 +4,14 @@ CompleteGraphGT: Abstract base class for complete graph models in graph-tool.
 This mirrors the NX pattern where CompleteGraphNX is abstract and
 FullyConnectedNX is the concrete implementation.
 """
+
 from __future__ import annotations
 
 from abc import abstractmethod
 from typing import Optional
 
-import numpy as np
 import graph_tool.all as gt
+import numpy as np
 
 from ..SignedGraphGT import SignedGraphGT
 

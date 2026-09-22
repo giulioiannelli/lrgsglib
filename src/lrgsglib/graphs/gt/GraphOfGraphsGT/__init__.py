@@ -5,8 +5,8 @@ This module provides the GraphOfGraphsGT class for creating generalized
 as base and fiber components.
 """
 
-from .GraphOfGraphsGT import GraphOfGraphsGT, GraphOfGraphs
 from ._policies import AnchorPolicy, get_anchor_index, resolve_anchor_indices
+from .GraphOfGraphsGT import GraphOfGraphs, GraphOfGraphsGT
 
 __all__ = [
     "GraphOfGraphsGT",

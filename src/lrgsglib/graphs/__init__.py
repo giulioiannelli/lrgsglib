@@ -75,13 +75,6 @@ Supported Engines
 - 'ig' : igraph (future support)
 """
 
-from .protocols import (
-    LatticeGraphProtocol,
-    SignedGraphProtocol,
-    SpectralGraphProtocol,
-    is_lattice_graph,
-    is_signed_graph,
-)
 from ._engine import (
     GraphEngine,
     available_engines,
@@ -94,71 +87,79 @@ from ._engine import (
     set_default_engine,
 )
 
-# === Graph type facades ===
-
-# Base
-from .SignedGraph import SignedGraph
-
 # Disorder model (engine-neutral): support x coupling-law spec carried on sg
 from ._shared._disorder import (
-    Disorder,
     CompositeDisorder,
+    Disorder,
     register_coupling,
     register_support,
     registered_supports,
 )
 
-# Lattice
-from .Lattice2D import Lattice2D
-from .Lattice3D import Lattice3D
-from .LatticeND import LatticeND
+# Scale-Free
+from .BarabasiAlbert import BarabasiAlbert
+from .BipartiteFromDegreeSequence import BipartiteFromDegreeSequence
+
+# Bipartite
+from .BipartiteGraph import BipartiteGraph
+from .ConfigurationModel import ConfigurationModel
+from .DGMgraph import DGMgraph
+from .DiracBrushGraph import DiracBrushGraph
+from .DiracCombGraph import DiracCombGraph
+from .DualBarabasiAlbert import DualBarabasiAlbert
 
 # Random
 from .ErdosRenyi import ErdosRenyi
-from .kRegularGraph import kRegularGraph
-from .ConfigurationModel import ConfigurationModel
-from .RandomGeometric import RandomGeometric
-from .LFRBenchmark import LFRBenchmark
-
-# Scale-Free
-from .BarabasiAlbert import BarabasiAlbert
 from .ExtendedBarabasiAlbert import ExtendedBarabasiAlbert
-from .DualBarabasiAlbert import DualBarabasiAlbert
-from .HolmeKim import HolmeKim
-
-# Small-World
-from .WattsStrogatz import WattsStrogatz
-
-# Community
-from .StochasticBlockModel import StochasticBlockModel
 
 # Complete
 from .FullyConnected import FullyConnected
 
-# Bipartite
-from .BipartiteGraph import BipartiteGraph
-from .BipartiteFromDegreeSequence import BipartiteFromDegreeSequence
+# Graph-of-Graphs / Dirac
+from .GraphOfGraphs import GraphOfGraphs
+from .HierarchicalModular import HierarchicalModular
 
 # Neural
 from .HofieldNN import HofieldNN
-from .SCSGeneralizedNN import SCSGeneralizedNN
+from .HolmeKim import HolmeKim
+from .kRegularGraph import kRegularGraph
+
+# Lattice
+from .Lattice2D import Lattice2D
+from .Lattice3D import Lattice3D
+from .LatticeND import LatticeND
+from .LFRBenchmark import LFRBenchmark
 
 # Multispectral (concrete classes)
 from .MultiplicativeCascade import MultiplicativeCascade
-from .VicsekGraph import VicsekGraph
-from .HierarchicalModular import HierarchicalModular
+from .protocols import (
+    LatticeGraphProtocol,
+    SignedGraphProtocol,
+    SpectralGraphProtocol,
+    is_lattice_graph,
+    is_signed_graph,
+)
+from .RandomGeometric import RandomGeometric
+from .SCSGeneralizedNN import SCSGeneralizedNN
 
 # Fractal (concrete classes)
 from .SierpinskiGraph import SierpinskiGraph
-from .DGMgraph import DGMgraph
 
-# Graph-of-Graphs / Dirac
-from .GraphOfGraphs import GraphOfGraphs
-from .DiracCombGraph import DiracCombGraph
-from .DiracBrushGraph import DiracBrushGraph
+# Base
+from .SignedGraph import SignedGraph
+
+# Community
+from .StochasticBlockModel import StochasticBlockModel
 
 # Temporal
 from .TemporalGraph import TemporalGraph
+from .VicsekGraph import VicsekGraph
+
+# Small-World
+from .WattsStrogatz import WattsStrogatz
+
+# === Graph type facades ===
+
 
 __all__ = [
     # Engine management

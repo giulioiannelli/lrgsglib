@@ -5,13 +5,19 @@ This module re-exports for backward compatibility with existing NX imports.
 """
 
 from ..._shared._backend import (  # noqa: F401
-    Backend,
     ArrayBackend,
+    Backend,
     BackendManager,
+    CupyBackend,
     NumpyBackend,
     ScipyBackend,
-    CupyBackend,
 )
 
-__all__ = ["Backend", "ArrayBackend", "BackendManager",
-           "NumpyBackend", "ScipyBackend", "CupyBackend"]
+__all__ = [
+    "Backend",
+    "ArrayBackend",
+    "BackendManager",
+    "NumpyBackend",
+    "ScipyBackend",
+    "CupyBackend",
+]

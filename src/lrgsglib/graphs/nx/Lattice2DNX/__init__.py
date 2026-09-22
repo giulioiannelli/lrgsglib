@@ -5,10 +5,12 @@ This module provides the Lattice2DNX class and supporting functions for
 2D lattice graphs with periodic/fixed boundary conditions.
 """
 
+from . import generators_2d, paths
+from .eigenspace import (
+    create_lattice_with_eigenspace,
+    load_or_compute_Lattice2DNX,
+)
 from .Lattice2DNX import Lattice2DNX
-from .eigenspace import create_lattice_with_eigenspace, load_or_compute_Lattice2DNX
-from . import generators_2d
-from . import paths
 
 # Backward compatibility alias
 Lattice2D = Lattice2DNX

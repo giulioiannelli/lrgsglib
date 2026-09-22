@@ -9,7 +9,7 @@ region detection, and edge-based connected components.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 try:
     import graph_tool as gt
-    from graph_tool import GraphView, Graph
+    from graph_tool import Graph, GraphView
     from graph_tool.topology import label_components
 except ImportError:
     pass
@@ -150,7 +150,7 @@ def make_connected_component_by_edge(
 
     efilt = self.G.new_edge_property("bool")
     for e in self.G.edges():
-        efilt[e] = (prop[e] == value)
+        efilt[e] = prop[e] == value
 
     gv = GraphView(self.G, efilt=efilt)
 
@@ -158,7 +158,9 @@ def make_connected_component_by_edge(
     comp, hist = label_components(gv)
 
     if len(hist) == 0:
-        raise ValueError(f"No connected components found with {edge_attr}={value}.")
+        raise ValueError(
+            f"No connected components found with {edge_attr}={value}."
+        )
 
     giant_label = int(np.argmax(hist))
 

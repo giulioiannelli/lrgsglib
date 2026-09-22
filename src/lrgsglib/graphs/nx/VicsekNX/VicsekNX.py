@@ -7,13 +7,12 @@ from typing import Any
 import networkx as nx
 import numpy as np
 
-from ....config.const import VCK_STDFN, VCK_SGPATH
+from ....config.const import VCK_SGPATH, VCK_STDFN
 from ..MultispectralGraphNX import MultispectralGraphNX
 from ..MultispectralGraphNX.generators_msg import (
-    palla_lovasz_vicksek_graph,
     initial_measure,
+    palla_lovasz_vicksek_graph,
 )
-
 
 __all__ = ["VicsekGraphNX", "VicsekGraph"]
 
@@ -57,11 +56,7 @@ class VicsekGraphNX(MultispectralGraphNX):
         self.probability_matrix = None
         self.sample_fraction = 1.0
 
-        super().__init__(
-            stdFnameSFFX=stdFnameSFFX,
-            sgpathn=sgpathn,
-            **kwargs
-        )
+        super().__init__(stdFnameSFFX=stdFnameSFFX, sgpathn=sgpathn, **kwargs)
 
     def _generate(self) -> nx.Graph:
         """Generate Vicsek graph."""

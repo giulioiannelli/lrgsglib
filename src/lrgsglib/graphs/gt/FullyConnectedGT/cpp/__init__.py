@@ -5,6 +5,7 @@ Provides high-performance complete graph construction using graph-tool's C++ bac
 
 Build with: make cpp-make (from lrgsglib root)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,6 +19,7 @@ _SO_PATH = Path(__file__).parent / "complete_graph.so"
 
 try:
     from . import complete_graph as _cg_module
+
     _create_complete_graph_raw = _cg_module.create_complete_graph
 except ImportError as e:
     _cg_module = None

@@ -8,6 +8,7 @@ These know nothing about graphs -- they operate on plain numpy arrays. Used by
 the structural 3D-lattice animations in
 :mod:`lrgsglib.graphs._shared.animation.lattice3d`.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -22,9 +23,9 @@ __all__ = [
 ]
 
 # Voxel cosmetics, shared across static views and movies.
-VOX_KW = dict(edgecolor="w", lw=0.25)   # per-voxel edge borders
-VOX_ALPHA = 0.5                          # default translucency of one phase
-VOX_GAP = 0.05                           # gap so each cell is a separate cube
+VOX_KW = dict(edgecolor="w", lw=0.25)  # per-voxel edge borders
+VOX_ALPHA = 0.5  # default translucency of one phase
+VOX_GAP = 0.05  # gap so each cell is a separate cube
 
 
 def explode(a):

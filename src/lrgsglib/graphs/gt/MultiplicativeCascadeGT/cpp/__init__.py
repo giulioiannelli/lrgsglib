@@ -6,6 +6,7 @@ C++ backend.  Falls back to vectorized numpy if the .so is not built.
 
 Build with: make cpp-make (from lrgsglib root)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,6 +19,7 @@ _SO_PATH = Path(__file__).parent / "multiplicative_cascade.so"
 
 try:
     from . import multiplicative_cascade as _mc_module
+
     _build_cascade_edges_raw = _mc_module.build_cascade_edges
 except ImportError as e:
     _mc_module = None

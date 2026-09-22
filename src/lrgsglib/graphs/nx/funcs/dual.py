@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 import networkx as nx
 
@@ -130,14 +130,16 @@ def build_signed_dual(
     SignedGraphNX
         A fresh SignedGraphNX with the dual topology and inherited signs.
     """
-    from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
     from ....config.const import SG_REPR
+    from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 
     if on_g is None:
         on_g = getattr(sg, "on_g", SG_REPR)
 
     G = sg.gr[on_g]
-    dual_nx, face_info = build_planar_dual(G, include_outer_face=include_outer_face)
+    dual_nx, face_info = build_planar_dual(
+        G, include_outer_face=include_outer_face
+    )
 
     # Relabel to consecutive integers for clean indexing
     dual_nx = nx.convert_node_labels_to_integers(dual_nx)

@@ -1,8 +1,8 @@
 import numpy as np
 
 from ....config.const import *
-from ..funcs import *
 from ..FullyConnectedNX import FullyConnectedNX
+from ..funcs import *
 from .patterns import init_mnist_patterns
 
 
@@ -27,7 +27,9 @@ class HofieldNNNX(FullyConnectedNX):
         super().__init__(only_const_mode=only_const_mode, **kwargs)
         if not only_const_mode:
             if with_patterns == "uniform":
-                self.patterns = np.random.choice([-1, 1], size=(n_samples, self.N))
+                self.patterns = np.random.choice(
+                    [-1, 1], size=(n_samples, self.N)
+                )
             elif with_patterns == "mnist":
                 self.patterns = init_mnist_patterns(digit, n_samples, threshold)
             # Calculate the weight matrix using the Hebbian learning rule

@@ -1,8 +1,10 @@
-from networkx import Graph
-import networkx as nx
 from typing import Any
 
+import networkx as nx
+from networkx import Graph
+
 __all__ = ["dorogovtsev_goltsev_mendes_graph_FastPatch"]
+
 
 def dorogovtsev_goltsev_mendes_graph_FastPatch(
     n: int,

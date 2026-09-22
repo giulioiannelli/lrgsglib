@@ -6,8 +6,9 @@ the classical SignedLaplacianAnalysis to support quantum propagators e^(-itL)
 and quantum information-theoretic observables.
 """
 
+from typing import TYPE_CHECKING, Optional
+
 import numpy as np
-from typing import Optional, TYPE_CHECKING
 from numpy.typing import NDArray
 
 from .quantum import (
@@ -17,7 +18,7 @@ from .quantum import (
 
 # Import constants
 try:
-    from ...config.const import LRSG_ENTROPY_STEP, DEFAULT_MAX_THRESHOLD
+    from ...config.const import DEFAULT_MAX_THRESHOLD, LRSG_ENTROPY_STEP
 except ImportError:
     # Fallback for testing
     LRSG_ENTROPY_STEP = 600

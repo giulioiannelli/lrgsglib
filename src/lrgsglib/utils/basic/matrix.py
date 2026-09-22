@@ -1,13 +1,13 @@
+from typing import Dict, Iterable, Tuple
+
 from numpy.typing import NDArray
-from typing import Dict, Tuple, Iterable
 
-__all__ = [
-    "zoom_into_array",
-    "shift_with_wrap",
-    "unravel_1d_to_2d_nodemap"
-]
+__all__ = ["zoom_into_array", "shift_with_wrap", "unravel_1d_to_2d_nodemap"]
 
-def zoom_into_array(array: NDArray, x: int, y: int, width: int, height: int) -> NDArray:
+
+def zoom_into_array(
+    array: NDArray, x: int, y: int, width: int, height: int
+) -> NDArray:
     """
     Extract a subarray from a 2D array based on a given coordinate and dimensions.
 
@@ -48,7 +48,10 @@ def zoom_into_array(array: NDArray, x: int, y: int, width: int, height: int) -> 
     y_end = min(array.shape[1], y + height // 2 + 1)
     return array[x_start:x_end, y_start:y_end]
 
-def shift_with_wrap(image: NDArray, shift_right: int, shift_down: int) -> NDArray:
+
+def shift_with_wrap(
+    image: NDArray, shift_right: int, shift_down: int
+) -> NDArray:
     """
     Shift a 2D image with wrap-around at the edges.
 
@@ -81,17 +84,25 @@ def shift_with_wrap(image: NDArray, shift_right: int, shift_down: int) -> NDArra
            [6, 4, 5]])
     """
     from numpy import roll
+
     # Ensure shifts are within the bounds of the image dimensions
     shift_right %= image.shape[1]
     shift_down %= image.shape[0]
 
     # Perform the shift
     shifted_image = roll(image, shift=shift_down, axis=0)  # Shift down
-    shifted_image = roll(shifted_image, shift=shift_right, axis=1)  # Then shift right
+    shifted_image = roll(
+        shifted_image, shift=shift_right, axis=1
+    )  # Then shift right
 
     return shifted_image
 
-def unravel_1d_to_2d_nodemap(arr1d: NDArray, imap: Dict[int, Tuple[int, int]], dims: Tuple[int, int] = None) -> NDArray:
+
+def unravel_1d_to_2d_nodemap(
+    arr1d: NDArray,
+    imap: Dict[int, Tuple[int, int]],
+    dims: Tuple[int, int] = None,
+) -> NDArray:
     """
     Transforms a 1D array into a 2D array based on a given index mapping and optional dimensions.
 
@@ -110,10 +121,13 @@ def unravel_1d_to_2d_nodemap(arr1d: NDArray, imap: Dict[int, Tuple[int, int]], d
         The 2D array obtained from rearranging `arr1d` according to `imap`.
     """
     from numpy import empty, sqrt
+
     if not dims:
         side = int(sqrt(len(arr1d)))
         dims = (side, side)
     arr_2d = empty(dims, dtype=arr1d.dtype)
     for idx_1d, (row, col) in imap.items():
-        arr_2d[row, col] = arr1d[idx_1d]  # Adjusted indexing to [row, col] for clarity
+        arr_2d[row, col] = arr1d[
+            idx_1d
+        ]  # Adjusted indexing to [row, col] for clarity
     return arr_2d

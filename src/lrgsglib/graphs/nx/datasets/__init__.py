@@ -16,9 +16,9 @@ Example
 """
 
 from .real_dataset_loader import (
-    RealDatasetLoader,
-    DatasetInfo,
     BUILTIN_DATASETS,
+    DatasetInfo,
+    RealDatasetLoader,
 )
 
 __all__ = [

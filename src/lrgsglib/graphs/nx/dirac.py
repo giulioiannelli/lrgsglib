@@ -3,14 +3,13 @@
 Re-exports Dirac lattice classes from DiracLatticeNX package for cleaner imports.
 """
 
-from .DiracLatticeNX import (
-    DiracLatticeGraphNX,
-    DiracCombGraphNX,
-    DiracBrushGraphNX,
-    # Backward compatibility aliases
-    DiracLatticeGraph,
-    DiracCombGraph,
+from .DiracLatticeNX import (  # Backward compatibility aliases
     DiracBrushGraph,
+    DiracBrushGraphNX,
+    DiracCombGraph,
+    DiracCombGraphNX,
+    DiracLatticeGraph,
+    DiracLatticeGraphNX,
 )
 
 __all__ = [

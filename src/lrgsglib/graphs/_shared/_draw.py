@@ -13,6 +13,7 @@ Rendering goes straight through matplotlib (a single ``LineCollection`` for the
 bonds plus one scatter for the sites) instead of graph-tool's Cairo canvas,
 which is fast, gives a true 2D layout, and behaves the same on every engine.
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional, Tuple
@@ -124,8 +125,13 @@ def draw(
 
     if with_labels:
         for n, xy in pos.items():
-            ax.annotate(str(n), (float(xy[0]), float(xy[1])),
-                        fontsize=6, ha="center", va="center")
+            ax.annotate(
+                str(n),
+                (float(xy[0]), float(xy[1])),
+                fontsize=6,
+                ha="center",
+                va="center",
+            )
 
     ax.set_aspect("equal")
     ax.autoscale_view()

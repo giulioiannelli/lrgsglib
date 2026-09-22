@@ -21,7 +21,6 @@ import numpy as np
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
 
-
 # Constants for StochasticBlockModel
 SBM_PHTABB = "sbm"
 SBM_SGPATH = ""
@@ -154,10 +153,7 @@ class StochasticBlockModelNX(RandomGraphNX):
         # Compute average intra/inter probabilities for summary
         p_in = np.mean([self.p_matrix[i][i] for i in range(k)])
         p_out_vals = [
-            self.p_matrix[i][j]
-            for i in range(k)
-            for j in range(k)
-            if i != j
+            self.p_matrix[i][j] for i in range(k) for j in range(k) if i != j
         ]
         p_out = np.mean(p_out_vals) if p_out_vals else 0
         return f"N={n}_k={k}_pin={p_in:.2g}_pout={p_out:.2g}"
@@ -192,7 +188,9 @@ class StochasticBlockModelNX(RandomGraphNX):
         float
             Average probability of edges within communities.
         """
-        return float(np.mean([self.p_matrix[i][i] for i in range(self.num_communities)]))
+        return float(
+            np.mean([self.p_matrix[i][i] for i in range(self.num_communities)])
+        )
 
     def get_inter_edge_probability(self) -> float:
         """

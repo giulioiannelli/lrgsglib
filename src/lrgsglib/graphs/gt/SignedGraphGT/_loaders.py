@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -93,6 +93,7 @@ def set_edgel_from_bin(
 
     # Build a fresh graph
     from graph_tool import Graph
+
     G = Graph(directed=False)
     G.add_vertex(n_nodes)
     sign_prop = G.new_edge_property("int", val=1)

@@ -16,8 +16,7 @@ Example
 >>> G = lattice.squared_lattice_graph_FastPatch(10, 10, periodic=True)
 """
 
-from . import lattice
-from . import random
+from . import lattice, random
 
 __all__ = [
     "lattice",

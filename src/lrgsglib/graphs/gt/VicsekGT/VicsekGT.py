@@ -15,18 +15,18 @@ from numpy.typing import NDArray
 try:
     import graph_tool as gt
     from graph_tool import Graph
+
     GT_AVAILABLE = True
 except ImportError:
     GT_AVAILABLE = False
     Graph = object
 
-from ..MultispectralGraphGT import MultispectralGraphGT
-from ....config.const import VCK_STDFN, VCK_SGPATH
+from ....config.const import VCK_SGPATH, VCK_STDFN
 from ...nx.MultispectralGraphNX.generators_msg import (
     initial_measure,
     link_probabilities,
 )
-
+from ..MultispectralGraphGT import MultispectralGraphGT
 
 __all__ = ["VicsekGraphGT", "VicsekGraph"]
 
@@ -115,7 +115,6 @@ class VicsekGraphGT(MultispectralGraphGT):
 
         # Initialize base class with generated graph
         super().__init__(G=G, pflip=pflip, seed=seed, sgpathn=sgpathn, **kwargs)
-
 
     def _generate(self) -> "Graph":
         """Generate Vicsek graph using native graph-tool operations.

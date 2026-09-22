@@ -12,6 +12,7 @@ primitives in :mod:`lrgsglib.plotlib.animation`.
 Graphs whose 2D rendering genuinely differs between engines bind their own
 engine-specific renderers under ``graphs/<engine>/<Class>/animation.py`` instead.
 """
+
 from .lattice2d import (
     animate_largest_cluster,
     animate_states,

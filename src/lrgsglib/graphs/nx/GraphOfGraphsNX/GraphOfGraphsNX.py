@@ -27,6 +27,7 @@ import networkx as nx
 import numpy as np
 
 from ..MultispectralGraphNX import MultispectralGraphNX
+from . import _spectral
 from ._generators import (
     build_composite_nx_graph,
     extract_edge_signs_from_nx_graph,
@@ -35,8 +36,6 @@ from ._generators import (
     generate_fiber_edges,
 )
 from ._policies import AnchorPolicy, get_anchor_index, resolve_anchor_indices
-from . import _spectral
-
 
 __all__ = ["GraphOfGraphsNX", "GraphOfGraphs"]
 
@@ -51,29 +50,31 @@ def _register_graph_types():
         return
 
     # Import graph types on demand to avoid circular imports
+    from ..BarabasiAlbertNX import BarabasiAlbertNX
+    from ..ErdosRenyiNX import ErdosRenyiNX
     from ..Lattice2DNX import Lattice2DNX
     from ..Lattice3DNX import Lattice3DNX
-    from ..ErdosRenyiNX import ErdosRenyiNX
-    from ..BarabasiAlbertNX import BarabasiAlbertNX
-    from ..WattsStrogatzNX import WattsStrogatzNX
     from ..StochasticBlockModelNX import StochasticBlockModelNX
+    from ..WattsStrogatzNX import WattsStrogatzNX
 
-    _GRAPH_TYPE_REGISTRY.update({
-        # Lattice types
-        "Lattice2D": Lattice2DNX,
-        "Lattice2DNX": Lattice2DNX,
-        "Lattice3D": Lattice3DNX,
-        "Lattice3DNX": Lattice3DNX,
-        # Random types
-        "ErdosRenyi": ErdosRenyiNX,
-        "ErdosRenyiNX": ErdosRenyiNX,
-        "BarabasiAlbert": BarabasiAlbertNX,
-        "BarabasiAlbertNX": BarabasiAlbertNX,
-        "WattsStrogatz": WattsStrogatzNX,
-        "WattsStrogatzNX": WattsStrogatzNX,
-        "StochasticBlockModel": StochasticBlockModelNX,
-        "StochasticBlockModelNX": StochasticBlockModelNX,
-    })
+    _GRAPH_TYPE_REGISTRY.update(
+        {
+            # Lattice types
+            "Lattice2D": Lattice2DNX,
+            "Lattice2DNX": Lattice2DNX,
+            "Lattice3D": Lattice3DNX,
+            "Lattice3DNX": Lattice3DNX,
+            # Random types
+            "ErdosRenyi": ErdosRenyiNX,
+            "ErdosRenyiNX": ErdosRenyiNX,
+            "BarabasiAlbert": BarabasiAlbertNX,
+            "BarabasiAlbertNX": BarabasiAlbertNX,
+            "WattsStrogatz": WattsStrogatzNX,
+            "WattsStrogatzNX": WattsStrogatzNX,
+            "StochasticBlockModel": StochasticBlockModelNX,
+            "StochasticBlockModelNX": StochasticBlockModelNX,
+        }
+    )
 
 
 def _resolve_graph_type(type_name: str) -> Callable[..., Any]:
@@ -144,7 +145,9 @@ class GraphOfGraphsNX(MultispectralGraphNX):
         base_params: dict,
         fiber_graph_type: str,
         fiber_params: Union[dict, Callable[[int], dict]],
-        anchor_policy: Union[str, AnchorPolicy, Callable[[int, int], int]] = "first",
+        anchor_policy: Union[
+            str, AnchorPolicy, Callable[[int, int], int]
+        ] = "first",
         pflip: float = 0.0,
         seed: Optional[int] = None,
         **kwargs,
@@ -231,7 +234,9 @@ class GraphOfGraphsNX(MultispectralGraphNX):
 
         # Collect all edges
         base_edges = extract_edges_from_nx_graph(self._base_graph_instance.G)
-        base_signs = extract_edge_signs_from_nx_graph(self._base_graph_instance.G)
+        base_signs = extract_edge_signs_from_nx_graph(
+            self._base_graph_instance.G
+        )
 
         fiber_edges_list = []
         fiber_signs_list = []
@@ -248,7 +253,9 @@ class GraphOfGraphsNX(MultispectralGraphNX):
                 fiber_graph.G, base_idx, self._n_base, self._n_fiber
             )
             fiber_edges_list.append(fiber_edges)
-            fiber_signs_list.append(extract_edge_signs_from_nx_graph(fiber_graph.G))
+            fiber_signs_list.append(
+                extract_edge_signs_from_nx_graph(fiber_graph.G)
+            )
 
         anchor_edges = generate_anchor_edges(
             self._n_base, self._n_fiber, self._anchor_indices
@@ -444,7 +451,9 @@ class GraphOfGraphsNX(MultispectralGraphNX):
 # Attach spectral methods to class
 GraphOfGraphsNX.compute_base_spectrum = _spectral.compute_base_spectrum
 GraphOfGraphsNX.compute_fiber_laplacian = _spectral.compute_fiber_laplacian
-GraphOfGraphsNX.compute_separated_spectrum = _spectral.compute_separated_spectrum
+GraphOfGraphsNX.compute_separated_spectrum = (
+    _spectral.compute_separated_spectrum
+)
 GraphOfGraphsNX.get_base_fiber_dimensions = _spectral.get_base_fiber_dimensions
 
 

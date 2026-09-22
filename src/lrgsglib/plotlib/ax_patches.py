@@ -1,20 +1,24 @@
-from typing import Any, Optional, Dict
+from typing import Any, Dict, Optional
+
 #
 from .const_plotlib import *
+
 #
 __all__ = [
-    'add_external_border_axis',
-    'add_rectangle_patch_to_axis',
+    "add_external_border_axis",
+    "add_rectangle_patch_to_axis",
 ]
+
+
 #
 def add_external_border_axis(
-    axx: Axes, 
-    color: str = 'black', 
-    linewidth: float = 2.0, 
-    axis_off: bool = False, 
-    fill_opt: bool = False, 
-    tranform: Optional[Any] = None, 
-    **more_kwargs: Dict[str, Any]
+    axx: Axes,
+    color: str = "black",
+    linewidth: float = 2.0,
+    axis_off: bool = False,
+    fill_opt: bool = False,
+    tranform: Optional[Any] = None,
+    **more_kwargs: Dict[str, Any],
 ) -> None:
     """
     Add an external border to the given axis.
@@ -32,7 +36,7 @@ def add_external_border_axis(
     fill_opt : bool, optional
         If True, the border will be filled. Default is False.
     tranform : Optional[Any], optional
-        The transformation to apply to the border. If None, defaults to 
+        The transformation to apply to the border. If None, defaults to
         `axx.transAxes`. Default is None.
     **more_kwargs : Dict[str, Any]
         Additional keyword arguments to pass to the Rectangle.
@@ -41,18 +45,27 @@ def add_external_border_axis(
     -------
     None
     """
-    add_rectangle_patch_to_axis(axx, (0, 0, 1, 1), color, linewidth, axis_off, 
-                                fill_opt, tranform, **more_kwargs)
+    add_rectangle_patch_to_axis(
+        axx,
+        (0, 0, 1, 1),
+        color,
+        linewidth,
+        axis_off,
+        fill_opt,
+        tranform,
+        **more_kwargs,
+    )
+
 
 def add_rectangle_patch_to_axis(
     axx: Axes,
     rect_coords: tuple[float, float, float, float],
-    color: str = 'black',
+    color: str = "black",
     linewidth: float = 2.0,
     axis_off: bool = False,
     fill_opt: bool = False,
     tranform: Optional[Any] = None,
-    **more_kwargs: Dict[str, Any]
+    **more_kwargs: Dict[str, Any],
 ) -> None:
     """
     Add a rectangle patch to the given axis.
@@ -72,7 +85,7 @@ def add_rectangle_patch_to_axis(
     fill_opt : bool, optional
         If True, the rectangle will be filled. Default is False.
     tranform : Optional[Any], optional
-        The transformation to apply to the rectangle. If None, defaults to 
+        The transformation to apply to the rectangle. If None, defaults to
         `axx.transAxes`. Default is None.
     **more_kwargs : Dict[str, Any]
         Additional keyword arguments to pass to the Rectangle.
@@ -82,23 +95,29 @@ def add_rectangle_patch_to_axis(
     None
     """
     rect_kwargs = {
-        'transform': axx.transAxes if tranform is None else tranform,
-        'fill': fill_opt,
-        'edgecolor': color,
-        'linewidth': linewidth,
+        "transform": axx.transAxes if tranform is None else tranform,
+        "fill": fill_opt,
+        "edgecolor": color,
+        "linewidth": linewidth,
     }
-    rectangle = Rectangle(rect_coords[:2], rect_coords[2], rect_coords[3], **rect_kwargs, **more_kwargs)
+    rectangle = Rectangle(
+        rect_coords[:2],
+        rect_coords[2],
+        rect_coords[3],
+        **rect_kwargs,
+        **more_kwargs,
+    )
     axx.add_patch(rectangle)
     if axis_off:
-        axx.axis('off')
+        axx.axis("off")
+
+
 #
 def set_ax_ratio_1_withlim(
-    ax: Axes,
-    margin: float = 0.0,
-    maintain_center: bool = True
+    ax: Axes, margin: float = 0.0, maintain_center: bool = True
 ) -> None:
     """
-    Adjust the axis limits to ensure a 1:1 aspect ratio, optionally adding 
+    Adjust the axis limits to ensure a 1:1 aspect ratio, optionally adding
     a margin and maintaining the center of the plot.
 
     Parameters
@@ -106,11 +125,11 @@ def set_ax_ratio_1_withlim(
     ax : matplotlib.axes.Axes
         The axis to adjust.
     margin : float, optional
-        Additional margin to add around the plot, as a fraction of the 
+        Additional margin to add around the plot, as a fraction of the
         largest range. Default is 0.0 (no margin).
     maintain_center : bool, optional
-        If True, the plot will remain centered around its original center. 
-        If False, the limits will be adjusted to fit the data tightly. 
+        If True, the plot will remain centered around its original center.
+        If False, the limits will be adjusted to fit the data tightly.
         Default is True.
 
     Returns
@@ -120,11 +139,11 @@ def set_ax_ratio_1_withlim(
 
     Notes
     -----
-    - The function calculates the largest range (x or y) and adjusts the 
+    - The function calculates the largest range (x or y) and adjusts the
       limits to ensure a square plot.
-    - If `margin` is provided, it is added to the largest range before 
+    - If `margin` is provided, it is added to the largest range before
       setting the limits.
-    - If `maintain_center` is False, the plot will not be centered, and the 
+    - If `maintain_center` is False, the plot will not be centered, and the
       limits will be adjusted to fit the data tightly.
 
     Examples
@@ -144,7 +163,7 @@ def set_ax_ratio_1_withlim(
 
     # Determine the largest range and add margin
     max_range = max(x_range, y_range) / 2
-    max_range *= (1 + margin)
+    max_range *= 1 + margin
 
     if maintain_center:
         # Set the new limits to ensure the plot is square and centered

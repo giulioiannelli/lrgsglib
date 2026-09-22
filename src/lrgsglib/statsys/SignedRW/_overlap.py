@@ -54,7 +54,7 @@ def overlap(
     c1: np.ndarray,
     c2: np.ndarray,
     *,
-    kind: str = 'l2_raw',
+    kind: str = "l2_raw",
 ) -> float:
     r"""Scalar overlap between two visit-count fields.
 
@@ -87,18 +87,14 @@ def overlap(
     c1 = np.asarray(c1)
     c2 = np.asarray(c2)
     if c1.shape != c2.shape:
-        raise ValueError(
-            f"shape mismatch: {c1.shape} vs {c2.shape}."
-        )
+        raise ValueError(f"shape mismatch: {c1.shape} vs {c2.shape}.")
     if c1.ndim != 1:
-        raise ValueError(
-            f"expected 1-D arrays, got {c1.ndim}-D."
-        )
+        raise ValueError(f"expected 1-D arrays, got {c1.ndim}-D.")
     if (c1 < 0).any() or (c2 < 0).any():
         raise ValueError("visit counts must be non-negative.")
-    if kind == 'l2_raw':
+    if kind == "l2_raw":
         return float(np.dot(c1.astype(np.float64), c2.astype(np.float64)))
-    if kind == 'jaccard':
+    if kind == "jaccard":
         s1 = c1 > 0
         s2 = c2 > 0
         inter = int((s1 & s2).sum())
@@ -106,11 +102,11 @@ def overlap(
         return float(inter / union) if union else 0.0
     rho1 = _as_density(c1)
     rho2 = _as_density(c2)
-    if kind == 'l2_norm':
+    if kind == "l2_norm":
         return float(np.dot(rho1, rho2))
-    if kind == 'l2_rescaled':
+    if kind == "l2_rescaled":
         return float(rho1.size * np.dot(rho1, rho2))
-    if kind == 'fidelity':
+    if kind == "fidelity":
         return float(np.sqrt(rho1 * rho2).sum())
     # kind == 'tv'
     return float(0.5 * np.abs(rho1 - rho2).sum())
@@ -130,7 +126,7 @@ def overlap_all(
 def pairwise_overlap_matrix(
     visits_per_walker: np.ndarray,
     *,
-    kind: str = 'l2_raw',
+    kind: str = "l2_raw",
 ) -> np.ndarray:
     """Gram-style matrix of overlaps across walkers in one ensemble.
 
@@ -155,8 +151,8 @@ def pairwise_overlap_matrix(
 
 
 __all__ = [
-    'aggregate_visits',
-    'overlap',
-    'overlap_all',
-    'pairwise_overlap_matrix',
+    "aggregate_visits",
+    "overlap",
+    "overlap_all",
+    "pairwise_overlap_matrix",
 ]

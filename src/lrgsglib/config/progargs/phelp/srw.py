@@ -19,12 +19,16 @@ phelp_srw_x_node = (
     "unfrustrated negative edges reflect the walker) or 'absorb' (any "
     "negative-edge crossing kills, matches the FrustratedRW.ipynb notebook)."
 )
-phelp_srw_max_n_cross = "Sticky-rule only — death threshold on frustrated crossings."
+phelp_srw_max_n_cross = (
+    "Sticky-rule only — death threshold on frustrated crossings."
+)
 phelp_srw_start_a = (
     "Walker-A start protocol: 'random' (uniform over nodes), 'fixed' "
     "(uses --start-a-node), 'center' (lattice-aware, (s//2)*(s+1) index)."
 )
-phelp_srw_start_b = "Walker-B start protocol (pair mode only; same choices as --start-a)."
+phelp_srw_start_b = (
+    "Walker-B start protocol (pair mode only; same choices as --start-a)."
+)
 phelp_srw_start_node_a = "Node index for walker A when --start-a=fixed."
 phelp_srw_start_node_b = "Node index for walker B when --start-b=fixed."
 phelp_srw_seed_a = "RNG seed for walker A."

@@ -5,9 +5,9 @@ This module provides the Lattice3DNX class and supporting functions for
 3D lattice graphs (SC, BCC, FCC) with periodic/fixed boundary conditions.
 """
 
-from .Lattice3DNX import Lattice3DNX
-from .eigenspace import load_or_compute_Lattice3DNX
 from . import generators_3d
+from .eigenspace import load_or_compute_Lattice3DNX
+from .Lattice3DNX import Lattice3DNX
 
 # Backward compatibility alias
 Lattice3D = Lattice3DNX

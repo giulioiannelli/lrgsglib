@@ -17,7 +17,6 @@ import networkx as nx
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
 
-
 # Constants for BarabasiAlbert
 BA_PHTABB = "ba"
 BA_SGPATH = ""

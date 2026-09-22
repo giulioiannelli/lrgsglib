@@ -3,10 +3,7 @@ from typing import Tuple
 
 from networkx import Graph
 
-__all__ = [
-    'generate_bcc_lattice',
-    'generate_fcc_lattice'
-]
+__all__ = ["generate_bcc_lattice", "generate_fcc_lattice"]
 
 # Canonical nearest-neighbour displacement sets (unit-cell coordinates),
 # matching the GT engine bond-for-bond:
@@ -14,12 +11,23 @@ __all__ = [
 # FCC — every atom bonds to the 12 atoms half a face-diagonal away (z=12).
 BCC_NN_DELTAS = [
     (dx, dy, dz)
-    for dx in (0.5, -0.5) for dy in (0.5, -0.5) for dz in (0.5, -0.5)
+    for dx in (0.5, -0.5)
+    for dy in (0.5, -0.5)
+    for dz in (0.5, -0.5)
 ]
 FCC_NN_DELTAS = [
-    (0.5, 0.5, 0), (0.5, -0.5, 0), (-0.5, 0.5, 0), (-0.5, -0.5, 0),
-    (0.5, 0, 0.5), (0.5, 0, -0.5), (-0.5, 0, 0.5), (-0.5, 0, -0.5),
-    (0, 0.5, 0.5), (0, 0.5, -0.5), (0, -0.5, 0.5), (0, -0.5, -0.5),
+    (0.5, 0.5, 0),
+    (0.5, -0.5, 0),
+    (-0.5, 0.5, 0),
+    (-0.5, -0.5, 0),
+    (0.5, 0, 0.5),
+    (0.5, 0, -0.5),
+    (-0.5, 0, 0.5),
+    (-0.5, 0, -0.5),
+    (0, 0.5, 0.5),
+    (0, 0.5, -0.5),
+    (0, -0.5, 0.5),
+    (0, -0.5, -0.5),
 ]
 
 
@@ -30,10 +38,12 @@ def _sublattice(dim, off, periodic: bool) -> list:
     axis its offset displaces (no partner cell to bond to) — the same
     convention as the GT engine, so both engines agree node-for-node.
     """
-    ranges = [range(d if periodic or o == 0 else d - 1)
-              for d, o in zip(dim, off)]
-    return [(x + off[0], y + off[1], z + off[2])
-            for x, y, z in product(*ranges)]
+    ranges = [
+        range(d if periodic or o == 0 else d - 1) for d, o in zip(dim, off)
+    ]
+    return [
+        (x + off[0], y + off[1], z + off[2]) for x, y, z in product(*ranges)
+    ]
 
 
 def _wrap(coord, dim):
@@ -77,9 +87,11 @@ def generate_bcc_lattice(dim, periodic: bool) -> Graph:
             if periodic:
                 nb = _wrap(nb, dim)
             if nb in corner_set:
-                edges.append((c, nb, {'type': 'link'}))
+                edges.append((c, nb, {"type": "link"}))
     G.add_edges_from(edges)
     return G
+
+
 #
 def generate_fcc_lattice(dim: Tuple[int, int, int], periodic: bool) -> Graph:
     """

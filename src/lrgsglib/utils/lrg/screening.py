@@ -153,11 +153,7 @@ def compute_face_statistics(
     _, fi = build_planar_dual(G, include_outer_face=True)
     outer = fi["outer_face_idx"]
 
-    sizes = [
-        fi["face_sizes"][i]
-        for i in range(len(fi["faces"]))
-        if i != outer
-    ]
+    sizes = [fi["face_sizes"][i] for i in range(len(fi["faces"])) if i != outer]
     counts = Counter(sizes)
     n_faces = len(sizes)
 
@@ -608,9 +604,7 @@ def plot_pareto_front(
             pz.append(mid)
         ax.plot(px, pz, "k--", lw=1.5, label="GVB bound")
 
-    ax.plot(
-        [0, 0.5], [0, 0.5], ":", color="gray", alpha=0.4, label="$p_X=p_Z$"
-    )
+    ax.plot([0, 0.5], [0, 0.5], ":", color="gray", alpha=0.4, label="$p_X=p_Z$")
 
     # Fujii reference
     if include_fujii:
@@ -780,6 +774,7 @@ def compute_graph_properties(
     # full Hermitian solve is both correct and backend-parity-clean.
     if N > 2 and props["is_connected"]:
         from ...graphs._shared._backend import BackendManager
+
         be = BackendManager.get_backend(backend)
         L = nx.laplacian_matrix(G).toarray().astype(float)
         eigs = np.sort(be.eigvalsh(L))
@@ -789,9 +784,7 @@ def compute_graph_properties(
 
     # Clustering coefficient
     try:
-        props["clustering_coefficient"] = float(
-            nx.average_clustering(G)
-        )
+        props["clustering_coefficient"] = float(nx.average_clustering(G))
     except Exception:
         props["clustering_coefficient"] = 0.0
 
@@ -1008,34 +1001,40 @@ def generate_lattice_configs(
     # 2D lattices
     for geo, label in [("sqr", "Square"), ("hex", "Hex"), ("tri", "Tri")]:
         for s in sizes_2d:
-            configs.append({
-                "name": f"2D-{label}-{s}",
-                "factory": Lattice2DNX,
-                "params": {"side1": s, "geo": geo, "pbc": False},
-                "dimension": 2,
-                "geometry": geo,
-            })
+            configs.append(
+                {
+                    "name": f"2D-{label}-{s}",
+                    "factory": Lattice2DNX,
+                    "params": {"side1": s, "geo": geo, "pbc": False},
+                    "dimension": 2,
+                    "geometry": geo,
+                }
+            )
 
     # 3D lattices
     for geo, label in [("sc", "SC"), ("bcc", "BCC"), ("fcc", "FCC")]:
         for d in sizes_3d:
-            configs.append({
-                "name": f"3D-{label}-{d}",
-                "factory": Lattice3DNX,
-                "params": {"dim": d, "geo": geo, "pbc": False},
-                "dimension": 3,
-                "geometry": geo,
-            })
+            configs.append(
+                {
+                    "name": f"3D-{label}-{d}",
+                    "factory": Lattice3DNX,
+                    "params": {"dim": d, "geo": geo, "pbc": False},
+                    "dimension": 3,
+                    "geometry": geo,
+                }
+            )
 
     # 4D hypercubic
     for L in sizes_4d:
-        configs.append({
-            "name": f"4D-HC-{L}",
-            "factory": LatticeNDNX,
-            "params": {"shape": (L, L, L, L), "periodic": False},
-            "dimension": 4,
-            "geometry": "hypercubic",
-        })
+        configs.append(
+            {
+                "name": f"4D-HC-{L}",
+                "factory": LatticeNDNX,
+                "params": {"shape": (L, L, L, L), "periodic": False},
+                "dimension": 4,
+                "geometry": "hypercubic",
+            }
+        )
 
     return configs
 
@@ -1059,15 +1058,15 @@ def generate_random_configs(
         Each has ``'name'``, ``'factory'``, ``'params'``,
         ``'family'``, ``'expected_avg_degree'``.
     """
+    from ...graphs.nx.BarabasiAlbertNX.BarabasiAlbertNX import (
+        BarabasiAlbertNX,
+    )
+    from ...graphs.nx.ErdosRenyiNX.ErdosRenyiNX import ErdosRenyiNX
     from ...graphs.nx.kRegularGraphNX.kRegularGraphNX import (
         kRegularGraphNX,
     )
-    from ...graphs.nx.ErdosRenyiNX.ErdosRenyiNX import ErdosRenyiNX
     from ...graphs.nx.WattsStrogatzNX.WattsStrogatzNX import (
         WattsStrogatzNX,
-    )
-    from ...graphs.nx.BarabasiAlbertNX.BarabasiAlbertNX import (
-        BarabasiAlbertNX,
     )
 
     if n_values is None:
@@ -1080,48 +1079,56 @@ def generate_random_configs(
     # k-regular
     for k in k_degrees:
         for n in n_values:
-            configs.append({
-                "name": f"kReg-k{k}-N{n}",
-                "factory": kRegularGraphNX,
-                "params": {"n": n, "k": k},
-                "family": "k-regular",
-                "expected_avg_degree": k,
-            })
+            configs.append(
+                {
+                    "name": f"kReg-k{k}-N{n}",
+                    "factory": kRegularGraphNX,
+                    "params": {"n": n, "k": k},
+                    "family": "k-regular",
+                    "expected_avg_degree": k,
+                }
+            )
 
     # Erdos-Renyi at matched average degrees
     for z_target in [4, 6, 8, 10]:
         for n in n_values:
             p_edge = z_target / (n - 1)
-            configs.append({
-                "name": f"ER-z{z_target}-N{n}",
-                "factory": ErdosRenyiNX,
-                "params": {"n": n, "p": p_edge},
-                "family": "erdos-renyi",
-                "expected_avg_degree": z_target,
-            })
+            configs.append(
+                {
+                    "name": f"ER-z{z_target}-N{n}",
+                    "factory": ErdosRenyiNX,
+                    "params": {"n": n, "p": p_edge},
+                    "family": "erdos-renyi",
+                    "expected_avg_degree": z_target,
+                }
+            )
 
     # Watts-Strogatz
     for k in [4, 6, 8]:
         for p_rew in [0.01, 0.1, 0.3]:
             for n in n_values:
-                configs.append({
-                    "name": f"WS-k{k}-p{p_rew}-N{n}",
-                    "factory": WattsStrogatzNX,
-                    "params": {"n": n, "k": k, "p": p_rew},
-                    "family": "watts-strogatz",
-                    "expected_avg_degree": k,
-                })
+                configs.append(
+                    {
+                        "name": f"WS-k{k}-p{p_rew}-N{n}",
+                        "factory": WattsStrogatzNX,
+                        "params": {"n": n, "k": k, "p": p_rew},
+                        "family": "watts-strogatz",
+                        "expected_avg_degree": k,
+                    }
+                )
 
     # Barabasi-Albert
     for m in [2, 3, 4]:
         for n in n_values:
-            configs.append({
-                "name": f"BA-m{m}-N{n}",
-                "factory": BarabasiAlbertNX,
-                "params": {"n": n, "m": m},
-                "family": "barabasi-albert",
-                "expected_avg_degree": 2 * m,
-            })
+            configs.append(
+                {
+                    "name": f"BA-m{m}-N{n}",
+                    "factory": BarabasiAlbertNX,
+                    "params": {"n": n, "m": m},
+                    "family": "barabasi-albert",
+                    "expected_avg_degree": 2 * m,
+                }
+            )
 
     return configs
 
@@ -1168,23 +1175,30 @@ def plot_pc_landscape(
     if color_col and color_col in success.columns:
         for label, grp in success.groupby(color_col):
             ax.scatter(
-                grp[x_col], grp[threshold_col],
-                label=label, s=60, edgecolors="black",
-                linewidths=0.5, alpha=0.8, zorder=5,
+                grp[x_col],
+                grp[threshold_col],
+                label=label,
+                s=60,
+                edgecolors="black",
+                linewidths=0.5,
+                alpha=0.8,
+                zorder=5,
             )
         ax.legend(fontsize=8)
     else:
         ax.scatter(
-            success[x_col], success[threshold_col],
-            c="steelblue", s=60, edgecolors="black",
-            linewidths=0.5, zorder=5,
+            success[x_col],
+            success[threshold_col],
+            c="steelblue",
+            s=60,
+            edgecolors="black",
+            linewidths=0.5,
+            zorder=5,
         )
 
     ax.set_xlabel(x_col.replace("_", " ").title(), fontsize=12)
     ax.set_ylabel(f"${threshold_col}$", fontsize=12)
-    ax.set_title(
-        f"Topology Landscape: {threshold_col} vs {x_col}", fontsize=13
-    )
+    ax.set_title(f"Topology Landscape: {threshold_col} vs {x_col}", fontsize=13)
     return ax
 
 
@@ -1210,23 +1224,30 @@ def plot_pc_vs_dimension(
         _, ax = plt.subplots(figsize=(8, 5))
 
     success = results_df[
-        (results_df["status"] == "success")
-        & results_df["dimension"].notna()
+        (results_df["status"] == "success") & results_df["dimension"].notna()
     ].copy()
 
     if "geometry" in success.columns:
         for geo, grp in success.groupby("geometry"):
             ax.scatter(
-                grp["dimension"], grp["p_Z"],
-                label=geo, s=80, edgecolors="black",
-                linewidths=0.5, zorder=5,
+                grp["dimension"],
+                grp["p_Z"],
+                label=geo,
+                s=80,
+                edgecolors="black",
+                linewidths=0.5,
+                zorder=5,
             )
         ax.legend(fontsize=9)
     else:
         ax.scatter(
-            success["dimension"], success["p_Z"],
-            c="steelblue", s=80, edgecolors="black",
-            linewidths=0.5, zorder=5,
+            success["dimension"],
+            success["p_Z"],
+            c="steelblue",
+            s=80,
+            edgecolors="black",
+            linewidths=0.5,
+            zorder=5,
         )
 
     ax.set_xlabel("Spatial dimension $d$", fontsize=13)

@@ -5,6 +5,7 @@ independent of any graph engine or graph type. Graph-specific renderers live
 under :mod:`lrgsglib.graphs` (structural) and dynamics frame collection under
 :mod:`lrgsglib.statsys`; both reuse the primitives exposed here.
 """
+
 from ._core import LatticeAnimationResult, render_animation, save_animation
 from .frames import make_animation_fromFrames
 from .raster import autocrop_frames, figure_to_image, frames_to_player_html

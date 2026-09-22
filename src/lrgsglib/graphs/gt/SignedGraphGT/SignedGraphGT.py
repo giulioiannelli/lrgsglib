@@ -30,6 +30,7 @@ try:
     import graph_tool as gt
     from graph_tool import Graph
     from graph_tool.spectral import adjacency, laplacian
+
     GT_AVAILABLE = True
 except ImportError:
     GT_AVAILABLE = False
@@ -37,25 +38,35 @@ except ImportError:
 
 import networkx as nx
 
-from .._converters import nx_to_gt, gt_to_nx, get_laplacian_matrix_gt
-from ..._shared._nw_container import NwContainer
-from ..._shared._nw_geometry import hub_central_edge, elementary_cell_edges
+from ....config.const import (
+    BIN,
+    PATHDATA,
+    PATHN_DYNAMICS_LIST,
+    PATHN_GRAPH_LIST,
+    SG_DIL_EXTRACT_GIANT,
+    SG_DISORDER,
+    SG_INIT_NW_DICT,
+    SG_LAPL_DEFAULT_TYPE,
+    SG_LAPL_RW,
+    SG_LAPL_RW_IMAG_TOL,
+    SG_LAPL_SIGNED,
+    SG_LAPL_SYM,
+    SG_LAPL_TYPES,
+    SG_PDIL,
+    SG_PREW,
+    SG_REPR,
+)
+from ....config.funcs import build_p_fname
 from ..._shared._disorder import (
-    Disorder,
     CompositeDisorder,
+    Disorder,
     as_disorder,
     plan_composite_ops,
 )
-from .._topology_ops import apply_rewiring, apply_dilution
-from ....config.const import (
-    BIN, PATHDATA, SG_REPR,
-    PATHN_GRAPH_LIST, PATHN_DYNAMICS_LIST,
-    SG_LAPL_SIGNED, SG_LAPL_RW, SG_LAPL_SYM,
-    SG_LAPL_TYPES, SG_LAPL_DEFAULT_TYPE, SG_LAPL_RW_IMAG_TOL,
-    SG_INIT_NW_DICT, SG_PREW, SG_PDIL, SG_DIL_EXTRACT_GIANT,
-    SG_DISORDER,
-)
-from ....config.funcs import build_p_fname
+from ..._shared._nw_container import NwContainer
+from ..._shared._nw_geometry import elementary_cell_edges, hub_central_edge
+from .._converters import get_laplacian_matrix_gt, gt_to_nx, nx_to_gt
+from .._topology_ops import apply_dilution, apply_rewiring
 
 
 def _real_cast_sorted_gt(w, V=None):
@@ -152,7 +163,9 @@ class SignedGraphGT:
         # Resolve the disorder spec (support x coupling-law); a Disorder's own
         # pflip wins, otherwise the top-level pflip feeds the str/default path.
         self.disorder = as_disorder(disorder, pflip)
-        self._pflip = self.disorder.pflip if self.disorder is not None else pflip
+        self._pflip = (
+            self.disorder.pflip if self.disorder is not None else pflip
+        )
         self._seed = seed
         self._rng = np.random.default_rng(seed)
 
@@ -189,7 +202,9 @@ class SignedGraphGT:
 
         # Ensure sign property exists
         if "sign" not in self.G.edge_properties:
-            self.G.edge_properties["sign"] = self.G.new_edge_property("int", val=1)
+            self.G.edge_properties["sign"] = self.G.new_edge_property(
+                "int", val=1
+            )
 
         # Track edges marked for flipping
         self._flip_edges = set()
@@ -307,7 +322,9 @@ class SignedGraphGT:
         if support == "all":
             return list(self.G.edges())
         if d.is_registered_support:
-            return self._edges_from_tuples(d.build_support(self, self._rng, SG_REPR))
+            return self._edges_from_tuples(
+                d.build_support(self, self._rng, SG_REPR)
+            )
         if d.is_structured:
             pattern = self.nwDict[support]
             tuples = pattern[SG_REPR] if isinstance(pattern, dict) else pattern
@@ -317,7 +334,7 @@ class SignedGraphGT:
     def _edges_from_tuples(self, tuples) -> list:
         """Map ``(u, v)`` int tuples to existing GT ``Edge`` objects (skip absent)."""
         edges = []
-        for (u, v) in tuples:
+        for u, v in tuples:
             e = self.G.edge(int(u), int(v))
             if e is not None:
                 edges.append(e)
@@ -602,6 +619,7 @@ class SignedGraphGT:
             raise ImportError("graph-tool is not installed")
 
         from graph_tool.generation import complete_graph
+
         G = complete_graph(n)
         return cls(G=G, pflip=pflip, seed=seed)
 
@@ -636,6 +654,7 @@ class SignedGraphGT:
             raise ImportError("graph-tool is not installed")
 
         from graph_tool.generation import lattice
+
         G = lattice(shape, periodic=periodic)
         return cls(G=G, pflip=pflip, seed=seed)
 
@@ -776,7 +795,9 @@ class SignedGraphGT:
         n = min(n, len(edges))
         indices = self._rng.choice(len(edges), size=n, replace=False)
 
-        return [(int(edges[i].source()), int(edges[i].target())) for i in indices]
+        return [
+            (int(edges[i].source()), int(edges[i].target())) for i in indices
+        ]
 
     def get_edge_sign(self, u: int, v: int) -> int:
         """
@@ -1039,20 +1060,24 @@ class SignedGraphGT:
                 eigenvalues, _ = eigsh(L_sparse, k=k, which="SM")
             else:
                 from scipy.sparse.linalg import eigs
+
                 eigenvalues, _ = eigs(L_sparse, k=k, which="SR")
                 eigenvalues = _real_cast_sorted_gt(eigenvalues)
         elif not is_sym:
             # Full non-symmetric (rw) spectrum -> dense general solver
             from scipy.linalg import eigvals as _sp_eigvals
+
             eigenvalues = _real_cast_sorted_gt(_sp_eigvals(L))
         elif backend == "cupy":
             try:
                 import cupy as cp
+
                 eigenvalues = cp.asnumpy(cp.linalg.eigvalsh(cp.asarray(L)))
             except ImportError:
                 eigenvalues = np.linalg.eigvalsh(L)
         elif backend == "scipy":
             from scipy.linalg import eigvalsh
+
             eigenvalues = eigvalsh(L)
         else:
             eigenvalues = np.linalg.eigvalsh(L)
@@ -1096,10 +1121,13 @@ class SignedGraphGT:
             # cupy lacks a general (non-Hermitian) eig, so fall back to numpy.
             if backend == "scipy":
                 from scipy.linalg import eig as _sp_eig
+
                 eigenvalues, eigenvectors = _sp_eig(L)
             else:
                 eigenvalues, eigenvectors = np.linalg.eig(L)
-            self.eigv, self.eigV = _real_cast_sorted_gt(eigenvalues, eigenvectors)
+            self.eigv, self.eigV = _real_cast_sorted_gt(
+                eigenvalues, eigenvectors
+            )
             self._spectrum_laplacian_type = laplacian_type
             return self.eigv, self.eigV
 
@@ -1173,12 +1201,17 @@ class SignedGraphGT:
 
         if is_sym:
             eigenvalues, eigenvectors = eigsh(L_sparse, k=k, which=which)
-            idx = np.argsort(eigenvalues) if which == "SM" else np.argsort(-eigenvalues)
+            idx = (
+                np.argsort(eigenvalues)
+                if which == "SM"
+                else np.argsort(-eigenvalues)
+            )
             self.eigv = eigenvalues[idx]
             self.eigV = eigenvectors[:, idx]
         else:
             # Non-symmetric (rw): smallest/largest real part, real-cast & sorted
             from scipy.sparse.linalg import eigs
+
             which_ns = "SR" if which == "SM" else "LR"
             w, V = eigs(L_sparse, k=k, which=which_ns)
             self.eigv, self.eigV = _real_cast_sorted_gt(w, V)
@@ -1217,12 +1250,14 @@ class SignedGraphGT:
         if backend == "cupy":
             try:
                 import cupy as cp
+
                 eigv, eigV = cp.linalg.eigh(cp.asarray(A))
                 eigv, eigV = cp.asnumpy(eigv), cp.asnumpy(eigV)
             except ImportError:
                 eigv, eigV = np.linalg.eigh(A)
         elif backend == "scipy":
             from scipy.linalg import eigh
+
             eigv, eigV = eigh(A)
         else:
             eigv, eigV = np.linalg.eigh(A)
@@ -1308,6 +1343,7 @@ class SignedGraphGT:
             self.resLp = L - self.eigv[0] * np.eye(self.N)
         elif MODE == "double":
             from scipy.linalg import eigvalsh
+
             self.resLp = L - self.eigv[0] * np.eye(self.N)
             new_eigv0 = eigvalsh(self.resLp, subset_by_index=[0, 0])
             self.resLp = self.resLp - new_eigv0 * np.eye(self.N)
@@ -1400,7 +1436,11 @@ class SignedGraphGT:
             v = self.G.vertex(node)
             neighbors: list[tuple[int, float]] = []
             for e in v.out_edges():
-                nn = int(e.target()) if int(e.source()) == node else int(e.source())
+                nn = (
+                    int(e.target())
+                    if int(e.source()) == node
+                    else int(e.source())
+                )
                 neighbors.append((nn, float(sign_prop[e])))
             cache[node] = neighbors
         self._neighbor_cache = cache
@@ -1507,7 +1547,7 @@ class SignedGraphGT:
         for v in self.G.vertices():
             neighbors = list(v.out_neighbors())
             for i, n1 in enumerate(neighbors):
-                for n2 in neighbors[i + 1:]:
+                for n2 in neighbors[i + 1 :]:
                     # Check if n1-n2 edge exists (completing triangle)
                     e12 = self.G.edge(n1, n2)
                     if e12 is not None:
@@ -1515,11 +1555,13 @@ class SignedGraphGT:
                         # Count negative edges in triangle
                         e_v_n1 = self.G.edge(v, n1)
                         e_v_n2 = self.G.edge(v, n2)
-                        neg_count = sum([
-                            sign_prop[e_v_n1] == -1,
-                            sign_prop[e_v_n2] == -1,
-                            sign_prop[e12] == -1,
-                        ])
+                        neg_count = sum(
+                            [
+                                sign_prop[e_v_n1] == -1,
+                                sign_prop[e_v_n2] == -1,
+                                sign_prop[e12] == -1,
+                            ]
+                        )
                         if neg_count % 2 == 1:  # 1 or 3 negative edges
                             n_frustrated += 1
 
@@ -1542,7 +1584,9 @@ class SignedGraphGT:
             )
         if self.eigV.ndim == 1:
             if which != 0:
-                raise IndexError(f"Only 1 eigenvector available, got which={which}")
+                raise IndexError(
+                    f"Only 1 eigenvector available, got which={which}"
+                )
             return self.eigV
         if self.eigV.shape[1] <= which:
             raise IndexError(
@@ -1568,9 +1612,8 @@ class SignedGraphGT:
         **kwargs
             Forwarded to ``compute_k_eigvV`` if recomputation is needed.
         """
-        need_compute = (
-            self.eigV is None
-            or (self.eigV.ndim == 2 and self.eigV.shape[1] <= which)
+        need_compute = self.eigV is None or (
+            self.eigV.ndim == 2 and self.eigV.shape[1] <= which
         )
         if need_compute:
             self.compute_k_eigvV(k=which + 1)
@@ -1630,7 +1673,9 @@ class SignedGraphGT:
             Binarized eigenvectors in {-1, +1}.
         """
         stop = custom_slice.stop if custom_slice.stop is not None else self.N
-        vecs = [self.get_eigV_check(i, binarize=True, **kwargs) for i in range(stop)]
+        vecs = [
+            self.get_eigV_check(i, binarize=True, **kwargs) for i in range(stop)
+        ]
         if asarray:
             return np.array(vecs)
         return vecs
@@ -1688,9 +1733,15 @@ class SignedGraphGT:
         """
         be = backend or "numpy"
         cached = getattr(self, "_eigv", None)
-        if cached is not None and getattr(self, "_spectrum_laplacian_type", None) == laplacian_type:
+        if (
+            cached is not None
+            and getattr(self, "_spectrum_laplacian_type", None)
+            == laplacian_type
+        ):
             return
-        self.eigv = self.get_laplacian_spectrum(backend=be, laplacian_type=laplacian_type)
+        self.eigv = self.get_laplacian_spectrum(
+            backend=be, laplacian_type=laplacian_type
+        )
         self._spectrum_laplacian_type = laplacian_type
 
     def get_sgspect_basis(
@@ -1724,7 +1775,9 @@ class SignedGraphGT:
             return np.empty((0, self.N))
         # Ensure enough eigenvectors are computed
         max_idx = max(indices)
-        if self.eigV is None or (self.eigV.ndim == 2 and self.eigV.shape[1] <= max_idx):
+        if self.eigV is None or (
+            self.eigV.ndim == 2 and self.eigV.shape[1] <= max_idx
+        ):
             self.compute_k_eigvV(k=max_idx + 1)
 
         basis = np.array([self._get_eigvec(i) for i in indices])
@@ -1773,9 +1826,7 @@ class SignedGraphGT:
             clusters[label].add(int(indices[local_idx]))
 
         # Sort by size descending, drop empties
-        clusters = sorted(
-            (c for c in clusters if c), key=len, reverse=True
-        )
+        clusters = sorted((c for c in clusters if c), key=len, reverse=True)
         return clusters
 
     def make_clustersYN(
@@ -1906,8 +1957,7 @@ class SignedGraphGT:
             denominator = np.sum(cl_sizes) - cl_sizes[0]
             if denominator > 0:
                 self.Pinf_var = float(
-                    np.sum(cl_sizes @ cl_sizes - cl_sizes[0] ** 2)
-                    / denominator
+                    np.sum(cl_sizes @ cl_sizes - cl_sizes[0] ** 2) / denominator
                 )
             else:
                 self.Pinf_var = 0.0
@@ -1941,91 +1991,103 @@ class SignedGraphGT:
     # ------------------------------------------------------------------
 
     # Info theory (Shannon & Renyi entropy, specific heat)
-    from ._infotheory import compute_signed_laplacian_entropy
-    from ._infotheory import compute_renyi_entropy_profile
-    from ._infotheory import get_entropy, get_specific_heat
-    from ._infotheory import get_entropy_derivative  # DEPRECATED
-    from ._infotheory import get_renyi_results
+    # File I/O — cleaners
+    from ._cleaners import (
+        clean_gclutil,
+        remove_adj_file,
+        remove_edgl_file,
+        remove_eigV_file,
+        remove_exported_files,
+        remove_ising_clust_files,
+    )
 
     # Dynamics energy (RBIM, spherical SK from eigenvectors)
-    from ._dynamics import compute_rbim_energy_eigV
-    from ._dynamics import compute_rbim_energy_eigV_all
-    from ._dynamics import get_rbim_energy_eigV
-    from ._dynamics import get_all_rbim_energy_eigV
-    from ._dynamics import compute_sksph_energy_eigV
-    from ._dynamics import compute_sksph_energy_eigV_all
-    from ._dynamics import get_sksph_energy_eigV
-    from ._dynamics import get_all_sksph_energy_eigV
-
-    # Order parameters (spectral gap)
-    from ._ordparams import compute_gap
-    from ._ordparams import compute_gap_between
-    from ._ordparams import get_gap
-
-    # Quantum propagator
-    from ._quantum import compute_quantum_propagator
-    from ._quantum import quantum_walk_probabilities
-    from ._quantum import quantum_observables_time_series
-
-    # Graph operations (NX _ongraph.py parity)
-    from ._ongraph import check_Ne_flips
-    from ._ongraph import set_edges_random_normal
-    from ._ongraph import load_vec_on_nodes
-    from ._ongraph import set_node_attributes
-    from ._ongraph import get_random_edges_from_set
-
-    # Partitioning (NX _partitioning.py parity)
-    from ._partitioning import get_subgraph_from_nodes
-    from ._partitioning import get_nodes_subgraph_by_kv
-    from ._partitioning import make_graphYN
-    from ._partitioning import make_connected_component_by_edge
-    from ._partitioning import get_ferroAntiferro_regions
+    from ._dynamics import (
+        compute_rbim_energy_eigV,
+        compute_rbim_energy_eigV_all,
+        compute_sksph_energy_eigV,
+        compute_sksph_energy_eigV_all,
+        get_all_rbim_energy_eigV,
+        get_all_sksph_energy_eigV,
+        get_rbim_energy_eigV,
+        get_sksph_energy_eigV,
+    )
 
     # File I/O — exports
-    from ._exports import export_eigV_all
-    from ._exports import export_adj_bin
-    from ._exports import export_ising_clust
+    from ._exports import export_adj_bin, export_eigV_all, export_ising_clust
+    from ._infotheory import get_entropy_derivative  # DEPRECATED
+    from ._infotheory import (
+        compute_renyi_entropy_profile,
+        compute_signed_laplacian_entropy,
+        get_entropy,
+        get_renyi_results,
+        get_specific_heat,
+    )
 
     # File I/O — loaders
-    from ._loaders import load_eigV_all
-    from ._loaders import set_edgel_from_bin
+    from ._loaders import load_eigV_all, set_edgel_from_bin
 
-    # File I/O — cleaners
-    from ._cleaners import remove_ising_clust_files
-    from ._cleaners import remove_edgl_file
-    from ._cleaners import remove_eigV_file
-    from ._cleaners import remove_adj_file
-    from ._cleaners import remove_exported_files
-    from ._cleaners import clean_gclutil
+    # Graph operations (NX _ongraph.py parity)
+    from ._ongraph import (
+        check_Ne_flips,
+        get_random_edges_from_set,
+        load_vec_on_nodes,
+        set_edges_random_normal,
+        set_node_attributes,
+    )
 
-    # Topology helpers (NX _topology.py parity)
-    from ._topology import nodes_in
-    from ._topology import get_node_attributes
-    from ._topology import get_edge_data
-    from ._topology import get_edge_color
-    from ._topology import get_graph_neighbors
-    from ._topology import get_adjacency_matrix_for
-    from ._topology import get_degree_matrix_for
-    from ._topology import get_laplacian_matrix_for
-    from ._topology import get_signed_degree_matrix_for
-    from ._topology import get_signed_laplacian_matrix_for
+    # Order parameters (spectral gap)
+    from ._ordparams import compute_gap, compute_gap_between, get_gap
+
+    # Partitioning (NX _partitioning.py parity)
+    from ._partitioning import (
+        get_ferroAntiferro_regions,
+        get_nodes_subgraph_by_kv,
+        get_subgraph_from_nodes,
+        make_connected_component_by_edge,
+        make_graphYN,
+    )
+
+    # Quantum propagator
+    from ._quantum import (
+        compute_quantum_propagator,
+        quantum_observables_time_series,
+        quantum_walk_probabilities,
+    )
 
     # Representation stubs (NX multi-repr compat)
-    from ._representations import upd_graph_matrices
-    from ._representations import upd_edge_sets
-    from ._representations import upd_Degree
-    from ._representations import upd_GraphRepr_All
-    from ._representations import upd_NodeMap
-    from ._representations import upd_EdgeMap
-    from ._representations import upd_ReprMaps
-    from ._representations import zip_reprNodes
-    from ._representations import zip_reprEdges
+    from ._representations import (
+        upd_Degree,
+        upd_edge_sets,
+        upd_EdgeMap,
+        upd_graph_matrices,
+        upd_GraphRepr_All,
+        upd_NodeMap,
+        upd_ReprMaps,
+        zip_reprEdges,
+        zip_reprNodes,
+    )
+
+    # Topology helpers (NX _topology.py parity)
+    from ._topology import (
+        get_adjacency_matrix_for,
+        get_degree_matrix_for,
+        get_edge_color,
+        get_edge_data,
+        get_graph_neighbors,
+        get_laplacian_matrix_for,
+        get_node_attributes,
+        get_signed_degree_matrix_for,
+        get_signed_laplacian_matrix_for,
+        nodes_in,
+    )
 
     @property
     def gcl(self):
         """Graph clustering utility (lazy-initialized NestedDict)."""
         if not hasattr(self, "_gcl"):
             from ....utils.tools import NestedDict
+
             self._gcl = NestedDict()
         return self._gcl
 
@@ -2116,15 +2178,19 @@ class SignedGraphGT:
             Suffix appended to the filename (typically the run id).
         """
         self._ensure_paths()
-        fname = build_p_fname("edgelist", self.pflip, out_suffix=exName, ext=BIN)
+        fname = build_p_fname(
+            "edgelist", self.pflip, out_suffix=exName, ext=BIN
+        )
         self.path_exp_edgl = self.path_graph / fname
         self.path_exp_edgl.parent.mkdir(parents=True, exist_ok=True)
 
         sign_prop = self.G.edge_properties["sign"]
         dtype = [("i", np.uint64), ("j", np.uint64), ("w_ij", np.float64)]
         edge_array = np.array(
-            [(int(e.source()), int(e.target()), float(sign_prop[e]))
-             for e in self.G.edges()],
+            [
+                (int(e.source()), int(e.target()), float(sign_prop[e]))
+                for e in self.G.edges()
+            ],
             dtype=dtype,
         )
         with open(self.path_exp_edgl, "wb") as f:

@@ -47,28 +47,28 @@
 # ):
 #     """
 #     Generates a perceptually distinct colormap.
-# 
+#
 #     Parameters:
 #     -----------
 #     number_of_distinct_colors : int, optional
 #         The number of distinct colors in the colormap. Default is 80.
-# 
+#
 #     Returns:
 #     --------
 #     ListedColormap
 #         A ListedColormap object representing the generated colormap.
-# 
+#
 #     Notes:
 #     ------
-#     This function generates a perceptually distinct colormap using a saw-tooth 
+#     This function generates a perceptually distinct colormap using a saw-tooth
 #         pattern in the HSV color space. The number of distinct colors can be ]
 #         customized by providing the `number_of_distinct_colors` parameter.
-# 
+#
 #     Reference:
 #     -----------
 #     - Based on the "saw-like" pattern technique for generating distinct colors.
 #     - HSV colormap is used to create cyclic color variations.
-# 
+#
 #     Example:
 #     --------
 #     >>> colormap = generate_colormap(100)
@@ -79,45 +79,45 @@
 #     >>> plt.colorbar()
 #     >>> plt.show()
 #     """
-# 
+#
 #     no_distinct_colors_wmultshades = int(
 #         np.ceil(number_of_distinct_colors / number_of_shades) * number_of_shades
 #     )
-# 
+#
 #     # Create an array with uniformly drawn floats taken from <0, 1) partition
 #     linearly_distributed_nums = (
 #         np.arange(no_distinct_colors_wmultshades)
 #         / no_distinct_colors_wmultshades
 #     )
-# 
+#
 #     # We are going to reorganize monotonically growing numbers in such a way that there will be a single array with a saw-like pattern
 #     #     but each sawtooth is slightly higher than the one before
 #     # First divide linearly_distributed_nums into number_of_shades sub-arrays containing linearly distributed numbers
 #     arr_by_shade_rows = linearly_distributed_nums.reshape(
 #         number_of_shades, no_distinct_colors_wmultshades // number_of_shades
 #     )
-# 
+#
 #     # Transpose the above matrix (columns become rows) - as a result, each row contains a sawtooth with values slightly higher than the row above
 #     arr_by_shade_columns = arr_by_shade_rows.T
-# 
+#
 #     # Keep the number of sawtooths for later
 #     number_of_partitions = arr_by_shade_columns.shape[0]
-# 
+#
 #     # Flatten the above matrix - join each row into a single array
 #     nums_distributed_like_rising_saw = arr_by_shade_columns.reshape(-1)
-# 
+#
 #     # HSV colormap is cyclic (https://matplotlib.org/tutorials/colors/colormaps.html#cyclic), we'll use this property
 #     initial_cm = hsv(nums_distributed_like_rising_saw)
-# 
+#
 #     lower_partitions_half = number_of_partitions // 2
 #     upper_partitions_half = number_of_partitions - lower_partitions_half
-# 
+#
 #     # Modify the lower half in such a way that colors towards the beginning of the partition are darker
 #     # First colors are affected more, colors closer to the middle are affected less
 #     lower_half = lower_partitions_half * number_of_shades
 #     for i in range(3):
 #         initial_cm[0:lower_half, i] *= np.arange(0.2, 1, 0.8 / lower_half)
-# 
+#
 #     # Modify the second half in such a way that colors towards the end of the partition are less intense and brighter
 #     # Colors closer to the middle are affected less, colors closer to the end are affected more
 #     for i in range(3):
@@ -158,9 +158,9 @@
 #         pos_state[0, 2] = np.random.choice([-1, +1])  # Initial state
 #     elif init == 'fixed':
 #         pos_state[0, 2] = +1
-#     global edge_signs 
+#     global edge_signs
 #     edge_signs = {}
-# 
+#
 #     # Function to update position and state
 #     def update_position_state(current_pos_state, direction, p):
 #         x, y, state = current_pos_state
@@ -168,7 +168,7 @@
 #         if key not in edge_signs:
 #             edge_signs[key] = -1 if np.random.rand() < p else 1
 #         sign = edge_signs[key]
-# 
+#
 #         # Update position based on direction
 #         if direction == 0:  # Move up
 #             y += 1
@@ -178,19 +178,19 @@
 #             x -= 1
 #         elif direction == 3:  # Move right
 #             x += 1
-# 
+#
 #         # Flip state if necessary
 #         if sign == -1:
 #             state *= -1
-# 
+#
 #         return np.array([x, y, state])
-# 
+#
 #     # Generate the walk
 #     for i in range(1, n_steps):
 #         direction = np.random.randint(0, 4)  # Choose direction
 #         pos_state[i] = update_position_state(pos_state[i-1], direction, p)
 #     return pos_state
-# 
+#
 # def average_evolving_rw(replica: int = 10**2, n_steps: int = 10**4, p=0.3, init: str = 'random'):
 #     cumulative_walk = {}
 #     for _ in range(replica):
@@ -325,14 +325,14 @@
 #     """
 #     Plot a planar triangular grid by placing a hexagon at each node.
 #     Each hexagon is colored based on the corresponding value in the provided 2D array.
-    
+
 #     The centers of the hexagons are arranged on a triangular (offset) grid. For a pointy-topped
 #     hexagon tiling the horizontal distance between adjacent centers is defined by:
 #         distance = √3 * R,  with  R = triangle_size / √3.
 #     This yields centers computed as:
 #         x_center = col * triangle_size + (row % 2) * (triangle_size / 2)
 #         y_center = row * ((√3)/2 * triangle_size)
-    
+
 #     Parameters
 #     ----------
 #     data : np.ndarray
@@ -345,7 +345,7 @@
 #         The grid spacing parameter. It is used both to determine the positions of nodes and
 #         to set the size of each hexagon (with the hexagon circumradius being triangle_size/√3).
 #         Default is 1.0.
-    
+
 #     Returns
 #     -------
 #     None
@@ -366,10 +366,10 @@
 #             # Calculate the center of the hexagon.
 #             x_center = col * triangle_size + (row % 2) * (triangle_size / 2)
 #             y_center = row * ((np.sqrt(3) / 2) * triangle_size)
-            
+
 #             # Get color based on the data value (assuming credcblu is defined elsewhere).
 #             color = credcblu(data[row, col])
-            
+
 #             # Create a pointy-topped hexagon (using orientation=π/2 so that one vertex is at the top).
 #             hexagon = patches.RegularPolygon(
 #                 (x_center, y_center),
@@ -435,5 +435,3 @@
 #     ax.add_collection(coll)
 #     ax.autoscale()
 #     ax.set_aspect('equal')
-
-

@@ -146,10 +146,14 @@ class BinDynSys(DynSys):
         # array: in-place sweeps would otherwise corrupt the supplied IC.
         arr = np.array(custom, dtype=np.int8)
         if arr.shape != (self.sg.N,):
-            raise ValueError("Custom state must match the number of nodes in the graph.")
+            raise ValueError(
+                "Custom state must match the number of nodes in the graph."
+            )
         valid_values = {self.inactive_state, self.active_state}
         if not set(np.unique(arr)).issubset(valid_values):
-            raise ValueError("Custom state contains values incompatible with the chosen state_type.")
+            raise ValueError(
+                "Custom state contains values incompatible with the chosen state_type."
+            )
         return arr
 
     # ------------------------------------------------------------------
@@ -160,7 +164,8 @@ class BinDynSys(DynSys):
             self.s[nd] = np.int8(-self.s[nd])
         else:
             self.s[nd] = np.int8(
-                self.active_state if self.s[nd] == self.inactive_state
+                self.active_state
+                if self.s[nd] == self.inactive_state
                 else self.inactive_state
             )
 
@@ -189,18 +194,24 @@ class BinDynSys(DynSys):
                     self.s = eig_state
             case "custom":
                 if custom is None:
-                    raise ValueError("A custom state must be provided for 'custom' initial condition.")
+                    raise ValueError(
+                        "A custom state must be provided for 'custom' initial condition."
+                    )
                 self.s = self._coerce_custom_state(custom)
             case "homogeneous" | "homo":
                 self.s = np.full(self.sg.N, active, dtype=np.int8)
             case "delta":
                 self.s = np.full(self.sg.N, inactive, dtype=np.int8)
                 self.s[np.random.randint(self.sg.N)] = active
-            case _ if self.ic.startswith("mult_rand") or self.ic.startswith("deltas"):
+            case _ if self.ic.startswith("mult_rand") or self.ic.startswith(
+                "deltas"
+            ):
                 try:
                     num = int(self.ic.split("_")[-1])
                 except (IndexError, ValueError) as exc:
-                    raise ValueError("Invalid 'mult_rand' specification.") from exc
+                    raise ValueError(
+                        "Invalid 'mult_rand' specification."
+                    ) from exc
                 num = max(1, min(num, self.sg.N))
                 self.s = np.full(self.sg.N, inactive, dtype=np.int8)
                 indices = np.random.choice(self.sg.N, size=num, replace=False)
@@ -217,11 +228,11 @@ class BinDynSys(DynSys):
         self.export_s_init()
 
     def export_s_init(self) -> None:
-        out_suffix = self.run_id or ''
-        fname = self.sg.get_p_fname('s', out_suffix=out_suffix)
+        out_suffix = self.run_id or ""
+        fname = self.sg.get_p_fname("s", out_suffix=out_suffix)
         self._ensure_dynpath_exists()
         self.sfout = self.dynpath / fname
-        self.s.astype('int8').tofile(open(self.sfout, 'wb'))
+        self.s.astype("int8").tofile(open(self.sfout, "wb"))
         self.s_0 = self.s.copy()
 
     # ------------------------------------------------------------------

@@ -98,6 +98,7 @@ DEFAULT_SUBSTRATES: Tuple[SubstrateSpec, ...] = (
 # Signatures
 # ---------------------------------------------------------------------------
 
+
 def substrate_signature(spec: SubstrateSpec, n_target: int) -> str:
     """Stable 12-char SHA1 of a (spec, n_target) pair.
 

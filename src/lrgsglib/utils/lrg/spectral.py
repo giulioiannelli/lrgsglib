@@ -1,22 +1,25 @@
-import networkx as nx
-import numpy as np
 #
 from typing import Optional
+
+import networkx as nx
+import numpy as np
+
 #
 from numpy.typing import NDArray
-from scipy.linalg import fractional_matrix_power
-from scipy.linalg import expm
+from scipy.linalg import expm, fractional_matrix_power
 from scipy.sparse import diags
+
 #
 from ...config.const import (
-    SG_LAPL_SIGNED,
+    SG_LAPL_DEFAULT_TYPE,
     SG_LAPL_RW,
+    SG_LAPL_RW_IMAG_TOL,
+    SG_LAPL_SIGNED,
     SG_LAPL_SYM,
     SG_LAPL_TYPES,
-    SG_LAPL_DEFAULT_TYPE,
-    SG_LAPL_RW_IMAG_TOL,
 )
 from ...graphs._shared._backend import BackendManager
+
 #
 __all__ = [
     "get_graph_lspectrum",
@@ -29,9 +32,13 @@ __all__ = [
 # numerical backend name understood by ``BackendManager.get_backend`` (numpy is
 # the eigen backend for the "networkx" source, which has no GPU eig of its own).
 _LIBRARY_TO_BACKEND: dict[str, str] = {
-    "numpy": "numpy", "networkx": "numpy", "nx": "numpy",
-    "scipy": "scipy", "sp": "scipy",
-    "cupy": "cupy", "cp": "cupy",
+    "numpy": "numpy",
+    "networkx": "numpy",
+    "nx": "numpy",
+    "scipy": "scipy",
+    "sp": "scipy",
+    "cupy": "cupy",
+    "cp": "cupy",
 }
 
 
@@ -115,12 +122,16 @@ def get_graph_lspectrum(
     """
     if laplacian_type in (SG_LAPL_SYM, SG_LAPL_RW):
         from lrgsglib.graphs.nx.funcs.spectral import (
-            signed_sym_laplacian_matrix,
             signed_rw_laplacian_matrix,
+            signed_sym_laplacian_matrix,
         )
 
         is_sym = laplacian_type == SG_LAPL_SYM
-        builder = signed_sym_laplacian_matrix if is_sym else signed_rw_laplacian_matrix
+        builder = (
+            signed_sym_laplacian_matrix
+            if is_sym
+            else signed_rw_laplacian_matrix
+        )
         L = builder(G).toarray()
         # Backend-agnostic: L_sym is symmetric (eigvalsh); L_rw is non-symmetric
         # but isospectral to it (eigvals, real part taken below). nx has no
@@ -129,7 +140,9 @@ def get_graph_lspectrum(
         w = backend.eigvalsh(L) if is_sym else backend.eigvals(L)
         if not is_sym:
             # L_rw is isospectral to the symmetric L_sym -> eigenvalues are real
-            imag = float(np.max(np.abs(np.imag(w)))) if np.iscomplexobj(w) else 0.0
+            imag = (
+                float(np.max(np.abs(np.imag(w)))) if np.iscomplexobj(w) else 0.0
+            )
             if imag > SG_LAPL_RW_IMAG_TOL:
                 import warnings
 
@@ -260,4 +273,3 @@ def compute_laplacian_properties(
     np.fill_diagonal(Trho, 0)
 
     return spectrum, L, rho, Trho, tau
-

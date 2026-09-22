@@ -8,16 +8,16 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import tqdm
 
-from .._c_backend import CBackendMixin
-from .._solver import SolverBackend
-from .._solver_engine import get_solver
-from ..BinDynSys import BinDynSys
-from .defaults import ISING_SOLVER_NAME, ISING_TIE_FLIP_DEFAULT
 from ...config.const import BIN, SG_REPR
 from ...config.funcs import build_pT_fname
 from ...utils.lrg.ising import compute_ising_pairwise_energy
 from ...utils.statsys import boltzmann_factor
 from ...utils.tools.chronometer import time_function_accumulate
+from .._c_backend import CBackendMixin
+from .._solver import SolverBackend
+from .._solver_engine import get_solver
+from ..BinDynSys import BinDynSys
+from .defaults import ISING_SOLVER_NAME, ISING_TIE_FLIP_DEFAULT
 
 if TYPE_CHECKING:
     from ...graphs.protocols import DynamicsGraphProtocol as SignedGraph
@@ -61,40 +61,40 @@ _ISING_DEFAULT_SAVE = "em"
 
 # Deprecated legacy codes → (backend, save_flags, new_equivalent)
 _ISING_DEPRECATED: dict[str, tuple[str, str, str]] = {
-    "C0":  ("c_met", "em",              "C0E"),
-    "C1":  ("c_met", "clust",           "C0K"),
-    "C1B": ("c_met", "em",              "C0E"),
-    "C2":  ("c_met", "snap",            "C0S"),
-    "C3":  ("c_met", "em,snap",         "C0ES"),
-    "C3B": ("c_sa",  "em",              "C1E"),
-    "C4":  ("c_met", "clust,eigvec",    "C0KV"),
-    "C4B": ("c_pt",  "em",              "C2E"),
-    "C5":  ("c_met", "em,snap,hfield",  "C0ESH"),
+    "C0": ("c_met", "em", "C0E"),
+    "C1": ("c_met", "clust", "C0K"),
+    "C1B": ("c_met", "em", "C0E"),
+    "C2": ("c_met", "snap", "C0S"),
+    "C3": ("c_met", "em,snap", "C0ES"),
+    "C3B": ("c_sa", "em", "C1E"),
+    "C4": ("c_met", "clust,eigvec", "C0KV"),
+    "C4B": ("c_pt", "em", "C2E"),
+    "C5": ("c_met", "em,snap,hfield", "C0ESH"),
 }
 
 # Convenience aliases (non-C backends)
 _RUNLANG_ALIASES: dict[str, str] = {
-    "py":       "py_met",
-    "python":   "py_met",
-    "Python":   "py_met",
-    "pb":       "pb_met",
-    "pybind":   "pb_met",
-    "cu":       "cu_met",
-    "cuda":     "cu_met",
-    "gpu":      "cu_met",
-    "wolff":    "py_wolff",
-    "sw":       "py_sw",
+    "py": "py_met",
+    "python": "py_met",
+    "Python": "py_met",
+    "pb": "pb_met",
+    "pybind": "pb_met",
+    "cu": "cu_met",
+    "cuda": "cu_met",
+    "gpu": "cu_met",
+    "wolff": "py_wolff",
+    "sw": "py_sw",
     "topo_met": "py_topo_met",
     "topo_fca": "py_topo_fca",
     "topo_cem": "py_topo_cem",
-    "cem":      "py_topo_cem",
+    "cem": "py_topo_cem",
 }
 
 # Canonical algorithm → unified binary name
 _C_UNIFIED_BINARY: dict[str, str] = {
     "c_met": "IsingMetropolis",
-    "c_sa":  "IsingSimulatedAnnealing",
-    "c_pt":  "IsingParallelTempering",
+    "c_sa": "IsingSimulatedAnnealing",
+    "c_pt": "IsingParallelTempering",
 }
 
 
@@ -265,7 +265,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     def __init__(
         self,
         sg: "SignedGraph",
-        T: float = 0.,
+        T: float = 0.0,
         *,
         NoClust: int = 1,
         thrmSTEP: int = 20,
@@ -315,15 +315,17 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         cem_restarts: int = 10,
         cem_greedy: bool = True,
         cem_greedy_sweeps: int = 120,
-        **kwargs
+        **kwargs,
     ) -> None:
-        dynpath = getattr(sg, 'path_ising', None)
+        dynpath = getattr(sg, "path_ising", None)
         resolved_steps = steps
         if resolved_steps is None:
             resolved_steps = nstepsIsing
         if resolved_steps is None:
             resolved_steps = eqSTEP
-        super(IsingDynamics, self).__init__(sg, dynpath=dynpath, steps=resolved_steps, simref=simref, **kwargs)
+        super(IsingDynamics, self).__init__(
+            sg, dynpath=dynpath, steps=resolved_steps, simref=simref, **kwargs
+        )
         self.T = T
         self.thrmSTEP = thrmSTEP
         self.freq = freq
@@ -396,13 +398,16 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     @nstepsIsing.setter
     def nstepsIsing(self, value: int) -> None:
         self._set_time_controls(steps=value)
+
     #
     def neigh_ene(self, neigh: list) -> float:
         return np.sum(neigh) / len(neigh)
+
     #
     def neigh_wghtmagn(self, node: int) -> list:
         neighbors = self.sg.get_neighbors_with_weights(node)
         return [w * self.s[nn] for nn, w in neighbors]
+
     #
     def metropolis(self, node: int) -> None:
         neigh = self.neigh_wghtmagn(node)
@@ -419,6 +424,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 self.flip_spin(node)
         elif np.random.uniform() < boltzmann_factor(DeltaE, self.T, self.k_B):
             self.flip_spin(node)
+
     #
     def is_absorbing(self) -> bool:
         """Zero-temperature frozen check: ``True`` when no spin flip can change
@@ -431,19 +437,26 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ``DeltaE`` is ``>= 0`` (ties frozen, ``tie_flip_p == 0``) or strictly
         ``> 0`` (ties mobile).
         """
-        de = np.array([
-            2 * self.s[node] * self.neigh_ene(self.neigh_wghtmagn(node))
-            for node in range(self.sg.N)
-        ])
+        de = np.array(
+            [
+                2 * self.s[node] * self.neigh_ene(self.neigh_wghtmagn(node))
+                for node in range(self.sg.N)
+            ]
+        )
         if self.tie_flip_p <= 0.0:
             return bool(np.all(de >= 0))
         return bool(np.all(de > 0))
+
     #
     def calc_full_energy(self) -> float:
-        neigh_energies = np.array([
-            self.neigh_ene(self.neigh_wghtmagn(node)) for node in range(self.sg.N)
-        ])
+        neigh_energies = np.array(
+            [
+                self.neigh_ene(self.neigh_wghtmagn(node))
+                for node in range(self.sg.N)
+            ]
+        )
         return -np.dot(self.s, neigh_energies)
+
     #
     def init_ising_dynamics(self, custom: Any = None, exName: str = "") -> None:
         self._check_c_backend_or_fallback()
@@ -460,12 +473,13 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             # Export uses build_p_fname which handles underscore via join_non_empty
             self.sg._export_edgel_bin(exName=exName_arg)
         self.sini = self.s.copy()
+
     #
     def check_attribute(self) -> None:
         """Initialize dynamics if not already done."""
         # Check sini (set at end of init_ising_dynamics) rather than CbaseName
         # because CbaseName has a class-level default from CBackendMixin
-        if not hasattr(self, 'sini') or self.sini is None:
+        if not hasattr(self, "sini") or self.sini is None:
             self.init_ising_dynamics()
 
     def initialize_run_parameters(
@@ -611,6 +625,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             self._c_suffix_arg(self.out_suffix),
             self.upd_mode,
         ]
+
     # ------------------------------------------------------------------
     # C backend execution (overrides CBackendMixin)
     # ------------------------------------------------------------------
@@ -642,8 +657,10 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 f"C backend executable '{binary_path}' not found."
             )
         result = subprocess.run(
-            self.cprogram, stderr=self.stderr_fopen,
-            stdout=subprocess.PIPE, check=False,
+            self.cprogram,
+            stderr=self.stderr_fopen,
+            stdout=subprocess.PIPE,
+            check=False,
         )
         self._close_stderr_handle()
         total = self.n_replicas * self.N
@@ -663,18 +680,20 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         in addition to standard state output.
         """
         paths: list[Path | None] = [
-            getattr(self, 'sfout', None),
-            getattr(self, 'hfout', None),
+            getattr(self, "sfout", None),
+            getattr(self, "hfout", None),
         ]
         # Add E/M output files if they exist
-        if hasattr(self, '_c_output_paths'):
+        if hasattr(self, "_c_output_paths"):
             paths.extend(self._c_output_paths)
         return paths
+
     #
     def _output_includes_em(self) -> bool:
         """Check if current variant outputs energy/magnetization time series."""
         save_flags = self._resolve_save_flags()
         return "em" in save_flags
+
     #
     def _read_c_em_output(self) -> None:
         """Read energy and magnetization binary files from C backend output."""
@@ -689,12 +708,14 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # Build filenames matching C backend output format
         ene_fname = build_pT_fname(
-            'ene', self.sg.pflip, T_for_fname,
-            out_suffix=self.out_suffix, ext=BIN
+            "ene",
+            self.sg.pflip,
+            T_for_fname,
+            out_suffix=self.out_suffix,
+            ext=BIN,
         )
         magn_fname = build_pT_fname(
-            'm', self.sg.pflip, T_for_fname,
-            out_suffix=self.out_suffix, ext=BIN
+            "m", self.sg.pflip, T_for_fname, out_suffix=self.out_suffix, ext=BIN
         )
 
         ene_path = self.dynpath / ene_fname
@@ -724,8 +745,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         # For PT, also read temperature ladder
         if self._is_pt_variant():
             tladder_fname = build_pT_fname(
-                'Tladder', self.sg.pflip, T_for_fname,
-                out_suffix=self.out_suffix, ext=BIN
+                "Tladder",
+                self.sg.pflip,
+                T_for_fname,
+                out_suffix=self.out_suffix,
+                ext=BIN,
             )
             tladder_path = self.dynpath / tladder_fname
             if tladder_path.exists():
@@ -735,26 +759,36 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         # For SA, read temperature schedule
         if self._is_sa_variant():
             tsched_fname = build_pT_fname(
-                'Tsched', self.sg.pflip, T_for_fname,
-                out_suffix=self.out_suffix, ext=BIN
+                "Tsched",
+                self.sg.pflip,
+                T_for_fname,
+                out_suffix=self.out_suffix,
+                ext=BIN,
             )
             tsched_path = self.dynpath / tsched_fname
             if tsched_path.exists():
                 self.sa_temps = np.fromfile(tsched_path, dtype=np.float64)
                 self._c_output_paths.append(tsched_path)
+
     #
     def metropolis_sampling(self, tqdm_on):
         metropolis_1step = np.vectorize(self.metropolis, excluded="self")
         if self.savemagn:
+
             def save_magn_array():
                 self.s_t.append(self.s)
+
         else:
+
             def save_magn_array():
                 pass
 
         sample = list(range(self.sg.N))
-        iterator = tqdm.tqdm(range(self.steps), desc="Metropolis") if tqdm_on \
+        iterator = (
+            tqdm.tqdm(range(self.steps), desc="Metropolis")
+            if tqdm_on
             else range(self.steps)
+        )
         self.ene = []
         self.magn = []
         for _ in iterator:
@@ -773,8 +807,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.magn = []
         self.cluster_sizes = []
 
-        iterator = tqdm.tqdm(range(self.steps), desc="Wolff") if tqdm_on \
+        iterator = (
+            tqdm.tqdm(range(self.steps), desc="Wolff")
+            if tqdm_on
             else range(self.steps)
+        )
 
         for _ in iterator:
             self.magn.append(np.sum(self.s))
@@ -825,8 +862,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.magn = []
         self.cluster_sizes = []
 
-        iterator = tqdm.tqdm(range(self.steps), desc="SW") if tqdm_on \
+        iterator = (
+            tqdm.tqdm(range(self.steps), desc="SW")
+            if tqdm_on
             else range(self.steps)
+        )
 
         for _ in iterator:
             self.magn.append(np.sum(self.s))
@@ -901,7 +941,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         elif self.cooling_schedule == "logarithmic":
             return self.T_init / np.log(2 + np.arange(n))
         else:
-            raise ValueError(f"Unknown cooling schedule: {self.cooling_schedule}")
+            raise ValueError(
+                f"Unknown cooling schedule: {self.cooling_schedule}"
+            )
 
     def simulated_annealing_sampling(self, tqdm_on: bool = True) -> None:
         """Pure Python simulated annealing implementation."""
@@ -929,11 +971,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
     def get_sa_observables_by_temperature(self) -> dict:
         """Reshape SA observables by temperature."""
-        return {
-            'ene': self.sa_energy,
-            'magn': self.sa_magn,
-            'T': self.sa_temps
-        }
+        return {"ene": self.sa_energy, "magn": self.sa_magn, "T": self.sa_temps}
 
     # =========================================================================
     # Parallel Tempering Methods
@@ -946,20 +984,26 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         n = self.n_replicas
         if self.T_ladder_type == "geometric":
-            return self.T_min * (self.T_max / self.T_min) ** (np.arange(n) / (n - 1))
+            return self.T_min * (self.T_max / self.T_min) ** (
+                np.arange(n) / (n - 1)
+            )
         elif self.T_ladder_type == "linear":
             return np.linspace(self.T_min, self.T_max, n)
         else:
             raise ValueError(f"Unknown T_ladder_type: {self.T_ladder_type}")
 
-    def _attempt_exchange(self, replicas: list, i: int, j: int, T_ladder: np.ndarray) -> bool:
+    def _attempt_exchange(
+        self, replicas: list, i: int, j: int, T_ladder: np.ndarray
+    ) -> bool:
         """Attempt replica exchange using Metropolis criterion."""
         E_i = self._calc_replica_energy(replicas[i])
         E_j = self._calc_replica_energy(replicas[j])
         delta_beta = 1.0 / T_ladder[i] - 1.0 / T_ladder[j]
         delta_E = E_i - E_j
 
-        if delta_beta * delta_E <= 0 or np.random.random() < np.exp(delta_beta * delta_E):
+        if delta_beta * delta_E <= 0 or np.random.random() < np.exp(
+            delta_beta * delta_E
+        ):
             # Swap spin configurations
             replicas[i], replicas[j] = replicas[j].copy(), replicas[i].copy()
             return True
@@ -987,7 +1031,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.pt_magn = np.zeros((n_rep, self.n_exchanges))
         self.pt_exchanges = []  # List of (round, i, j, accepted)
 
-        outer_iter = tqdm.tqdm(range(self.n_exchanges), desc="PT") if tqdm_on else range(self.n_exchanges)
+        outer_iter = (
+            tqdm.tqdm(range(self.n_exchanges), desc="PT")
+            if tqdm_on
+            else range(self.n_exchanges)
+        )
 
         for ex_round in outer_iter:
             # Run MC sweeps on all replicas
@@ -1000,7 +1048,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 replicas[r] = self.s.copy()
 
                 # Record observables
-                self.pt_energy[r, ex_round] = self._calc_replica_energy(replicas[r])
+                self.pt_energy[r, ex_round] = self._calc_replica_energy(
+                    replicas[r]
+                )
                 self.pt_magn[r, ex_round] = np.mean(replicas[r])
 
             # Attempt exchanges (even-odd alternation)
@@ -1019,7 +1069,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         rates = np.zeros(n_rep - 1)
         counts = np.zeros(n_rep - 1)
 
-        for (_, i, j, accepted) in self.pt_exchanges:
+        for _, i, j, accepted in self.pt_exchanges:
             idx = min(i, j)
             counts[idx] += 1
             if accepted:
@@ -1113,9 +1163,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         """
         if hasattr(self.sg, "get_edge_arrays"):
             src, dst, wts = self.sg.get_edge_arrays()
-            return self._build_graph_csr_from_arrays(
-                src, dst, wts, self.N
-            )
+            return self._build_graph_csr_from_arrays(src, dst, wts, self.N)
 
         # Fallback: per-node loop (fast for NX dict-of-dicts)
         indices_list: list[int] = []
@@ -1141,7 +1189,10 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     def _load_native_module():
         """Import the compiled _ising_native pybind11 module."""
         try:
-            from ..IsingDynamics.ccore import _ising_native  # type: ignore[import-untyped]
+            from ..IsingDynamics.ccore import (
+                _ising_native,  # type: ignore[import-untyped]
+            )
+
             return _ising_native
         except ImportError as exc:
             raise RuntimeError(
@@ -1155,7 +1206,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ni, nw, nptr = self._build_graph_csr()
         s_out, ene, magn = mod.metropolis_sampling(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             self.field.astype(np.float64),
             float(self.T),
             int(self.steps),
@@ -1172,7 +1225,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ni, nw, nptr = self._build_graph_csr()
         s_out, ene, magn, T_sched = mod.sa_sampling(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             self.field.astype(np.float64),
             float(self.T_init),
             float(self.T_final),
@@ -1198,7 +1253,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         T_ladder = self._generate_T_ladder()
         s_out, ene_2d, magn_2d, exchanges = mod.pt_sampling(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             self.field.astype(np.float64),
             T_ladder.astype(np.float64),
             int(self.steps_per_exchange),
@@ -1234,7 +1291,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ni, nw, nptr = self._build_graph_csr()
         final_spins, ene_trace, magn_trace = cupy_metropolis(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             float(self.T),
             int(self.steps),
             int(self.seed),
@@ -1250,7 +1309,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ni, nw, nptr = self._build_graph_csr()
         final_spins, ene_trace, magn_trace, temps = cupy_sa(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             float(self.T_init),
             float(self.T_final),
             self.cooling_schedule,
@@ -1274,7 +1335,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         T_ladder = self._generate_T_ladder()
         final_spins, ene_2d, magn_2d, exchanges = cupy_pt(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             T_ladder.astype(np.float64),
             int(self.steps_per_exchange),
             int(self.n_exchanges),
@@ -1306,7 +1369,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ni, nw, nptr = self._build_graph_csr()
         s_out, ene, magn, clusters = mod.wolff_sampling(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             self.field.astype(np.float64),
             float(self.T),
             int(self.steps),
@@ -1323,7 +1388,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ni, nw, nptr = self._build_graph_csr()
         s_out, ene, magn, clusters = mod.sw_sampling(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             self.field.astype(np.float64),
             float(self.T),
             int(self.steps),
@@ -1345,7 +1412,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ni, nw, nptr = self._build_graph_csr()
         final_spins, ene_trace, magn_trace, clusters = cupy_wolff(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             float(self.T),
             int(self.steps),
             int(self.seed),
@@ -1362,7 +1431,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ni, nw, nptr = self._build_graph_csr()
         final_spins, ene_trace, magn_trace, clusters = cupy_sw(
             self.s.astype(np.int8),
-            ni, nw, nptr,
+            ni,
+            nw,
+            nptr,
             float(self.T),
             int(self.steps),
             int(self.seed),
@@ -1398,6 +1469,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         # Force sparse solver for large graphs to avoid O(N^3) dense eigh
         if self.N > 500 and n_modes < self.N // 2:
             import inspect
+
             sig = inspect.signature(self.sg.compute_k_eigvV)
             if "backend" in sig.parameters:
                 kwargs["backend"] = "scipy"
@@ -1410,22 +1482,22 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         ``self.sg.get_eigV(which=k)`` which handles NX/GT layout.
         """
         vecs = [
-            self.sg.get_eigV(which=k, binarize=False)
-            for k in range(n_modes)
+            self.sg.get_eigV(which=k, binarize=False) for k in range(n_modes)
         ]
-        return np.vstack(vecs).astype(np.float64)   # (M, N)
+        return np.vstack(vecs).astype(np.float64)  # (M, N)
 
     def _compute_rbim_energies(self, n_modes: int) -> np.ndarray:
         """Return ``(n_modes,)`` array of RBIM energies for binarized eigvecs."""
         self._ensure_spectral_subspace(n_modes)
         self.sg.compute_rbim_energy_eigV_all()
-        return np.array([
-            self.sg.energy_eigV_RBIM[k]
-            for k in range(n_modes)
-        ], dtype=np.float64)
+        return np.array(
+            [self.sg.energy_eigV_RBIM[k] for k in range(n_modes)],
+            dtype=np.float64,
+        )
 
     def _best_eigenvector_seed(
-        self, n_modes: int,
+        self,
+        n_modes: int,
     ) -> tuple[np.ndarray, int]:
         """Return binarized spins and mode index of lowest-RBIM-energy eigvec."""
         rbim_E = self._compute_rbim_energies(n_modes)
@@ -1465,7 +1537,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         normed = rbim_energies / E_min_abs if E_min_abs > 0 else rbim_energies
         # softmax(-E_norm / tau): lower energy → higher weight
         logits = -normed / tau
-        logits -= logits.max()                       # numerical stability
+        logits -= logits.max()  # numerical stability
         weights = np.exp(logits)
         weights /= weights.sum()
         # h_i = field_strength * sum_k c_k * v_k[i]
@@ -1484,9 +1556,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         s = spins.astype(np.float64).copy()
         edges = self.sg.get_edges_with_weights()
         # Precompute adjacency as dict-of-lists for fast node lookup
-        adj: dict[int, list[tuple[int, float]]] = {
-            i: [] for i in range(self.N)
-        }
+        adj: dict[int, list[tuple[int, float]]] = {i: [] for i in range(self.N)}
         for u, v, w in edges:
             adj[u].append((v, w))
             adj[v].append((u, w))
@@ -1496,7 +1566,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             for node in range(self.N):
                 h_eff = sum(w * s[nn] for nn, w in adj[node])
                 dE = 2.0 * s[node] * h_eff
-                if dE < 0:           # flipping reduces energy
+                if dE < 0:  # flipping reduces energy
                     s[node] = -s[node]
                     any_flip = True
             if not any_flip:
@@ -1538,7 +1608,8 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     # =========================================================================
 
     def topological_metropolis_sampling(
-        self, tqdm_on: bool = True,
+        self,
+        tqdm_on: bool = True,
     ) -> None:
         """MC in spectral coefficient space with mode-weighted selection.
 
@@ -1550,14 +1621,14 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         """
         n_modes = min(self.topo_n_modes, self.N)
         self._ensure_spectral_subspace(n_modes)
-        V = self._build_subspace_matrix(n_modes)       # (M, N)
-        rbim_E = self._compute_rbim_energies(n_modes)   # (M,)
+        V = self._build_subspace_matrix(n_modes)  # (M, N)
+        rbim_E = self._compute_rbim_energies(n_modes)  # (M,)
 
         # --- seed from best eigenvector ---
         best_spins, best_idx = self._best_eigenvector_seed(n_modes)
         coeffs = np.zeros(n_modes, dtype=np.float64)
         coeffs[best_idx] = 1.0
-        field = V[best_idx].copy()                      # (N,) continuous
+        field = V[best_idx].copy()  # (N,) continuous
         spins = best_spins.astype(np.float64).copy()
 
         # --- edge arrays for fast energy ---
@@ -1583,7 +1654,8 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         rng = np.random.default_rng(self.seed)
         iterator = (
             tqdm.tqdm(range(self.steps), desc="TopoMet")
-            if tqdm_on else range(self.steps)
+            if tqdm_on
+            else range(self.steps)
         )
 
         n_proposals = self.N  # 1 MC step = N proposals
@@ -1603,15 +1675,12 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 s_new[zeros] = spins[zeros]
 
                 # 4. energy
-                E_new = float(
-                    compute_ising_pairwise_energy(s_new, edges)
-                )
+                E_new = float(compute_ising_pairwise_energy(s_new, edges))
                 dE = E_new - E_current
 
                 # 5. Metropolis
                 if dE <= 0 or (
-                    self.T > 0
-                    and rng.random() < np.exp(-dE / self.T)
+                    self.T > 0 and rng.random() < np.exp(-dE / self.T)
                 ):
                     coeffs[m] += delta
                     field = field_new
@@ -1683,7 +1752,10 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         rbim_E = self._compute_rbim_energies(n_modes)
 
         spectral_field = self._compute_spectral_field(
-            V, rbim_E, self.topo_tau, self.topo_field_strength,
+            V,
+            rbim_E,
+            self.topo_tau,
+            self.topo_field_strength,
         )
         self.topo_fca_field = spectral_field.copy()
 
@@ -1700,7 +1772,8 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     # =========================================================================
 
     def cem_spectral_sampling(
-        self, tqdm_on: bool = True,
+        self,
+        tqdm_on: bool = True,
     ) -> None:
         """Population-based CEM optimizer in spectral coefficient space.
 
@@ -1732,7 +1805,8 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         outer_iter = (
             tqdm.tqdm(range(self.cem_restarts), desc="CEM restarts")
-            if tqdm_on else range(self.cem_restarts)
+            if tqdm_on
+            else range(self.cem_restarts)
         )
 
         for r in outer_iter:
@@ -1747,7 +1821,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             for _it in range(self.cem_iter):
                 # 1. Sample K coefficient vectors
                 coeffs_pop = rng.normal(
-                    loc=mu, scale=sigma, size=(K, M),
+                    loc=mu,
+                    scale=sigma,
+                    size=(K, M),
                 )
 
                 # 2. Map to spins: sign(C @ V) -> (K, N)
@@ -1759,17 +1835,25 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 if self.cem_greedy:
                     for k in range(K):
                         spins_pop[k] = self._greedy_polish_csr(
-                            spins_pop[k], ni, nw, nptr,
+                            spins_pop[k],
+                            ni,
+                            nw,
+                            nptr,
                             max_sweeps=self.cem_greedy_sweeps,
                         )
 
                 # 4. Evaluate energies
-                energies = np.array([
-                    float(compute_ising_pairwise_energy(
-                        spins_pop[k], edges,
-                    ))
-                    for k in range(K)
-                ])
+                energies = np.array(
+                    [
+                        float(
+                            compute_ising_pairwise_energy(
+                                spins_pop[k],
+                                edges,
+                            )
+                        )
+                        for k in range(K)
+                    ]
+                )
 
                 # 5. Elite selection
                 elite_idx = np.argsort(energies)[:n_elite]
@@ -1782,7 +1866,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 mu = alpha * mu + (1.0 - alpha) * new_mu
                 sigma = alpha * sigma + (1.0 - alpha) * new_sigma
                 sigma = np.clip(
-                    sigma, self.cem_sigma_floor, self.cem_sigma_ceiling,
+                    sigma,
+                    self.cem_sigma_floor,
+                    self.cem_sigma_ceiling,
                 )
 
                 # Track best this iteration
@@ -1795,17 +1881,15 @@ class IsingDynamics(CBackendMixin, BinDynSys):
                 ene_trace.append(restart_best_E)
 
             # Optional final polish of restart best
-            if (
-                self.topo_polish
-                and restart_best_spins is not None
-            ):
+            if self.topo_polish and restart_best_spins is not None:
                 polished = self._greedy_polish_csr(
-                    restart_best_spins, ni, nw, nptr,
+                    restart_best_spins,
+                    ni,
+                    nw,
+                    nptr,
                     max_sweeps=self.topo_polish_sweeps,
                 )
-                E_pol = float(
-                    compute_ising_pairwise_energy(polished, edges)
-                )
+                E_pol = float(compute_ising_pairwise_energy(polished, edges))
                 if E_pol < restart_best_E:
                     restart_best_E = E_pol
                     restart_best_spins = polished
@@ -1834,9 +1918,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         self.topo_cem_restart_energies = restart_energies / self.N
         self.ene = [e / self.N for e in ene_trace]
         self.magn = [
-            float(np.sum(global_best_spins)) / self.N
-            if global_best_spins is not None
-            else 0.0
+            (
+                float(np.sum(global_best_spins)) / self.N
+                if global_best_spins is not None
+                else 0.0
+            )
         ]
 
     # =========================================================================
@@ -1860,7 +1946,10 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         rbim_E = self._compute_rbim_energies(n_modes)
 
         spectral_field = self._compute_spectral_field(
-            V, rbim_E, self.topo_tau, self.topo_field_strength,
+            V,
+            rbim_E,
+            self.topo_tau,
+            self.topo_field_strength,
         )
         self.topo_fca_field = spectral_field.copy()
         self.field = spectral_field
@@ -1896,22 +1985,22 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             mode_w[:] = 1.0
         mode_w /= mode_w.sum()
 
-        s_out, ene, magn, best_s, best_E, final_coeffs = (
-            mod.topo_met_sampling(
-                best_spins.astype(np.int8),
-                ni, nw, nptr,
-                V.astype(np.float64),
-                coeffs.astype(np.float64),
-                init_field.astype(np.float64),
-                mode_w.astype(np.float64),
-                float(self.T),
-                int(self.steps),
-                float(self.topo_sigma_init),
-                int(self.topo_chunk_size),
-                bool(self.topo_polish),
-                int(self.topo_polish_sweeps),
-                int(self.seed),
-            )
+        s_out, ene, magn, best_s, best_E, final_coeffs = mod.topo_met_sampling(
+            best_spins.astype(np.int8),
+            ni,
+            nw,
+            nptr,
+            V.astype(np.float64),
+            coeffs.astype(np.float64),
+            init_field.astype(np.float64),
+            mode_w.astype(np.float64),
+            float(self.T),
+            int(self.steps),
+            float(self.topo_sigma_init),
+            int(self.topo_chunk_size),
+            bool(self.topo_polish),
+            int(self.topo_polish_sweeps),
+            int(self.seed),
         )
         self.s = s_out
         self.ene = ene.tolist()
@@ -1935,7 +2024,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         best_spins, best_E, best_coeffs, restart_E, ene_trace = (
             mod.topo_cem_sampling(
-                ni, nw, nptr,
+                ni,
+                nw,
+                nptr,
                 V.astype(np.float64),
                 int(self.N),
                 int(self.cem_iter),
@@ -2003,7 +2094,9 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             Run parallel tempering.
         """
         self.check_attribute()
-        self.initialize_run_parameters(T_ising, steps=steps, simref=simref, eqSTEP=eqSTEP)
+        self.initialize_run_parameters(
+            T_ising, steps=steps, simref=simref, eqSTEP=eqSTEP
+        )
 
         # Resolve naming convention (same predicates the old if/elif chain used).
         rl = _resolve_runlang(self.runlang)
@@ -2030,8 +2123,11 @@ class IsingDynamics(CBackendMixin, BinDynSys):
         solver.supports(self)
         try:
             solver.execute(
-                self, tqdm_on=tqdm_on, verbose=verbose,
-                sa_mode=sa_mode, pt_mode=pt_mode,
+                self,
+                tqdm_on=tqdm_on,
+                verbose=verbose,
+                sa_mode=sa_mode,
+                pt_mode=pt_mode,
             )
         finally:
             if backend is SolverBackend.C and clean_export:
@@ -2041,8 +2137,8 @@ class IsingDynamics(CBackendMixin, BinDynSys):
     #
     def find_ising_clusters(self, import_cl: bool = False):
         if import_cl:
-            path_ising = getattr(self.sg, 'path_ising', self.dynpath)
-            std_fname = getattr(self.sg, 'std_fname', 'sg')
+            path_ising = getattr(self.sg, "path_ising", self.dynpath)
+            std_fname = getattr(self.sg, "std_fname", "sg")
             for i in range(self.NoClust):
                 self.Ising_clusters.append(
                     np.fromfile(
@@ -2094,7 +2190,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
             self.Ising_clusters.append(allclusters[0])
         self.numIsing_cl = len(self.Ising_clusters)
         if self.runlang.startswith("C"):
-            if hasattr(self.sg, 'export_ising_clust'):
+            if hasattr(self.sg, "export_ising_clust"):
                 self.sg.export_ising_clust()
 
     #
@@ -2115,6 +2211,7 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 
         # Lattice-specific mapping (requires side1/side2)
         from ...graphs.protocols import is_lattice_graph
+
         if not is_lattice_graph(self.sg):
             raise TypeError(
                 "mapping_nodes_to_clusters requires a lattice graph "
@@ -2134,4 +2231,3 @@ class IsingDynamics(CBackendMixin, BinDynSys):
 # dispatch; no circular import (``_solvers`` imports IsingDynamics lazily inside
 # its mode-resolution helper).
 from . import _solvers  # noqa: E402,F401
-

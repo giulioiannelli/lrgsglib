@@ -1,22 +1,19 @@
-from typing import Any, Callable, Union, Optional
 import operator
 from numbers import Number
+from typing import Any, Callable, Optional, Union
 
 # Type alias for inputs that can be normalized to ConditionalPartitioning
 # Note: Using int and float explicitly instead of Number for better type checking compatibility
 ConditionalPartitioningInput = Union[
-    "ConditionalPartitioning", 
-    int,
-    float,
-    str, 
-    Callable[[Any], bool]
+    "ConditionalPartitioning", int, float, str, Callable[[Any], bool]
 ]
 
 __all__ = [
-    "ConditionalPartitioning", 
+    "ConditionalPartitioning",
     "ConditionalPartitioningInput",
-    "_normalize_conditional_partitioning"
+    "_normalize_conditional_partitioning",
 ]
+
 
 class ConditionalPartitioning:
     def __init__(self, condition: Union[Callable[[Any], bool], str, Any]):
@@ -27,7 +24,7 @@ class ConditionalPartitioning:
         ----------
         condition : Union[Callable[[Any], bool], str, Any]
             A condition as a lambda (e.g., lambda x: x < threshold), a key string (e.g., "<10"), or a direct value.
-            
+
         Raises
         ------
         ValueError
@@ -40,13 +37,15 @@ class ConditionalPartitioning:
                 "ConditionalPartitioning condition cannot be None. "
                 "Please provide a number, string (e.g., '>0', '=1'), or callable."
             )
-        
+
         self._original = condition
-        
+
         # Handle string conditions (operators like "<10", ">=5", etc.)
         if isinstance(condition, str):
             if not condition:
-                raise ValueError("ConditionalPartitioning condition string cannot be empty.")
+                raise ValueError(
+                    "ConditionalPartitioning condition string cannot be empty."
+                )
             if condition[0] in "<=>!":
                 self.key = condition
                 self.cond_func = self.key_to_cond()
@@ -64,7 +63,7 @@ class ConditionalPartitioning:
         # Handle callable conditions
         elif callable(condition):
             # Try to create a reasonable key for callables
-            if hasattr(condition, '__name__'):
+            if hasattr(condition, "__name__"):
                 self.key = f"callable:{condition.__name__}"
             else:
                 self.key = f"callable:{id(condition)}"
@@ -72,12 +71,19 @@ class ConditionalPartitioning:
             # Validate that the callable can accept at least one argument
             try:
                 import inspect
+
                 sig = inspect.signature(condition)
                 # Check if there are any positional or keyword parameters
-                params = [p for p in sig.parameters.values() 
-                         if p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                                      inspect.Parameter.POSITIONAL_ONLY,
-                                      inspect.Parameter.VAR_POSITIONAL)]
+                params = [
+                    p
+                    for p in sig.parameters.values()
+                    if p.kind
+                    in (
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                        inspect.Parameter.POSITIONAL_ONLY,
+                        inspect.Parameter.VAR_POSITIONAL,
+                    )
+                ]
                 if len(params) == 0:
                     raise TypeError(
                         f"Callable condition must accept at least one argument. "
@@ -86,7 +92,9 @@ class ConditionalPartitioning:
                     )
             except (ValueError, TypeError) as e:
                 # If inspection fails or raises our TypeError, re-raise
-                if isinstance(e, TypeError) and "must accept at least one argument" in str(e):
+                if isinstance(
+                    e, TypeError
+                ) and "must accept at least one argument" in str(e):
                     raise
                 # Otherwise, can't inspect (e.g., built-in), so try calling it
                 # with a test value to see if it works
@@ -103,7 +111,6 @@ class ConditionalPartitioning:
                 f"ConditionalPartitioning accepts: numbers, strings (e.g., '>0'), "
                 f"or callables (e.g., lambda x: x > 0). Got: {condition}"
             )
-        
 
     def key_to_cond(self) -> Union[Callable[[Any], bool], int, float, str]:
         """
@@ -126,11 +133,11 @@ class ConditionalPartitioning:
             "=": operator.eq,
             "<": operator.lt,
             ">": operator.gt,
-            "!=": operator.ne
+            "!=": operator.ne,
         }
         for op_str in sorted(op_map.keys(), key=len, reverse=True):
             if self.key.startswith(op_str):
-                value_str = self.key[len(op_str):]
+                value_str = self.key[len(op_str) :]
                 try:
                     val = float(value_str)
                     if val.is_integer():
@@ -151,15 +158,15 @@ class ConditionalPartitioning:
 
 
 def _normalize_conditional_partitioning(
-    val: ConditionalPartitioningInput
+    val: ConditionalPartitioningInput,
 ) -> "ConditionalPartitioning":
     """
     Normalize various input types to a ConditionalPartitioning object.
-    
+
     This function provides a convenient way to convert different types of inputs
     into ConditionalPartitioning objects, making it easier to work with conditional
     partitioning across the codebase.
-    
+
     Parameters
     ----------
     val : ConditionalPartitioningInput
@@ -168,12 +175,12 @@ def _normalize_conditional_partitioning(
         - A number (int/float) - converted to equality condition (e.g., 1 → "=1")
         - A string with operator (e.g., '>0', '<=10', '!=5')
         - A callable (e.g., lambda x: x > 0)
-    
+
     Returns
     -------
     ConditionalPartitioning
         Normalized ConditionalPartitioning object.
-        
+
     Raises
     ------
     ValueError
@@ -181,7 +188,7 @@ def _normalize_conditional_partitioning(
     TypeError
         If val is not a supported type (e.g., list, dict, tuple) or if a callable
         doesn't accept the expected number of arguments.
-        
+
     Examples
     --------
     >>> # From a number
@@ -190,19 +197,19 @@ def _normalize_conditional_partitioning(
     '=1'
     >>> cp.cond_func(1)
     True
-    
+
     >>> # From a string operator
     >>> cp = _normalize_conditional_partitioning('>0')
     >>> cp.key
     '>0'
     >>> cp.cond_func(5)
     True
-    
+
     >>> # From a lambda
     >>> cp = _normalize_conditional_partitioning(lambda x: x > 0)
     >>> cp.cond_func(5)
     True
-    
+
     >>> # Already a ConditionalPartitioning (returns same object)
     >>> original = ConditionalPartitioning('>0')
     >>> result = _normalize_conditional_partitioning(original)

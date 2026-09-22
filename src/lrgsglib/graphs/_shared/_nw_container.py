@@ -22,6 +22,7 @@ code here. ``single*`` patterns require the graph to implement
 ``build_single`` defaults ``False``). ``GTnwContainer`` is kept as a back-compat
 alias.
 """
+
 from __future__ import annotations
 
 import random
@@ -107,14 +108,15 @@ class NwContainer(dict):
             }
             if bz:
                 self["singleZERR"] = {
-                    g: sg.cell_edges(self.centedge[g][0], g)
-                    for g in self.rd
+                    g: sg.cell_edges(self.centedge[g][0], g) for g in self.rd
                 }
 
         self["rand"] = {g: list(sg.fleset[g]) for g in self.rd}
         self["randXERR"] = {g: self._rand_pattern("XERR", g) for g in self.rd}
         if bz:
-            self["randZERR"] = {g: self._rand_pattern("ZERR", g) for g in self.rd}
+            self["randZERR"] = {
+                g: self._rand_pattern("ZERR", g) for g in self.rd
+            }
 
     def get_links_XERR(self, node: Any, on_g: str = SG_REPR) -> List[Edge]:
         """Star pattern (all edges incident to ``node``)."""
@@ -136,9 +138,7 @@ class NwContainer(dict):
                     pattern = self._filtered_xerr(on_g)
             case "ZERR":
                 pattern = [
-                    e
-                    for i in nodes
-                    for e in self.sg.cell_edges(i, on_g)
+                    e for i in nodes for e in self.sg.cell_edges(i, on_g)
                 ]
             case _:
                 pattern = []
@@ -153,10 +153,7 @@ class NwContainer(dict):
         while idx < len(tmp):
             node = tmp[idx]
             has_all_neg_neighbor = any(
-                all(
-                    w == -1
-                    for _, w in self.sg.get_neighbors_with_weights(nn)
-                )
+                all(w == -1 for _, w in self.sg.get_neighbors_with_weights(nn))
                 for nn in self.sg.get_graph_neighbors(node, on_g)
             )
             if has_all_neg_neighbor:

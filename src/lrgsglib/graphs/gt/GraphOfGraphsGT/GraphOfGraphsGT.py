@@ -42,7 +42,6 @@ from ._generators import (
 )
 from ._policies import AnchorPolicy, get_anchor_index, resolve_anchor_indices
 
-
 __all__ = ["GraphOfGraphsGT", "GraphOfGraphs"]
 
 
@@ -56,29 +55,31 @@ def _register_graph_types():
         return
 
     # Import graph types on demand to avoid circular imports
+    from ..BarabasiAlbertGT import BarabasiAlbertGT
+    from ..ErdosRenyiGT import ErdosRenyiGT
     from ..Lattice2DGT import Lattice2DGT
     from ..Lattice3DGT import Lattice3DGT
-    from ..ErdosRenyiGT import ErdosRenyiGT
-    from ..BarabasiAlbertGT import BarabasiAlbertGT
-    from ..WattsStrogatzGT import WattsStrogatzGT
     from ..StochasticBlockModelGT import StochasticBlockModelGT
+    from ..WattsStrogatzGT import WattsStrogatzGT
 
-    _GRAPH_TYPE_REGISTRY.update({
-        # Lattice types
-        "Lattice2D": Lattice2DGT,
-        "Lattice2DGT": Lattice2DGT,
-        "Lattice3D": Lattice3DGT,
-        "Lattice3DGT": Lattice3DGT,
-        # Random types
-        "ErdosRenyi": ErdosRenyiGT,
-        "ErdosRenyiGT": ErdosRenyiGT,
-        "BarabasiAlbert": BarabasiAlbertGT,
-        "BarabasiAlbertGT": BarabasiAlbertGT,
-        "WattsStrogatz": WattsStrogatzGT,
-        "WattsStrogatzGT": WattsStrogatzGT,
-        "StochasticBlockModel": StochasticBlockModelGT,
-        "StochasticBlockModelGT": StochasticBlockModelGT,
-    })
+    _GRAPH_TYPE_REGISTRY.update(
+        {
+            # Lattice types
+            "Lattice2D": Lattice2DGT,
+            "Lattice2DGT": Lattice2DGT,
+            "Lattice3D": Lattice3DGT,
+            "Lattice3DGT": Lattice3DGT,
+            # Random types
+            "ErdosRenyi": ErdosRenyiGT,
+            "ErdosRenyiGT": ErdosRenyiGT,
+            "BarabasiAlbert": BarabasiAlbertGT,
+            "BarabasiAlbertGT": BarabasiAlbertGT,
+            "WattsStrogatz": WattsStrogatzGT,
+            "WattsStrogatzGT": WattsStrogatzGT,
+            "StochasticBlockModel": StochasticBlockModelGT,
+            "StochasticBlockModelGT": StochasticBlockModelGT,
+        }
+    )
 
 
 def _resolve_graph_type(type_name: str) -> Callable[..., Any]:
@@ -149,7 +150,9 @@ class GraphOfGraphsGT(SignedGraphGT):
         base_params: dict,
         fiber_graph_type: str,
         fiber_params: Union[dict, Callable[[int], dict]],
-        anchor_policy: Union[str, AnchorPolicy, Callable[[int, int], int]] = "first",
+        anchor_policy: Union[
+            str, AnchorPolicy, Callable[[int, int], int]
+        ] = "first",
         pflip: float = 0.0,
         seed: Optional[int] = None,
         **kwargs,
@@ -194,7 +197,6 @@ class GraphOfGraphsGT(SignedGraphGT):
 
         # Initialize base class
         super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
-
 
     def _instantiate_base_graph(self) -> SignedGraphGT:
         """Create the base graph instance."""

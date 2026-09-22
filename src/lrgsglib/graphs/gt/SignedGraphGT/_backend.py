@@ -4,10 +4,10 @@ The canonical implementation lives in ``graphs._shared._backend``.
 """
 
 from ..._shared._backend import (  # noqa: F401
-    Backend,
     ArrayBackend,
+    Backend,
     BackendManager,
+    CupyBackend,
     NumpyBackend,
     ScipyBackend,
-    CupyBackend,
 )

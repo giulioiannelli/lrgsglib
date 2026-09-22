@@ -8,12 +8,12 @@ unflip_all, get_random_links) are NOT duplicated here.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 from numpy.typing import NDArray
 
-from ....config.const import SG_REPR, SG_ERRMSG_NFLIP
+from ....config.const import SG_ERRMSG_NFLIP, SG_REPR
 from ....config.errwar import NflipError
 
 logger = logging.getLogger(__name__)

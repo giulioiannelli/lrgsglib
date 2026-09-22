@@ -14,6 +14,7 @@ can decode -- so the result is an exact 2-3 colour "chessboard".
 
 Saving ``.gif`` instead uses Pillow (palette, also exact) and needs no ffmpeg.
 """
+
 from __future__ import annotations
 
 import base64
@@ -69,15 +70,34 @@ def encode_rgb_video(
         raise ValueError("frames must be an (n, H, W, 3) uint8 array.")
     _, h, w, _ = stack.shape
     cmd = [
-        "ffmpeg", "-y", "-loglevel", "error",
-        "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}",
-        "-r", str(int(fps)), "-i", "-",
+        "ffmpeg",
+        "-y",
+        "-loglevel",
+        "error",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        f"{w}x{h}",
+        "-r",
+        str(int(fps)),
+        "-i",
+        "-",
     ]
     if upscale > 1:
         cmd += ["-vf", f"scale=iw*{upscale}:ih*{upscale}:flags=neighbor"]
     cmd += [
-        "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-        "-preset", preset, "-crf", str(int(crf)), str(path),
+        "-an",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-preset",
+        preset,
+        "-crf",
+        str(int(crf)),
+        str(path),
     ]
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)

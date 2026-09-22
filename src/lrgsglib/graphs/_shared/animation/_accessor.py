@@ -11,6 +11,7 @@ its ``save`` through :func:`resolve_plot_path`, so animations/figures land under
 ``path_plot/<structure>/<subfolder>`` consistently (the subfolder derived from the
 dynamics object that produced the data).
 """
+
 from __future__ import annotations
 
 

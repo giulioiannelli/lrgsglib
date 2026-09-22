@@ -8,9 +8,10 @@ from .formatter import *
 from .io import *
 from .lattices import *
 from .mathplot import *
+from .plot3d import *
 from .tilings import *
 from .voxels import *
-from .plot3d import *
+
 # NOTE: .lrg (plot_graph_analysis) is intentionally NOT star-imported here: it
 # pulls in utils.lrg, which is only partially initialised at the point plotlib is
 # first imported during graph construction -> circular import. Import it directly

@@ -26,4 +26,5 @@ class NestedDict(dict):
             if isinstance(d, NestedDict):
                 d = {k: recursive_convert(v) for k, v in d.items()}
             return d
+
         return recursive_convert(self)

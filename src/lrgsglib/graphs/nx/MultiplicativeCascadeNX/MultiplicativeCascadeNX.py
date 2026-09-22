@@ -5,22 +5,22 @@ from __future__ import annotations
 import networkx as nx
 
 from ....config.const import (
+    DEFAULT_P_FSTR_FMT,
+    MC_SGPATH,
+    MC_STDFN,
+    MSG_FRACTION,
+    MSG_ITERATIONS,
     MSG_P1,
     MSG_P2,
     MSG_P3,
     MSG_P4,
-    MSG_FRACTION,
-    MSG_ITERATIONS,
-    MC_STDFN,
-    MC_SGPATH,
-    DEFAULT_P_FSTR_FMT,
 )
-from ..MultispectralGraphNX.MultispectralGraphNX import MultispectralGraphNX
 from ..MultispectralGraphNX.generators_msg import (
+    multiplicative_cascade_exp_clocks,
     multiplicative_cascade_graph,
     multiplicative_cascade_probability_matrix,
-    multiplicative_cascade_exp_clocks,
 )
+from ..MultispectralGraphNX.MultispectralGraphNX import MultispectralGraphNX
 
 
 class MultiplicativeCascadeGraphNX(MultispectralGraphNX):
@@ -88,17 +88,16 @@ class MultiplicativeCascadeGraphNX(MultispectralGraphNX):
             f"{mode_str}"
         )
 
-        super().__init__(
-            stdFnameSFFX=stdFnameSFFX,
-            sgpathn=sgpathn,
-            **kwargs
-        )
+        super().__init__(stdFnameSFFX=stdFnameSFFX, sgpathn=sgpathn, **kwargs)
 
     def _generate(self) -> nx.Graph:
         """Generate multiplicative cascade graph."""
         # Compute probability matrix
         self.probability_matrix = multiplicative_cascade_probability_matrix(
-            self.p1, self.p2, self.p3, self.p4,
+            self.p1,
+            self.p2,
+            self.p3,
+            self.p4,
             iterations=self.iterations,
             stochastic=self.stochastic,
         )
@@ -106,13 +105,14 @@ class MultiplicativeCascadeGraphNX(MultispectralGraphNX):
         # Generate graph using appropriate variant
         if self.variant == "exp_clocks":
             H = multiplicative_cascade_exp_clocks(
-                self.probability_matrix,
-                self.fraction,
-                periodic=self.periodic
+                self.probability_matrix, self.fraction, periodic=self.periodic
             )
         else:
             H = multiplicative_cascade_graph(
-                self.p1, self.p2, self.p3, self.p4,
+                self.p1,
+                self.p2,
+                self.p3,
+                self.p4,
                 fraction=self.fraction,
                 iterations=self.iterations,
                 stochastic=self.stochastic,
@@ -128,7 +128,9 @@ class MultiplicativeCascadeGraphNX(MultispectralGraphNX):
         if self.only_const_mode or self.probability_matrix is None:
             return 0
         size = int(self.probability_matrix.shape[0])
-        return max(1, int(round(self.sample_fraction * (size ** 2))))
+        return max(1, int(round(self.sample_fraction * (size**2))))
 
     def __repr__(self) -> str:
-        return f"MultiplicativeCascadeGraphNX(N={self.N}, variant={self.variant})"
+        return (
+            f"MultiplicativeCascadeGraphNX(N={self.N}, variant={self.variant})"
+        )

@@ -14,14 +14,14 @@ import numpy as np
 try:
     import graph_tool as gt
     from graph_tool import Graph
+
     GT_AVAILABLE = True
 except ImportError:
     GT_AVAILABLE = False
     Graph = object
 
-from ....config.const import DCOMB_STDFN, DCOMB_SGPATH
+from ....config.const import DCOMB_SGPATH, DCOMB_STDFN
 from .DiracLatticeGT import DiracLatticeGraphGT
-
 
 __all__ = ["DiracCombGraphGT", "DiracCombGraph"]
 
@@ -124,7 +124,9 @@ class DiracCombGraphGT(DiracLatticeGraphGT):
         if self.fiber_nodes <= 0:
             raise ValueError("fiber_nodes must be a positive integer.")
         if self.base_type != "line":
-            raise ValueError(f"Unsupported base_type: {self.base_type}. Use 'line'.")
+            raise ValueError(
+                f"Unsupported base_type: {self.base_type}. Use 'line'."
+            )
 
         # Calculate total nodes
         total_nodes = self.base_nodes * (1 + self.fiber_nodes)
@@ -171,12 +173,12 @@ class DiracCombGraphGT(DiracLatticeGraphGT):
 
         # Store metadata
         self.dirac_structure = {
-            'base_nodes': self.base_nodes,
-            'fiber_nodes': self.fiber_nodes,
-            'total_nodes': total_nodes,
-            'structure': 'dirac_comb',
-            'base_type': self.base_type,
-            'periodic': self.periodic,
+            "base_nodes": self.base_nodes,
+            "fiber_nodes": self.fiber_nodes,
+            "total_nodes": total_nodes,
+            "structure": "dirac_comb",
+            "base_type": self.base_type,
+            "periodic": self.periodic,
         }
 
         return G

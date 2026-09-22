@@ -7,9 +7,10 @@
     backward compatibility; prefer ``lattice.animate.states(...)`` or building a
     ``FuncAnimation`` and calling :func:`save_animation`.
 """
-import numpy as np
-import matplotlib.pyplot as plt
+
 import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 __all__ = ["make_animation_fromFrames"]

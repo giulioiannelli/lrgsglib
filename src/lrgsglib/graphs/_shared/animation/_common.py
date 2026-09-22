@@ -1,4 +1,5 @@
 """Shared helpers for the engine-agnostic graph plot/animation accessors."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -42,7 +43,7 @@ def resolve_plot_path(sg, save, *, model=None, subfolder=None):
     path_data = getattr(sg, "path_data", None)
     plot_root = getattr(sg, "path_plot", None)
     if plot_root is None and path_data is not None:
-        plot_root = Path(path_data) / "plot"   # GT fallback (mirrors NX default)
+        plot_root = Path(path_data) / "plot"  # GT fallback (mirrors NX default)
     if plot_root is None:
         return p
     plot_root = Path(plot_root)
@@ -50,7 +51,11 @@ def resolve_plot_path(sg, save, *, model=None, subfolder=None):
     rel = None
     if subfolder is not None:
         struct = _relative_to(getattr(sg, "path_sgdata", None), path_data)
-        rel = (struct / str(subfolder)) if struct is not None else Path(str(subfolder))
+        rel = (
+            (struct / str(subfolder))
+            if struct is not None
+            else Path(str(subfolder))
+        )
     elif model is not None:
         # Mirror the dynamics' own data subtree (<structure>/<dyn>/<size>).
         rel = _relative_to(getattr(model, "dynpath", None), path_data)

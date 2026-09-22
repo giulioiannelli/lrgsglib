@@ -2,8 +2,10 @@ from collections import Counter
 
 import numpy as np
 from numpy.typing import NDArray
+
 #
 from .tools import UnionFind
+
 #
 __all__ = [
     "boltzmann_factor",
@@ -23,6 +25,8 @@ __all__ = [
     "interface_density_ensemble",
     "order_parameter_susceptibility",
 ]
+
+
 #
 def boltzmann_factor(E: NDArray, T: float, k_B: float = 1.0) -> NDArray:
     """
@@ -47,9 +51,11 @@ def boltzmann_factor(E: NDArray, T: float, k_B: float = 1.0) -> NDArray:
     The Boltzmann factor is calculated as exp(-E / (k_B * T)).
     """
     from numpy import exp
+
     if T <= 0:
         raise ValueError("Temperature must be positive.")
     return exp(-E / (k_B * T))
+
 
 def find_largest_cluster_circle2D(circles, radius):
     """
@@ -70,8 +76,10 @@ def find_largest_cluster_circle2D(circles, radius):
     It employs a union-find data structure to group and identify clusters of overlapping circles.
     The function returns the largest cluster found.
     """
-    from scipy.spatial import KDTree
     from collections import defaultdict
+
+    from scipy.spatial import KDTree
+
     tree = KDTree(circles)
     uf = UnionFind(len(circles))
     threshold = 2 * radius
@@ -90,7 +98,10 @@ def find_largest_cluster_circle2D(circles, radius):
     largest_cluster = max(clusters.values(), key=len)
     return largest_cluster
 
-def correlated_binary_sequence_vectorized(length: int, T: float, J: float = 1.) -> NDArray:
+
+def correlated_binary_sequence_vectorized(
+    length: int, T: float, J: float = 1.0
+) -> NDArray:
     """
     Generate a random binary sequence with a given flipping probability based on interaction JI and temperature T,
     using a vectorized approach.
@@ -109,14 +120,16 @@ def correlated_binary_sequence_vectorized(length: int, T: float, J: float = 1.) 
     NDArray
         A binary sequence with flipping probabilities defined by tanh(JI / T).
     """
-    from numpy import tanh, random, cumsum, ones
-    P_flip = 1-0.5 * (tanh(J / T) + 1)  # Calculate flipping probability
+    from numpy import cumsum, ones, random, tanh
+
+    P_flip = 1 - 0.5 * (tanh(J / T) + 1)  # Calculate flipping probability
     flips = random.random(size=length) < P_flip
     sequence = ones(length, dtype=int)
     sequence[0] = random.choice([-1, 1])
     flips_cumsum = cumsum(flips)
     sequence = sequence[0] * (-1) ** flips_cumsum
     return sequence
+
 
 # --------------------------------------------------------------------------- #
 # Configuration-domain (cluster) observables                                  #
@@ -133,6 +146,7 @@ def correlated_binary_sequence_vectorized(length: int, T: float, J: float = 1.) 
 # ragged per-node neighbour/sign representation (``idx``, ``b``) plus a spin
 # vector. The native voter C/pybind kernel mirrors ``cluster_size_distribution``
 # exactly and is checked against it for parity (see the voter cluster tests).
+
 
 def edge_sign_arrays(signs, cluster_mode: str):
     """
@@ -157,6 +171,7 @@ def edge_sign_arrays(signs, cluster_mode: str):
     if cluster_mode == "rawspin":
         return [np.ones(len(sg), dtype=np.int8) for sg in signs]
     raise ValueError(f"unknown cluster_mode={cluster_mode!r}")
+
 
 def signed_neighbor_arrays(sg, cluster_mode: str = "rawspin"):
     """
@@ -191,6 +206,7 @@ def signed_neighbor_arrays(sg, cluster_mode: str = "rawspin"):
         idx.append(np.asarray(js, dtype=np.int64))
         signs.append(np.asarray(sgn, dtype=np.int8))
     return idx, edge_sign_arrays(signs, cluster_mode)
+
 
 def cluster_components(s, idx, b) -> np.ndarray:
     """
@@ -235,6 +251,7 @@ def cluster_components(s, idx, b) -> np.ndarray:
                     stack.append(v)
         cur += 1
     return label
+
 
 def flat_signed_edges(idx, b):
     """Flatten ragged ``(idx, b)`` neighbour arrays into deduped *undirected*
@@ -295,10 +312,14 @@ def iter_largest_cluster_masks(states, idx, b):
 def _largest_cluster_masks_chunk(states, idx, b) -> NDArray:
     """Stack the largest-cluster masks for a block of states (module-level so it
     is picklable for a process pool)."""
-    return np.asarray(list(iter_largest_cluster_masks(states, idx, b)), dtype=bool)
+    return np.asarray(
+        list(iter_largest_cluster_masks(states, idx, b)), dtype=bool
+    )
 
 
-def compute_largest_cluster_masks(states, idx, b, *, workers: int | None = None) -> NDArray:
+def compute_largest_cluster_masks(
+    states, idx, b, *, workers: int | None = None
+) -> NDArray:
     """Buffer the largest active-edge cluster mask of every frame as one
     ``(n_frames, N)`` boolean array.
 
@@ -344,7 +365,8 @@ def compute_largest_cluster_masks(states, idx, b, *, workers: int | None = None)
     edges = [round(i * n / w) for i in range(w + 1)]
     parts = Parallel(n_jobs=w, backend="loky")(
         delayed(_largest_cluster_masks_chunk)(arr[a:c], idx, b)
-        for a, c in zip(edges[:-1], edges[1:]) if c > a
+        for a, c in zip(edges[:-1], edges[1:])
+        if c > a
     )
     return np.concatenate(parts, axis=0)
 
@@ -354,6 +376,7 @@ def cluster_size_distribution(s, idx, b) -> Counter:
     label = cluster_components(s, idx, b)
     sizes = np.bincount(label)
     return Counter(int(x) for x in sizes)
+
 
 def largest_fraction(s_t, idx, b) -> list:
     """
@@ -373,8 +396,15 @@ def largest_fraction(s_t, idx, b) -> list:
         coarsening order parameter.
     """
     N = len(idx)
-    return [int(np.bincount(cluster_components(np.asarray(s, np.int8), idx, b)).max()) / N
-            for s in s_t]
+    return [
+        int(
+            np.bincount(
+                cluster_components(np.asarray(s, np.int8), idx, b)
+            ).max()
+        )
+        / N
+        for s in s_t
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -614,4 +644,3 @@ def order_parameter_susceptibility(op_samples, n_sites=None) -> tuple:
     var = float(arr.var(ddof=0))
     chi = var * (1.0 if n_sites is None else float(n_sites))
     return float(arr.mean()), chi
-

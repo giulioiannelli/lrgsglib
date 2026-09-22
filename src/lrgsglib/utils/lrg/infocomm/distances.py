@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.cluster.hierarchy import cophenet
 from scipy.linalg import expm
-from scipy.sparse import csr_matrix, csr_array
+from scipy.sparse import csr_array, csr_matrix
 from scipy.sparse.linalg import expm as sparse_expm
 from scipy.spatial.distance import squareform
 
@@ -17,7 +17,9 @@ __all__ = [
 ]
 
 
-def extract_ultrametric_matrix(linkage_matrix: NDArray, n_nodes: int) -> NDArray:
+def extract_ultrametric_matrix(
+    linkage_matrix: NDArray, n_nodes: int
+) -> NDArray:
     """
     Extract the ultrametric distance matrix from a linkage matrix.
 

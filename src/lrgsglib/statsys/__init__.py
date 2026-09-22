@@ -14,34 +14,34 @@ from ._solver_engine import (
     list_solvers_for_model,
     register_solver,
 )
-
-# Base classes
-from .DynSys import DynSys
 from .BinDynSys import BinDynSys
-from .ContDynSys import ContDynSys
-from .VecDynSys import VecDynSys
-
-# Binary-state dynamics
-from .IsingDynamics import IsingDynamics, IsingModel
 from .ContactProcess import (
     ContactProcess,
     ContactProcessBase,
     ContactProcessEI,
     ContactProcessSIR,
 )
-from .SignedRW import SignedRW
-from .VoterModel import VoterModel
+from .ContDynSys import ContDynSys
+from .CoupledODEModel import CoupledODEModel
+
+# Base classes
+from .DynSys import DynSys
+from .HeisenbergModel import HeisenbergModel
+
+# Binary-state dynamics
+from .IsingDynamics import IsingDynamics, IsingModel
 
 # Continuous-state dynamics
 from .KuramotoModel import KuramotoModel
-from .ReactionDiffusionModel import ReactionDiffusionModel
-from .CoupledODEModel import CoupledODEModel
+from .MultiSpeciesModel import MultiSpeciesModel
 
 # Vector-state dynamics
 from .PottsModel import PottsModel
+from .ReactionDiffusionModel import ReactionDiffusionModel
+from .SignedRW import SignedRW
+from .VecDynSys import VecDynSys
+from .VoterModel import VoterModel
 from .XYModel import XYModel
-from .HeisenbergModel import HeisenbergModel
-from .MultiSpeciesModel import MultiSpeciesModel
 
 __all__ = [
     # Solver registry

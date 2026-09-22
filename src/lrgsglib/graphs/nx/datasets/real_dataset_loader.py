@@ -12,15 +12,15 @@ Example
 >>> G = loader.load_konect("dolphins")
 """
 
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Optional, Union, Literal
-import hashlib
 import gzip
+import hashlib
 import io
 import os
 import tempfile
 import warnings
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Literal, Optional, Union
 
 import networkx as nx
 import numpy as np
@@ -250,9 +250,7 @@ class RealDatasetLoader:
         elif name == "football":
             # Football is in GML format in NetworkX data
             try:
-                url = (
-                    "http://www-personal.umich.edu/~mejn/netdata/football.zip"
-                )
+                url = "http://www-personal.umich.edu/~mejn/netdata/football.zip"
                 return self._load_gml_from_url(url, "football.gml")
             except Exception:
                 # Fallback: create a similar structure
@@ -417,8 +415,8 @@ class RealDatasetLoader:
         KONECT URL format: http://konect.cc/networks/{name}/
         Download URL: http://konect.cc/files/download.tsv.{name}.tar.bz2
         """
-        import urllib.request
         import tarfile
+        import urllib.request
 
         cache_path = self.cache_dir / f"konect_{name}"
 
@@ -445,9 +443,7 @@ class RealDatasetLoader:
                     tf.extractall(tmpdir)
 
                 # Find the extracted directory
-                extracted = [
-                    p for p in Path(tmpdir).iterdir() if p.is_dir()
-                ]
+                extracted = [p for p in Path(tmpdir).iterdir() if p.is_dir()]
                 if extracted:
                     # Move to cache
                     import shutil
@@ -642,9 +638,7 @@ class RealDatasetLoader:
             datasets = [d for d in datasets if d.source == source]
 
         if tags is not None:
-            datasets = [
-                d for d in datasets if any(t in d.tags for t in tags)
-            ]
+            datasets = [d for d in datasets if any(t in d.tags for t in tags)]
 
         return datasets
 

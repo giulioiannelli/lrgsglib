@@ -1,10 +1,13 @@
+from typing import Any
+
+import numpy as np
+from networkx import Graph, NetworkXError, empty_graph, set_node_attributes
+from networkx.utils import pairwise
+from networkx.utils.backends import _dispatchable as _nx_dispatchable
+from networkx.utils.backends import _registered_algorithms
 from numpy import sqrt
 from numpy.random import choice, rand
-import numpy as np
-from networkx import Graph, empty_graph, NetworkXError, set_node_attributes
-from networkx.utils import pairwise
-from networkx.utils.backends import _dispatchable as _nx_dispatchable, _registered_algorithms
-from typing import Any
+
 #
 __all__ = [
     # "triangular_lattice_graph_modified",
@@ -16,6 +19,8 @@ __all__ = [
     "kagome_lattice_graph",
     "tri_hexagonal_lattice_graph",
 ]
+
+
 #
 def _dispatchable_safe(**kwargs):
     def decorator(func):
@@ -23,6 +28,7 @@ def _dispatchable_safe(**kwargs):
         if name in _registered_algorithms:
             return func
         return _nx_dispatchable(func, **kwargs)
+
     return decorator
 
 
@@ -32,7 +38,7 @@ def triangular_lattice_graph_modified(
     n: int,
     periodic: bool = False,
     with_positions: bool = True,
-    create_using: Any = None
+    create_using: Any = None,
 ) -> Graph:
     """
     Generates a triangular lattice graph with optional periodic boundary
@@ -101,13 +107,9 @@ def triangular_lattice_graph_modified(
                 if j < m:
                     G.add_edge((i % n, j % m), (i % n, (j + 1) % m))
                     if j % 2:  # Diagonal for even rows
-                        G.add_edge(
-                            (i % n, j % m), ((i + 1) % n, (j + 1) % m)
-                        )
+                        G.add_edge((i % n, j % m), ((i + 1) % n, (j + 1) % m))
                     else:  # Diagonal for odd rows, wrapping if at the edge
-                        G.add_edge(
-                            (i % n, j % m), ((i - 1) % n, (j + 1) % m)
-                        )
+                        G.add_edge((i % n, j % m), ((i - 1) % n, (j + 1) % m))
     else:
         # Make grid
         G.add_edges_from(
@@ -139,13 +141,13 @@ def triangular_lattice_graph_modified(
         else:
             yy = (h * j for i in cols for j in rows)
         pos = {
-            (i, j): (x, y)
-            for i, j, x, y in zip(ii, jj, xx, yy)
-            if (i, j) in G
+            (i, j): (x, y) for i, j, x, y in zip(ii, jj, xx, yy) if (i, j) in G
         }
         set_node_attributes(G, pos, "pos")
 
     return G
+
+
 #
 @_dispatchable_safe(graphs=None, returns_graph=True)
 def triangular_lattice_graph_FastPatch(
@@ -154,7 +156,7 @@ def triangular_lattice_graph_FastPatch(
     periodic: bool = False,
     with_positions: bool = True,
     create_using: Any = None,
-    bend_positions: bool = False
+    bend_positions: bool = False,
 ) -> Graph:
     """
     Generates a triangular lattice graph with optional periodic boundary
@@ -224,13 +226,9 @@ def triangular_lattice_graph_FastPatch(
                 if j < m:
                     G.add_edge((i % n, j % m), (i % n, (j + 1) % m))
                     if j % 2:  # Diagonal for even rows
-                        G.add_edge(
-                            (i % n, j % m), ((i + 1) % n, (j + 1) % m)
-                        )
+                        G.add_edge((i % n, j % m), ((i + 1) % n, (j + 1) % m))
                     else:  # Diagonal for odd rows, wrapping if at the edge
-                        G.add_edge(
-                            (i % n, j % m), ((i - 1) % n, (j + 1) % m)
-                        )
+                        G.add_edge((i % n, j % m), ((i - 1) % n, (j + 1) % m))
     else:
         # Make grid
         G.add_edges_from(
@@ -262,13 +260,13 @@ def triangular_lattice_graph_FastPatch(
         else:
             yy = (h * i for i in rows for j in cols)
         pos = {
-            (j, i): (x, y)
-            for i, j, x, y in zip(ii, jj, xx, yy)
-            if (j, i) in G
+            (j, i): (x, y) for i, j, x, y in zip(ii, jj, xx, yy) if (j, i) in G
         }
         set_node_attributes(G, pos, "pos")
 
     return G
+
+
 #
 @_dispatchable_safe(graphs=None, returns_graph=True)
 def hexagonal_lattice_graph_FastPatch(
@@ -277,7 +275,7 @@ def hexagonal_lattice_graph_FastPatch(
     periodic: bool = False,
     with_positions: bool = True,
     create_using: Any = None,
-    bend_positions: bool = False
+    bend_positions: bool = False,
 ) -> Graph:
     """
     Generate a hexagonal lattice graph with optional periodic boundary
@@ -356,13 +354,13 @@ def hexagonal_lattice_graph_FastPatch(
         else:
             yy = (h * j for i in cols for j in rows)
         pos = {
-            (i, j): (x, y)
-            for i, j, x, y in zip(ii, jj, xx, yy)
-            if (i, j) in G
+            (i, j): (x, y) for i, j, x, y in zip(ii, jj, xx, yy) if (i, j) in G
         }
         set_node_attributes(G, pos, "pos")
 
     return G
+
+
 #
 @_dispatchable_safe(graphs=None, returns_graph=True)
 def squared_lattice_graph_FastPatch(
@@ -371,7 +369,7 @@ def squared_lattice_graph_FastPatch(
     periodic: bool = False,
     create_using: Any = None,
     with_positions: bool = True,
-    bend_positions: bool = False
+    bend_positions: bool = False,
 ) -> Graph:
     """
     Returns the two-dimensional grid graph.
@@ -415,10 +413,12 @@ def squared_lattice_graph_FastPatch(
     rows = range(m)
     cols = range(n)
     G.add_nodes_from((i, j) for i in rows for j in cols)
-    G.add_edges_from(((i, j), (pi, j)) for pi, i in pairwise(rows) 
-                     for j in cols)
-    G.add_edges_from(((i, j), (i, pj)) for i in rows 
-                     for pj, j in pairwise(cols))
+    G.add_edges_from(
+        ((i, j), (pi, j)) for pi, i in pairwise(rows) for j in cols
+    )
+    G.add_edges_from(
+        ((i, j), (i, pj)) for i in rows for pj, j in pairwise(cols)
+    )
 
     try:
         periodic_r, periodic_c = periodic
@@ -446,13 +446,13 @@ def squared_lattice_graph_FastPatch(
             xx = (i + 0.02 * j * j for i in rows for j in cols)
             yy = (j + 0.02 * i * i for i in rows for j in cols)
         pos = {
-            (i, j): (x, y)
-            for i, j, x, y in zip(ii, jj, xx, yy)
-            if (i, j) in G
+            (i, j): (x, y) for i, j, x, y in zip(ii, jj, xx, yy) if (i, j) in G
         }
         set_node_attributes(G, pos, "pos")
 
     return G
+
+
 #
 @_dispatchable_safe(graphs=None, returns_graph=True)
 def squared_lattice_SW_graph_FastPatch(
@@ -461,7 +461,7 @@ def squared_lattice_SW_graph_FastPatch(
     prew: float = 0,
     periodic: bool = False,
     create_using: Any = None,
-    with_positions: bool = True
+    with_positions: bool = True,
 ) -> Graph:
     """
     Generates a small-world squared lattice graph with optional periodic
@@ -525,6 +525,7 @@ def squared_lattice_SW_graph_FastPatch(
 
     return G
 
+
 @_dispatchable_safe(graphs=None, returns_graph=True)
 def rhomb_octagonal_graph_FastPatch(
     m: int,
@@ -532,12 +533,12 @@ def rhomb_octagonal_graph_FastPatch(
     periodic: bool = False,
     create_using: Any = None,
     with_positions: bool = True,
-    bend_positions: bool = False
+    bend_positions: bool = False,
 ) -> Graph:
     """
-    Generates a rhomb-octagonal lattice graph where each node of a square 
-    lattice is replaced by four nodes forming a rhomb. This creates a 
-    dual-scale lattice with rhombs at one scale and octagonal cells at 
+    Generates a rhomb-octagonal lattice graph where each node of a square
+    lattice is replaced by four nodes forming a rhomb. This creates a
+    dual-scale lattice with rhombs at one scale and octagonal cells at
     another scale.
 
     Parameters
@@ -697,7 +698,8 @@ def kagome_lattice_graph(
         #      reads as a clean edge column/row, not a stripe through the middle.
         ref_hex = (
             _nx.hexagonal_lattice_graph(m, n, periodic=False)
-            if periodic else hex_graph
+            if periodic
+            else hex_graph
         )
         hex_pos = _nx.get_node_attributes(ref_hex, "pos")
         pos = {}
@@ -708,8 +710,11 @@ def kagome_lattice_graph(
             xmax, ymax = max(xs), max(ys)
             spanx, spany = xmax - min(xs), ymax - min(ys)
             blens = [
-                ((hex_pos[a][0] - hex_pos[b][0]) ** 2
-                 + (hex_pos[a][1] - hex_pos[b][1]) ** 2) ** 0.5
+                (
+                    (hex_pos[a][0] - hex_pos[b][0]) ** 2
+                    + (hex_pos[a][1] - hex_pos[b][1]) ** 2
+                )
+                ** 0.5
                 for a, b in ref_hex.edges()
                 if a in hex_pos and b in hex_pos
             ]

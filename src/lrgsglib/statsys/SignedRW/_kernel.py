@@ -106,10 +106,10 @@ def _kill_masks(
       - kill when moving across ANY negative edge
       - never reflect
     """
-    if x_node_behavior == 'reflect':
+    if x_node_behavior == "reflect":
         kill_mask = frust
         reflect_mask = neg & ~frust
-    elif x_node_behavior == 'absorb':
+    elif x_node_behavior == "absorb":
         kill_mask = neg
         reflect_mask = np.zeros_like(neg)
     else:
@@ -157,10 +157,17 @@ def _init_walker_state(
     stop_reason[initial] = 0
     stopped |= initial
     return dict(
-        wid=wid, alive=alive, stopped=stopped, step=step,
-        stop_step=stop_step, stop_reason=stop_reason,
-        visited=visited, unique_count=unique_count,
-        visits_agg=visits_agg, visits_pw=visits_pw, history=history,
+        wid=wid,
+        alive=alive,
+        stopped=stopped,
+        step=step,
+        stop_step=stop_step,
+        stop_reason=stop_reason,
+        visited=visited,
+        unique_count=unique_count,
+        visits_agg=visits_agg,
+        visits_pw=visits_pw,
+        history=history,
     )
 
 
@@ -173,49 +180,60 @@ def _finalize_result(
 ):
     """Pack the walker-state dict into the observable dict returned to callers."""
     return dict(
-        unique_visits=state['unique_count'].astype(np.int64),
-        unique_frac=state['unique_count'] / neg.shape[0],
-        stop_step=state['stop_step'],
-        stop_reason=state['stop_reason'],
+        unique_visits=state["unique_count"].astype(np.int64),
+        unique_frac=state["unique_count"] / neg.shape[0],
+        stop_step=state["stop_step"],
+        stop_reason=state["stop_reason"],
         final_position=pos_idx.copy(),
-        visits_agg=state['visits_agg'],
-        visits_per_walker=state['visits_pw'],
-        history=state['history'],
+        visits_agg=state["visits_agg"],
+        visits_per_walker=state["visits_pw"],
+        history=state["history"],
         neg_frac=float(neg.sum()) / (2 * Ne),
         frust_frac=float(frust.sum()) / (2 * Ne),
     )
 
 
 def _absorb_kernel(
-    nbrs, neg, frust, *,
-    pos_idx, n_walkers, stop_thresh,
-    x_node_behavior, rng,
-    store_trajectory, store_per_walker_visits,
+    nbrs,
+    neg,
+    frust,
+    *,
+    pos_idx,
+    n_walkers,
+    stop_thresh,
+    x_node_behavior,
+    rng,
+    store_trajectory,
+    store_per_walker_visits,
 ):
     """Absorbing walker — dies on crossing a killing edge; reflects otherwise."""
     N, z = nbrs.shape
     kill_mask, reflect_mask = _kill_masks(neg, frust, x_node_behavior)
     st = _init_walker_state(
-        n_walkers, pos_idx, N, stop_thresh,
-        store_trajectory, store_per_walker_visits,
+        n_walkers,
+        pos_idx,
+        N,
+        stop_thresh,
+        store_trajectory,
+        store_per_walker_visits,
     )
-    wid = st['wid']
+    wid = st["wid"]
     # Trap safeguard (reflect mode only): a walker whose position has
     # every outgoing edge reflective AND no killing edge can never move
     # and cannot die — it would infinite-loop. Mark as stopped with
     # reason 2 ('trapped') at step 0.
-    if x_node_behavior == 'reflect':
+    if x_node_behavior == "reflect":
         all_refl = reflect_mask[pos_idx].all(axis=1)
         no_kill = ~kill_mask[pos_idx].any(axis=1)
-        trapped = all_refl & no_kill & ~st['stopped']
+        trapped = all_refl & no_kill & ~st["stopped"]
         if trapped.any():
-            st['stop_step'][trapped] = 0
-            st['stop_reason'][trapped] = 2
-            st['stopped'] |= trapped
-    while not st['stopped'].all():
-        active = ~st['stopped']
-        st['step'] += active
-        move = active & st['alive']
+            st["stop_step"][trapped] = 0
+            st["stop_reason"][trapped] = 2
+            st["stopped"] |= trapped
+    while not st["stopped"].all():
+        active = ~st["stopped"]
+        st["step"] += active
+        move = active & st["alive"]
         k = rng.integers(0, z, size=n_walkers)
         is_kill = kill_mask[pos_idx, k]
         is_refl = reflect_mask[pos_idx, k]
@@ -223,78 +241,99 @@ def _absorb_kernel(
         advance = move & ~is_refl
         new_pos = np.where(advance, nbrs[pos_idx, k], pos_idx)
         # death is resolved AFTER we know who advanced: absorb-on-crossing
-        st['alive'] &= ~(move & is_kill)
+        st["alive"] &= ~(move & is_kill)
         # visit bookkeeping uses the post-move position
-        pre = st['visited'][wid, new_pos]
-        st['visited'][wid, new_pos] = True
+        pre = st["visited"][wid, new_pos]
+        st["visited"][wid, new_pos] = True
         newly_visited = active & ~pre
-        st['unique_count'] += newly_visited
-        np.add.at(st['visits_agg'], new_pos[active], 1)
-        if st['visits_pw'] is not None:
-            st['visits_pw'][wid[active], new_pos[active]] += 1
+        st["unique_count"] += newly_visited
+        np.add.at(st["visits_agg"], new_pos[active], 1)
+        if st["visits_pw"] is not None:
+            st["visits_pw"][wid[active], new_pos[active]] += 1
         pos_idx = new_pos
-        if st['history'] is not None:
-            st['history'].append(pos_idx.copy())
+        if st["history"] is not None:
+            st["history"].append(pos_idx.copy())
         _mark_stops(
             st,
-            covered=active & (st['unique_count'] >= stop_thresh),
-            died=active & ~st['alive'],
+            covered=active & (st["unique_count"] >= stop_thresh),
+            died=active & ~st["alive"],
         )
     return pos_idx, st
 
 
 def _kill_kernel(
-    nbrs, neg, frust, *,
-    pos_idx, n_walkers, stop_thresh,
-    x_node_behavior, rng,
-    store_trajectory, store_per_walker_visits,
+    nbrs,
+    neg,
+    frust,
+    *,
+    pos_idx,
+    n_walkers,
+    stop_thresh,
+    x_node_behavior,
+    rng,
+    store_trajectory,
+    store_per_walker_visits,
 ):
     """Killing walker — at each step, die with prob ``1/n_neg`` at the current node."""
     N, z = nbrs.shape
     # kill-count-per-node: under 'reflect' count only frustrated edges,
     # under 'absorb' count all negative edges (notebook-default).
-    if x_node_behavior == 'reflect':
+    if x_node_behavior == "reflect":
         n_kill = frust.sum(axis=1)
-    elif x_node_behavior == 'absorb':
+    elif x_node_behavior == "absorb":
         n_kill = neg.sum(axis=1)
     else:
-        raise ValueError(f"x_node_behavior must be 'reflect'|'absorb', got {x_node_behavior!r}.")
+        raise ValueError(
+            f"x_node_behavior must be 'reflect'|'absorb', got {x_node_behavior!r}."
+        )
     kp = np.where(n_kill > 0, 1.0 / np.maximum(n_kill, 1), 0.0)
     st = _init_walker_state(
-        n_walkers, pos_idx, N, stop_thresh,
-        store_trajectory, store_per_walker_visits,
+        n_walkers,
+        pos_idx,
+        N,
+        stop_thresh,
+        store_trajectory,
+        store_per_walker_visits,
     )
-    wid = st['wid']
-    while not st['stopped'].all():
-        active = ~st['stopped']
-        st['step'] += active
-        die = active & st['alive'] & (rng.random(n_walkers) < kp[pos_idx])
-        st['alive'] &= ~die
-        move = active & st['alive']
+    wid = st["wid"]
+    while not st["stopped"].all():
+        active = ~st["stopped"]
+        st["step"] += active
+        die = active & st["alive"] & (rng.random(n_walkers) < kp[pos_idx])
+        st["alive"] &= ~die
+        move = active & st["alive"]
         k = rng.integers(0, z, size=n_walkers)
         new_pos = np.where(move, nbrs[pos_idx, k], pos_idx)
-        pre = st['visited'][wid, new_pos]
-        st['visited'][wid, new_pos] = True
-        st['unique_count'] += active & ~pre
-        np.add.at(st['visits_agg'], new_pos[active], 1)
-        if st['visits_pw'] is not None:
-            st['visits_pw'][wid[active], new_pos[active]] += 1
+        pre = st["visited"][wid, new_pos]
+        st["visited"][wid, new_pos] = True
+        st["unique_count"] += active & ~pre
+        np.add.at(st["visits_agg"], new_pos[active], 1)
+        if st["visits_pw"] is not None:
+            st["visits_pw"][wid[active], new_pos[active]] += 1
         pos_idx = new_pos
-        if st['history'] is not None:
-            st['history'].append(pos_idx.copy())
+        if st["history"] is not None:
+            st["history"].append(pos_idx.copy())
         _mark_stops(
             st,
-            covered=active & (st['unique_count'] >= stop_thresh),
-            died=active & ~st['alive'],
+            covered=active & (st["unique_count"] >= stop_thresh),
+            died=active & ~st["alive"],
         )
     return pos_idx, st
 
 
 def _sticky_kernel(
-    nbrs, neg, frust, *,
-    pos_idx, n_walkers, stop_thresh,
-    x_node_behavior, max_n_cross, rng,
-    store_trajectory, store_per_walker_visits,
+    nbrs,
+    neg,
+    frust,
+    *,
+    pos_idx,
+    n_walkers,
+    stop_thresh,
+    x_node_behavior,
+    max_n_cross,
+    rng,
+    store_trajectory,
+    store_per_walker_visits,
 ):
     """Sticky walker — ``P(move) = 2^(-n_cross)``; dies at ``n_cross >= max_n_cross``.
 
@@ -304,61 +343,67 @@ def _sticky_kernel(
     N, z = nbrs.shape
     # "crossing" count: under 'reflect' only frustrated counts toward stickiness,
     # under 'absorb' any negative counts.
-    if x_node_behavior == 'reflect':
+    if x_node_behavior == "reflect":
         cross_mask = frust
-    elif x_node_behavior == 'absorb':
+    elif x_node_behavior == "absorb":
         cross_mask = neg
     else:
-        raise ValueError(f"x_node_behavior must be 'reflect'|'absorb', got {x_node_behavior!r}.")
+        raise ValueError(
+            f"x_node_behavior must be 'reflect'|'absorb', got {x_node_behavior!r}."
+        )
     st = _init_walker_state(
-        n_walkers, pos_idx, N, stop_thresh,
-        store_trajectory, store_per_walker_visits,
+        n_walkers,
+        pos_idx,
+        N,
+        stop_thresh,
+        store_trajectory,
+        store_per_walker_visits,
     )
-    wid = st['wid']
+    wid = st["wid"]
     n_cross = np.zeros(n_walkers, dtype=np.int64)
-    while not st['stopped'].all():
-        active = ~st['stopped']
+    while not st["stopped"].all():
+        active = ~st["stopped"]
         p_move = np.ldexp(1.0, -n_cross)
         W = rng.geometric(p_move).astype(np.int64)
-        st['step'] += active * W
+        st["step"] += active * W
         k = rng.integers(0, z, size=n_walkers)
         is_cross = cross_mask[pos_idx, k]
         new_pos = np.where(active, nbrs[pos_idx, k], pos_idx)
         n_cross += active & is_cross
-        st['alive'] = n_cross < max_n_cross
-        pre = st['visited'][wid, new_pos]
-        st['visited'][wid, new_pos] = True
-        st['unique_count'] += active & ~pre
-        np.add.at(st['visits_agg'], new_pos[active], 1)
-        if st['visits_pw'] is not None:
-            st['visits_pw'][wid[active], new_pos[active]] += 1
+        st["alive"] = n_cross < max_n_cross
+        pre = st["visited"][wid, new_pos]
+        st["visited"][wid, new_pos] = True
+        st["unique_count"] += active & ~pre
+        np.add.at(st["visits_agg"], new_pos[active], 1)
+        if st["visits_pw"] is not None:
+            st["visits_pw"][wid[active], new_pos[active]] += 1
         pos_idx = new_pos
-        if st['history'] is not None:
-            st['history'].append(pos_idx.copy())
+        if st["history"] is not None:
+            st["history"].append(pos_idx.copy())
         _mark_stops(
             st,
-            covered=active & (st['unique_count'] >= stop_thresh),
-            died=active & ~st['alive'],
+            covered=active & (st["unique_count"] >= stop_thresh),
+            died=active & ~st["alive"],
         )
     return pos_idx, st
 
 
 def _mark_stops(state: dict, covered: np.ndarray, died: np.ndarray) -> None:
     """Record stop time/reason for walkers that just stopped."""
-    stopped = state['stopped']
+    stopped = state["stopped"]
     new_c = covered & ~stopped
     new_d = died & ~stopped
-    state['stop_step'][new_c] = state['step'][new_c]
-    state['stop_reason'][new_c] = 0
-    state['stop_step'][new_d] = state['step'][new_d]
-    state['stop_reason'][new_d] = 1
-    state['stopped'][new_c | new_d] = True
+    state["stop_step"][new_c] = state["step"][new_c]
+    state["stop_reason"][new_c] = 0
+    state["stop_step"][new_d] = state["step"][new_d]
+    state["stop_reason"][new_d] = 1
+    state["stopped"][new_c | new_d] = True
 
 
 _KERNELS = {
-    'absorb': _absorb_kernel,
-    'kill': _kill_kernel,
-    'sticky': _sticky_kernel,
+    "absorb": _absorb_kernel,
+    "kill": _kill_kernel,
+    "sticky": _sticky_kernel,
 }
 
 
@@ -370,7 +415,7 @@ def run_walker(
     start_positions: np.ndarray,
     seed: int,
     coverage_stop: float,
-    x_node_behavior: str = 'reflect',
+    x_node_behavior: str = "reflect",
     max_n_cross: int = 14,
     store_trajectory: bool = False,
     store_per_walker_visits: bool = False,
@@ -404,7 +449,9 @@ def run_walker(
         ``neg_frac``, ``frust_frac``.
     """
     if rule not in _KERNELS:
-        raise ValueError(f"rule must be one of {tuple(_KERNELS)}, got {rule!r}.")
+        raise ValueError(
+            f"rule must be one of {tuple(_KERNELS)}, got {rule!r}."
+        )
     pos_idx = np.asarray(start_positions, dtype=np.int64).copy()
     if pos_idx.shape != (n_walkers,):
         raise ValueError(
@@ -417,19 +464,22 @@ def run_walker(
     stop_thresh = max(1, int(coverage_stop * N))
     rng = np.random.default_rng(seed)
     kwargs = dict(
-        pos_idx=pos_idx, n_walkers=n_walkers, stop_thresh=stop_thresh,
-        x_node_behavior=x_node_behavior, rng=rng,
+        pos_idx=pos_idx,
+        n_walkers=n_walkers,
+        stop_thresh=stop_thresh,
+        x_node_behavior=x_node_behavior,
+        rng=rng,
         store_trajectory=store_trajectory,
         store_per_walker_visits=store_per_walker_visits,
     )
-    if rule == 'sticky':
-        kwargs['max_n_cross'] = max_n_cross
+    if rule == "sticky":
+        kwargs["max_n_cross"] = max_n_cross
     final_pos, state = _KERNELS[rule](nbrs, neg, frust, **kwargs)
-    Ne = int(sg.Ne) if hasattr(sg, 'Ne') else int(sg.num_edges)
+    Ne = int(sg.Ne) if hasattr(sg, "Ne") else int(sg.num_edges)
     return _finalize_result(state, final_pos, neg, frust, Ne)
 
 
 __all__ = [
-    'signed_lattice_tables',
-    'run_walker',
+    "signed_lattice_tables",
+    "run_walker",
 ]

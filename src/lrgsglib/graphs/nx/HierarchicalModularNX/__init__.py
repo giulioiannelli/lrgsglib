@@ -1,7 +1,7 @@
 """Hierarchical Modular Network module."""
 
-from .HierarchicalModularNetworkNX import HierarchicalModularNetworkNX
 from .generators_hmn import hierarchical_modular_network
+from .HierarchicalModularNetworkNX import HierarchicalModularNetworkNX
 
 # Backward compatibility alias
 HierarchicalModularNetwork = HierarchicalModularNetworkNX

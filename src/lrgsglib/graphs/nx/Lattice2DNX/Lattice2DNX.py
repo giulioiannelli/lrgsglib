@@ -1,22 +1,24 @@
-from os.path import join as pth_join
 import warnings
+from os.path import join as pth_join
 
-import numpy as np
 import networkx as nx
-from networkx import convert_node_labels_to_integers, set_node_attributes, Graph
+import numpy as np
+from networkx import Graph, convert_node_labels_to_integers, set_node_attributes
 
 from ....config.const import *
 from ....config.errwar import Lattice2DWarning
+from ....utils.basic.arithmetic import adjust_to_even
 from ....utils.basic.iterables import compose
 from ....utils.basic.numeric import is_positive_int
-from ....utils.basic.arithmetic import adjust_to_even
+from ..._shared._draw import draw as _draw_lattice2d
+from ..._shared._nw_geometry import hub_central_edge, oriented_cell_edges
+from ..._shared.animation.lattice2d import _Lattice2DAnimate, _Lattice2DPlot
 from ..funcs import *
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
-from .generators_2d import *
-from ..._shared._draw import draw as _draw_lattice2d
-from ..._shared._nw_geometry import oriented_cell_edges, hub_central_edge
 from ._nw_container import Lattice2DNXnwContainer
-from ..._shared.animation.lattice2d import _Lattice2DAnimate, _Lattice2DPlot
+from .generators_2d import *
+
+
 #
 class Lattice2DNX(SignedGraphNX):
     """
@@ -73,7 +75,9 @@ class Lattice2DNX(SignedGraphNX):
     >>> lat = Lattice2DNX(side1=10, geo="sqr", pflip=0.2, seed=1)
     >>> lat.flip_random_fract_edges()  # apply sign flips
     """
+
     eta_c = 1.128
+
     #
     def __init__(
         self,
@@ -90,7 +94,7 @@ class Lattice2DNX(SignedGraphNX):
         only_const_mode: bool = L2D_ONLY_CONST_MODE,
         **kwargs,
     ) -> None:
-        self._verify_pflip(kwargs.get('pflip', 0.))
+        self._verify_pflip(kwargs.get("pflip", 0.0))
         self.only_const_mode = only_const_mode
         self.__init_side__(side1, side2)
         self.pbc = pbc
@@ -101,7 +105,11 @@ class Lattice2DNX(SignedGraphNX):
         #
         self.__init_stdFname__(stdFnameSFFX)
         #
-        self.sgpathn = pth_join(sgpathn, L2D_PATH_DICT[self.geo]) if sgpathn else L2D_PATH_DICT[self.geo]
+        self.sgpathn = (
+            pth_join(sgpathn, L2D_PATH_DICT[self.geo])
+            if sgpathn
+            else L2D_PATH_DICT[self.geo]
+        )
         self.with_positions = with_positions
         self.bend_positions = bend_positions
         #
@@ -110,6 +118,7 @@ class Lattice2DNX(SignedGraphNX):
         else:
             self.G = nx.Graph()
         super(Lattice2DNX, self).__init__(self.G, **kwargs)
+
     #
     def __init_side__(self, side1: int, side2: int) -> None:
         """
@@ -132,47 +141,52 @@ class Lattice2DNX(SignedGraphNX):
         if side2 and not is_positive_int(side2):
             raise ValueError("side2 must be a positive integer.")
         if side2:
-            self.side1, self.side2 = (side2, side1) if side2 > side1 else (side1, side2)
+            self.side1, self.side2 = (
+                (side2, side1) if side2 > side1 else (side1, side2)
+            )
         else:
             self.side1 = side1
         #
+
     #
     def __init_geo__(self, geo: str) -> None:
         self.geo = geo
-        if self.prew > 0.:
-            self.geo = geo + '_sw'
+        if self.prew > 0.0:
+            self.geo = geo + "_sw"
         if geo not in L2D_GEO_LIST:
             if geo not in L2D_GEO_SHRT_LIST:
                 warnings.warn(L2D_WARNMSG_GEO, Lattice2DWarning)
                 self.geo = L2D_GEO
             else:
                 self.geo = L2D_SHRT_GEO_DICT[self.geo]
-        if not hasattr(self, 'side2'):
-            if self.geo == 'hexagonal':
+        if not hasattr(self, "side2"):
+            if self.geo == "hexagonal":
                 self.side2 = self.side1
-                self.side1 = adjust_to_even(self.side1/np.sqrt(3))
+                self.side1 = adjust_to_even(self.side1 / np.sqrt(3))
                 if (self.side1 % 2 or self.side2 % 2) and self.pbc:
                     raise ValueError(L2D_ERRMSG_GEO)
-            elif self.geo in ('kagome', 'tri_hexagonal'):
+            elif self.geo in ("kagome", "tri_hexagonal"):
                 self.side2 = self.side1
             else:
                 self.side2 = self.side1
             # if (self.side1 % 2 or self.side2 % 2) and self.pbc:
             #     raise ValueError(DEFLattice2D_geoerrmsg)
-                #
+            #
         # For rhomb_octagonal graphs each rhomb contributes four nodes
-        self.node_multiplier = 4 if self.geo.startswith(L2D_SHRT_GEO_DICT['oct_sqr']) else 1
+        self.node_multiplier = (
+            4 if self.geo.startswith(L2D_SHRT_GEO_DICT["oct_sqr"]) else 1
+        )
         total_nodes = self.node_multiplier * self.side1 * self.side2
-        
+
         if self.side1 == self.side2:
             self.syshapePth = f"N={total_nodes}"
         elif self.side1 > self.side2:
             self.syshapePth = f"L1={self.side1}_L2={self.side2}"
         elif self.side2 > self.side1:
             self.syshapePth = f"L1={self.side2}_L2={self.side1}"
-        if self.prew > 0.:
+        if self.prew > 0.0:
             self.syshapePth = self.syshapePth + f"_prew={self.prew:.3g}"
-        
+
         # Set syshape to reflect actual number of nodes
         if self.node_multiplier > 1:
             # For oct_sqr: each side gets multiplied by 2 (since 2*2 = 4 nodes per rhomb)
@@ -180,63 +194,72 @@ class Lattice2DNX(SignedGraphNX):
         else:
             self.syshape = (self.side1, self.side2)
         #
-        self.p_c = L2D_P_C_DICT.get(self.geo, float('nan'))
+        self.p_c = L2D_P_C_DICT.get(self.geo, float("nan"))
         if np.isfinite(self.p_c) and self.p_c > 0:
-            self.r_c = np.sqrt(self.eta_c/(np.pi*self.p_c))
+            self.r_c = np.sqrt(self.eta_c / (np.pi * self.p_c))
         else:
-            self.r_c = float('nan')
+            self.r_c = float("nan")
+
     #
     def __init_stdFname__(self, SFFX: str = "") -> None:
         self.std_fname = L2D_GEO_SHRT_DICT[self.geo] + SFFX
+
     #
     def __init_lattice__(self) -> None:
         #
-        if self.geo.startswith(L2D_SHRT_GEO_DICT['tri']):
-            if self.prew == 0.:
+        if self.geo.startswith(L2D_SHRT_GEO_DICT["tri"]):
+            if self.prew == 0.0:
                 nxfunc = triangular_lattice_graph_FastPatch
             else:
-                nxfunc = compose(triangular_lattice_graph_FastPatch, 
-                                 rewire_edges_optimized, 
-                                 g_kwargs={'prew': self.prew})
+                nxfunc = compose(
+                    triangular_lattice_graph_FastPatch,
+                    rewire_edges_optimized,
+                    g_kwargs={"prew": self.prew},
+                )
             self.z = 6
-        elif self.geo.startswith(L2D_SHRT_GEO_DICT['sqr']):
-            if self.prew == 0.:
+        elif self.geo.startswith(L2D_SHRT_GEO_DICT["sqr"]):
+            if self.prew == 0.0:
                 nxfunc = squared_lattice_graph_FastPatch
             else:
-                nxfunc = compose(squared_lattice_graph_FastPatch, 
-                                 rewire_edges_optimized, 
-                                 g_kwargs={'prew': self.prew})
+                nxfunc = compose(
+                    squared_lattice_graph_FastPatch,
+                    rewire_edges_optimized,
+                    g_kwargs={"prew": self.prew},
+                )
             self.z = 4
-        elif self.geo == L2D_SHRT_GEO_DICT['hex']:
+        elif self.geo == L2D_SHRT_GEO_DICT["hex"]:
             self.z = 3
             nxfunc = hexagonal_lattice_graph_FastPatch
-        elif self.geo.startswith(L2D_SHRT_GEO_DICT['oct_sqr']):
+        elif self.geo.startswith(L2D_SHRT_GEO_DICT["oct_sqr"]):
             self.z = 3
             nxfunc = rhomb_octagonal_graph_FastPatch
-        elif self.geo == L2D_SHRT_GEO_DICT['kgm']:
+        elif self.geo == L2D_SHRT_GEO_DICT["kgm"]:
             self.z = 4
             nxfunc = kagome_lattice_graph
-        elif self.geo == L2D_SHRT_GEO_DICT['tri_hex']:
+        elif self.geo == L2D_SHRT_GEO_DICT["tri_hex"]:
             self.z = 3
             nxfunc = tri_hexagonal_lattice_graph
 
         #
         self.H = nxfunc(
-            self.side1, 
-            self.side2, 
-            periodic=self.pbc, 
+            self.side1,
+            self.side2,
+            periodic=self.pbc,
             with_positions=self.with_positions,
-            bend_positions=self.bend_positions
+            bend_positions=self.bend_positions,
         )
         self.G = nx.convert_node_labels_to_integers(self.H)
 
     def get_expected_num_nodes(self) -> int:
         """Return the expected number of nodes for the lattice."""
         return int(self.node_multiplier * self.side1 * self.side2)
+
     #
     def degree_check(self, degree):
-        return np.where(np.array(list(map(lambda x: x[1], 
-                                          list(self.G.degree())))) != degree)
+        return np.where(
+            np.array(list(map(lambda x: x[1], list(self.G.degree())))) != degree
+        )
+
     #
     def _cell_posfn(self, on_g: str = L2D_ONREP):
         """Return a ``node -> (x, y)`` coordinate function for repr ``on_g``.
@@ -311,7 +334,10 @@ class Lattice2DNX(SignedGraphNX):
         box = None
         if self.pbc:
             box = (float(self.side1), float(self.side2))
-        return oriented_cell_edges(self, node, on_g, self._cell_posfn(on_g), box)
+        return oriented_cell_edges(
+            self, node, on_g, self._cell_posfn(on_g), box
+        )
+
     #
     nwContainer = Lattice2DNXnwContainer
     # Engine-agnostic 2D lattice drawing (shared with Lattice2DGT).

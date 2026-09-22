@@ -1,4 +1,5 @@
 """N-dimensional lattice using graph-tool, inheriting SignedGraphGT."""
+
 from __future__ import annotations
 
 from typing import Optional, Tuple, Union
@@ -8,6 +9,7 @@ import numpy as np
 try:
     import graph_tool.all as gt
     import graph_tool.generation as gen
+
     GT_AVAILABLE = True
 except ImportError:
     GT_AVAILABLE = False
@@ -73,8 +75,14 @@ class LatticeNDGT(SignedGraphGT):
         self._syshapePth = f"N={G.num_vertices()}"
 
         # Pop any NX-specific kwargs that might leak through facades
-        for key in ("sgpathn", "stdFnameSFFX", "only_const_mode",
-                     "path_data", "path_plot", "init_nw_dict"):
+        for key in (
+            "sgpathn",
+            "stdFnameSFFX",
+            "only_const_mode",
+            "path_data",
+            "path_plot",
+            "init_nw_dict",
+        ):
             kwargs.pop(key, None)
 
         # Initialize SignedGraphGT

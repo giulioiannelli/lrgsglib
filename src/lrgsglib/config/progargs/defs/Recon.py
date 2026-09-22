@@ -1,4 +1,4 @@
-ALL_MODES = ['statistic', 'full']
+ALL_MODES = ["statistic", "full"]
 DEFAULT_MODE = ALL_MODES[0]
 DEFAULT_MAX_FACTOR = 2
 DEFAULT_BASIS_STEP = 1

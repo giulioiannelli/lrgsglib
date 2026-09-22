@@ -14,13 +14,13 @@ import numpy as np
 try:
     import graph_tool as gt
     from graph_tool import Graph
+
     GT_AVAILABLE = True
 except ImportError:
     GT_AVAILABLE = False
     Graph = object
 
 from ..SignedGraphGT import SignedGraphGT
-
 
 __all__ = ["DiracLatticeGraphGT"]
 
@@ -81,7 +81,6 @@ class DiracLatticeGraphGT(SignedGraphGT):
 
         # Initialize base class with generated graph
         super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
-
 
     def _generate(self) -> "Graph":
         """Generate the Dirac graph. Must be implemented by subclasses."""
@@ -187,7 +186,9 @@ class DiracLatticeGraphGT(SignedGraphGT):
 
     def get_expected_num_nodes(self) -> int:
         """Return expected number of nodes. Must be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement get_expected_num_nodes()")
+        raise NotImplementedError(
+            "Subclasses must implement get_expected_num_nodes()"
+        )
 
     @property
     def N(self) -> int:

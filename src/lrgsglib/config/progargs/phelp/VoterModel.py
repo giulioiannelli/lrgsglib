@@ -48,9 +48,7 @@ phelp_voter_steps = (
 phelp_voter_simref = (
     "Size-normalised time; steps = simref x N. Mutually exclusive with --steps."
 )
-phelp_voter_state_type = (
-    "State encoding: 'bipolar' (-1/+1) or 'binary' (0/1)."
-)
+phelp_voter_state_type = "State encoding: 'bipolar' (-1/+1) or 'binary' (0/1)."
 phelp_voter_freq = "Recording frequency for the history/observable sampling."
 phelp_voter_num_log_samples = (
     "Log-spaced snapshot count for the C-subprocess backend (C0S mode)."
@@ -79,16 +77,18 @@ phelp_voter_cluster_mode = (
 phelp_voter_sout_every = (
     "Subsample the saved trajectory: keep every Nth recorded sweep (>= 1)."
 )
-phelp_voter_sout_nlog = (
-    "Log-spaced snapshot count for the saved trajectory (overrides --sout-every)."
-)
+phelp_voter_sout_nlog = "Log-spaced snapshot count for the saved trajectory (overrides --sout-every)."
 phelp_voter_sout_force_full = (
     "Force the full trajectory, overriding the 4 GiB soft cap fallback."
 )
 
 # --- observable save gates -----------------------------------------------------
-phelp_voter_save_magn = "Record/persist the per-spin magnetization series (magn)."
-phelp_voter_save_sout = "Record/persist the spin-configuration trajectory (sout)."
+phelp_voter_save_magn = (
+    "Record/persist the per-spin magnetization series (magn)."
+)
+phelp_voter_save_sout = (
+    "Record/persist the spin-configuration trajectory (sout)."
+)
 phelp_voter_save_cldist = (
     "Record/persist the cluster-size-distribution time series (cldist); enables "
     "cluster tracking."
@@ -104,9 +104,7 @@ phelp_voter_upd_mode_list = (
     "Serializer sweep: one job per update schedule in this list. Omit to use the "
     "single --upd_mode."
 )
-phelp_voter_alpha_list = (
-    "Serializer sweep: nonlinearity exponents (nonlinear rule). Omit for --alpha."
-)
+phelp_voter_alpha_list = "Serializer sweep: nonlinearity exponents (nonlinear rule). Omit for --alpha."
 phelp_voter_alpha_linsp = (
     "Serializer sweep: semicolon-separated linspace tuples for alpha, e.g. "
     "'(0.5, 2.0, 7)'."

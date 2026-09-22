@@ -3,6 +3,7 @@ LFRBenchmarkGT - Falls back to NX implementation (no native GT implementation).
 """
 
 import warnings
+
 from ...nx.random import LFRBenchmarkNX
 
 warnings.warn(

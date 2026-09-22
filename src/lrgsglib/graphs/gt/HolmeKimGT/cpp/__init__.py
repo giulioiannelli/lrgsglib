@@ -6,6 +6,7 @@ generation using graph-tool's C++ backend.
 
 Build with: make cpp-make (from lrgsglib root)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,6 +20,7 @@ _SO_PATH = Path(__file__).parent / "holme_kim.so"
 
 try:
     from . import holme_kim as _hk_module
+
     _create_holme_kim_raw = _hk_module.create_holme_kim
 except ImportError as e:
     _hk_module = None

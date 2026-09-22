@@ -1,17 +1,20 @@
 from pathlib import Path
-from typing import Union, Tuple
+from typing import Tuple, Union
+
+from dotenv import load_dotenv
 from numpy import integer as np_int
 from numpy import pi as np_pi
-from dotenv import load_dotenv
+
 #
 from .lrgsg_env import *
+
 # types
 ColorType = Union[
     Tuple[int, int, int],
     Tuple[float, float, float],
     Tuple[int, int, int, int],
     Tuple[float, float, float, float],
-    str
+    str,
 ]
 GeneralInteger = (int, np_int)
 # extensions
@@ -35,69 +38,80 @@ SAVEFIG_BBOX = "tight"
 # lrgsglib.plotlib.animation.video). Lossless yuv420p keeps discrete spin
 # colours exact (no chroma/DCT smear); an even integer upscale gives a viewable,
 # chroma-aligned frame that every player (incl. VS Code) can decode.
-ANIM_VIDEO_TARGET_PX = 240   # nearest-neighbour upscale targets each frame's long edge near this
-ANIM_VIDEO_CRF = 0           # H.264 quality; 0 = lossless -> exact colours
+ANIM_VIDEO_TARGET_PX = (
+    240  # nearest-neighbour upscale targets each frame's long edge near this
+)
+ANIM_VIDEO_CRF = 0  # H.264 quality; 0 = lossless -> exact colours
 ANIM_VIDEO_PRESET = "ultrafast"
-ANIM_VIDEO_FPS = 12          # default playback fps for lattice animations
+ANIM_VIDEO_FPS = 12  # default playback fps for lattice animations
 # paths
 load_dotenv()
 #
 PATHNLLIB: str = Path(LRGSG_LLIB).resolve().name
 #
-PATHDATA = Path(LRGSG_DATA)#
+PATHDATA = Path(LRGSG_DATA)  #
 #
 #
 PATHNDATA = PATHDATA.name
 #
-PATHNCLDT = 'cluster_data'
-PATHNGRPH = 'graph'
-PATHNISNG = 'ising'
-PATHNLRGS = 'lrgsg'
-PATHNPAPR = 'paper'
-PATHNPHTR = 'phtra'
-PATHNPLOT = 'plot'
-PATHNSPEC = 'spect'
-PATHNVM = 'voter'
-PATHNCP = 'cntct'
-PATHNSRW = 'srw'
-PATHNPOTTS = 'potts'
-PATHNXY = 'xy'
-PATHNHEIS = 'heisenberg'
-PATHNMS = 'multi_species'
-PATHNKURA = 'kuramoto'
-PATHNRD = 'reaction_diffusion'
-PATHNCODE = 'coupled_ode'
+PATHNCLDT = "cluster_data"
+PATHNGRPH = "graph"
+PATHNISNG = "ising"
+PATHNLRGS = "lrgsg"
+PATHNPAPR = "paper"
+PATHNPHTR = "phtra"
+PATHNPLOT = "plot"
+PATHNSPEC = "spect"
+PATHNVM = "voter"
+PATHNCP = "cntct"
+PATHNSRW = "srw"
+PATHNPOTTS = "potts"
+PATHNXY = "xy"
+PATHNHEIS = "heisenberg"
+PATHNMS = "multi_species"
+PATHNKURA = "kuramoto"
+PATHNRD = "reaction_diffusion"
+PATHNCODE = "coupled_ode"
 # Graph-related paths (created by SignedGraph)
 PATHN_GRAPH_LIST = [PATHNGRPH, PATHNLRGS, PATHNPHTR, PATHNSPEC]
 # Dynamics-related paths (created by respective dynamics classes)
 PATHN_DYNAMICS_LIST = [
-    PATHNISNG, PATHNVM, PATHNCP, PATHNSRW,
-    PATHNPOTTS, PATHNXY, PATHNHEIS, PATHNMS,
-    PATHNKURA, PATHNRD, PATHNCODE,
+    PATHNISNG,
+    PATHNVM,
+    PATHNCP,
+    PATHNSRW,
+    PATHNPOTTS,
+    PATHNXY,
+    PATHNHEIS,
+    PATHNMS,
+    PATHNKURA,
+    PATHNRD,
+    PATHNCODE,
 ]
 # All paths (for backward compatibility)
 PATHN_LIST = PATHN_GRAPH_LIST + PATHN_DYNAMICS_LIST
 #
-PATHPLOT =  PATHDATA / Path(PATHNPLOT)
+PATHPLOT = PATHDATA / Path(PATHNPLOT)
 PATHPAPER = PATHPLOT / Path(PATHNPAPR)
 PATHCLDAT = Path(PATHNDATA, PATHNCLDT)
 #
 # default values
-LB_PFLIP = 0.
-UB_PFLIP = 1.
+LB_PFLIP = 0.0
+UB_PFLIP = 1.0
 #
 BSP_VAL = [-1, +1]
-BSP_STORE_MODE = ''
-BSP_STORE_MODES = [BSP_STORE_MODE, 'persistent', 'sequential']
+BSP_STORE_MODE = ""
+BSP_STORE_MODES = [BSP_STORE_MODE, "persistent", "sequential"]
 BSP_STORE_FREQ = 0
-BSP_RUN_MODE_C = 'C'
-BSP_RUN_MODE_PYTHON = 'Python'
+BSP_RUN_MODE_C = "C"
+BSP_RUN_MODE_PYTHON = "Python"
 BSP_RUN_MODE = BSP_RUN_MODE_PYTHON
 BSP_RUN_MODES_C_LIST = [BSP_RUN_MODE_C, "c"]
 BSP_RUN_MODES_C_DICT = {bsp: BSP_RUN_MODE_C for bsp in BSP_RUN_MODES_C_LIST}
 BSP_RUN_MODES_PY_LIST = [BSP_RUN_MODE_PYTHON, "py", "Py", "PY", "Python"]
-BSP_RUN_MODES_PY_DICT = {bsp: BSP_RUN_MODE_PYTHON 
-                         for bsp in BSP_RUN_MODES_PY_LIST}
+BSP_RUN_MODES_PY_DICT = {
+    bsp: BSP_RUN_MODE_PYTHON for bsp in BSP_RUN_MODES_PY_LIST
+}
 BSP_RUN_MODES = BSP_RUN_MODES_PY_LIST + BSP_RUN_MODES_C_LIST
 BSP_RUN_MODES_DICT = {**BSP_RUN_MODES_PY_DICT, **BSP_RUN_MODES_C_DICT}
 # Signed Graph default values
@@ -105,20 +119,24 @@ SG_PFLIP = 0.0
 SG_IMPORT_ON = False
 SG_IMPORT_EIGV = False
 SG_INIT_NW_DICT = False
-SG_PREW = 0.0   # default edge-rewiring fraction (small-world); 0 = no rewiring
-SG_PDIL = 0.0   # default bond-dilution fraction; 0 = no dilution
+SG_PREW = 0.0  # default edge-rewiring fraction (small-world); 0 = no rewiring
+SG_PDIL = 0.0  # default bond-dilution fraction; 0 = no dilution
 SG_DIL_EXTRACT_GIANT = True  # after dilution, keep largest connected component
-SG_DISORDER = 'rand'   # default disorder support; see graphs/_shared/_disorder.py.
-                       # 'rand'+pflip=0 -> positive graph (backward compatible);
-                       # None -> defer (select fleset, realize signs manually later)
-SG_COUPLING = 'flip'   # default coupling law: w -> -w (sign flip, the ±1 behavior)
+SG_DISORDER = (
+    "rand"  # default disorder support; see graphs/_shared/_disorder.py.
+)
+# 'rand'+pflip=0 -> positive graph (backward compatible);
+# None -> defer (select fleset, realize signs manually later)
+SG_COUPLING = (
+    "flip"  # default coupling law: w -> -w (sign flip, the ±1 behavior)
+)
 SG_INIT_WVAL = 1.0
-SG_EXPORT_M = 'pk'
-SG_LOAD_M = 'pk'
-SG_LIST_REPR = ['H']
-SG_REPR = 'G'
+SG_EXPORT_M = "pk"
+SG_LOAD_M = "pk"
+SG_LIST_REPR = ["H"]
+SG_REPR = "G"
 SG_GRAPHINT_REPR = SG_REPR
-SG_GRAPHGEO_REPR = 'H'
+SG_GRAPHGEO_REPR = "H"
 SG_ERRMSG_MAXEIGVIDX = """The maximum eigenvalue index is out of bounds."""
 SG_ERRMSG_NW_DICT = f"Inheriting class must have attribute 'nwContainer'"
 SG_ERRMSG_NFLIP = """The probability of flipping an edge times the 
@@ -133,7 +151,7 @@ SG_WARNMSG_HASATTR = """The object does not has attribute."""
 SG_WARNMSG_NOCLUST = """No clusters were found in the graph."""
 # erdos renyi default values
 WS_PHTABB = "ws"
-WS_ONREP = 'G'
+WS_ONREP = "G"
 WS_STDFN = ""
 WS_SGPATH = ""
 # fully connected default values
@@ -141,48 +159,48 @@ FC_N = 100
 FC_PHTABB = "fc"
 FC_STDFN = ""
 FC_SGPATH = ""
-# scs generalized nn default values  
+# scs generalized nn default values
 SCS_PHTABB = "scs_nn"
 SCS_STDFN = ""
 SCS_SGPATH = ""
 # erdos renyi default values
 ER_PHTABB = "er"
-ER_ONREP = 'G'
+ER_ONREP = "G"
 ER_STDFN = ""
 ER_SGPATH = ""
 # Dorogovtsev-Goltsev-Mendes default values
 DGM_PHTABB = "dgm"
-DGM_ONREP = 'G'
+DGM_ONREP = "G"
 DGM_STDFN = ""
 DGM_SGPATH = ""
 # 2D Lattice default values
 L2D_BEND_POS = False
-L2D_FBCV = 1.
-L2D_PREW = 0.
+L2D_FBCV = 1.0
+L2D_PREW = 0.0
 L2D_PBC = True
 L2D_STDFN = ""
 L2D_SIDE1 = 32
 L2D_SIDE2 = 0
 L2D_SGPATH = ""
-L2D_ONREP = 'G'
+L2D_ONREP = "G"
 L2D_ONLY_CONST_MODE = False
-L2D_PHTABB = 'l2d_'
-L2D_GEO_TRI = 'triangular'
-L2D_GEO_SQR = 'squared'
-L2D_GEO_HEX = 'hexagonal'
-L2D_GEO_SQRSW = 'squared_sw'
-L2D_GEO_TRISW = 'triangular_sw'
-L2D_GEO_SQOCT = 'octagonal_sqr'
-L2D_GEO_KGM = 'kagome'
-L2D_GEO_TRIHEX = 'tri_hexagonal'
-L2D_GEO_TRI_SHRT = 'tri'
-L2D_GEO_SQR_SHRT = 'sqr'
-L2D_GEO_HEX_SHRT = 'hex'
-L2D_GEO_SQRSW_SHRT = 'sqr_sw'
-L2D_GEO_TRISW_SHRT = 'tri_sw'
-L2D_GEO_SQOCT_SHRT = 'oct_sqr'
-L2D_GEO_KGM_SHRT = 'kgm'
-L2D_GEO_TRIHEX_SHRT = 'tri_hex'
+L2D_PHTABB = "l2d_"
+L2D_GEO_TRI = "triangular"
+L2D_GEO_SQR = "squared"
+L2D_GEO_HEX = "hexagonal"
+L2D_GEO_SQRSW = "squared_sw"
+L2D_GEO_TRISW = "triangular_sw"
+L2D_GEO_SQOCT = "octagonal_sqr"
+L2D_GEO_KGM = "kagome"
+L2D_GEO_TRIHEX = "tri_hexagonal"
+L2D_GEO_TRI_SHRT = "tri"
+L2D_GEO_SQR_SHRT = "sqr"
+L2D_GEO_HEX_SHRT = "hex"
+L2D_GEO_SQRSW_SHRT = "sqr_sw"
+L2D_GEO_TRISW_SHRT = "tri_sw"
+L2D_GEO_SQOCT_SHRT = "oct_sqr"
+L2D_GEO_KGM_SHRT = "kgm"
+L2D_GEO_TRIHEX_SHRT = "tri_hex"
 L2D_P_C_LIST = [
     0.146,
     0.103,
@@ -192,11 +210,11 @@ L2D_P_C_LIST = [
     float("nan"),
     0.095,
     0.041,
-] 
+]
 L2D_WITH_POS = False
-# 
+#
 L2D_GEO = L2D_GEO_SQR
-# 
+#
 L2D_GEO_LIST = [
     L2D_GEO_TRI,
     L2D_GEO_SQR,
@@ -217,14 +235,14 @@ L2D_GEO_SHRT_LIST = [
     L2D_GEO_KGM_SHRT,
     L2D_GEO_TRIHEX_SHRT,
 ]
-L2D_SINGLE_CELL_LIST = ['single', 'singleXERR', 'singleZERR']
-L2D_RAND_CELL_LIST = ['rand', 'randXERR', 'randZERR']
+L2D_SINGLE_CELL_LIST = ["single", "singleXERR", "singleZERR"]
+L2D_RAND_CELL_LIST = ["rand", "randXERR", "randZERR"]
 #
-L2D_P_C_DICT = {g: p for g,p in zip(L2D_GEO_LIST, L2D_P_C_LIST)}
+L2D_P_C_DICT = {g: p for g, p in zip(L2D_GEO_LIST, L2D_P_C_LIST)}
 L2D_PATH_DICT = {g: L2D_PHTABB + g for g in L2D_GEO_LIST}
 L2D_ZIP_GEO_SHRT = list(zip(L2D_GEO_SHRT_LIST, L2D_GEO_LIST))
-L2D_GEO_SHRT_DICT = {s: a for a,s in L2D_ZIP_GEO_SHRT}
-L2D_SHRT_GEO_DICT = {a: s for a,s in L2D_ZIP_GEO_SHRT}
+L2D_GEO_SHRT_DICT = {s: a for a, s in L2D_ZIP_GEO_SHRT}
+L2D_SHRT_GEO_DICT = {a: s for a, s in L2D_ZIP_GEO_SHRT}
 #
 L2D_WARNMSG_GEO = """The selected geometry of the 2D lattice is not available. 
     Setting it to 'squared' for a 2d regular grid."""
@@ -235,34 +253,31 @@ L2D_ERRMSG_GEO = """Invalid side value for hexagonal lattice. In order to
 L3D_DIM0 = 16
 L3D_DIM = tuple(L3D_DIM0 for _ in range(3))
 L3D_PBC = True
-L3D_FBCV = 1.
-L3D_PDIL = 0.
+L3D_FBCV = 1.0
+L3D_PDIL = 0.0
 L3D_SGPATH = ""
 L3D_STDFN = ""
 L3D_PHTABB = "l3d_"
-L3D_GEO_SC = 'simple_cubic'
-L3D_GEO_BCC = 'body_centered'
-L3D_GEO_FCC = 'face_centered'
-L3D_GEO_SC_SHRT1 = 'cubic'
-L3D_GEO_SC_SHRT = 'sc'
-L3D_GEO_BCC_SHRT = 'bcc'
-L3D_GEO_FCC_SHRT = 'fcc'
-L3D_ONREP = 'G'
+L3D_GEO_SC = "simple_cubic"
+L3D_GEO_BCC = "body_centered"
+L3D_GEO_FCC = "face_centered"
+L3D_GEO_SC_SHRT1 = "cubic"
+L3D_GEO_SC_SHRT = "sc"
+L3D_GEO_BCC_SHRT = "bcc"
+L3D_GEO_FCC_SHRT = "fcc"
+L3D_ONREP = "G"
 L3D_ONLY_CONST_MODE = False
 L3D_WITH_POS = False
-L3D_THETA = np_pi/6
-L3D_PHI = np_pi/6
-# 
+L3D_THETA = np_pi / 6
+L3D_PHI = np_pi / 6
+#
 L3D_GEO = L3D_GEO_SC
 #
-L3D_GEO_LIST = [L3D_GEO_SC, 
-                        L3D_GEO_BCC, 
-                        L3D_GEO_FCC]
-L3D_GEO_SHRT_LIST = [L3D_GEO_SC_SHRT, 
-                        L3D_GEO_BCC_SHRT, 
-                        L3D_GEO_FCC_SHRT]
-L3D_GEO_DICT = {a: g for a,g in
-                 zip(L3D_GEO_SHRT_LIST+L3D_GEO_LIST, L3D_GEO_LIST*2)}
+L3D_GEO_LIST = [L3D_GEO_SC, L3D_GEO_BCC, L3D_GEO_FCC]
+L3D_GEO_SHRT_LIST = [L3D_GEO_SC_SHRT, L3D_GEO_BCC_SHRT, L3D_GEO_FCC_SHRT]
+L3D_GEO_DICT = {
+    a: g for a, g in zip(L3D_GEO_SHRT_LIST + L3D_GEO_LIST, L3D_GEO_LIST * 2)
+}
 
 # Multispectral graph default values
 MSG_DEFAULT_TYPE = "multiplicative_cascade"
@@ -298,12 +313,14 @@ DCOMB_PHTABB = "dcomb_"
 DBRUSH_STDFN = ""
 DBRUSH_SGPATH = "msg_dbrush"
 DBRUSH_PHTABB = "dbrush_"
-L3D_PATH_DICT = {a: L3D_PHTABB + g for a,g in 
-                 zip(L3D_GEO_SHRT_LIST+L3D_GEO_LIST, L3D_GEO_LIST*2)}
+L3D_PATH_DICT = {
+    a: L3D_PHTABB + g
+    for a, g in zip(L3D_GEO_SHRT_LIST + L3D_GEO_LIST, L3D_GEO_LIST * 2)
+}
 #
 L3D_ZIP_GEO_SHRT = list(zip(L3D_GEO_SHRT_LIST, L3D_GEO_LIST))
-L3D_GEO_SHRT_DICT = {s: a for a,s in L3D_ZIP_GEO_SHRT}
-L3D_SHRT_GEO_DICT = {a: s for a,s in L3D_ZIP_GEO_SHRT}
+L3D_GEO_SHRT_DICT = {s: a for a, s in L3D_ZIP_GEO_SHRT}
+L3D_SHRT_GEO_DICT = {a: s for a, s in L3D_ZIP_GEO_SHRT}
 #
 L3D_WARNMSG_GEO = """The selected geometry of the 3D lattice is not available. 
     Setting it to 'sc' for a 3d regular grid."""
@@ -319,13 +336,20 @@ DEFAULT_SRW_N_WALKERS = 200
 DEFAULT_SRW_SEED = 42
 DEFAULT_SRW_COVERAGE_FRAC = 0.20
 DEFAULT_SRW_MAX_N_CROSS = 14
-DEFAULT_SRW_RULE = 'absorb'
-DEFAULT_SRW_START = 'random'
-DEFAULT_SRW_X_NODE = 'reflect'
-SRW_RULES = ('absorb', 'kill', 'sticky')
-SRW_START_PROTOCOLS = ('random', 'fixed', 'center')
-SRW_X_NODE_BEHAVIORS = ('reflect', 'absorb')
-SRW_OVERLAP_KINDS = ('l2_raw', 'l2_norm', 'l2_rescaled', 'fidelity', 'tv', 'jaccard')
+DEFAULT_SRW_RULE = "absorb"
+DEFAULT_SRW_START = "random"
+DEFAULT_SRW_X_NODE = "reflect"
+SRW_RULES = ("absorb", "kill", "sticky")
+SRW_START_PROTOCOLS = ("random", "fixed", "center")
+SRW_X_NODE_BEHAVIORS = ("reflect", "absorb")
+SRW_OVERLAP_KINDS = (
+    "l2_raw",
+    "l2_norm",
+    "l2_rescaled",
+    "fidelity",
+    "tv",
+    "jaccard",
+)
 
 # Signed Laplacian type selector (see graphs/.../_topology.py, _spectral.py).
 # Three genuinely distinct matrices (Kunegis 2010, kunegis2010spectral.pdf):
@@ -333,9 +357,9 @@ SRW_OVERLAP_KINDS = ('l2_raw', 'l2_norm', 'l2_rescaled', 'fidelity', 'tv', 'jacc
 #   'sym'    -> L_sym = I - D_s^-1/2 A D_s^-1/2 (symmetric normalized)    §3.4
 #   'rw'     -> L_rw  = I - D_s^-1 A           (random walk, NON-symmetric) §3.3
 # D_s is the signed (absolute) degree matrix, D_s[i,i] = sum_j |A_ij|.
-SG_LAPL_SIGNED = 'signed'
-SG_LAPL_RW = 'rw'
-SG_LAPL_SYM = 'sym'
+SG_LAPL_SIGNED = "signed"
+SG_LAPL_RW = "rw"
+SG_LAPL_SYM = "sym"
 SG_LAPL_TYPES = (SG_LAPL_SIGNED, SG_LAPL_RW, SG_LAPL_SYM)
 SG_LAPL_DEFAULT_TYPE = SG_LAPL_SIGNED
 # Max |Im(lambda)| tolerated from the non-symmetric (rw) eigensolver before the
@@ -348,10 +372,11 @@ DEFAULT_SPIKE_THRESHOLD = 0.05
 DEFAULT_MAX_THRESHOLD = 2 * DEFAULT_SPIKE_THRESHOLD
 
 DEFAULT_LOG_DIR = LRGSG_LOG
-DEFAULT_P_FSTR_FMT = '.3g'
+DEFAULT_P_FSTR_FMT = ".3g"
 
 # Logging configuration constants
 import logging as _logging
+
 LOG_DEFAULT_LEVEL = _logging.WARNING
 LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 LOG_BACKUP_COUNT = 3

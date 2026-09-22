@@ -3,6 +3,7 @@ SCSGeneralizedNNGT - Falls back to NX implementation (no native GT implementatio
 """
 
 import warnings
+
 from ...nx.neural import SCSGeneralizedNNNX
 
 warnings.warn(

@@ -19,7 +19,7 @@ locates the threshold p_c.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import networkx as nx
 import numpy as np
@@ -402,9 +402,7 @@ def identify_frustrated_vertices(
     """
     frustrated = []
     for v in G.nodes():
-        n_neg = sum(
-            1 for u in G.neighbors(v) if G[v][u].get(weight, 1) < 0
-        )
+        n_neg = sum(1 for u in G.neighbors(v) if G[v][u].get(weight, 1) < 0)
         if n_neg % 2 == 1:
             frustrated.append(v)
     return frustrated
@@ -571,8 +569,7 @@ def defect_percolation_sweep(
             frust_faces = identify_frustrated_faces(G, fi)
             if not include_outer_face:
                 frust_faces = [
-                    f for f in frust_faces
-                    if f != fi["outer_face_idx"]
+                    f for f in frust_faces if f != fi["outer_face_idx"]
                 ]
 
             syn_Z = build_face_syndrome(fi, frust_faces)
@@ -596,9 +593,7 @@ def defect_percolation_sweep(
     if verbose:
         print()
 
-    def _pack(
-        Pinf_arr: NDArray, N: int, n_def: NDArray
-    ) -> dict[str, Any]:
+    def _pack(Pinf_arr: NDArray, N: int, n_def: NDArray) -> dict[str, Any]:
         mean = Pinf_arr.mean(axis=1)
         std = Pinf_arr.std(axis=1)
         return {
@@ -769,7 +764,7 @@ def build_cycle_dual(
         # Product of shared edge signs
         prod = 1
         for s in signs:
-            prod *= (1 if s >= 0 else -1)
+            prod *= 1 if s >= 0 else -1
         dual.add_edge(c1, c2, **{weight: prod})
 
     cycle_info = {
@@ -803,8 +798,8 @@ def build_signed_cycle_dual(
         Dual signed graph ready for ``compute_k_eigvV`` /
         ``compute_pinf``.
     """
-    from ...graphs.nx.SignedGraphNX.SignedGraphNX import SignedGraphNX
     from ...config.const import SG_REPR
+    from ...graphs.nx.SignedGraphNX.SignedGraphNX import SignedGraphNX
 
     if on_g is None:
         on_g = getattr(sg, "on_g", SG_REPR)
@@ -968,11 +963,13 @@ def compute_pareto_point_general(
     )
 
     p_Z = find_threshold(
-        sweep["primal"]["p"], sweep["primal"]["chi"],
+        sweep["primal"]["p"],
+        sweep["primal"]["chi"],
         method=threshold_method,
     )
     p_X = find_threshold(
-        sweep["dual"]["p"], sweep["dual"]["chi"],
+        sweep["dual"]["p"],
+        sweep["dual"]["chi"],
         method=threshold_method,
     )
 

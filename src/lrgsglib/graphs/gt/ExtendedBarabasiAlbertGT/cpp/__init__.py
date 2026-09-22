@@ -6,6 +6,7 @@ graph construction with initial attractiveness parameter.
 
 Build with: make cpp-make (from lrgsglib root)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,7 +20,10 @@ _SO_PATH = Path(__file__).parent / "extended_barabasi_albert.so"
 
 try:
     from . import extended_barabasi_albert as _eba_module
-    _create_extended_barabasi_albert_raw = _eba_module.create_extended_barabasi_albert
+
+    _create_extended_barabasi_albert_raw = (
+        _eba_module.create_extended_barabasi_albert
+    )
 except ImportError as e:
     _eba_module = None
     _import_error = e

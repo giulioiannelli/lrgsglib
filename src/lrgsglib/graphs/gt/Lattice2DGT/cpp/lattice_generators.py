@@ -4,6 +4,7 @@ Triangular lattice generator using graph-tool C++ extension.
 This module provides a Python wrapper for the C++ triangular lattice generator.
 The C++ implementation is significantly faster than pure Python alternatives.
 """
+
 from __future__ import annotations
 
 import sys
@@ -64,6 +65,8 @@ def create_triangular_lattice(width: int, height: int) -> gt.Graph:
     # For graph objects, we need to pass the internal GraphInterface
     # which is accessed via g._Graph__graph.
     # The C++ function needs no property maps, so we only pass dimensions
-    _triangular_lattice_ext.create_triangular_lattice(g._Graph__graph, width, height)
+    _triangular_lattice_ext.create_triangular_lattice(
+        g._Graph__graph, width, height
+    )
 
     return g

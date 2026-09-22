@@ -167,7 +167,9 @@ def build_composite_nx_graph(
             # Map back to local indices for sign lookup
             u_local = u - fiber_start
             v_local = v - fiber_start
-            sign = fiber_signs.get((u_local, v_local), fiber_signs.get((v_local, u_local), 1))
+            sign = fiber_signs.get(
+                (u_local, v_local), fiber_signs.get((v_local, u_local), 1)
+            )
             G.add_edge(u, v, sign=sign)
 
     # Add anchor edges (always positive)

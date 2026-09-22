@@ -57,7 +57,9 @@ def compute_threshold_stats(
             giant_nodes = max(components, key=len)
             giant_size = len(giant_nodes)
             giant_edges = sum(
-                1 for u, v in valid_edges if u in giant_nodes and v in giant_nodes
+                1
+                for u, v in valid_edges
+                if u in giant_nodes and v in giant_nodes
             )
             Pinf[idx] = giant_size / N0
             Einf[idx] = giant_edges / E0
@@ -120,14 +122,18 @@ def compute_threshold_stats_fast(
             Pinf[i] = 0
             Einf[i] = 0
         else:
-            max_component_size = max(component_size[find(j)] for j in range(n_nodes))
+            max_component_size = max(
+                component_size[find(j)] for j in range(n_nodes)
+            )
             giant_root = None
             for j in range(n_nodes):
                 if component_size[find(j)] == max_component_size:
                     giant_root = find(j)
                     break
 
-            giant_nodes = {nodes[j] for j in range(n_nodes) if find(j) == giant_root}
+            giant_nodes = {
+                nodes[j] for j in range(n_nodes) if find(j) == giant_root
+            }
             giant_edges = sum(
                 1
                 for u, v, w in edges_data
@@ -167,7 +173,11 @@ def find_exact_detachment_threshold(corr_mat: np.ndarray) -> float:
         else:
             right = mid
 
-    return sorted_weights[left] if left < len(sorted_weights) else sorted_weights[-1]
+    return (
+        sorted_weights[left]
+        if left < len(sorted_weights)
+        else sorted_weights[-1]
+    )
 
 
 def select_threshold_and_graph(
@@ -182,7 +192,11 @@ def select_threshold_and_graph(
 
     G_thresh = G0.copy()
     G_thresh.remove_edges_from(
-        [(u, v) for u, v, w in G_thresh.edges(data="weight") if w < best_threshold]
+        [
+            (u, v)
+            for u, v, w in G_thresh.edges(data="weight")
+            if w < best_threshold
+        ]
     )
     return best_threshold, G_thresh
 
@@ -192,10 +206,14 @@ def threshold_graph(
 ) -> Tuple[float, Graph, np.ndarray, np.ndarray, np.ndarray]:
     """Return the graph ``G`` thresholded at an optimal value."""
     if any(data["weight"] < 0 for _, _, data in G.edges(data=True)):
-        raise ValueError("Graph contains negative weights, which is not allowed.")
+        raise ValueError(
+            "Graph contains negative weights, which is not allowed."
+        )
 
     G0 = get_giant_component(G)
     Th, Einf, Pinf = compute_threshold_stats(G0)
-    best_threshold, G_thresh = select_threshold_and_graph(G0, Th, Pinf, percentage)
+    best_threshold, G_thresh = select_threshold_and_graph(
+        G0, Th, Pinf, percentage
+    )
 
     return best_threshold, G_thresh, Th, Einf, Pinf

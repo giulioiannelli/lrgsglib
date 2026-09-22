@@ -3,66 +3,54 @@
 Re-exports random graph classes from their respective packages for cleaner imports.
 """
 
-from .RandomGraphNX import (
+from .BarabasiAlbertNX import (  # Backward compatibility alias
+    BarabasiAlbert,
+    BarabasiAlbertNX,
+)
+from .ConfigurationModelNX import (  # Backward compatibility alias
+    ConfigurationModel,
+    ConfigurationModelNX,
+)
+from .DualBarabasiAlbertNX import (  # Backward compatibility alias
+    DualBarabasiAlbert,
+    DualBarabasiAlbertNX,
+)
+from .ErdosRenyiNX import (  # Backward compatibility alias
+    ErdosRenyi,
+    ErdosRenyiNX,
+)
+from .ExtendedBarabasiAlbertNX import (  # Backward compatibility alias
+    ExtendedBarabasiAlbert,
+    ExtendedBarabasiAlbertNX,
+)
+from .HolmeKimNX import (  # Backward compatibility alias
+    HolmeKim,
+    HolmeKimNX,
+)
+from .kRegularGraphNX import (  # Backward compatibility alias
+    kRegularGraph,
+    kRegularGraphNX,
+)
+from .LFRBenchmarkNX import (  # Backward compatibility alias
+    LFRBenchmark,
+    LFRBenchmarkNX,
+)
+from .RandomGeometricNX import (  # Backward compatibility alias
+    RandomGeometric,
+    RandomGeometricNX,
+)
+from .RandomGraphNX import (  # Backward compatibility alias
+    RandomGraph,
     RandomGraphNX,
     RandomNwContainerBase,
-    # Backward compatibility alias
-    RandomGraph,
 )
-from .ErdosRenyiNX import (
-    ErdosRenyiNX,
-    # Backward compatibility alias
-    ErdosRenyi,
-)
-from .BarabasiAlbertNX import (
-    BarabasiAlbertNX,
-    # Backward compatibility alias
-    BarabasiAlbert,
-)
-from .WattsStrogatzNX import (
-    WattsStrogatzNX,
-    # Backward compatibility alias
-    WattsStrogatz,
-)
-from .StochasticBlockModelNX import (
-    StochasticBlockModelNX,
-    # Backward compatibility alias
+from .StochasticBlockModelNX import (  # Backward compatibility alias
     StochasticBlockModel,
+    StochasticBlockModelNX,
 )
-from .kRegularGraphNX import (
-    kRegularGraphNX,
-    # Backward compatibility alias
-    kRegularGraph,
-)
-from .ConfigurationModelNX import (
-    ConfigurationModelNX,
-    # Backward compatibility alias
-    ConfigurationModel,
-)
-from .RandomGeometricNX import (
-    RandomGeometricNX,
-    # Backward compatibility alias
-    RandomGeometric,
-)
-from .LFRBenchmarkNX import (
-    LFRBenchmarkNX,
-    # Backward compatibility alias
-    LFRBenchmark,
-)
-from .ExtendedBarabasiAlbertNX import (
-    ExtendedBarabasiAlbertNX,
-    # Backward compatibility alias
-    ExtendedBarabasiAlbert,
-)
-from .DualBarabasiAlbertNX import (
-    DualBarabasiAlbertNX,
-    # Backward compatibility alias
-    DualBarabasiAlbert,
-)
-from .HolmeKimNX import (
-    HolmeKimNX,
-    # Backward compatibility alias
-    HolmeKim,
+from .WattsStrogatzNX import (  # Backward compatibility alias
+    WattsStrogatz,
+    WattsStrogatzNX,
 )
 
 __all__ = [

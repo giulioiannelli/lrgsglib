@@ -16,7 +16,6 @@ import networkx as nx
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
 
-
 # Constants
 KREG_PHTABB = "kreg"
 KREG_SGPATH = ""

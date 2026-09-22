@@ -8,7 +8,6 @@ from typing import Sequence
 
 from ..BipartiteGraphNX.BipartiteGraphNX import BipartiteGraphNX
 
-
 __all__ = ["BipartiteFromDegreeSequenceNX"]
 
 

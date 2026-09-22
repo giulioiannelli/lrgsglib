@@ -21,6 +21,7 @@ Graphs whose 2D rendering genuinely differs between engines (no shared
 engine-specific renderers, which can still reuse the back-end-neutral
 primitives in :mod:`lrgsglib.plotlib.animation._core`.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -33,7 +34,6 @@ from ....config.const import GIF
 from ....plotlib.animation._core import LatticeAnimationResult, render_animation
 from ._accessor import _Accessor, frames_and_model
 from ._common import resolve_plot_path
-
 
 FrameLike = NDArray[np.integer] | NDArray[np.floating]
 
@@ -54,7 +54,9 @@ def _to_2d_frame(
         arr = arr.reshape(syshape)
     elif arr.ndim == 2:
         if tuple(arr.shape) != syshape:
-            raise ValueError(f"Frame has shape {arr.shape}, expected {syshape}.")
+            raise ValueError(
+                f"Frame has shape {arr.shape}, expected {syshape}."
+            )
     else:
         raise ValueError("Frames must be 1D state vectors or 2D arrays.")
 
@@ -108,8 +110,10 @@ def _cluster_to_rgb(
     pos8 = np.asarray(np.asarray(pos_color, np.float64) * 255, np.uint8)
     neg8 = np.asarray(np.asarray(neg_color, np.float64) * 255, np.uint8)
     bg8 = np.asarray(np.asarray(bg_color, np.float64) * 255, np.uint8)
-    net = (s * masks).sum(axis=1)                      # net spin of the largest cluster
-    col = np.where(net[:, None] > 0, pos8, neg8)        # (n, 3) per-frame cluster colour
+    net = (s * masks).sum(axis=1)  # net spin of the largest cluster
+    col = np.where(
+        net[:, None] > 0, pos8, neg8
+    )  # (n, 3) per-frame cluster colour
     rgb = np.broadcast_to(bg8, (n, npix, 3)).copy()
     rgb = np.where(masks[:, :, None], col[:, None, :], rgb).astype(np.uint8)
     return rgb.reshape(n, syshape[0], syshape[1], 3)
@@ -360,13 +364,17 @@ def animate_states(
             "VoterModel, build it with savedyn=True (and call run()) so that "
             "vm.s_t holds the recorded configurations."
         )
-    save_path = resolve_plot_path(lattice, save, model=model, subfolder=subfolder)
+    save_path = resolve_plot_path(
+        lattice, save, model=model, subfolder=subfolder
+    )
 
     if fast and not add_colorbar and _fast_output_ok(save_path, inline):
         from ....plotlib.animation.video import render_rgb_stack
 
         syshape = tuple(getattr(lattice, "syshape"))
-        rgb = _states_to_rgb(frames, syshape=syshape, cmap=cmap, vmin=vmin, vmax=vmax)
+        rgb = _states_to_rgb(
+            frames, syshape=syshape, cmap=cmap, vmin=vmin, vmax=vmax
+        )
         return render_rgb_stack(rgb, save_path, fps=fps, inline=inline)
 
     import matplotlib.pyplot as plt
@@ -447,7 +455,9 @@ def animate_largest_cluster(
     cluster_masks = masks
     if cluster_masks is not None and n_frames:
         cluster_masks = subsample(list(cluster_masks), n_frames)
-    save_path = resolve_plot_path(lattice, save, model=model, subfolder=subfolder)
+    save_path = resolve_plot_path(
+        lattice, save, model=model, subfolder=subfolder
+    )
 
     if fast and _fast_output_ok(save_path, inline):
         from ....plotlib.animation.video import render_rgb_stack
@@ -464,8 +474,12 @@ def animate_largest_cluster(
             else compute_largest_cluster_masks(fr, idx, b)
         )
         rgb = _cluster_to_rgb(
-            fr, cl, syshape=syshape,
-            pos_color=pos_color, neg_color=neg_color, bg_color=bg_color,
+            fr,
+            cl,
+            syshape=syshape,
+            pos_color=pos_color,
+            neg_color=neg_color,
+            bg_color=bg_color,
         )
         return render_rgb_stack(rgb, save_path, fps=fps, inline=inline)
 
@@ -511,13 +525,21 @@ class _Lattice2DAnimate(_Accessor):
     def states(self, source, *, model=None, subfolder=None, **kw):
         frames, src_model = frames_and_model(source)
         return animate_states(
-            self._sg, frames, model=model or src_model, subfolder=subfolder, **kw
+            self._sg,
+            frames,
+            model=model or src_model,
+            subfolder=subfolder,
+            **kw,
         )
 
     def largest_cluster(self, source, *, model=None, subfolder=None, **kw):
         frames, src_model = frames_and_model(source)
         return animate_largest_cluster(
-            self._sg, frames, model=model or src_model, subfolder=subfolder, **kw
+            self._sg,
+            frames,
+            model=model or src_model,
+            subfolder=subfolder,
+            **kw,
         )
 
     def make(self, fig, ax, frames, **kw):

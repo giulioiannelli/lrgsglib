@@ -6,6 +6,7 @@ set — ``single`` / ``singleXERR`` / ``singleZERR`` / ``rand`` / ``randXERR`` /
 lattice's elementary face (3-cycle triangular/kagome/tri_hex, 4-cycle
 square/octagon, 6-cycle honeycomb) via the shared geometry helpers.
 """
+
 from __future__ import annotations
 
 from ..._shared._nw_container import GTnwContainer

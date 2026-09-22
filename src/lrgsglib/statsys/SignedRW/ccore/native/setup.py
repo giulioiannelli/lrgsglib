@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from pybind11.setup_helpers import Pybind11Extension, build_ext as _build_ext
+from pybind11.setup_helpers import Pybind11Extension
+from pybind11.setup_helpers import build_ext as _build_ext
 from setuptools import setup
 
 
@@ -15,7 +16,8 @@ class build_ext(_build_ext):
         def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
             if src.endswith(".c"):
                 extra_postargs = [
-                    f for f in extra_postargs
+                    f
+                    for f in extra_postargs
                     if not f.startswith(("-std=c++", "-std=gnu++"))
                 ]
             original_compile(obj, src, ext, cc_args, extra_postargs, pp_opts)
@@ -25,11 +27,13 @@ class build_ext(_build_ext):
 
 
 HERE = Path(__file__).resolve().parent
-CCORE_DIR = HERE.parent                                # SignedRW/ccore
-SHARED_CCORE = CCORE_DIR.parent.parent / "_ccore"      # statsys/_ccore
+CCORE_DIR = HERE.parent  # SignedRW/ccore
+SHARED_CCORE = CCORE_DIR.parent.parent / "_ccore"  # statsys/_ccore
 SFMT_DIR = SHARED_CCORE / "SFMT"
 # GCC 15 + old conda sysroot compat (shared header)
-LRGSG_ROOT = CCORE_DIR.parents[4]                      # ccore → SignedRW → statsys → lrgsglib(pkg) → src → ROOT
+LRGSG_ROOT = CCORE_DIR.parents[
+    4
+]  # ccore → SignedRW → statsys → lrgsglib(pkg) → src → ROOT
 GCC15_COMPAT = str(LRGSG_ROOT / "build" / "gcc15_compat.h")
 
 ext_modules = [

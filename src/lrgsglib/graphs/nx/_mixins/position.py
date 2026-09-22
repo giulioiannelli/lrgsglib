@@ -4,7 +4,8 @@ Unified position handling mixin for graph types.
 Provides standardized methods for computing and storing node positions
 across different graph families (lattices, random graphs, etc.).
 """
-from typing import Any, Callable, Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import networkx as nx
 
@@ -132,7 +133,9 @@ class PositionMixin:
         if isinstance(first_node, tuple):
             if len(first_node) == 2:
                 # 2D coordinates - use directly
-                pos_h = {node: (float(node[0]), float(node[1])) for node in h_nodes}
+                pos_h = {
+                    node: (float(node[0]), float(node[1])) for node in h_nodes
+                }
             elif len(first_node) == 3:
                 # 3D coordinates - project to 2D
                 from ....utils.basic.linalg import project_3d_to_2d
@@ -140,12 +143,16 @@ class PositionMixin:
                 theta = getattr(self, "theta", 0.5236)  # pi/6
                 phi = getattr(self, "phi", 0.5236)
                 pos_h = {
-                    node: project_3d_to_2d(node[0], node[1], node[2], theta, phi)
+                    node: project_3d_to_2d(
+                        node[0], node[1], node[2], theta, phi
+                    )
                     for node in h_nodes
                 }
             else:
                 # Higher dimensions - use first 2 coords
-                pos_h = {node: (float(node[0]), float(node[1])) for node in h_nodes}
+                pos_h = {
+                    node: (float(node[0]), float(node[1])) for node in h_nodes
+                }
         else:
             # Non-tuple nodes - fall back to spring layout
             return nx.spring_layout(self.G)
@@ -153,8 +160,10 @@ class PositionMixin:
         # Map H positions to G nodes
         if hasattr(self, "map_node") and "G" in self.map_node:
             node_mapping = self.map_node["G"].get("H", {})
-            pos_g = {node_mapping.get(h_node, h_node): position
-                     for h_node, position in pos_h.items()}
+            pos_g = {
+                node_mapping.get(h_node, h_node): position
+                for h_node, position in pos_h.items()
+            }
         else:
             # No mapping available yet, use H positions directly
             pos_g = pos_h
@@ -175,8 +184,10 @@ class PositionMixin:
 
         if hasattr(self, "map_node") and "H" in self.map_node:
             node_mapping = self.map_node["H"].get("G", {})
-            pos_h = {node_mapping.get(g_node, g_node): position
-                     for g_node, position in pos_g.items()}
+            pos_h = {
+                node_mapping.get(g_node, g_node): position
+                for g_node, position in pos_g.items()
+            }
         else:
             pos_h = pos_g
 
@@ -200,8 +211,10 @@ class PositionMixin:
 
         if hasattr(self, "map_node") and "G" in self.map_node:
             node_mapping = self.map_node["G"].get("H", {})
-            pos_g = {node_mapping.get(h_node, h_node): position
-                     for h_node, position in pos_h.items()}
+            pos_g = {
+                node_mapping.get(h_node, h_node): position
+                for h_node, position in pos_h.items()
+            }
         else:
             pos_g = pos_h
 

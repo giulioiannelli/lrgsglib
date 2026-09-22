@@ -23,21 +23,22 @@ These are not separate computations — they are two views of the same
 spectral data, separated by scale (τ) and mode structure.
 """
 
+from typing import Any, Optional
+
+import networkx as nx
 import numpy as np
 from numpy.typing import NDArray
-from typing import Optional, Any
-import networkx as nx
+from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.signal import find_peaks
-from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 
+from ...graphs._shared._backend import BackendManager
+from .clustering import compute_optimal_threshold
 from .quantum import (
     compute_ldos_entropy,
     compute_ldos_specific_heat,
     compute_quantum_distance_matrix,
 )
-from .clustering import compute_optimal_threshold
-from ...graphs._shared._backend import BackendManager
 
 __all__ = [
     "negative_edge_fraction",
@@ -80,9 +81,7 @@ def negative_edge_fraction(G: nx.Graph) -> float:
     return sum(1 for w in weights if w < 0) / len(weights)
 
 
-def frustration_index(
-    G: nx.Graph, cycles: Optional[list] = None
-) -> float:
+def frustration_index(G: nx.Graph, cycles: Optional[list] = None) -> float:
     """Fraction of cycles that are frustrated (product of edge signs = -1).
 
     A cycle is **frustrated** iff it contains an odd number of negative
@@ -161,12 +160,14 @@ def lattice_plaquettes(side: int, periodic: bool = True) -> list:
         for c in range(c_max):
             r1 = (r + 1) % side
             c1 = (c + 1) % side
-            plaquettes.append([
-                r * side + c,
-                r * side + c1,
-                r1 * side + c1,
-                r1 * side + c,
-            ])
+            plaquettes.append(
+                [
+                    r * side + c,
+                    r * side + c1,
+                    r1 * side + c1,
+                    r1 * side + c,
+                ]
+            )
     return plaquettes
 
 
@@ -193,7 +194,11 @@ def spectral_frustration(G: nx.Graph, backend: str = "numpy") -> float:
     if G.number_of_nodes() < 2:
         return 0.0
     nodes = sorted(G.nodes())
-    A = nx.adjacency_matrix(G, nodelist=nodes, weight="weight").toarray().astype(float)
+    A = (
+        nx.adjacency_matrix(G, nodelist=nodes, weight="weight")
+        .toarray()
+        .astype(float)
+    )
     D = np.diag(np.abs(A).sum(axis=1))
     L = D - A
     eigv = BackendManager.get_backend(backend).eigvalsh(L)
@@ -252,7 +257,7 @@ def compute_signed_diffusion_distance(
     # Weighted eigenvectors: V_w[i, k] = v_k(i) * exp(-tau * |lambda_k|)
     V_w = eigenvectors_col * phases[np.newaxis, :]
     # d^2(i,j) = ||V_w[i,:] - V_w[j,:]||^2 via expansion
-    diag = np.sum(V_w ** 2, axis=1)
+    diag = np.sum(V_w**2, axis=1)
     cross = V_w @ V_w.T
     D2 = diag[:, np.newaxis] + diag[np.newaxis, :] - 2.0 * cross
     D = np.sqrt(np.maximum(D2, 0.0))
@@ -719,7 +724,7 @@ def partition_at_scale(
         # content: on homogeneous lattices the topological channel is
         # small (nearly uniform), so the signed channel dominates —
         # correctly. On block-structured SBMs, both channels contribute.
-        D = np.sqrt(D_signed ** 2 + D_topo ** 2)
+        D = np.sqrt(D_signed**2 + D_topo**2)
         np.fill_diagonal(D, 0.0)
         D_cond = squareform(D)
         Z = linkage(D_cond, method=linkage_method)
@@ -759,6 +764,7 @@ def partition_at_scale(
         # Signed, weighted embedding over ALL modes
         V_emb = eigenvectors_col * np.sqrt(w_modes)[np.newaxis, :]
         from scipy.spatial.distance import pdist
+
         D_cond = pdist(V_emb, metric="euclidean")
         D = squareform(D_cond)
         Z = linkage(D_cond, method=linkage_method)
@@ -927,7 +933,7 @@ def build_reduced_graph(
                 # magnitude proportional to edge density.
                 # Frustration info stored as node/edge attributes.
                 w_total = w_pos + w_neg  # net signed
-                n_edges = (w_pos + abs(w_neg))  # total |weight|
+                n_edges = w_pos + abs(w_neg)  # total |weight|
                 if n_edges < 1e-10:
                     continue
                 frac_neg = abs(w_neg) / n_edges
@@ -935,7 +941,8 @@ def build_reduced_graph(
                 if w_norm > min_edge_weight:
                     sign = 1.0 if w_pos >= abs(w_neg) else -1.0
                     G_reduced.add_edge(
-                        i, j,
+                        i,
+                        j,
                         weight=sign * w_norm,
                         frustration=frac_neg,
                         n_pos=int(w_pos),
@@ -953,7 +960,9 @@ def build_reduced_graph(
     metadata = {
         "node_map": {i: partition[i] for i in range(n_clusters)},
         "cluster_sizes": [len(p) for p in partition],
-        "internal_weights": [cross_weights[i, i] / 2 for i in range(n_clusters)],
+        "internal_weights": [
+            cross_weights[i, i] / 2 for i in range(n_clusters)
+        ],
         "cross_weight_matrix": cross_weights,
         "cross_pos": cross_pos,
         "cross_neg": cross_neg,
@@ -1039,10 +1048,16 @@ def spectral_rg_step(
     # Compute spectrum if not provided
     if eigenvalues is None or eigenvectors_col is None:
         nodes = sorted(G.nodes())
-        A = nx.adjacency_matrix(G, nodelist=nodes, weight="weight").toarray().astype(float)
+        A = (
+            nx.adjacency_matrix(G, nodelist=nodes, weight="weight")
+            .toarray()
+            .astype(float)
+        )
         D = np.diag(np.abs(A).sum(axis=1))
         L = D - A
-        eigenvalues, eigenvectors_col = BackendManager.get_backend(backend).eigh(L)
+        eigenvalues, eigenvectors_col = BackendManager.get_backend(
+            backend
+        ).eigh(L)
 
     # Find RG scales
     rg_info = find_rg_scales(eigenvalues, N, use_abs=use_abs)
@@ -1257,12 +1272,8 @@ def rg_flow_observables(
         n_nodes.append(step["N_original"])
         n_edges.append(G_r.number_of_edges())
         frustration.append(meta["frustration_fraction"])
-        boundary_frustration.append(
-            meta.get("mean_boundary_frustration", 0.0)
-        )
-        intra_frustration.append(
-            meta.get("mean_intra_frustration", 0.0)
-        )
+        boundary_frustration.append(meta.get("mean_boundary_frustration", 0.0))
+        intra_frustration.append(meta.get("mean_intra_frustration", 0.0))
 
         # Spectral gap: smallest nonzero eigenvalue
         nonzero = np.abs(eigv_r) > 1e-10
@@ -1274,7 +1285,9 @@ def rg_flow_observables(
         tau_stars.append(step["tau_star"])
 
         # Entropy at tau_star
-        idx = np.argmin(np.abs(step["rg_scales"]["tau_grid"] - step["tau_star"]))
+        idx = np.argmin(
+            np.abs(step["rg_scales"]["tau_grid"] - step["tau_star"])
+        )
         entropy_at_tau_star.append(step["rg_scales"]["S_global"][idx])
 
     # Add final reduced graph info

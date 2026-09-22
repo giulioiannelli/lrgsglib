@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ..BinDynSys import BinDynSys
 from .._solver import SolverBackend
 from .._solver_engine import get_solver
+from ..BinDynSys import BinDynSys
 from .defaults import SRW_COPY_SOLVER_NAME
 
 if TYPE_CHECKING:

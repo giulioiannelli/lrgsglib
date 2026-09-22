@@ -22,6 +22,7 @@ one place:
 * dynamics frame collection -- e.g.
   :mod:`lrgsglib.statsys.ContactProcess.frames`.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -71,7 +72,9 @@ def save_animation(
         elif suffix == ".mp4":
             writer = "ffmpeg"
         else:
-            raise ValueError("Unknown output extension; pass writer explicitly.")
+            raise ValueError(
+                "Unknown output extension; pass writer explicitly."
+            )
 
     save = getattr(animation, "save", None)
     if save is None:

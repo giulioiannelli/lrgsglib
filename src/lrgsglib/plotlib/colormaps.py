@@ -1,14 +1,15 @@
-from .const_plotlib import *
 from .color import convert_to_rgb, to_hex
+from .const_plotlib import *
+
 #
 __all__ = [
-    'create_custom_colormap',
+    "create_custom_colormap",
 ]
+
+
 #
 def create_custom_colormap(
-    c1: ColorType = "#0000ff", 
-    c2: ColorType = "#fc0303", 
-    nc: int = 0
+    c1: ColorType = "#0000ff", c2: ColorType = "#fc0303", nc: int = 0
 ) -> LinearSegmentedColormap:
     """
     Create a custom colormap transitioning between two specified colors.
@@ -42,18 +43,18 @@ def create_custom_colormap(
     colors = [start_color, end_color]
     nocol = dict(N=nc) if nc else dict()
 
-    cmap = LinearSegmentedColormap.from_list(
-        "custom_colormap", colors, **nocol
-    )
+    cmap = LinearSegmentedColormap.from_list("custom_colormap", colors, **nocol)
     return cmap
+
+
 #
 
+
 def generate_maxpercdiff_colormap(
-    number_of_distinct_colors: int = 80, 
-    number_of_shades: int = 7
+    number_of_distinct_colors: int = 80, number_of_shades: int = 7
 ) -> ListedColormap:
     """
-    Generate a perceptually distinct colormap using a saw-tooth pattern in 
+    Generate a perceptually distinct colormap using a saw-tooth pattern in
     the HSV color space.
 
     Parameters
@@ -70,14 +71,14 @@ def generate_maxpercdiff_colormap(
 
     Notes
     -----
-    - The function generates a perceptually distinct colormap using a 
-      saw-tooth pattern in the HSV color space. The number of distinct 
-      colors can be customized by providing the `number_of_distinct_colors` 
+    - The function generates a perceptually distinct colormap using a
+      saw-tooth pattern in the HSV color space. The number of distinct
+      colors can be customized by providing the `number_of_distinct_colors`
       parameter.
-    - The HSV colormap is cyclic, which is leveraged to create cyclic color 
+    - The HSV colormap is cyclic, which is leveraged to create cyclic color
       variations.
-    - The lower half of the colormap is modified to make colors towards the 
-      beginning darker, while the upper half is adjusted to make colors 
+    - The lower half of the colormap is modified to make colors towards the
+      beginning darker, while the upper half is adjusted to make colors
       towards the end brighter.
 
     Examples
@@ -92,7 +93,7 @@ def generate_maxpercdiff_colormap(
     """
     import numpy as np
 
-    # Calculate the total number of colors, ensuring it is a multiple of the 
+    # Calculate the total number of colors, ensuring it is a multiple of the
     # number of shades
     total_colors = int(
         np.ceil(number_of_distinct_colors / number_of_shades) * number_of_shades
@@ -127,10 +128,12 @@ def generate_maxpercdiff_colormap(
         ):
             start = lower_half + j * number_of_shades
             end = start + number_of_shades
-            modifier = (
-                (1 - initial_colormap[start:end, i]) * 
-                (j / (total_colors // number_of_shades - 
-                      lower_half // number_of_shades))
+            modifier = (1 - initial_colormap[start:end, i]) * (
+                j
+                / (
+                    total_colors // number_of_shades
+                    - lower_half // number_of_shades
+                )
             )
             initial_colormap[start:end, i] += modifier
 

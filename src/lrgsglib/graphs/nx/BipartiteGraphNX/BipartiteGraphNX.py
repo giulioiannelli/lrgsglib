@@ -29,7 +29,6 @@ from networkx.algorithms import bipartite
 
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 
-
 # Constants
 BP_PHTABB = "bp"
 BP_SGPATH = ""
@@ -136,11 +135,9 @@ class BipartiteGraphNX(SignedGraphNX):
         **kwargs,
     ) -> None:
         # --- Resolve build mode ---
-        has_deg = (
-            top_degrees is not None and bottom_degrees is not None
-        )
-        has_partial_deg = (
-            (top_degrees is not None) != (bottom_degrees is not None)
+        has_deg = top_degrees is not None and bottom_degrees is not None
+        has_partial_deg = (top_degrees is not None) != (
+            bottom_degrees is not None
         )
 
         if has_partial_deg:
@@ -152,9 +149,7 @@ class BipartiteGraphNX(SignedGraphNX):
         if has_deg:
             self.mode: str = "degree_sequence"
             self.top_degrees: Optional[list[int]] = list(top_degrees)
-            self.bottom_degrees: Optional[list[int]] = list(
-                bottom_degrees
-            )
+            self.bottom_degrees: Optional[list[int]] = list(bottom_degrees)
 
             if sum(self.top_degrees) != sum(self.bottom_degrees):
                 raise ValueError(
@@ -185,9 +180,7 @@ class BipartiteGraphNX(SignedGraphNX):
                     f"n1 and n2 must be >= 1, got n1={n1}, n2={n2}"
                 )
             if not 0 <= self.p <= 1:
-                raise ValueError(
-                    f"p must be in [0, 1], got {self.p}"
-                )
+                raise ValueError(f"p must be in [0, 1], got {self.p}")
 
         self.only_const_mode = only_const_mode
         self._init_std_fname(stdFnameSFFX)
@@ -237,14 +230,10 @@ class BipartiteGraphNX(SignedGraphNX):
     def _extract_partitions(self) -> None:
         """Extract top/bottom node sets from bipartite attribute."""
         self.top_nodes = {
-            n
-            for n, d in self.G.nodes(data=True)
-            if d["bipartite"] == 0
+            n for n, d in self.G.nodes(data=True) if d["bipartite"] == 0
         }
         self.bottom_nodes = {
-            n
-            for n, d in self.G.nodes(data=True)
-            if d["bipartite"] == 1
+            n for n, d in self.G.nodes(data=True) if d["bipartite"] == 1
         }
 
     def _compute_syshapePth(self) -> str:
@@ -278,9 +267,7 @@ class BipartiteGraphNX(SignedGraphNX):
             return sum(self.top_degrees)
         return int(self.n1 * self.n2 * self.p)
 
-    def get_biadjacency_matrix(
-        self, sparse: bool = False
-    ) -> np.ndarray:
+    def get_biadjacency_matrix(self, sparse: bool = False) -> np.ndarray:
         """
         Return the biadjacency matrix of the bipartite graph.
 
@@ -331,17 +318,11 @@ class BipartiteGraphNX(SignedGraphNX):
             Projected one-mode graph.
         """
         if which == "top":
-            return bipartite.projected_graph(
-                self.G, self.top_nodes
-            )
+            return bipartite.projected_graph(self.G, self.top_nodes)
         elif which == "bottom":
-            return bipartite.projected_graph(
-                self.G, self.bottom_nodes
-            )
+            return bipartite.projected_graph(self.G, self.bottom_nodes)
         else:
-            raise ValueError(
-                f"which must be 'top' or 'bottom', got {which}"
-            )
+            raise ValueError(f"which must be 'top' or 'bottom', got {which}")
 
     def get_density(self) -> float:
         """

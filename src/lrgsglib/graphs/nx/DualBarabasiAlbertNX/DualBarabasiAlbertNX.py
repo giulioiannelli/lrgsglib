@@ -14,7 +14,6 @@ import networkx as nx
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
 
-
 # Constants
 PA_PHTABB = "pa"
 PA_SGPATH = ""
@@ -102,8 +101,10 @@ class DualBarabasiAlbertNX(RandomGraphNX):
 
     def _generate_graph(self) -> nx.Graph:
         """Generate dual BA graph."""
-        seed = getattr(self, '_rng_seed', None)
-        return nx.dual_barabasi_albert_graph(self.n, self.m1, self.m2, self.p, seed=seed)
+        seed = getattr(self, "_rng_seed", None)
+        return nx.dual_barabasi_albert_graph(
+            self.n, self.m1, self.m2, self.p, seed=seed
+        )
 
     def _compute_syshapePth(self) -> str:
         """Compute system shape path string."""

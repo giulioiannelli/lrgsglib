@@ -1,7 +1,8 @@
 from numpy import linspace
+
 #
-DEFAULT_INIT_COND = 'rand'
-DEFAULT_RUNLANG = 'C0E'
+DEFAULT_INIT_COND = "rand"
+DEFAULT_RUNLANG = "C0E"
 DEFAULT_THRMSTEPS = 20
 DEFAULT_EQSTEP = 20
 DEFAULT_TEMP_LINSP = linspace(0.1, 2.2, 10).round(decimals=2)
@@ -9,7 +10,7 @@ DEFAULT_randstr = True
 # Simulated Annealing defaults
 DEFAULT_SA_T_INIT = 10.0
 DEFAULT_SA_T_FINAL = 0.01
-DEFAULT_SA_COOLING_SCHEDULE = 'exponential'
+DEFAULT_SA_COOLING_SCHEDULE = "exponential"
 DEFAULT_SA_COOLING_RATE = 0.95
 DEFAULT_SA_STEPS_PER_T = 100
 DEFAULT_SA_N_TEMPERATURES = 100
@@ -17,7 +18,7 @@ DEFAULT_SA_N_TEMPERATURES = 100
 DEFAULT_PT_N_REPLICAS = 8
 DEFAULT_PT_T_MIN = 0.5
 DEFAULT_PT_T_MAX = 5.0
-DEFAULT_PT_T_LADDER_TYPE = 'geometric'
+DEFAULT_PT_T_LADDER_TYPE = "geometric"
 DEFAULT_PT_STEPS_PER_EXCHANGE = 10
 DEFAULT_PT_N_EXCHANGES = 1000
 # Topological algorithm defaults
@@ -31,12 +32,12 @@ DEFAULT_TOPO_FIELD_STRENGTH = 1.0
 # Strong-SA baseline defaults (multi-restart heavy schedule + final greedy)
 # Used by lrgsglib.notebooks.run_strong_sa as the "best-achievable" SA
 # reference for hyperparameter exploration of the spectral CEM optimizer.
-DEFAULT_SA_STRONG_T_INIT          = 3.0
-DEFAULT_SA_STRONG_T_FINAL         = 0.05
-DEFAULT_SA_STRONG_N_TEMPERATURES  = 140
-DEFAULT_SA_STRONG_STEPS_PER_T     = 10
-DEFAULT_SA_STRONG_N_RESTARTS      = 8
-DEFAULT_SA_STRONG_GREEDY_SWEEPS   = 180
+DEFAULT_SA_STRONG_T_INIT = 3.0
+DEFAULT_SA_STRONG_T_FINAL = 0.05
+DEFAULT_SA_STRONG_N_TEMPERATURES = 140
+DEFAULT_SA_STRONG_STEPS_PER_T = 10
+DEFAULT_SA_STRONG_N_RESTARTS = 8
+DEFAULT_SA_STRONG_GREEDY_SWEEPS = 180
 # Cross-Entropy Method (CEM) spectral optimizer defaults
 DEFAULT_CEM_ITER = 30
 DEFAULT_CEM_POP_SIZE = 128
@@ -53,11 +54,11 @@ DEFAULT_N_THERMAL = 1
 # Quench-id sentinel: -1 disables single-task mode and uses the internal loop.
 DEFAULT_QUENCH_ID = -1
 # Array-dispatch defaults (used by the serializer only, not the main program)
-DISPATCH_CHOICES = ('slanzarv', 'array')
-DEFAULT_DISPATCH = 'slanzarv'
+DISPATCH_CHOICES = ("slanzarv", "array")
+DEFAULT_DISPATCH = "slanzarv"
 DEFAULT_ARRAY_CONCURRENT = 1000
-DEFAULT_ARRAY_PARTITION = ''
-DEFAULT_ARRAY_TIME = ''
+DEFAULT_ARRAY_PARTITION = ""
+DEFAULT_ARRAY_TIME = ""
 # Result persistence
 DEFAULT_SAVE_RESULTS = False
 DEFAULT_SAVE_FREQUENCY = 0

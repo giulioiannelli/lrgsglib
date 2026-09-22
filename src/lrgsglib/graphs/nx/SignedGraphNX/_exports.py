@@ -1,47 +1,57 @@
+import pickle as pk
 import struct
+from functools import partial
+from pathlib import Path
+
+#
+from typing import TYPE_CHECKING, Any, Callable, Union
+
+import networkx as nx
+
 #
 import numpy as np
-import pickle as pk
-import networkx as nx
-#
-from typing import Union, Callable, Any, TYPE_CHECKING
-from pathlib import Path
-from functools import partial
+
 #
 from ....config.const import *
 from ....config.funcs import build_p_fname
 from ....utils.basic import join_non_empty
+
 #
 if TYPE_CHECKING:
     from .SignedGraphNX import SignedGraphNX
 
 
-def __export_graph__(self: "SignedGraphNX", file_name: str = '', export_mode: str = SG_EXPORT_M):
+def __export_graph__(
+    self: "SignedGraphNX", file_name: str = "", export_mode: str = SG_EXPORT_M
+):
     self.path_graph.mkdir(parents=True, exist_ok=True)
     match export_mode:
-        case 'pkl'|'pk'|'pickle':
-            fname = file_name or self.std_fname + PKL 
+        case "pkl" | "pk" | "pickle":
+            fname = file_name or self.std_fname + PKL
             self.path_graph_graph = self.path_graph / fname
-            pk.dump(self.G, open(self.path_graph_graph, "wb"), 
-                    pk.HIGHEST_PROTOCOL)
-        case 'gml':
+            pk.dump(
+                self.G, open(self.path_graph_graph, "wb"), pk.HIGHEST_PROTOCOL
+            )
+        case "gml":
             fname = self.std_fname + GML
             self.path_graph_graph = self.path_graph / fname
             nx.write_gml(self.G, self.path_graph_graph)
-        case 'graphml':
+        case "graphml":
             fname = self.std_fname + XML
             self.path_graph_graph = self.path_graph / fname
             nx.write_graphml(self.G, self.path_graph_graph)
+
+
 #
 def __export_data_tofile__(
-        self, 
-        who: str,
-        export_func: Callable,
-        path_sgdata: Path,
-        file_name: str = '',
-        exName: str = '', 
-        ext: str = '', 
-        **kwargs: Any
+    self,
+    who: str,
+    export_func: Callable,
+    path_sgdata: Path,
+    file_name: str = "",
+    exName: str = "",
+    ext: str = "",
+    **kwargs: Any,
 ) -> None:
     """Load data from a file into the SignedGraph instance."""
     if not hasattr(self, who):
@@ -49,12 +59,11 @@ def __export_data_tofile__(
     fname = file_name or self.get_p_fname(who=who, out_suffix=exName, ext=ext)
     path_sgdata.mkdir(parents=True, exist_ok=True)
     export_func(self, path_sgdata / fname, **kwargs)
+
+
 #
 def _export_eigV(
-        self,
-        path: Path,
-        binarize: bool = True,
-        ext: str = '.bin'
+    self, path: Path, binarize: bool = True, ext: str = ".bin"
 ) -> None:
     """Export eigenvalues to a file."""
     dtype = np.int8 if binarize else np.float64
@@ -65,32 +74,32 @@ def _export_eigV(
     else:
         outarr = self.eigV.astype(dtype)
     match ext:
-        case '.bin':
+        case ".bin":
             with open(path, "wb") as f:
                 outarr.tofile(f)
-        case '.txt':
+        case ".txt":
             with open(path, "w") as f:
                 for i in range(outarr.shape[0]):
-                    np.savetxt(f, outarr[i], fmt='%.3g')
-        case '.npz':
+                    np.savetxt(f, outarr[i], fmt="%.3g")
+        case ".npz":
             np.savez(path, eigV=outarr)
-        case '.pkl'|'pickle':
+        case ".pkl" | "pickle":
             with open(path, "wb") as f:
                 pk.dump(outarr, f, pk.HIGHEST_PROTOCOL)
         case _:
-            raise ValueError(f"Unsupported format: {ext}. Supported formats\
-                              are: .bin, .txt, .npz, .pkl")
+            raise ValueError(
+                f"Unsupported format: {ext}. Supported formats\
+                              are: .bin, .txt, .npz, .pkl"
+            )
+
+
 #
-def export_ising_clust(
-        self,
-        NoClust: int = 1,
-        exName: str = ''
-) -> None:
+def export_ising_clust(self, NoClust: int = 1, exName: str = "") -> None:
     """Export indices of Ising clusters to binary files.
 
     Files are named using the standard convention via `build_p_fname`,
     e.g., `cl{i}_peq{...}[_{exName}].bin` and written under `self.path_ising`.
-    
+
     Note: The path_ising directory will be created if it doesn't exist.
 
     Parameters
@@ -102,7 +111,7 @@ def export_ising_clust(
     """
     # Ensure the ising directory exists before writing
     self.path_ising.mkdir(parents=True, exist_ok=True)
-    
+
     self.clPname = []
     for i in range(NoClust):
         fname = build_p_fname(f"cl{i}", self.pflip, out_suffix=exName, ext=BIN)
@@ -110,41 +119,41 @@ def export_ising_clust(
         self.clPname.append(path)
         with open(path, "wb") as f:
             np.array(list(self.biggestClSet[i])).astype(int).tofile(f)
+
+
 #
 def export_eigV_all(
-    self, 
-    exName: str = '', 
-    ext: str = '.bin', 
-    binarize: bool = True, 
-    path_sgdata: Path = None
+    self,
+    exName: str = "",
+    ext: str = ".bin",
+    binarize: bool = True,
+    path_sgdata: Path = None,
 ) -> None:
     __export_data_tofile__(
         self,
-        who='eigV',
+        who="eigV",
         export_func=partial(_export_eigV, binarize=binarize),
         path_sgdata=path_sgdata or self.path_graph,
         exName=exName,
         ext=ext,
     )
 
+
 def _export_edgel_bin(
-        self,
-        exName: str = '',
-        mode: str = 'numpy',
-        on_g: str = SG_REPR
+    self, exName: str = "", mode: str = "numpy", on_g: str = SG_REPR
 ) -> None:
-    fname = build_p_fname('edgelist', self.pflip, out_suffix=exName, ext=BIN)
+    fname = build_p_fname("edgelist", self.pflip, out_suffix=exName, ext=BIN)
     self.path_graph.mkdir(parents=True, exist_ok=True)
     self.path_exp_edgl = self.path_graph / fname
     #
-    edges = self.gr[on_g].edges(data='weight')
+    edges = self.gr[on_g].edges(data="weight")
     match mode:
-        case 'numpy':
-            dtype = [('i', np.uint64), ('j', np.uint64), ('w_ij', np.float64)]
+        case "numpy":
+            dtype = [("i", np.uint64), ("j", np.uint64), ("w_ij", np.float64)]
             edge_array = np.array(list(edges), dtype=dtype)
             with open(self.path_exp_edgl, "wb") as f:
                 edge_array.tofile(f)
-        case 'struct':
+        case "struct":
             with open(self.path_exp_edgl, "wb") as f:
                 for edge in edges:
                     assert len(edge) == 3, "Edge must be: (i, j, w_ij)"
@@ -152,11 +161,11 @@ def _export_edgel_bin(
 
 
 def export_adj_bin(
-        self,
-        exName: str = '',
-        *,
-        on_g: str = SG_REPR,
-        upper_triangle: bool = True,
+    self,
+    exName: str = "",
+    *,
+    on_g: str = SG_REPR,
+    upper_triangle: bool = True,
 ) -> None:
     """Export the adjacency matrix of the active graph representation."""
 
@@ -167,10 +176,16 @@ def export_adj_bin(
     if adj_matrix is None:
         raise RuntimeError("Adjacency matrix is not available for export.")
 
-    dense_adj = adj_matrix.toarray() if hasattr(adj_matrix, "toarray") else np.asarray(adj_matrix)
+    dense_adj = (
+        adj_matrix.toarray()
+        if hasattr(adj_matrix, "toarray")
+        else np.asarray(adj_matrix)
+    )
     dense_adj = np.asarray(dense_adj, dtype=np.float64)
     self.path_graph.mkdir(parents=True, exist_ok=True)
-    self.path_exp_adj = self.path_graph / self.get_p_fname('adj', out_suffix=exName)
+    self.path_exp_adj = self.path_graph / self.get_p_fname(
+        "adj", out_suffix=exName
+    )
 
     with open(self.path_exp_adj, "wb") as f:
         if upper_triangle:
@@ -178,6 +193,8 @@ def export_adj_bin(
                 dense_adj[i, i:].tofile(f)
         else:
             dense_adj.tofile(f)
+
+
 #
 # def export_adj_bin(self, verbose: bool = False) -> None:
 #     rowarr = [row[i:] for i, row in enumerate(self.adjacency_matrix.toarray())]
@@ -215,4 +232,3 @@ def export_adj_bin(
 #         outarr = self.get_eigV_bin_check_list(asarray=True).astype("int8")
 #     else:
 #         outarr = self.eigV.astype("float64")
-

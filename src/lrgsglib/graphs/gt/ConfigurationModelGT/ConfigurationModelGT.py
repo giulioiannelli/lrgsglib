@@ -4,13 +4,14 @@ ConfigurationModelGT: graph-tool implementation using native GT random_graph.
 Uses graph-tool's built-in random_graph with a degree sequence sampler
 for high-performance configuration model graph generation.
 """
+
 from __future__ import annotations
 
 from typing import Optional, Sequence, Tuple
 
-import numpy as np
 import graph_tool.all as gt
 import graph_tool.generation as gen
+import numpy as np
 
 from ..SignedGraphGT import SignedGraphGT
 
@@ -86,7 +87,6 @@ class ConfigurationModelGT(SignedGraphGT):
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
 
-
     def _generate_graph(self) -> gt.Graph:
         """Generate configuration model graph using graph-tool's random_graph."""
         # Create a degree sampler that cycles through the sequence
@@ -129,10 +129,10 @@ class ConfigurationModelGT(SignedGraphGT):
             Dictionary with mean, std, min, max of degree sequence.
         """
         return {
-            'mean': float(np.mean(self.degree_sequence)),
-            'std': float(np.std(self.degree_sequence)),
-            'min': int(np.min(self.degree_sequence)),
-            'max': int(np.max(self.degree_sequence)),
+            "mean": float(np.mean(self.degree_sequence)),
+            "std": float(np.std(self.degree_sequence)),
+            "min": int(np.min(self.degree_sequence)),
+            "max": int(np.max(self.degree_sequence)),
         }
 
     def get_degree_distribution(self) -> Tuple[np.ndarray, np.ndarray]:

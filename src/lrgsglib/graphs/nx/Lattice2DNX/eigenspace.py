@@ -1,34 +1,38 @@
 import pickle as pk
+from typing import Any
+
 #
 from numpy.random import randint
 from numpy.typing import NDArray
-from typing import Any
+
 #
 from ....config.funcs import peq_fstr
-from .Lattice2DNX import Lattice2DNX, L2D_ONREP
+from .Lattice2DNX import L2D_ONREP, Lattice2DNX
+
 #
-__all__ = [
-    "create_lattice_with_eigenspace",
-    "load_or_compute_Lattice2DNX"
-]
+__all__ = ["create_lattice_with_eigenspace", "load_or_compute_Lattice2DNX"]
+
+
 #
 def _cache_has_payload(lattice: Any, compute: str) -> bool:
     """True if an unpickled lattice actually carries the payload that
     the given ``compute`` mode promises (guards against stale caches
     saved before the computation ran)."""
-    if compute.startswith('energy'):
-        return bool(getattr(lattice, 'energy_eigV_RBIM', None))
-    if compute.startswith(('eigenmodes', 'eigV')):
-        return getattr(lattice, 'eigV', None) is not None
-    return getattr(lattice, 'eigv', None) is not None
+    if compute.startswith("energy"):
+        return bool(getattr(lattice, "energy_eigV_RBIM", None))
+    if compute.startswith(("eigenmodes", "eigV")):
+        return getattr(lattice, "eigV", None) is not None
+    return getattr(lattice, "eigv", None) is not None
+
+
 #
 def create_lattice_with_eigenspace(
     side: int,
-    disorder_struct: str = 'random',
+    disorder_struct: str = "random",
     *,
-    backend: str = 'scipy',
+    backend: str = "scipy",
     k: int = 1,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Lattice2DNX:
     """
     Construct a 2D lattice, apply a specified disorder pattern, and compute its first k eigenpairs.
@@ -64,34 +68,37 @@ def create_lattice_with_eigenspace(
         `nwDict`.
     """
     # Ensure that predefined structures load their network definitions
-    if disorder_struct != 'random':
-        kwargs.setdefault('init_nw_dict', True)
+    if disorder_struct != "random":
+        kwargs.setdefault("init_nw_dict", True)
 
     # Initialize lattice
     lattice = Lattice2DNX(side, **kwargs)
 
     # Apply disorder
-    if disorder_struct == 'random':
+    if disorder_struct == "random":
         lattice.flip_random_fract_edges()
     else:
         try:
             pattern = lattice.nwDict[disorder_struct][L2D_ONREP]
         except KeyError:
-            raise ValueError(f"Unknown disorder_struct '{disorder_struct}'.") from None
+            raise ValueError(
+                f"Unknown disorder_struct '{disorder_struct}'."
+            ) from None
         lattice.flip_sel_edges(pattern)
 
     # Compute the lowest-k eigenpairs
     lattice.compute_k_eigvV(backend=backend, k=k)
     return lattice
 
+
 def load_or_compute_Lattice2DNX(
-        side1: int, 
-        geo: str,
-        *,
-        cell_type: str = 'rand',
-        save: bool = True, 
-        compute: str = 'energy_cupy',
-        **kwargs: Any
+    side1: int,
+    geo: str,
+    *,
+    cell_type: str = "rand",
+    save: bool = True,
+    compute: str = "energy_cupy",
+    **kwargs: Any,
 ) -> Lattice2DNX:
     """
     Load or compute a 2D lattice object, optionally saving it to a file.
@@ -142,23 +149,27 @@ def load_or_compute_Lattice2DNX(
     tmp_l = Lattice2DNX(side1, geo, only_const_mode=True, **kwargs)
     if not compute:
         return tmp_l
-    pflip = kwargs.get('pflip', .0)
-    new_seed = kwargs.get('seed', randint(0, 2**31 - 1)) if (pflip > 0. and pflip < 1.) else None
-    seed_str = f'_seed{new_seed%2**16}' if new_seed is not None else ''
+    pflip = kwargs.get("pflip", 0.0)
+    new_seed = (
+        kwargs.get("seed", randint(0, 2**31 - 1))
+        if (pflip > 0.0 and pflip < 1.0)
+        else None
+    )
+    seed_str = f"_seed{new_seed%2**16}" if new_seed is not None else ""
     match compute:
-        case _ if compute.startswith('spectrum'):
-            basename = 'L2D_spe'
-        case _ if compute.startswith('energy'):
-            basename = 'L2D_ene'
-    fname = '_'.join([basename, peq_fstr(pflip)]) + seed_str
+        case _ if compute.startswith("spectrum"):
+            basename = "L2D_spe"
+        case _ if compute.startswith("energy"):
+            basename = "L2D_ene"
+    fname = "_".join([basename, peq_fstr(pflip)]) + seed_str
     #
-    pname = tmp_l.path_graph / (fname + '.pkl')
+    pname = tmp_l.path_graph / (fname + ".pkl")
     tmp_l.path_graph.mkdir(parents=True, exist_ok=True)
     #
     lattice = None
     if pname.exists():
-        lattice = pk.load(open(pname, 'rb'))
-        lattice.__init_loaded_graph__(path_data=kwargs.get('path_data', None))
+        lattice = pk.load(open(pname, "rb"))
+        lattice.__init_loaded_graph__(path_data=kwargs.get("path_data", None))
         if not _cache_has_payload(lattice, compute):
             # Cache written before the payload existed (e.g. by the lazy
             # compute_rbim_energy_eigV_all) — recompute and overwrite.
@@ -166,29 +177,32 @@ def load_or_compute_Lattice2DNX(
     if lattice is None:
         lattice = Lattice2DNX(side1, geo=geo, **kwargs)
         match cell_type:
-            case 'rand':
+            case "rand":
                 lattice.flip_random_fract_edges()
             case _:
                 try:
                     pattern = lattice.nwDict[cell_type][L2D_ONREP]
                 except KeyError:
-                    raise ValueError(f"Unknown cell_type '{cell_type}'.") from None
+                    raise ValueError(
+                        f"Unknown cell_type '{cell_type}'."
+                    ) from None
                 lattice.flip_sel_edges(pattern)
         try:
             import cupy as cp
+
             # Test if a GPU is available
             cp.cuda.runtime.getDeviceCount()
         except Exception as e:
-            compute = compute.replace('cupy', 'numpy')
+            compute = compute.replace("cupy", "numpy")
         match compute:
-            case _ if compute.startswith('spectrum'):
-                routine = compute.split('_')[1] if '_' in compute else 'numpy'
+            case _ if compute.startswith("spectrum"):
+                routine = compute.split("_")[1] if "_" in compute else "numpy"
                 lattice.compute_laplacian_spectrum(backend=routine)
-            case _ if compute.startswith('eigenmodes'):
-                routine = compute.split('_')[1] if '_' in compute else 'numpy'
+            case _ if compute.startswith("eigenmodes"):
+                routine = compute.split("_")[1] if "_" in compute else "numpy"
                 lattice.compute_laplacian_spectrum_weigV(backend=routine)
-            case _ if compute.startswith('energy'):
-                routine = compute.split('_')[1] if '_' in compute else 'numpy'
+            case _ if compute.startswith("energy"):
+                routine = compute.split("_")[1] if "_" in compute else "numpy"
                 # compute_rbim_energy_eigV_all only walks already-cached
                 # modes (46425e1): materialize the full spectrum first.
                 lattice.compute_laplacian_spectrum_weigV(backend=routine)
@@ -196,6 +210,6 @@ def load_or_compute_Lattice2DNX(
             case _:
                 raise ValueError(f"Unknown compute option '{compute}'.")
         if save:
-            with open(pname, 'wb') as f:
+            with open(pname, "wb") as f:
                 pk.dump(lattice, f)
     return lattice

@@ -8,7 +8,7 @@ make_rescaled_signed_laplacian) are NOT duplicated here.
 
 from __future__ import annotations
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 # ------------------------------------------------------------------
 # Node / edge accessors
 # ------------------------------------------------------------------
+
 
 def nodes_in(self: "SignedGraphGT", on_g: Optional[str] = None) -> list[int]:
     """Get list of node indices (alias for get_nodes_list)."""
@@ -148,6 +149,7 @@ def get_graph_neighbors(
 # ------------------------------------------------------------------
 # Multi-representation matrix accessors (GT: single repr, thin wrappers)
 # ------------------------------------------------------------------
+
 
 def get_adjacency_matrix_for(
     self: "SignedGraphGT", on_g: Optional[str] = None

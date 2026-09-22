@@ -20,13 +20,13 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
+from ...utils.tools.chronometer import time_function_accumulate
 from .._c_backend import CBackendMixin
 from .._csr import build_graph_csr
 from .._solver import SolverBackend
 from .._solver_engine import get_solver
 from ..VecDynSys import VecDynSys
 from .defaults import POTTS_SOLVER_NAME
-from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
     from ...graphs.nx import SignedGraphNX as SignedGraph
@@ -76,7 +76,7 @@ class PottsModel(CBackendMixin, VecDynSys):
         save_observables: bool = False,
         **kw: Any,
     ) -> None:
-        dynpath = getattr(sg, 'path_data', None)
+        dynpath = getattr(sg, "path_data", None)
         if dynpath is not None:
             dynpath = Path(dynpath) / "potts"
         super().__init__(
@@ -146,10 +146,14 @@ class PottsModel(CBackendMixin, VecDynSys):
         dE = 0.0
         for j in range(self.N):
             if A[nd, j] != 0:
-                dE += A[nd, j] * (float(current == self.s[j]) - float(proposal == self.s[j]))
+                dE += A[nd, j] * (
+                    float(current == self.s[j]) - float(proposal == self.s[j])
+                )
 
         # Accept/reject
-        if dE <= 0 or (self.T > 0 and np.random.uniform() < np.exp(-dE / self.T)):
+        if dE <= 0 or (
+            self.T > 0 and np.random.uniform() < np.exp(-dE / self.T)
+        ):
             self.s[nd] = np.int32(proposal)
 
     # ------------------------------------------------------------------
@@ -200,9 +204,14 @@ class PottsModel(CBackendMixin, VecDynSys):
         ni, nw, nptr = build_graph_csr(self.sg, self.N)
         s0 = np.ascontiguousarray(self.s, dtype=np.int32)
         s, ene, magn = _potts_native.potts_sampling(
-            s0, ni, nw, nptr,
-            int(self.q), float(self.T),
-            int(self.steps), int(self.seed),
+            s0,
+            ni,
+            nw,
+            nptr,
+            int(self.q),
+            float(self.T),
+            int(self.steps),
+            int(self.seed),
             bool(self.save_observables),
         )
         self.s = s
@@ -229,7 +238,7 @@ class PottsModel(CBackendMixin, VecDynSys):
         ]
 
     def _get_cleanup_paths(self) -> list[Path | None]:
-        return [getattr(self, 'sfout', None)]
+        return [getattr(self, "sfout", None)]
 
     @time_function_accumulate(auto_log=False)
     def run(

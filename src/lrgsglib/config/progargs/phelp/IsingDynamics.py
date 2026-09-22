@@ -10,7 +10,9 @@ phelp_runlang = (
     "letters: E=energy/magn, S=snapshots, K=cluster, V=eigvec, H=hfield"
 )
 phelp_thrmsteps = "Number of thermalization steps"
-phelp_eqstep = "Number of equilibrium/optimization MC steps (1 step = N proposals)"
+phelp_eqstep = (
+    "Number of equilibrium/optimization MC steps (1 step = N proposals)"
+)
 phelp_randstr = "Random string for the output files"
 phelp_quench_id = (
     "Run exactly one quench with this 1-indexed id (for SLURM array "
@@ -55,7 +57,9 @@ phelp_pt_T_ladder_type = "Type of temperature ladder"
 phelp_pt_steps_per_exchange = "MC sweeps between exchange attempts"
 phelp_pt_n_exchanges = "Total number of exchange rounds"
 # Topological algorithm help text
-phelp_topo_n_modes = "Number of Laplacian eigenvectors for topological algorithms"
+phelp_topo_n_modes = (
+    "Number of Laplacian eigenvectors for topological algorithms"
+)
 phelp_topo_sigma_init = "Initial proposal width for topo_met"
 phelp_topo_chunk_size = "Steps between adaptive sigma adjustments"
 phelp_topo_polish = "Enable T=0 greedy polish after each chunk"
@@ -67,7 +71,9 @@ phelp_cem_iter = "Number of CEM iterations per restart"
 phelp_cem_pop_size = "Population size (K) for CEM sampling"
 phelp_cem_elite_frac = "Fraction of population used as elite set"
 phelp_cem_init_sigma = "Initial std deviation for CEM coefficient sampling"
-phelp_cem_smoothing = "Exponential smoothing factor for CEM distribution updates"
+phelp_cem_smoothing = (
+    "Exponential smoothing factor for CEM distribution updates"
+)
 phelp_cem_sigma_floor = "Minimum allowed sigma (prevents premature convergence)"
 phelp_cem_sigma_ceiling = "Maximum allowed sigma (prevents divergence)"
 phelp_cem_restarts = "Number of independent CEM restarts (best-of-R)"

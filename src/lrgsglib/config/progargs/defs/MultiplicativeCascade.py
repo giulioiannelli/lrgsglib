@@ -1,13 +1,13 @@
-from ...const import (
-    MSG_P1 as DEFAULT_MC_P1,
-    MSG_P2 as DEFAULT_MC_P2,
-    MSG_P3 as DEFAULT_MC_P3,
-    MSG_P4 as DEFAULT_MC_P4,
-    MSG_ITERATIONS as DEFAULT_MC_ITERATIONS,
-    MSG_FRACTION as DEFAULT_MC_FRACTION,
-)
+from ...const import MSG_FRACTION as DEFAULT_MC_FRACTION
+from ...const import MSG_ITERATIONS as DEFAULT_MC_ITERATIONS
+from ...const import MSG_P1 as DEFAULT_MC_P1
+from ...const import MSG_P2 as DEFAULT_MC_P2
+from ...const import MSG_P3 as DEFAULT_MC_P3
+from ...const import MSG_P4 as DEFAULT_MC_P4
 
-DEFAULT_MC_VARIANT = 'exp_clocks'  # exp_clocks is 2-16x faster (see benchmark_mc_variants.py)
+DEFAULT_MC_VARIANT = (
+    "exp_clocks"  # exp_clocks is 2-16x faster (see benchmark_mc_variants.py)
+)
 DEFAULT_MC_STOCHASTIC = False
 DEFAULT_MC_PERIODIC = False
 

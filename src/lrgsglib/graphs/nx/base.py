@@ -3,12 +3,11 @@
 Re-exports SignedGraphNX class from SignedGraphNX package for cleaner imports.
 """
 
-from .SignedGraphNX import (
-    SignedGraphNX,
+from .SignedGraphNX import (  # Backward compatibility alias
+    ArrayBackend,
     Backend,
     BackendManager,
-    ArrayBackend,
-    # Backward compatibility alias
+    SignedGraphNX,
 )
 
 # Backward compatibility alias

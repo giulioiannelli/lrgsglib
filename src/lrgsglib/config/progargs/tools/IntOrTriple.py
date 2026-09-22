@@ -1,6 +1,7 @@
 import argparse
 from typing import List, Tuple, Union
 
+
 class IntOrTriple(argparse.Action):
     """
     Store one integer as ``int`` or three integers as

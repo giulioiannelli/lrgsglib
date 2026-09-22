@@ -10,6 +10,7 @@ two implementations match each other's semantics.
 Both functions are driven by ``np.random`` so a seed set by the subclass
 (``np.random.seed`` + ``gt.seed_rng``) is reproducible.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -90,6 +91,7 @@ def apply_dilution(
         comp = gt.label_largest_component(G)
         if int(comp.a.sum()) < int(G.num_vertices()):
             import warnings
+
             warnings.warn(
                 "Dilution disconnected the graph; keeping the largest "
                 "connected component."

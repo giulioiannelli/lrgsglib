@@ -10,6 +10,7 @@ engine-independent ``cell_edges`` seam (``SignedGraph.cell_edges``). This replac
 the old bespoke nested container, whose ``random`` reference and hand-rolled XERR
 loop duplicated the shared machinery.
 """
+
 from __future__ import annotations
 
 from ..._shared._nw_container import NwContainer

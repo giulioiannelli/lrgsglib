@@ -27,13 +27,16 @@ if TYPE_CHECKING:
 
 # === Lazy imports for generic ND ===
 
+
 def _get_nx_impl():
     from .nx.LatticeNDNX import LatticeNDNX
+
     return LatticeNDNX
 
 
 def _get_gt_impl():
     from .gt.LatticeNDGT import LatticeNDGT
+
     return LatticeNDGT
 
 
@@ -115,6 +118,7 @@ class LatticeND:
         # --- Dispatch to Lattice2D for 2D shapes with 2D geometries ---
         if ndim == 2 and (geo is None or geo in _GEO_2D):
             from .Lattice2D import Lattice2D
+
             geo_2d = geo if geo is not None else "sqr"
             # Map generic params to Lattice2D params
             l2d_kwargs: dict[str, Any] = {
@@ -133,6 +137,7 @@ class LatticeND:
         # --- Dispatch to Lattice3D for 3D shapes with 3D geometries ---
         if ndim == 3 and (geo is None or geo in _GEO_3D):
             from .Lattice3D import Lattice3D
+
             geo_3d = geo if geo is not None else "sc"
             l3d_kwargs: dict[str, Any] = {
                 "dim": shape,

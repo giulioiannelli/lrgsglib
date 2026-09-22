@@ -5,5 +5,3 @@ This module contains functions for protein structure reconstruction using spectr
 """
 
 from .protein import *
-
-

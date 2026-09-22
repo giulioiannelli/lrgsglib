@@ -16,8 +16,8 @@ from typing import Optional, Tuple, Union
 
 import networkx as nx
 
-from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 from ..funcs.lattice import LatticeND_graph_FastPatch
+from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 
 
 class LatticeNDNX(SignedGraphNX):

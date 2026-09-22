@@ -3,19 +3,19 @@ ErdosRenyiGT: graph-tool implementation of Erdos-Renyi random graphs.
 
 Mirrors the API of ErdosRenyiNX for easy switching between backends.
 """
+
 from __future__ import annotations
 
 from typing import Optional
 
-import numpy as np
-
 import graph_tool.all as gt
 import graph_tool.generation as gen
 import graph_tool.topology as topo
+import numpy as np
 
 from ....config.const import SG_INIT_NW_DICT
-from ..SignedGraphGT import SignedGraphGT
 from ..._shared._nw_container import GTnwContainer
+from ..SignedGraphGT import SignedGraphGT
 
 
 class ErdosRenyiGT(SignedGraphGT):
@@ -103,9 +103,14 @@ class ErdosRenyiGT(SignedGraphGT):
         self._syshapePth = f"N={G.num_vertices()}_p={p:.3g}"
 
         # Initialize parent class
-        super().__init__(G=G, pflip=pflip, seed=seed,
-                         sgpathn="erdos_renyi_gt",
-                         init_nw_dict=init_nw_dict, **kwargs)
+        super().__init__(
+            G=G,
+            pflip=pflip,
+            seed=seed,
+            sgpathn="erdos_renyi_gt",
+            init_nw_dict=init_nw_dict,
+            **kwargs,
+        )
 
     def _generate_graph(self) -> gt.Graph:
         """Generate Erdos-Renyi random graph using graph-tool."""
@@ -191,5 +196,6 @@ class ErdosRenyiGT(SignedGraphGT):
             f"ErdosRenyiGT(n={self.n}, p={self.p}, N={self.N}, "
             f"edges={self.num_edges}, negative={neg})"
         )
+
 
 __all__ = ["ErdosRenyiGT"]

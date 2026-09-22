@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .protocols import SignedGraphProtocol
     from .nx.FullyConnectedNX import FullyConnectedNX
+    from .protocols import SignedGraphProtocol
 
 
 def _get_nx_impl():
@@ -31,12 +31,8 @@ def _get_gt_impl():
     return FullyConnectedGT
 
 
-register_implementation(
-    "FullyConnected", GraphEngine.NETWORKX, _get_nx_impl
-)
-register_implementation(
-    "FullyConnected", GraphEngine.GRAPHTOOL, _get_gt_impl
-)
+register_implementation("FullyConnected", GraphEngine.NETWORKX, _get_nx_impl)
+register_implementation("FullyConnected", GraphEngine.GRAPHTOOL, _get_gt_impl)
 
 _NX_SPECIFIC_PARAMS = {
     "sgpathn",

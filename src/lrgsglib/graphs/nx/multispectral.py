@@ -5,23 +5,20 @@ MultiplicativeCascadeNX, VicsekNX, and HierarchicalModularNX packages
 for cleaner imports.
 """
 
-from .MultispectralGraphNX import (
-    MultispectralGraphNX,
-    # Backward compatibility alias
-    MultispectralGraph,
-)
-from .MultiplicativeCascadeNX import (
-    MultiplicativeCascadeGraphNX,
-    # Backward compatibility alias
-    MultiplicativeCascadeGraph,
-)
-from .VicsekNX import (
-    VicsekGraphNX,
-    # Backward compatibility alias
-    VicsekGraph,
-)
 from .HierarchicalModularNX import (
     HierarchicalModularNetworkNX,
+)
+from .MultiplicativeCascadeNX import (  # Backward compatibility alias
+    MultiplicativeCascadeGraph,
+    MultiplicativeCascadeGraphNX,
+)
+from .MultispectralGraphNX import (  # Backward compatibility alias
+    MultispectralGraph,
+    MultispectralGraphNX,
+)
+from .VicsekNX import (  # Backward compatibility alias
+    VicsekGraph,
+    VicsekGraphNX,
 )
 
 __all__ = [

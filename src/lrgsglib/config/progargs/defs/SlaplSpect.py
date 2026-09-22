@@ -1,11 +1,13 @@
 DEFAULT_HOWMANY_EIGS = 0
-DEFAULT_L2DSSPECT_MODE = 'eigvec_dist'
+DEFAULT_L2DSSPECT_MODE = "eigvec_dist"
 
 # MCG_SlaplSpect defaults
-DEFAULT_MCGSSPECT_MODE = 'eigval_dist'
+DEFAULT_MCGSSPECT_MODE = "eigval_dist"
 
 # Backend for eigendecomposition (scipy/numpy/cupy)
-DEFAULT_SLAPLSPECT_BACKEND = 'scipy'  # Conservative default; cluster will use 'cupy'
+DEFAULT_SLAPLSPECT_BACKEND = (
+    "scipy"  # Conservative default; cluster will use 'cupy'
+)
 
 # Sparse eigendecomposition strategy
 DEFAULT_KEEP_SPARSE = None  # Auto-select based on N and sparsity
@@ -21,5 +23,6 @@ DEFAULT_SPECIFIC_HEAT_SCALE = "logN"
 
 # Laplacian type selector (canonical source of truth: config/const.py)
 from ...const import SG_LAPL_DEFAULT_TYPE, SG_LAPL_TYPES
+
 DEFAULT_LAPLACIAN_TYPE = SG_LAPL_DEFAULT_TYPE
 LAPLACIAN_TYPE_CHOICES = list(SG_LAPL_TYPES)

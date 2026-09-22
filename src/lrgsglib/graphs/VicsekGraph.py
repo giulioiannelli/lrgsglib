@@ -19,8 +19,8 @@ import numpy as np
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .protocols import SignedGraphProtocol
     from .nx.VicsekNX import VicsekGraphNX
+    from .protocols import SignedGraphProtocol
 
 
 def _get_nx_impl():

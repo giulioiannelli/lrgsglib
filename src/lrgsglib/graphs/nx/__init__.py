@@ -47,88 +47,102 @@ Temporal:
 
 # Base
 from .SignedGraphNX import SignedGraphNX
+
 SignedGraph = SignedGraphNX
+
+from .Lattice2DNX import (
+    Lattice2D,
+    Lattice2DNX,
+    create_lattice_with_eigenspace,
+    load_or_compute_Lattice2D,
+    load_or_compute_Lattice2DNX,
+)
+from .Lattice3DNX import (
+    Lattice3D,
+    Lattice3DNX,
+    load_or_compute_Lattice3D,
+    load_or_compute_Lattice3DNX,
+)
 
 # Lattice
 from .LatticeNDNX import LatticeNDNX
-from .Lattice2DNX import (
-    Lattice2DNX,
-    Lattice2D,
-    create_lattice_with_eigenspace,
-    load_or_compute_Lattice2DNX,
-    load_or_compute_Lattice2D,
-)
-from .Lattice3DNX import (
-    Lattice3DNX,
-    Lattice3D,
-    load_or_compute_Lattice3DNX,
-    load_or_compute_Lattice3D,
-)
 
 # Random
 from .RandomGraphNX import RandomGraphNX
+
 RandomGraph = RandomGraphNX
-from .ErdosRenyiNX import ErdosRenyiNX, ErdosRenyi
-from .BarabasiAlbertNX import BarabasiAlbertNX, BarabasiAlbert
-from .WattsStrogatzNX import WattsStrogatzNX, WattsStrogatz
+from .BarabasiAlbertNX import BarabasiAlbert, BarabasiAlbertNX
+from .ErdosRenyiNX import ErdosRenyi, ErdosRenyiNX
+from .WattsStrogatzNX import WattsStrogatz, WattsStrogatzNX
+
 WattStrogatz = WattsStrogatzNX  # legacy typo alias
-from .StochasticBlockModelNX import StochasticBlockModelNX, StochasticBlockModel
-from .kRegularGraphNX import kRegularGraphNX, kRegularGraph
-from .ConfigurationModelNX import ConfigurationModelNX, ConfigurationModel
-from .RandomGeometricNX import RandomGeometricNX, RandomGeometric
-from .LFRBenchmarkNX import LFRBenchmarkNX, LFRBenchmark
-from .ExtendedBarabasiAlbertNX import ExtendedBarabasiAlbertNX, ExtendedBarabasiAlbert
-from .DualBarabasiAlbertNX import DualBarabasiAlbertNX, DualBarabasiAlbert
-from .HolmeKimNX import HolmeKimNX, HolmeKim
-
-# Complete
-from .CompleteGraphNX import CompleteGraphNX, CompleteGraph
-from .FullyConnectedNX import FullyConnectedNX, FullyConnected
-
-# Neural
-from .HofieldNNNX import HofieldNNNX, HofieldNN
-from .SCSGeneralizedNNNX import SCSGeneralizedNNNX, SCSGeneralizedNN
-
-# Fractal
-from .FractalGraphNX import FractalGraphNX, FractalGraph
-from .DGMgraphNX import DGMgraphNX, DGMgraph
-from .SierpinskiNX import SierpinskiNX, SierpinskiGraph, SierpinskiGraphNX
+from .BipartiteFromDegreeSequenceNX import (
+    BipartiteFromDegreeSequence,
+    BipartiteFromDegreeSequenceNX,
+)
 
 # Bipartite
-from .BipartiteGraphNX import BipartiteGraphNX, BipartiteGraph
-from .BipartiteFromDegreeSequenceNX import BipartiteFromDegreeSequenceNX, BipartiteFromDegreeSequence
+from .BipartiteGraphNX import BipartiteGraph, BipartiteGraphNX
 
-# Multispectral
-from .MultispectralGraphNX import MultispectralGraphNX, MultispectralGraph
-from .MultiplicativeCascadeNX import MultiplicativeCascadeGraphNX, MultiplicativeCascadeGraph
-from .VicsekNX import VicsekGraphNX, VicsekGraph
-from .HierarchicalModularNX import HierarchicalModularNetworkNX, HierarchicalModularNetwork
+# Complete
+from .CompleteGraphNX import CompleteGraph, CompleteGraphNX
+from .ConfigurationModelNX import ConfigurationModel, ConfigurationModelNX
+from .DGMgraphNX import DGMgraph, DGMgraphNX
 
 # Dirac
 from .DiracLatticeNX import (
-    DiracLatticeGraphNX,
-    DiracLatticeGraph,
-    DiracBrushGraphNX,
     DiracBrushGraph,
-    DiracCombGraphNX,
+    DiracBrushGraphNX,
     DiracCombGraph,
+    DiracCombGraphNX,
+    DiracLatticeGraph,
+    DiracLatticeGraphNX,
 )
+from .DualBarabasiAlbertNX import DualBarabasiAlbert, DualBarabasiAlbertNX
+from .ExtendedBarabasiAlbertNX import (
+    ExtendedBarabasiAlbert,
+    ExtendedBarabasiAlbertNX,
+)
+
+# Fractal
+from .FractalGraphNX import FractalGraph, FractalGraphNX
+from .FullyConnectedNX import FullyConnected, FullyConnectedNX
+from .HierarchicalModularNX import (
+    HierarchicalModularNetwork,
+    HierarchicalModularNetworkNX,
+)
+
+# Neural
+from .HofieldNNNX import HofieldNN, HofieldNNNX
+from .HolmeKimNX import HolmeKim, HolmeKimNX
+from .kRegularGraphNX import kRegularGraph, kRegularGraphNX
+from .LFRBenchmarkNX import LFRBenchmark, LFRBenchmarkNX
+from .MultiplicativeCascadeNX import (
+    MultiplicativeCascadeGraph,
+    MultiplicativeCascadeGraphNX,
+)
+
+# Multispectral
+from .MultispectralGraphNX import MultispectralGraph, MultispectralGraphNX
+from .RandomGeometricNX import RandomGeometric, RandomGeometricNX
+from .SCSGeneralizedNNNX import SCSGeneralizedNN, SCSGeneralizedNNNX
+from .SierpinskiNX import SierpinskiGraph, SierpinskiGraphNX, SierpinskiNX
+from .StochasticBlockModelNX import StochasticBlockModel, StochasticBlockModelNX
+from .VicsekNX import VicsekGraph, VicsekGraphNX
+
 DiracLattice = DiracLatticeGraphNX
 
+# Utility submodules
+from . import datasets, funcs
+from .datasets import BUILTIN_DATASETS, RealDatasetLoader
+
 # GraphOfGraphs
-from .GraphOfGraphsNX import (
-    GraphOfGraphsNX,
-    GraphOfGraphs as GraphOfGraphsNXAlias,
-)
+from .GraphOfGraphsNX import GraphOfGraphs as GraphOfGraphsNXAlias
+from .GraphOfGraphsNX import GraphOfGraphsNX
 
 # Temporal
-from .TemporalGraphNX import TemporalGraphNX, TemporalGraph
-from .TemporalSignedGraphNX import TemporalSignedGraphNX, TemporalSignedGraph
-
-# Utility submodules
-from . import funcs
-from . import datasets
-from .datasets import RealDatasetLoader, BUILTIN_DATASETS
+from .TemporalGraphNX import TemporalGraph, TemporalGraphNX
+from .TemporalSignedGraphNX import TemporalSignedGraph, TemporalSignedGraphNX
 
 __all__ = [
     # Base

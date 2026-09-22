@@ -38,7 +38,6 @@ from numpy.typing import NDArray
 from .._frames import FrameHook, iter_frames
 from . import ContactProcessBase
 
-
 Frame = NDArray[np.int8]
 TContact = TypeVar("TContact", bound=ContactProcessBase)
 
@@ -121,7 +120,9 @@ def iter_contact_process_frames(
 
     if resolved_backend == "c_step":
         if not runlang_upper.startswith("C"):
-            raise ValueError("backend='c_step' requires a C runlang (e.g. 'C1c').")
+            raise ValueError(
+                "backend='c_step' requires a C runlang (e.g. 'C1c')."
+            )
 
         if tqdm_on:
             import tqdm as _tqdm

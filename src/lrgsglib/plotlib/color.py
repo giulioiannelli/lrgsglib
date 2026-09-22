@@ -1,15 +1,18 @@
-from .const_plotlib import *
 #
 from typing import Optional, Sequence
+
+from .const_plotlib import *
+
 #
 __all__ = [
-    'convert_to_RGB',
-    'get_opposite_color',
-    'set_alpha_tocolor',
-    'set_alpha_torgb',
-    'set_color_cycle',
+    "convert_to_RGB",
+    "get_opposite_color",
+    "set_alpha_tocolor",
+    "set_alpha_torgb",
+    "set_color_cycle",
 ]
 #
+
 
 def convert_to_RGB(color: ColorType) -> tuple[int, int, int]:
     """
@@ -57,6 +60,8 @@ def convert_to_RGB(color: ColorType) -> tuple[int, int, int]:
         "Invalid color format. Must be a string, a tuple of three integers, "
         "a tuple of three floats, or a tuple of four values (RGBA)."
     )
+
+
 #
 def convert_to_rgb(color: ColorType) -> tuple[float, float, float]:
     """
@@ -86,12 +91,12 @@ def convert_to_rgb(color: ColorType) -> tuple[float, float, float]:
     """
     rgb = convert_to_RGB(color)
     return (rgb[0] / 255, rgb[1] / 255, rgb[2] / 255)
+
+
 #
 
-def get_opposite_color(
-    color: ColorType, 
-    col_type: str = 'hex'
-) -> ColorType:
+
+def get_opposite_color(color: ColorType, col_type: str = "hex") -> ColorType:
     """
     Calculate the opposite color for a given color in various formats.
 
@@ -162,24 +167,25 @@ def get_opposite_color(
     opposite_rgb = 1 - rgb_array  # Find the opposite for each channel
 
     # Return the opposite color in the desired output format
-    if col_type == 'hex':
+    if col_type == "hex":
         return (
             to_hex(tuple(opposite_rgb))
             if alpha is None
             else to_hex(tuple(opposite_rgb)) + f"{int(alpha * 255):02x}"
         )
-    elif col_type == 'rgb':
-        return (
-            tuple(opposite_rgb)
-            if alpha is None
-            else (*opposite_rgb, alpha)
-        )
+    elif col_type == "rgb":
+        return tuple(opposite_rgb) if alpha is None else (*opposite_rgb, alpha)
     else:
-        raise ValueError("Unsupported output format. Please use 'hex' or 'rgb'.")
+        raise ValueError(
+            "Unsupported output format. Please use 'hex' or 'rgb'."
+        )
+
+
 #
 
+
 def set_alpha_tocolor(
-    color: ColorType, 
+    color: ColorType,
     alpha: float = 0.5,
 ) -> tuple[float, float, float, float]:
     """
@@ -210,11 +216,13 @@ def set_alpha_tocolor(
     """
     rgb = convert_to_rgb(color)
     return set_alpha_torgb(rgb, alpha)
+
+
 #
 
+
 def set_alpha_torgb(
-    rgbcol: tuple[int, int, int], 
-    alpha: float = 0.5
+    rgbcol: tuple[int, int, int], alpha: float = 0.5
 ) -> tuple[int, int, int, float]:
     """
     Set the alpha (transparency) channel of an RGB color tuple.
@@ -239,46 +247,46 @@ def set_alpha_torgb(
     (255, 0, 0, 0.2)
     """
     return (rgbcol[0], rgbcol[1], rgbcol[2], alpha)
+
+
 #
 def set_color_cycle(
-    arr: Sequence,
-    ax: Optional[Axes] = None,
-    my_cmap: Optional[Colormap] = None
+    arr: Sequence, ax: Optional[Axes] = None, my_cmap: Optional[Colormap] = None
 ) -> None:
     """
-    Sets the color cycle of the given Axes based on the provided colormap and 
+    Sets the color cycle of the given Axes based on the provided colormap and
     array length.
 
     Parameters
     ----------
     arr : Sequence
-        An array-like object that determines the number of distinct colors 
-        needed. The length of `arr` dictates how many colors will be 
+        An array-like object that determines the number of distinct colors
+        needed. The length of `arr` dictates how many colors will be
         generated from the colormap.
     ax : matplotlib.axes.Axes, optional
-        The Matplotlib Axes object to which the color cycle will be applied. 
-        This is where the color properties will be set, affecting subsequent 
-        plot elements added to this Axes. If not provided, the current axes 
+        The Matplotlib Axes object to which the color cycle will be applied.
+        This is where the color properties will be set, affecting subsequent
+        plot elements added to this Axes. If not provided, the current axes
         (`plt.gca()`) will be used.
     my_cmap : matplotlib.colors.Colormap, optional
-        A Matplotlib colormap instance used to map normalized values to 
-        colors. This colormap defines the range and variation of colors in 
-        the cycle. If not provided, defaults to the custom colormap 
+        A Matplotlib colormap instance used to map normalized values to
+        colors. This colormap defines the range and variation of colors in
+        the cycle. If not provided, defaults to the custom colormap
         `'restr_twilight'`.
 
     Returns
     -------
     None
-        This function does not return any value. It modifies the `ax` object 
+        This function does not return any value. It modifies the `ax` object
         in place by setting its color property cycle.
 
     Raises
     ------
     ValueError
-        If `arr` is empty, as at least one color is required to set the color 
+        If `arr` is empty, as at least one color is required to set the color
         cycle.
     LookupError
-        If the default colormap `'restr_twilight'` is not found and `my_cmap` 
+        If the default colormap `'restr_twilight'` is not found and `my_cmap`
         is not provided.
 
     Examples
@@ -298,13 +306,13 @@ def set_color_cycle(
 
     Notes
     -----
-    - Ensure that the length of `arr` corresponds to the number of distinct 
+    - Ensure that the length of `arr` corresponds to the number of distinct
       elements you plan to plot to avoid color repetition.
-    - The colormap (`my_cmap`) can be any Matplotlib colormap. You can create 
-      custom colormaps or use predefined ones like `'viridis'`, `'plasma'`, 
+    - The colormap (`my_cmap`) can be any Matplotlib colormap. You can create
+      custom colormaps or use predefined ones like `'viridis'`, `'plasma'`,
       `'inferno'`, `'magma'`, etc.
-    - If using the default `'restr_twilight'` colormap, ensure it is 
-      registered with Matplotlib using `plt.register_cmap()` before calling 
+    - If using the default `'restr_twilight'` colormap, ensure it is
+      registered with Matplotlib using `plt.register_cmap()` before calling
       this function.
     """
     if not arr:
@@ -319,7 +327,7 @@ def set_color_cycle(
     # Use the default colormap if none is provided
     if my_cmap is None:
         try:
-            my_cmap = plt.get_cmap('restr_twilight')
+            my_cmap = plt.get_cmap("restr_twilight")
         except ValueError:
             raise LookupError(
                 "The default colormap 'restr_twilight' is not found. Please "

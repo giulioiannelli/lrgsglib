@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
@@ -12,6 +12,7 @@ from scipy.spatial.distance import pdist, squareform
 # Bio.PDB imports for PDB processing
 try:
     from Bio.PDB import PDBParser
+
     BIO_PDB_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional dependency
     BIO_PDB_AVAILABLE = False
@@ -26,7 +27,9 @@ __all__ = [
 ]
 
 
-def protein_to_distance_feature_vector(coords: np.ndarray, n_features: int = 784) -> np.ndarray:
+def protein_to_distance_feature_vector(
+    coords: np.ndarray, n_features: int = 784
+) -> np.ndarray:
     """Convert coordinates to a fixed-size distance feature vector.
 
     .. deprecated:: CHL-SF04
@@ -78,7 +81,9 @@ def create_enhanced_feature_vector(
         coord_features[: len(coords_flat)] = coords_flat
         subsampling_indices = None
     else:
-        indices = np.linspace(0, len(coords_flat) - 1, coord_feature_size, dtype=int)
+        indices = np.linspace(
+            0, len(coords_flat) - 1, coord_feature_size, dtype=int
+        )
         coord_features = coords_flat[indices]
         subsampling_indices = indices
     bio_feature_size = n_features - coord_feature_size
@@ -117,7 +122,7 @@ def create_enhanced_feature_vector(
                 bio_features[3 + aa_dict[residue]] += 1
         bio_features[3:23] /= len(residue_types)
     if len(coords_centered) > 0:
-        rog = np.sqrt(np.mean(np.sum(coords_centered ** 2, axis=1)))
+        rog = np.sqrt(np.mean(np.sum(coords_centered**2, axis=1)))
         bio_features[23] = rog / 50.0
         if len(coords_centered) > 2:
             cov_matrix = np.cov(coords_centered.T)
@@ -143,8 +148,6 @@ def create_enhanced_feature_vector(
     return full_features, metadata
 
 
-
-
 def assign_secondary_structure_from_coords(coords: np.ndarray) -> List[str]:
     """Assign a rudimentary secondary structure from geometry."""
     n_residues = len(coords)
@@ -167,7 +170,10 @@ def assign_secondary_structure_from_coords(coords: np.ndarray) -> List[str]:
             ss_assignments[i] = "H"
     smoothed = ss_assignments.copy()
     for i in range(1, n_residues - 1):
-        if ss_assignments[i - 1] == ss_assignments[i + 1] and ss_assignments[i - 1] != "C":
+        if (
+            ss_assignments[i - 1] == ss_assignments[i + 1]
+            and ss_assignments[i - 1] != "C"
+        ):
             smoothed[i] = ss_assignments[i - 1]
     return smoothed
 
@@ -177,10 +183,14 @@ def extract_comprehensive_protein_features(
 ) -> Tuple[np.ndarray, Dict[str, Any], np.ndarray]:
     """Parse a PDB string and produce a comprehensive feature vector."""
     if not BIO_PDB_AVAILABLE:
-        raise ImportError("Bio.PDB required for comprehensive PDB processing. Install with: pip install biopython")
+        raise ImportError(
+            "Bio.PDB required for comprehensive PDB processing. Install with: pip install biopython"
+        )
 
     parser = PDBParser(QUIET=True)
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".pdb", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".pdb", delete=False
+    ) as tmp:
         tmp.write(pdb_content)
         tmp_path = tmp.name
     try:
@@ -270,20 +280,28 @@ def create_comprehensive_feature_vector(
         ss_composition /= len(secondary_structure)
     structural_features: List[float] = []
     if len(coords_centered) > 0:
-        rog = np.sqrt(np.mean(np.sum(coords_centered ** 2, axis=1)))
+        rog = np.sqrt(np.mean(np.sum(coords_centered**2, axis=1)))
         structural_features.append(rog)
         if len(coords_centered) > 2:
             cov_matrix = np.cov(coords_centered.T)
             eigenvals = np.sort(np.linalg.eigvals(cov_matrix))[::-1]
             asphericity = eigenvals[0] - 0.5 * (eigenvals[1] + eigenvals[2])
-            structural_features.extend([asphericity, eigenvals[0], eigenvals[1], eigenvals[2]])
+            structural_features.extend(
+                [asphericity, eigenvals[0], eigenvals[1], eigenvals[2]]
+            )
         contact_threshold = 8.0
         contacts = (dist_matrix < contact_threshold).sum()
-        contact_density = contacts / (len(coords) * (len(coords) - 1)) if len(coords) > 1 else 0
+        contact_density = (
+            contacts / (len(coords) * (len(coords) - 1))
+            if len(coords) > 1
+            else 0
+        )
         structural_features.append(contact_density)
     max_distance_features = n_features // 2
     distance_features = distances[: min(len(distances), max_distance_features)]
-    all_features = np.concatenate([distance_features, aa_composition, ss_composition, structural_features])
+    all_features = np.concatenate(
+        [distance_features, aa_composition, ss_composition, structural_features]
+    )
     if len(all_features) >= n_features:
         feature_vector = all_features[:n_features]
     else:
@@ -295,46 +313,46 @@ def create_comprehensive_feature_vector(
     return feature_vector
 
 
-def protein_to_coordinate_feature_vector(coords: np.ndarray, n_features: int = 1024) -> np.ndarray:
+def protein_to_coordinate_feature_vector(
+    coords: np.ndarray, n_features: int = 1024
+) -> np.ndarray:
     """
     PROPER coordinate feature extraction from protein structure.
-    
-    This function extracts actual x,y,z coordinates as features, which can be 
+
+    This function extracts actual x,y,z coordinates as features, which can be
     meaningfully reconstructed back to protein structures.
-    
+
     Args:
         coords: Protein coordinates array of shape (n_atoms, 3)
         n_features: Target number of features
-        
+
     Returns:
         Feature vector of length n_features containing coordinate information
     """
     if len(coords) == 0:
         return np.zeros(n_features)
-    
+
     # Center the coordinates
     coords_centered = coords - coords.mean(axis=0)
-    
+
     # Flatten to 1D: [x1, y1, z1, x2, y2, z2, ...]
     coords_flat = coords_centered.flatten()
-    
+
     # Create feature vector
     if len(coords_flat) <= n_features:
         # Pad with zeros if we have fewer coordinates than features
         feature_vector = np.zeros(n_features)
-        feature_vector[:len(coords_flat)] = coords_flat
+        feature_vector[: len(coords_flat)] = coords_flat
     else:
         # Subsample coordinates if we have more than n_features
         # Take every k-th coordinate to maintain spatial structure
         step = len(coords_flat) // n_features
         indices = np.arange(0, len(coords_flat), step)[:n_features]
         feature_vector = coords_flat[indices]
-    
+
     # Normalize to reasonable range
     max_coord = np.abs(feature_vector).max()
     if max_coord > 0:
         feature_vector = feature_vector / max_coord
-    
+
     return feature_vector
-
-

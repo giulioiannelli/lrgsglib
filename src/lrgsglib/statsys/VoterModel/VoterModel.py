@@ -19,28 +19,32 @@ from typing import Any
 import numpy as np
 import tqdm
 
-from .._c_backend import CBackendMixin
-from .._csr import build_graph_csr
-from .._run_host import RunHostMixin
-from ..BinDynSys import BinDynSys
 from ...config.const import BIN, NPZ
 from ...utils.statsys import (
     cluster_size_distribution,
-    consensus_time_stats as _consensus_time_stats,
-    edge_sign_arrays,
-    giant_cluster_spans as _giant_cluster_spans,
-    interface_density_ensemble as _interface_density_ensemble,
-    largest_fraction,
-    order_parameter_susceptibility as _order_parameter_susceptibility,
-    survival_curve as _survival_curve,
 )
-from . import _voter_io
+from ...utils.statsys import consensus_time_stats as _consensus_time_stats
+from ...utils.statsys import edge_sign_arrays
+from ...utils.statsys import giant_cluster_spans as _giant_cluster_spans
+from ...utils.statsys import (
+    interface_density_ensemble as _interface_density_ensemble,
+)
+from ...utils.statsys import largest_fraction
+from ...utils.statsys import (
+    order_parameter_susceptibility as _order_parameter_susceptibility,
+)
+from ...utils.statsys import survival_curve as _survival_curve
+from .._c_backend import CBackendMixin
+from .._csr import build_graph_csr
 from .._observables import (
     HistogramSeries,
     ObservableSet,
     RowTrajectory,
     ScalarSeries,
 )
+from .._run_host import RunHostMixin
+from ..BinDynSys import BinDynSys
+from . import _voter_io
 from .defaults import (
     CLUSTER_MODE_CODE,
     CLUSTER_MODES,
@@ -1260,7 +1264,7 @@ class VoterModel(RunHostMixin, CBackendMixin, BinDynSys):
         consulted. Graph is passed as CSR arrays, so there is no file I/O and GT
         graphs are supported.
         """
-        from ._vectorized_voter import run_vectorized_sync, CUPY_AVAILABLE
+        from ._vectorized_voter import CUPY_AVAILABLE, run_vectorized_sync
 
         if gpu:
             if not CUPY_AVAILABLE:

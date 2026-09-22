@@ -4,13 +4,14 @@ kRegularGraphGT: graph-tool implementation using native GT random_graph.
 Uses graph-tool's built-in random_graph with constant degree sampler
 for high-performance k-regular graph generation.
 """
+
 from __future__ import annotations
 
 from typing import Optional, Tuple
 
-import numpy as np
 import graph_tool.all as gt
 import graph_tool.generation as gen
+import numpy as np
 
 from ..SignedGraphGT import SignedGraphGT
 
@@ -87,7 +88,6 @@ class kRegularGraphGT(SignedGraphGT):
 
         # Initialize parent class
         super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
-
 
     def _generate_graph(self) -> gt.Graph:
         """Generate k-regular graph using graph-tool's random_graph."""

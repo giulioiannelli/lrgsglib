@@ -31,9 +31,9 @@ from ...config.const import (
     SRW_START_PROTOCOLS,
     SRW_X_NODE_BEHAVIORS,
 )
-from ..DynSys import DynSys
 from .._solver import SolverBackend
 from .._solver_engine import get_solver
+from ..DynSys import DynSys
 from ._kernel import _kill_masks, run_walker, signed_lattice_tables
 from .defaults import SRW_WALKER_SOLVER_NAME
 
@@ -48,6 +48,7 @@ def _load_srw_native():
     """
     try:
         from .ccore import _srw_native  # type: ignore
+
         return _srw_native
     except ImportError:
         try:
@@ -55,6 +56,7 @@ def _load_srw_native():
             # exported there, add the directory to sys.path manually.
             import importlib.util
             from pathlib import Path
+
             so_dir = Path(__file__).resolve().parent / "ccore"
             candidates = list(so_dir.glob("_srw_native*.so"))
             if not candidates:
@@ -161,8 +163,9 @@ class SignedWalker(DynSys):
         # walker time is not N-sweep time — pass steps=1 as placeholder so the
         # DynSys time-control helper is happy; real per-walker stop steps are
         # recorded in ``self.stop_step`` after ``run()``.
-        super().__init__(sg, runlang=runlang, steps=1, seed=seed,
-                         dynpath=dynpath, **kwargs)
+        super().__init__(
+            sg, runlang=runlang, steps=1, seed=seed, dynpath=dynpath, **kwargs
+        )
 
     # ------------------------------------------------------------------
     # DynSys abstract API (minimal stubs; walker uses vectorised kernel)
@@ -199,11 +202,11 @@ class SignedWalker(DynSys):
         """Compute the starting-node index array according to ``self.start``."""
         N = int(self.sg.N)
         rng = np.random.default_rng(self.seed)
-        if self.start == 'random':
+        if self.start == "random":
             return rng.integers(0, N, size=self.n_walkers, dtype=np.int64)
-        if self.start == 'fixed':
-            if 'nodes' in self.start_kwargs:
-                nodes = np.asarray(self.start_kwargs['nodes'], dtype=np.int64)
+        if self.start == "fixed":
+            if "nodes" in self.start_kwargs:
+                nodes = np.asarray(self.start_kwargs["nodes"], dtype=np.int64)
                 if nodes.shape == (self.n_walkers,):
                     return nodes
                 if nodes.ndim == 0:
@@ -212,16 +215,18 @@ class SignedWalker(DynSys):
                     f"start_kwargs['nodes'] shape {nodes.shape} "
                     f"!= ({self.n_walkers},) or scalar."
                 )
-            if 'node' in self.start_kwargs:
-                return np.full(self.n_walkers,
-                               int(self.start_kwargs['node']),
-                               dtype=np.int64)
+            if "node" in self.start_kwargs:
+                return np.full(
+                    self.n_walkers,
+                    int(self.start_kwargs["node"]),
+                    dtype=np.int64,
+                )
             raise ValueError(
                 "start='fixed' requires start_kwargs={'node': int} "
                 "or start_kwargs={'nodes': array-like}."
             )
-        if self.start == 'center':
-            side = int(round(N ** 0.5))
+        if self.start == "center":
+            side = int(round(N**0.5))
             if side * side != N:
                 raise ValueError(
                     f"start='center' requires a square lattice "
@@ -236,9 +241,9 @@ class SignedWalker(DynSys):
     # ------------------------------------------------------------------
     def _resolve_backend(self) -> SolverBackend:
         """Map the runlang code to a solver family (``py`` / ``pb_absorb``)."""
-        if self.runlang.startswith('pb'):
+        if self.runlang.startswith("pb"):
             return SolverBackend.PB
-        if self.runlang.startswith('py'):
+        if self.runlang.startswith("py"):
             return SolverBackend.PY
         raise NotImplementedError(
             f"runlang={self.runlang!r} is not available yet; "
@@ -264,7 +269,8 @@ class SignedWalker(DynSys):
         """Run the Python kernel and populate per-walker observables."""
         self.init_state()
         result = run_walker(
-            self.sg, self.rule,
+            self.sg,
+            self.rule,
             n_walkers=self.n_walkers,
             start_positions=self.s,
             seed=self.seed,
@@ -278,12 +284,12 @@ class SignedWalker(DynSys):
 
     def _run_pybind(self, **kw: Any) -> None:
         """Run the C absorb-kernel via the pybind11 extension."""
-        if self.runlang != 'pb_absorb':
+        if self.runlang != "pb_absorb":
             raise NotImplementedError(
                 f"Phase 2 ships only 'pb_absorb' (not {self.runlang!r}); "
                 f"kill/sticky C kernels are a follow-up."
             )
-        if self.rule != 'absorb':
+        if self.rule != "absorb":
             raise RuntimeError(
                 f"runlang='pb_absorb' requires rule='absorb'; "
                 f"got rule={self.rule!r}."
@@ -309,8 +315,12 @@ class SignedWalker(DynSys):
         # path; 0 disables the optional output entirely.
         wpt = 1 if self.store_per_walker_visits else 0
         (
-            visits_agg, unique_visits, stop_step, stop_reason,
-            final_position, trial_bubbles,
+            visits_agg,
+            unique_visits,
+            stop_step,
+            stop_reason,
+            final_position,
+            trial_bubbles,
         ) = native.absorb_walker_sampling(
             N,
             neigh_indices,
@@ -322,7 +332,11 @@ class SignedWalker(DynSys):
             int(self.seed),
             wpt,
         )
-        Ne = int(self.sg.Ne) if hasattr(self.sg, 'Ne') else int(self.sg.num_edges)
+        Ne = (
+            int(self.sg.Ne)
+            if hasattr(self.sg, "Ne")
+            else int(self.sg.num_edges)
+        )
         # trial_bubbles is (n_walkers, N) when walkers_per_trial=1, so it
         # coincides with the per-walker visited bitmap.
         vpw = trial_bubbles if self.store_per_walker_visits else None
@@ -342,16 +356,16 @@ class SignedWalker(DynSys):
 
     def _bind_result(self, result: dict) -> None:
         """Copy a kernel-result dict onto the walker instance."""
-        self.unique_visits = result['unique_visits']
-        self.unique_frac = result['unique_frac']
-        self.stop_step = result['stop_step']
-        self.stop_reason = result['stop_reason']
-        self.final_position = result['final_position']
-        self.visits_agg = result['visits_agg']
-        self.visits_per_walker = result['visits_per_walker']
-        self.trajectory = result['history']
-        self.neg_frac = result['neg_frac']
-        self.frust_frac = result['frust_frac']
+        self.unique_visits = result["unique_visits"]
+        self.unique_frac = result["unique_frac"]
+        self.stop_step = result["stop_step"]
+        self.stop_reason = result["stop_reason"]
+        self.final_position = result["final_position"]
+        self.visits_agg = result["visits_agg"]
+        self.visits_per_walker = result["visits_per_walker"]
+        self.trajectory = result["history"]
+        self.neg_frac = result["neg_frac"]
+        self.frust_frac = result["frust_frac"]
         self.result = result
 
     # ------------------------------------------------------------------
@@ -359,7 +373,7 @@ class SignedWalker(DynSys):
     # ------------------------------------------------------------------
     def summary(self) -> dict:
         """Return a picklable dict of the per-walker observables."""
-        if not hasattr(self, 'unique_visits'):
+        if not hasattr(self, "unique_visits"):
             raise RuntimeError("run() must be called before summary().")
         return dict(
             rule=self.rule,
@@ -380,25 +394,28 @@ class SignedWalker(DynSys):
 
 class AbsorbingWalker(SignedWalker):
     """D3 — walker dies crossing a killing edge; reflects at unfrustrated negatives."""
-    rule = 'absorb'
+
+    rule = "absorb"
     dyn_UVclass = "srw_absorb"
 
 
 class KillingWalker(SignedWalker):
     """D2 — walker dies with prob ``1/n_kill`` at any node with incident killing edges."""
-    rule = 'kill'
+
+    rule = "kill"
     dyn_UVclass = "srw_kill"
 
 
 class StickyWalker(SignedWalker):
     """D1 — walker's move prob halves per frustrated crossing; dies at ``max_n_cross``."""
-    rule = 'sticky'
+
+    rule = "sticky"
     dyn_UVclass = "srw_sticky"
 
 
 __all__ = [
-    'SignedWalker',
-    'AbsorbingWalker',
-    'KillingWalker',
-    'StickyWalker',
+    "SignedWalker",
+    "AbsorbingWalker",
+    "KillingWalker",
+    "StickyWalker",
 ]

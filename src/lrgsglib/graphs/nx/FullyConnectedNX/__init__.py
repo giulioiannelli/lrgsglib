@@ -5,8 +5,8 @@ This module provides the FullyConnectedNX class for creating fully connected
 graphs with signed edges and animation capabilities.
 """
 
-from .FullyConnectedNX import FullyConnectedNX
 from .animation import make_animation
+from .FullyConnectedNX import FullyConnectedNX
 
 # Backward compatibility alias
 FullyConnected = FullyConnectedNX

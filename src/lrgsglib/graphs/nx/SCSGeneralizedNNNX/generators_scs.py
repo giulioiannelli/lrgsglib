@@ -5,11 +5,10 @@ Generators for the generalized Sompolinsky-Crisanti-Sommers (SCS) model.
 from __future__ import annotations
 
 import math
-from typing import Dict, Tuple, Union, Iterable, Optional
+from typing import Dict, Iterable, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
-
 
 EdgeKey = Tuple[int, int]
 WeightMap = Dict[EdgeKey, float]
@@ -84,7 +83,9 @@ def generate_scs_generalized_graph(
         else:
             diag_arr = np.asarray(list(diagonal), dtype=float)
             if diag_arr.shape != (N,):
-                raise ValueError("diagonal must be a scalar or an iterable of length N")
+                raise ValueError(
+                    "diagonal must be a scalar or an iterable of length N"
+                )
 
     # Global scaling factor sanity check
     if not isinstance(g, (int, float, np.floating)):

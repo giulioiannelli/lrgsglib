@@ -22,8 +22,8 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .protocols import SignedGraphProtocol
     from .nx.random import StochasticBlockModelNX
+    from .protocols import SignedGraphProtocol
 
 
 # === Lazy imports to avoid circular dependencies ===
@@ -45,8 +45,12 @@ def _get_gt_impl():
 
 # === Register implementations ===
 
-register_implementation("StochasticBlockModel", GraphEngine.NETWORKX, _get_nx_impl)
-register_implementation("StochasticBlockModel", GraphEngine.GRAPHTOOL, _get_gt_impl)
+register_implementation(
+    "StochasticBlockModel", GraphEngine.NETWORKX, _get_nx_impl
+)
+register_implementation(
+    "StochasticBlockModel", GraphEngine.GRAPHTOOL, _get_gt_impl
+)
 
 
 # Parameters specific to each engine (not passed to the other)

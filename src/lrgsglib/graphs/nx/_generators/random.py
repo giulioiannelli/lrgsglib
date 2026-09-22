@@ -25,10 +25,11 @@ Example
 100
 """
 
-import networkx as nx
-from networkx import Graph
 from typing import Optional, Sequence
+
+import networkx as nx
 import numpy as np
+from networkx import Graph
 
 __all__ = [
     # Core random graph generators
@@ -49,6 +50,7 @@ __all__ = [
 # =============================================================================
 # Core Random Graph Generators
 # =============================================================================
+
 
 def erdos_renyi_graph(
     n: int,
@@ -121,6 +123,7 @@ def watts_strogatz_graph(
 # =============================================================================
 # Scale-Free and Community Models
 # =============================================================================
+
 
 def barabasi_albert_graph(
     n: int,
@@ -202,6 +205,7 @@ def stochastic_block_model(
 # Other Random Models
 # =============================================================================
 
+
 def k_regular_graph(
     n: int,
     k: int,
@@ -270,7 +274,9 @@ def configuration_model(
     >>> degrees = [3, 3, 3, 3, 2, 2]
     >>> G = configuration_model(degrees, seed=42)
     """
-    G = nx.configuration_model(degree_sequence, seed=seed, create_using=create_using)
+    G = nx.configuration_model(
+        degree_sequence, seed=seed, create_using=create_using
+    )
     # Remove self-loops and multi-edges
     G = nx.Graph(G)
     G.remove_edges_from(nx.selfloop_edges(G))
@@ -317,6 +323,7 @@ def random_geometric_graph(
 # =============================================================================
 # Utilities
 # =============================================================================
+
 
 def extract_giant_component(G: Graph) -> Graph:
     """

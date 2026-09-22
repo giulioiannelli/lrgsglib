@@ -5,17 +5,18 @@ bodies. They operate on ``self.eigv``, ``self.N``, ``self.slp`` — attributes
 present on both engines.
 """
 
-import numpy as np
 from typing import Optional
+
+import numpy as np
 from numpy.typing import NDArray
 
 from ...utils.basic import dtype_numerical_precision
 from ...utils.lrg.infocomm import (
-    entropy,
     compute_entropy_observables_slq,
     compute_renyi_observables_from_eigenvalues,
+    entropy,
 )
-from ._backend import BackendManager, Backend
+from ._backend import Backend, BackendManager
 
 
 def _ensure_spectrum(self, typf=np.float64, backend="numpy"):
@@ -67,7 +68,9 @@ def compute_signed_laplacian_entropy(
     ``variance_profile``, ``tauscale``, ``entropy_params``.
     """
     if steps < 1:
-        raise ValueError("steps must be at least 1 to build the entropy profile.")
+        raise ValueError(
+            "steps must be at least 1 to build the entropy profile."
+        )
 
     if backend is None:
         backend = getattr(self, "_backend_name", Backend.NUMPY.value)
@@ -86,31 +89,37 @@ def compute_signed_laplacian_entropy(
         is_sparse = getattr(self, "_sparse_spectrum", False)
         if is_sparse and eigv_count < self.N:
             import warnings
+
             warnings.warn(
                 f"Using sparse spectrum with {eigv_count} eigenvalues "
                 f"(missing {self.N - eigv_count}). Entropy may be less accurate.",
                 UserWarning,
             )
 
-    threshold = w_thresh if w_thresh is not None else dtype_numerical_precision(typf)
+    threshold = (
+        w_thresh if w_thresh is not None else dtype_numerical_precision(typf)
+    )
     backend_requested = backend
 
     if entropy_mode == "exact":
         eigenvalues = np.asarray(self.eigv, dtype=typf)
-        normalized_entropy, entropy_derivative, variance_profile, time_grid = entropy(
-            eigenvalues=eigenvalues,
-            num_nodes=self.N,
-            steps=steps,
-            t1=t1,
-            t2=t2,
-            wTresh=threshold,
-            entropy_norm=entropy_norm,
-            specific_heat_scale=specific_heat_scale,
-            typf=typf,
+        normalized_entropy, entropy_derivative, variance_profile, time_grid = (
+            entropy(
+                eigenvalues=eigenvalues,
+                num_nodes=self.N,
+                steps=steps,
+                t1=t1,
+                t2=t2,
+                wTresh=threshold,
+                entropy_norm=entropy_norm,
+                specific_heat_scale=specific_heat_scale,
+                typf=typf,
+            )
         )
     else:
         if backend_requested == "cupy":
             import warnings
+
             warnings.warn(
                 "SLQ entropy currently runs on CPU; ignoring backend='cupy'.",
                 RuntimeWarning,
@@ -140,7 +149,9 @@ def compute_signed_laplacian_entropy(
     self.entropy_derivative = entropy_derivative  # deprecated alias
     self.variance_profile = variance_profile
     self.tauscale = time_grid
-    self._last_entropy_backend = resolved_backend if entropy_mode == "exact" else "slq"
+    self._last_entropy_backend = (
+        resolved_backend if entropy_mode == "exact" else "slq"
+    )
     self._last_entropy_request = backend_requested
     self.entropy_params = {
         "steps": steps,
@@ -178,6 +189,7 @@ def get_specific_heat(self) -> NDArray:
 def get_entropy_derivative(self) -> NDArray:
     """Deprecated: use ``get_specific_heat`` instead."""
     import warnings
+
     warnings.warn(
         "get_entropy_derivative() is deprecated, use get_specific_heat() instead",
         DeprecationWarning,
@@ -209,7 +221,9 @@ def compute_renyi_entropy_profile(
     if q <= 0:
         raise ValueError("q must be strictly positive.")
     if steps < 2:
-        raise ValueError("steps must be at least 2 to build the entropy profile.")
+        raise ValueError(
+            "steps must be at least 2 to build the entropy profile."
+        )
     if not (0 < tail_fraction <= 1):
         raise ValueError("tail_fraction must be in the interval (0, 1].")
     _ = transpose
@@ -226,6 +240,7 @@ def compute_renyi_entropy_profile(
     is_sparse = getattr(self, "_sparse_spectrum", False)
     if is_sparse and eigv_count < self.N:
         import warnings
+
         warnings.warn(
             f"Using sparse spectrum with {eigv_count} eigenvalues "
             f"(missing {self.N - eigv_count}). Entropy may be less accurate.",

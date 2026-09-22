@@ -1,7 +1,9 @@
 from functools import wraps
+
 from .Chronometer import Chronometer
 
-def time_function_accumulate(auto_log: bool=False):
+
+def time_function_accumulate(auto_log: bool = False):
     """
     Decorator to time a function and accumulate its duration.
 
@@ -14,6 +16,7 @@ def time_function_accumulate(auto_log: bool=False):
         If True, log each call's duration immediately. If False, data is
         still accumulated and can be printed later with -pc flag.
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -22,6 +25,7 @@ def time_function_accumulate(auto_log: bool=False):
             result = func(*args, **kwargs)
             chrono.end()
             return result
-        return wrapper
-    return decorator
 
+        return wrapper
+
+    return decorator

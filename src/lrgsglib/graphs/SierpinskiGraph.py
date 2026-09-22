@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .protocols import SignedGraphProtocol
     from .nx.SierpinskiNX import SierpinskiNX
+    from .protocols import SignedGraphProtocol
 
 
 def _get_nx_impl():
@@ -31,12 +31,8 @@ def _get_gt_impl():
     return SierpinskiGraphGT
 
 
-register_implementation(
-    "SierpinskiGraph", GraphEngine.NETWORKX, _get_nx_impl
-)
-register_implementation(
-    "SierpinskiGraph", GraphEngine.GRAPHTOOL, _get_gt_impl
-)
+register_implementation("SierpinskiGraph", GraphEngine.NETWORKX, _get_nx_impl)
+register_implementation("SierpinskiGraph", GraphEngine.GRAPHTOOL, _get_gt_impl)
 
 _NX_SPECIFIC_PARAMS = {
     "with_positions",

@@ -1,7 +1,8 @@
 """Engine-agnostic order parameter mixin functions (spectral gap)."""
 
-import numpy as np
 from typing import Optional
+
+import numpy as np
 
 from ...config.const import SG_LAPL_DEFAULT_TYPE
 
@@ -57,6 +58,7 @@ def compute_gap_between(
             kw["backend"] = backend
         # Filter kwargs to only pass what the method accepts
         import inspect
+
         if hasattr(self, "compute_laplacian_spectrum_weigV"):
             sig = inspect.signature(self.compute_laplacian_spectrum_weigV)
             valid_kw = {k: v for k, v in kw.items() if k in sig.parameters}

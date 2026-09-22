@@ -5,9 +5,9 @@ concrete implementations DiracCombGraphNX and DiracBrushGraphNX for
 hierarchical graphs with efficient spectral computation.
 """
 
-from .DiracLatticeNX import DiracLatticeGraphNX, DiracLatticeGraph
-from .DiracCombNX import DiracCombGraphNX, DiracCombGraph
-from .DiracBrushNX import DiracBrushGraphNX, DiracBrushGraph
+from .DiracBrushNX import DiracBrushGraph, DiracBrushGraphNX
+from .DiracCombNX import DiracCombGraph, DiracCombGraphNX
+from .DiracLatticeNX import DiracLatticeGraph, DiracLatticeGraphNX
 
 __all__ = [
     # NX classes

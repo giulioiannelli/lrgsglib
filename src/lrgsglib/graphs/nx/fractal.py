@@ -4,21 +4,18 @@ Re-exports fractal graph classes from FractalGraphNX, DGMgraphNX, and Sierpinski
 packages for cleaner imports.
 """
 
-from .FractalGraphNX import (
+from .DGMgraphNX import (  # Backward compatibility alias
+    DGMgraph,
+    DGMgraphNX,
+)
+from .FractalGraphNX import (  # Backward compatibility alias
+    FractalGraph,
     FractalGraphNX,
     FractalNwContainerBase,
-    # Backward compatibility alias
-    FractalGraph,
 )
-from .DGMgraphNX import (
-    DGMgraphNX,
-    # Backward compatibility alias
-    DGMgraph,
-)
-from .SierpinskiNX import (
-    SierpinskiNX,
-    # Backward compatibility alias
+from .SierpinskiNX import (  # Backward compatibility alias
     SierpinskiGraph,
+    SierpinskiNX,
 )
 
 # Alias for backward compatibility with old naming

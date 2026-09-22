@@ -2,6 +2,8 @@ from typing import Iterable, Optional
 
 import numpy as np
 from numpy.typing import NDArray
+
+
 #
 def adjust_to_even(x: float) -> int:
     """
@@ -37,8 +39,11 @@ def adjust_to_even(x: float) -> int:
     # Choose the closer one; if exactly halfway, pick upper_even
     return lower_even if (x - lower_even) < (upper_even - x) else upper_even
 
+
 # review the commenting and typing
-def sign_with_threshold(arr: np.ndarray, threshold: float = 1e-17) -> np.ndarray:
+def sign_with_threshold(
+    arr: np.ndarray, threshold: float = 1e-17
+) -> np.ndarray:
     """
     Apply the sign function to an array with a threshold for zero.
 
@@ -76,9 +81,9 @@ def sign_with_threshold(arr: np.ndarray, threshold: float = 1e-17) -> np.ndarray
 
 def bin_sign(arr: Iterable) -> NDArray:
     """
-    Regularizes and binarizes an array by setting all zeros to +1 and taking 
+    Regularizes and binarizes an array by setting all zeros to +1 and taking
     the sign of each element.
-    
+
     Parameters
     ----------
     arr : Iterable
@@ -98,43 +103,44 @@ def bin_sign(arr: Iterable) -> NDArray:
 
     Notes
     -----
-    - This function replaces zero elements with +1 and converts all non-zero 
+    - This function replaces zero elements with +1 and converts all non-zero
       elements to their respective signs.
     - It can be used to transform continuous data into a binary representation.
     """
     arr = np.asarray(arr)
     return np.sign(np.where(arr == 0, 1, arr))
 
+
 def flip_to_positive_majority(arr):
-    """ 
+    """
     Flips the elements of an array to ensure a majority of positive components.
 
-    Given a numerical array, this function checks if the majority of its 
-    components are negative. If so, it multiplies every element by -1, 
-    effectively flipping the signs of all components to ensure a majority of 
+    Given a numerical array, this function checks if the majority of its
+    components are negative. If so, it multiplies every element by -1,
+    effectively flipping the signs of all components to ensure a majority of
     positive values. This operation is intended for arrays where elements can be
-    distinctly categorized as positive or negative (including zero as a 
+    distinctly categorized as positive or negative (including zero as a
     non-negative value).
 
     Parameters:
     -----------
     arr : array_like
-        The input array containing numerical data. This array can be a list, 
-        tuple, or any array-like object convertible to a NumPy array. The 
+        The input array containing numerical data. This array can be a list,
+        tuple, or any array-like object convertible to a NumPy array. The
         function is optimized for NumPy arrays for performance reasons.
 
     Returns:
     --------
     numpy.ndarray
         An array of the same shape and type as the input, with elements flipped
-        if the original array had a majority of negative components. If the 
-        input array already had a majority of positive components, it is 
+        if the original array had a majority of negative components. If the
+        input array already had a majority of positive components, it is
         returned unchanged.
 
     Notes:
     ------
     The function utilizes NumPy for efficient computation, especially for large
-    arrays. The determination of "majority" is based purely on the count of 
+    arrays. The determination of "majority" is based purely on the count of
     positive vs. negative elements, without weighting by magnitude.
 
     Examples:
@@ -153,15 +159,16 @@ def flip_to_positive_majority(arr):
         arr = arr * -1
     return arr
 
+
 def flip_to_positive_majority_adapted(
     arr: NDArray, axis: Optional[int] = None
 ) -> NDArray:
     """
     Flips the elements of an array to ensure a majority of positive components.
-    
-    This function assesses the balance of positive and negative values in the 
+
+    This function assesses the balance of positive and negative values in the
     given numerical array. If the count of negative values exceeds the count of
-    positive values, all elements of the array are multiplied by -1. This 
+    positive values, all elements of the array are multiplied by -1. This
     operation ensures that the majority of elements in the transformed array
     are positive. The function is particularly useful in data processing
     scenarios where the sign of data points affects subsequent analysis or
@@ -170,8 +177,8 @@ def flip_to_positive_majority_adapted(
     Parameters:
     -----------
     arr : ndarray
-        The input array containing numerical data. This array can be a list, 
-        tuple, or any array-like object convertible to a NumPy array. The 
+        The input array containing numerical data. This array can be a list,
+        tuple, or any array-like object convertible to a NumPy array. The
         function is optimized for NumPy arrays for performance reasons.
     axis : int, optional
         Axis along which to count positive/negative values and apply flipping.
@@ -182,8 +189,8 @@ def flip_to_positive_majority_adapted(
     --------
     ndarray
         An array of the same shape and type as the input, with elements flipped
-        if the original array had a majority of negative components. If the 
-        input array already had a majority of positive components, it is 
+        if the original array had a majority of negative components. If the
+        input array already had a majority of positive components, it is
         returned unchanged.
 
     Examples:
@@ -196,7 +203,7 @@ def flip_to_positive_majority_adapted(
     >>> arr = np.array([-1, 2, 3])
     >>> flip_to_positive_majority_adapted(arr)
     array([-1, 2, 3])
-    
+
     >>> arr = np.array([[1, -2, -3], [-4, -5, 6]])
     >>> flip_to_positive_majority_adapted(arr, axis=1)
     array([[-1,  2,  3], [ 4,  5, -6]])
@@ -215,8 +222,9 @@ def flip_to_positive_majority_adapted(
         flip_mask = num_negatives > num_positives
         # Apply flipping only to rows/columns where negatives dominate
         arr = np.where(flip_mask, -arr, arr)
-    
+
     return arr
+
 
 def is_in_range(number, range_start, range_end):
     """
@@ -251,6 +259,8 @@ def is_in_range(number, range_start, range_end):
     False
     """
     return range_start <= number <= range_end
+
+
 #
 def ceil(x: float) -> int:
     """

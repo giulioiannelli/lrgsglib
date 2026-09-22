@@ -67,144 +67,187 @@ Note: Classes marked "(fallback to NX)" will emit a warning when used and
 delegate to the NetworkX implementation until native GT implementations are added.
 """
 
+
 # Lazy imports to handle missing graph-tool gracefully
 def __getattr__(name):
     # Base
     if name == "SignedGraphGT":
         from .SignedGraphGT import SignedGraphGT
+
         return SignedGraphGT
 
     # Lattice (native GT)
     elif name == "LatticeNDGT":
         from .LatticeNDGT import LatticeNDGT
+
         return LatticeNDGT
     elif name == "Lattice2DGT":
         from .Lattice2DGT import Lattice2DGT
+
         return Lattice2DGT
     elif name == "Lattice3DGT":
         from .Lattice3DGT import Lattice3DGT
+
         return Lattice3DGT
 
     # Random (native GT)
     elif name == "ErdosRenyiGT":
         from .ErdosRenyiGT import ErdosRenyiGT
+
         return ErdosRenyiGT
     elif name == "BarabasiAlbertGT":
         from .BarabasiAlbertGT import BarabasiAlbertGT
+
         return BarabasiAlbertGT
     elif name == "WattsStrogatzGT":
         from .WattsStrogatzGT import WattsStrogatzGT
+
         return WattsStrogatzGT
     elif name == "StochasticBlockModelGT":
         from .StochasticBlockModelGT import StochasticBlockModelGT
+
         return StochasticBlockModelGT
 
     # Random (fallback to NX)
     elif name == "RandomGraphGT":
         from .RandomGraphGT import RandomGraphGT
+
         return RandomGraphGT
     elif name == "kRegularGraphGT":
         from .kRegularGraphGT import kRegularGraphGT
+
         return kRegularGraphGT
     elif name == "ConfigurationModelGT":
         from .ConfigurationModelGT import ConfigurationModelGT
+
         return ConfigurationModelGT
     elif name == "RandomGeometricGT":
         from .RandomGeometricGT import RandomGeometricGT
+
         return RandomGeometricGT
     elif name == "LFRBenchmarkGT":
         from .LFRBenchmarkGT import LFRBenchmarkGT
+
         return LFRBenchmarkGT
     elif name == "ExtendedBarabasiAlbertGT":
         from .ExtendedBarabasiAlbertGT import ExtendedBarabasiAlbertGT
+
         return ExtendedBarabasiAlbertGT
     elif name == "DualBarabasiAlbertGT":
         from .DualBarabasiAlbertGT import DualBarabasiAlbertGT
+
         return DualBarabasiAlbertGT
     elif name == "HolmeKimGT":
         from .HolmeKimGT import HolmeKimGT
+
         return HolmeKimGT
 
     # Complete (fallback to NX)
     elif name == "CompleteGraphGT":
         from .CompleteGraphGT import CompleteGraphGT
+
         return CompleteGraphGT
     elif name == "FullyConnectedGT":
         from .FullyConnectedGT import FullyConnectedGT
+
         return FullyConnectedGT
 
     # Neural (fallback to NX)
     elif name == "HofieldNNGT":
         from .HofieldNNGT import HofieldNNGT
+
         return HofieldNNGT
     elif name == "SCSGeneralizedNNGT":
         from .SCSGeneralizedNNGT import SCSGeneralizedNNGT
+
         return SCSGeneralizedNNGT
 
     # Fractal (fallback to NX)
     elif name == "FractalGraphGT":
         from .FractalGraphGT import FractalGraphGT
+
         return FractalGraphGT
     elif name == "DGMgraphGT":
         from .DGMgraphGT import DGMgraphGT
+
         return DGMgraphGT
     elif name == "SierpinskiGraphGT":
         from .SierpinskiGT import SierpinskiGraphGT
+
         return SierpinskiGraphGT
 
     # Bipartite (fallback to NX)
     elif name == "BipartiteGraphGT":
         from .BipartiteGraphGT import BipartiteGraphGT
+
         return BipartiteGraphGT
     elif name == "BipartiteFromDegreeSequenceGT":
         from .BipartiteFromDegreeSequenceGT import BipartiteFromDegreeSequenceGT
+
         return BipartiteFromDegreeSequenceGT
 
     # Multispectral (native GT; HierarchicalModular fallback to NX)
     elif name == "MultispectralGraphGT":
         from .MultispectralGraphGT import MultispectralGraphGT
+
         return MultispectralGraphGT
     elif name == "MultiplicativeCascadeGraphGT":
         from .MultiplicativeCascadeGT import MultiplicativeCascadeGraphGT
+
         return MultiplicativeCascadeGraphGT
     elif name == "VicsekGraphGT":
         from .VicsekGT import VicsekGraphGT
+
         return VicsekGraphGT
     elif name == "HierarchicalModularNetworkGT":
         from .HierarchicalModularGT import HierarchicalModularNetworkGT
+
         return HierarchicalModularNetworkGT
 
     # Dirac (native GT)
     elif name == "DiracLatticeGraphGT":
         from .DiracLatticeGT import DiracLatticeGraphGT
+
         return DiracLatticeGraphGT
     elif name == "DiracCombGraphGT":
         from .DiracLatticeGT import DiracCombGraphGT
+
         return DiracCombGraphGT
     elif name == "DiracBrushGraphGT":
         from .DiracLatticeGT import DiracBrushGraphGT
+
         return DiracBrushGraphGT
 
     # GraphOfGraphs (native GT)
     elif name == "GraphOfGraphsGT":
         from .GraphOfGraphsGT import GraphOfGraphsGT
+
         return GraphOfGraphsGT
 
     # Temporal (fallback to NX)
     elif name == "TemporalGraphGT":
         from .TemporalGraphGT import TemporalGraphGT
+
         return TemporalGraphGT
     elif name == "TemporalSignedGraphGT":
         from .TemporalSignedGraphGT import TemporalSignedGraphGT
+
         return TemporalSignedGraphGT
 
     # Converters / utilities
-    elif name in ("nx_to_gt", "gt_to_nx", "GTNXConverter",
-                   "get_adjacency_matrix_gt", "get_laplacian_matrix_gt"):
+    elif name in (
+        "nx_to_gt",
+        "gt_to_nx",
+        "GTNXConverter",
+        "get_adjacency_matrix_gt",
+        "get_laplacian_matrix_gt",
+    ):
         from . import _converters
+
         return getattr(_converters, name)
     elif name == "create_triangular_lattice":
         from .Lattice2DGT.cpp import create_triangular_lattice
+
         return create_triangular_lattice
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

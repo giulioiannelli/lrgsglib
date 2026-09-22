@@ -1,6 +1,6 @@
 import copy
-import os
 import logging
+import os
 import random
 import struct
 import time
@@ -10,55 +10,64 @@ try:  # cupy is GPU-optional: importing the library must not require CUDA.
     import cupy as cp
 except Exception:  # ImportError, or CUDA/driver errors raised at import time
     cp = None
+import pickle as pk
+from numbers import Number
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+
 import networkx as nx
 import numpy as np
-import pickle as pk
-
-from networkx import Graph
-from typing import Any, Union, List, Dict, Tuple, Optional, Type, Callable
-from numbers import Number
 from matplotlib.pyplot import get_cmap
+from networkx import Graph
 from numpy.typing import NDArray
-from scipy.sparse import spdiags
 from scipy.sparse import identity as scsp_identity
+from scipy.sparse import spdiags
 from scipy.sparse.linalg import eigsh as scsp_eigsh
 
 from ....config.const import *
-from ....config.funcs import build_p_fname
 from ....config.errwar import NflipError, NoClustError, SignedGraphWarning
-from ....utils.basic import is_in_range, join_non_empty,\
-    flip_to_positive_majority_adapted, bin_sign, flip_to_positive_majority,\
-    generate_random_id, normalize_array, dtype_numerical_precision
+from ....config.funcs import build_p_fname
+from ....utils.basic import (
+    bin_sign,
+    dtype_numerical_precision,
+    flip_to_positive_majority,
+    flip_to_positive_majority_adapted,
+    generate_random_id,
+    is_in_range,
+    join_non_empty,
+    normalize_array,
+)
 from ....utils.lrg import compute_ising_pairwise_energy
-from ....utils.tools import NestedDict, ConditionalPartitioning
+from ....utils.tools import ConditionalPartitioning, NestedDict
 from ....utils.tools.ConditionalPartitioning import ConditionalPartitioningInput
-from ._backend import Backend, BackendManager, ArrayBackend
-from ..._shared._nw_container import NwContainer
-from ..._shared._nw_geometry import hub_central_edge, elementary_cell_edges
 from ..._shared._disorder import (
-    Disorder,
     CompositeDisorder,
+    Disorder,
     as_disorder,
     plan_composite_ops,
 )
+from ..._shared._nw_container import NwContainer
+from ..._shared._nw_geometry import elementary_cell_edges, hub_central_edge
+from ._backend import ArrayBackend, Backend, BackendManager
+
 #
 logger = logging.getLogger(__name__)
 
+
 class SignedGraphNX:
     """
-    A class for representing and analyzing signed graphs with positive and 
+    A class for representing and analyzing signed graphs with positive and
     negative edge weights.
-    
+
     SignedGraph extends NetworkX graph functionality to support signed networks,
-    where edges can have positive or negative weights. The class provides 
-    comprehensive tools for analyzing structural properties, computing spectral 
-    characteristics of the signed Laplacian, clustering analysis, and studying 
+    where edges can have positive or negative weights. The class provides
+    comprehensive tools for analyzing structural properties, computing spectral
+    characteristics of the signed Laplacian, clustering analysis, and studying
     spin-glass-like dynamics on graphs.
-    
+
     Attributes
     ----------
     gr : dict
-        Dictionary of graph representations (alias for 
+        Dictionary of graph representations (alias for
         graph_representation_dictionary).
     G : Graph
         The primary NetworkX graph object.
@@ -95,9 +104,9 @@ class SignedGraphNX:
     lfeset : dict
         Dictionary mapping graph representations to sets of positive edges.
     nwContainer : Type[Any], optional
-        Network container class to be defined by subclasses. If defined and 
+        Network container class to be defined by subclasses. If defined and
         init_nw_dict is True, an instance will be created and stored in nwDict.
-    
+
     Methods
     -------
     **Core Graph Operations**:
@@ -150,7 +159,7 @@ class SignedGraphNX:
       Return cached normalized entropy profile.
     - ``get_specific_heat()``:
       Return entropy derivative (specific heat analog).
-    
+
     **Import/Export** (via ._exports / ._loaders):
 
     - ``export_eigV_all(out_suffix='', ext=BIN)``:
@@ -166,7 +175,7 @@ class SignedGraphNX:
       Update all graph representations to maintain consistency.
     - ``upd_graph_matrices(format='csr', on_g=SG_REPR)``:
       Update adjacency, degree, and Laplacian matrices.
-    
+
     Notes
     -----
     The signed Laplacian is defined as L_s = D_s - A, where D_s is the
@@ -185,7 +194,7 @@ class SignedGraphNX:
 
     Spectral methods use either NumPy, SciPy, or CuPy (GPU-accelerated)
     backends depending on availability and problem size.
-    
+
     Examples
     --------
 
@@ -211,12 +220,12 @@ class SignedGraphNX:
 
     >>> sg.compute_rbim_energy_eigV(which=0)  # doctest: +SKIP
     >>> energy = sg.get_rbim_energy_eigV(which=0)  # doctest: +SKIP
-    
+
     See Also
     --------
     networkx.Graph : Base NetworkX graph class
     scipy.sparse.linalg.eigsh : Sparse eigenvalue solver
-    
+
     References
     ----------
     .. [Cucuringu2016] Cucuringu, M. (2016). "Sync-Rank: Robust Ranking,
@@ -226,8 +235,9 @@ class SignedGraphNX:
     .. [SK1978] Kirkpatrick, S., & Sherrington, D. (1978). "Infinite-ranged
            models of spin-glasses." Physical Review B, 17(11), 4384.
     """
+
     sgpathn = "signed_graph"
-    
+
     # Optional class-level attributes that can be overridden by subclasses.
     # Defaults to the engine-neutral NwContainer so every graph (BA, Holme-Kim,
     # …) gets the geometry-free patterns (rand, randXERR); geometric subclasses
@@ -235,6 +245,7 @@ class SignedGraphNX:
     nwContainer: Optional[Type[Any]] = NwContainer  # Network container class
     syshape: Optional[int] = None  # System shape (set by topology subclasses)
     syshapePth: Optional[str] = None  # System shape path string
+
     #
     def __init__(
         self,
@@ -249,7 +260,7 @@ class SignedGraphNX:
         export_mode: str = SG_EXPORT_M,
         make_dir_tree: bool = False,
         imported: bool = SG_IMPORT_ON,
-        import_fname: str = '',
+        import_fname: str = "",
         import_mode: str = SG_LOAD_M,
         backend: Union[str, Backend] = Backend.NUMPY,
         prew: float = SG_PREW,
@@ -319,14 +330,14 @@ class SignedGraphNX:
         self.eset = {}
         self.fleset = {}
         self.lfeset = {}
-        
+
         # Initialize matrix dictionaries (keyed by graph representation)
         self.adjacency_matrices = {}
         self.degree_matrices = {}
         self.signed_degree_matrices = {}
         self.laplacian_matrices = {}
         self.signed_laplacian_matrices = {}
-        
+
         # Initialize clustering-related attributes
         self.clustersY: Optional[list[set]] = None
         self.clustersN: Optional[list[set]] = None
@@ -337,7 +348,7 @@ class SignedGraphNX:
         self.gc: Optional[set] = None
         self.largest_cc: Optional[set] = None
         self.largest_cc_subgraph: Optional[Graph] = None
-        
+
         # Resolve the disorder spec (support x coupling-law). A bare str/None is
         # coerced; a Disorder carries its own pflip which then wins. The
         # effective pflip drives the construction-time fleset selection.
@@ -347,30 +358,28 @@ class SignedGraphNX:
         # Validate pflip and initialize randomness
         self._verify_pflip(eff_pflip)
         self.__init_randomness__(seed)
-        
+
         # Ensure compatibility with topology subclasses
-        if not hasattr(self, 'std_fname'):
-            self.std_fname = 'sg'
-        if not hasattr(self, 'only_const_mode'):
+        if not hasattr(self, "std_fname"):
+            self.std_fname = "sg"
+        if not hasattr(self, "only_const_mode"):
             self.only_const_mode = False
-        
+
         # Initialize file system paths
         self.__init_paths__(path_data, path_plot, make_dir_tree)
-        
+
         # Set configuration parameters
         self.on_g = on_g
         self.init_weights_val = init_weights_val
         self.load_g = imported
         self.init_nw_dict = init_nw_dict
-        
+
         # Compose standard filename
-        self.std_fname = join_non_empty('_', self.std_fname, self.peq_str)
-        
+        self.std_fname = join_non_empty("_", self.std_fname, self.peq_str)
+
         # Load or assign base graph
         self.G = (
-            self.__load_graph__(import_fname, import_mode)
-            if self.load_g
-            else G
+            self.__load_graph__(import_fname, import_mode) if self.load_g else G
         )
 
         # ---- Topology disorder (engine-level, before signs) ----------------
@@ -382,7 +391,8 @@ class SignedGraphNX:
         self._prew = prew
         self._pdil = pdil
         if prew > 0.0 or pdil > 0.0:
-            from ..funcs.base import rewire_edges_optimized, remove_edges
+            from ..funcs.base import remove_edges, rewire_edges_optimized
+
             if prew > 0.0:
                 self.G = rewire_edges_optimized(self.G, prew)
             if pdil > 0.0:
@@ -390,7 +400,7 @@ class SignedGraphNX:
 
         # Initialize graph representations
         self.__init_reprdict__()
-        
+
         # Initialize signed graph structure (unless in const-only mode)
         if not self.only_const_mode:
             self.__init_sgraph__()
@@ -435,7 +445,9 @@ class SignedGraphNX:
         If CuPy is requested but unavailable, falls back to NumPy with warning.
         """
         # Store backend instance for numerical operations
-        self._backend: ArrayBackend = BackendManager.get_backend(backend, fallback=True)
+        self._backend: ArrayBackend = BackendManager.get_backend(
+            backend, fallback=True
+        )
         self._backend_name: str = self._backend.name
 
     #
@@ -591,7 +603,9 @@ class SignedGraphNX:
             Number of edges with negative weight.
         """
         graph = self.gr[self.on_g]
-        return sum(1 for _, _, w in graph.edges(data="weight", default=1) if w < 0)
+        return sum(
+            1 for _, _, w in graph.edges(data="weight", default=1) if w < 0
+        )
 
     def count_positive_edges(self) -> int:
         """Count number of positive edges (GT compatibility).
@@ -611,7 +625,7 @@ class SignedGraphNX:
         ndarray
             Signed adjacency matrix with +1/-1 edge weights.
         """
-        return self.adj.toarray() if hasattr(self.adj, 'toarray') else self.adj
+        return self.adj.toarray() if hasattr(self.adj, "toarray") else self.adj
 
     def to_networkx(self) -> Graph:
         """Return the underlying NetworkX graph (GT compatibility).
@@ -696,50 +710,52 @@ class SignedGraphNX:
         """
         # Initialize missing core attributes
         required_attrs = {
-            'eset': {},
-            'fleset': {},
-            'lfeset': {},
-            'map_node': {},
-            'map_edge': {},
-            'adjacency_matrices': {},
-            'degree_matrices': {},
-            'signed_degree_matrices': {},
-            'laplacian_matrices': {},
-            'signed_laplacian_matrices': {},
+            "eset": {},
+            "fleset": {},
+            "lfeset": {},
+            "map_node": {},
+            "map_edge": {},
+            "adjacency_matrices": {},
+            "degree_matrices": {},
+            "signed_degree_matrices": {},
+            "laplacian_matrices": {},
+            "signed_laplacian_matrices": {},
             # Will be initialized later if needed
-            'graph_clustering_utility': None
+            "graph_clustering_utility": None,
         }
-        
+
         for attr_name, default_value in required_attrs.items():
             if not hasattr(self, attr_name):
                 setattr(self, attr_name, default_value)
+
     #
     def __init_randomness__(self, seed: Optional[int] = None) -> None:
         """
         Initialize random number generators with a reproducible seed.
-        
-        Sets the random seed for Python's `random`, NumPy, and CuPy (if 
-        available) to ensure reproducibility across all random operations in 
-        the signed graph. If no seed is provided, generates a pseudo-random 
+
+        Sets the random seed for Python's `random`, NumPy, and CuPy (if
+        available) to ensure reproducibility across all random operations in
+        the signed graph. If no seed is provided, generates a pseudo-random
         seed from the current time and process ID.
-        
+
         Parameters
         ----------
         seed : int, optional
             Random seed value. If None, generates a seed from:
-            `(time_us + process_id + object_id) mod (2^32 - 1)` to ensure 
+            `(time_us + process_id + object_id) mod (2^32 - 1)` to ensure
             uniqueness across concurrent runs.
-            
+
         Notes
         -----
-        A random string identifier (`rand_str`) is also generated for 
+        A random string identifier (`rand_str`) is also generated for
         creating unique temporary filenames or identifiers.
-        
-        If CuPy is unavailable or fails to initialize, a warning is issued 
+
+        If CuPy is unavailable or fails to initialize, a warning is issued
         but execution continues without GPU-accelerated random operations.
         """
         self._seed = seed or (
-            (int(time.time() * 1_000_000) + os.getpid() + id(self)) % (2**32 - 1)
+            (int(time.time() * 1_000_000) + os.getpid() + id(self))
+            % (2**32 - 1)
         )
         random.seed(self._seed)
         try:
@@ -749,55 +765,57 @@ class SignedGraphNX:
         np.random.seed(self._seed)
         #
         self.rand_str = generate_random_id()
+
     #
     def __init_dirs__(self, exist_ok: bool = True):
         """
         Create the directory structure for storing signed graph data.
-        
-        Creates all directories specified in the `subpath_list` attribute, 
-        which typically includes subdirectories for eigenvalues, eigenvectors, 
-        Ising dynamics data, cluster information, and other computed 
+
+        Creates all directories specified in the `subpath_list` attribute,
+        which typically includes subdirectories for eigenvalues, eigenvectors,
+        Ising dynamics data, cluster information, and other computed
         properties.
-        
+
         Parameters
         ----------
         exist_ok : bool, default True
-            If True, do not raise an error if directories already exist. 
+            If True, do not raise an error if directories already exist.
             If False, raise FileExistsError for existing directories.
-            
+
         Notes
         -----
-        The directory structure is automatically populated during path 
-        initialization in `__init_paths__()`. This method is called 
+        The directory structure is automatically populated during path
+        initialization in `__init_paths__()`. This method is called
         internally when `make_dir_tree=True` during initialization.
-        
-        All directories are created relative to `path_sgdata`, which is 
+
+        All directories are created relative to `path_sgdata`, which is
         derived from the base data path and system shape parameters.
         """
-        for _ in self.subpath_list: 
+        for _ in self.subpath_list:
             os.makedirs(_, exist_ok=exist_ok)
+
     #
     def __init_graph_clustering_utility__(self):
         """
         Initialize the graph clustering utility as a nested dictionary.
-        
-        Creates a `NestedDict` structure to store clustering results from 
-        eigenvector-based partitioning. The nested dictionary organizes 
+
+        Creates a `NestedDict` structure to store clustering results from
+        eigenvector-based partitioning. The nested dictionary organizes
         clustering information hierarchically by:
         - Attribute key (e.g., 'eigV0', 'eigV1')
         - Partitioning condition (e.g., '+1', '-1')
         - Graph representation (e.g., SG_REPR)
-        
+
         Notes
         -----
-        The clustering utility is populated by methods like `make_clustersYN` 
-        and `make_graphYN`, which perform connected component analysis on 
+        The clustering utility is populated by methods like `make_clustersYN`
+        and `make_graphYN`, which perform connected component analysis on
         node subsets defined by eigenvector values.
-        
-        This structure is accessible via the `gcl` property and allows 
-        efficient caching and retrieval of clustering results for different 
+
+        This structure is accessible via the `gcl` property and allows
+        efficient caching and retrieval of clustering results for different
         eigenvectors and partitioning schemes.
-        
+
         Examples
         --------
         The structure after clustering might look like::
@@ -806,13 +824,14 @@ class SignedGraphNX:
             # Returns: (graphY, graphN)  - Tuple of subgraphs for nodes with eigV0 == +1
         """
         self.graph_clustering_utility = NestedDict()
+
     #
     def __init_paths__(
-            self,
-            path_data: Optional[Path] = None, 
-            path_plot: Optional[Path] = None,
-            make_dir_tree: bool = False,
-            exist_ok: bool = True
+        self,
+        path_data: Optional[Path] = None,
+        path_plot: Optional[Path] = None,
+        make_dir_tree: bool = False,
+        exist_ok: bool = True,
     ) -> None:
         """
         Initialize paths for data, plots, and various subdirectories used by the
@@ -833,20 +852,20 @@ class SignedGraphNX:
         -------
         dict
             A dictionary containing the initialized paths.
-        
+
         Notes
         -----
         This method creates directories only for graph-related data (graph, lrgsg,
         phtra, spect). Dynamics-specific directories (ising, voter, contact) are
-        defined but not created until their respective dynamics classes 
+        defined but not created until their respective dynamics classes
         (IsingDynamics, VoterModel, ContactProcess) are instantiated.
-        
-        Ensures syshapePth exists. Many topology subclasses set 
-        `self.syshapePth` during their own initialization. When SignedGraph 
-        is created directly from a networkx.Graph (without those wrappers) 
-        this attribute may be missing and would raise an AttributeError. 
-        Provides sensible fallbacks: prefer an existing `self.syshape` 
-        integer, otherwise use the number of nodes if `self.G` is already 
+
+        Ensures syshapePth exists. Many topology subclasses set
+        `self.syshapePth` during their own initialization. When SignedGraph
+        is created directly from a networkx.Graph (without those wrappers)
+        this attribute may be missing and would raise an AttributeError.
+        Provides sensible fallbacks: prefer an existing `self.syshape`
+        integer, otherwise use the number of nodes if `self.G` is already
         present, or a generic placeholder.
         """
         #
@@ -854,8 +873,8 @@ class SignedGraphNX:
         self.path_plot = path_plot or PATHPLOT
         self.path_sgdata = self.path_data / Path(self.sgpathn)
         #
-        if not hasattr(self, 'syshapePth') or self.syshapePth is None:
-            if hasattr(self, 'syshape') and isinstance(self.syshape, int):
+        if not hasattr(self, "syshapePth") or self.syshapePth is None:
+            if hasattr(self, "syshape") and isinstance(self.syshape, int):
                 self.syshapePth = f"N={self.syshape}"
             else:
                 try:
@@ -868,14 +887,14 @@ class SignedGraphNX:
                     self.syshapePth = "N=unknown"
 
         # Create paths for graph-related subdirectories only
-        # Dynamics-specific paths (ising, voter, contact) are created 
+        # Dynamics-specific paths (ising, voter, contact) are created
         # by their respective dynamics classes when instantiated
         self.subpath_list = []
         for p in PATHN_GRAPH_LIST:
             pfname = Path(p, self.syshapePth)
             setattr(self, f"path_{p}", self.path_sgdata / pfname)
             self.subpath_list.append(getattr(self, f"path_{p}"))
-        
+
         # Initialize dynamics paths as None (will be set by dynamics classes)
         for p in PATHN_DYNAMICS_LIST:
             pfname = Path(p, self.syshapePth)
@@ -887,21 +906,22 @@ class SignedGraphNX:
         # make_dir_tree=True to force eager creation of the whole tree.
         if make_dir_tree:
             self.__init_dirs__(exist_ok)
+
     #
     def __init_reprdict__(self):
         """
         Initialize the graph representation dictionary.
-        
-        Populates the graph representation dictionary with available graph 
-        representations and stores the list of representation keys. The 
-        primary representation (on_g) is always included, while additional 
-        representations from SG_LIST_REPR are added if they exist as 
+
+        Populates the graph representation dictionary with available graph
+        representations and stores the list of representation keys. The
+        primary representation (on_g) is always included, while additional
+        representations from SG_LIST_REPR are added if they exist as
         attributes.
-        
+
         Notes
         -----
-        Sets `self.gr` with the primary graph representation and any 
-        additional representations found in SG_LIST_REPR. Also creates 
+        Sets `self.gr` with the primary graph representation and any
+        additional representations found in SG_LIST_REPR. Also creates
         `self.graph_reprs` as a list of all available representation keys.
         """
         self.gr[self.on_g] = getattr(self, self.on_g)
@@ -911,19 +931,18 @@ class SignedGraphNX:
             except AttributeError:
                 pass
         self.graph_reprs = list(self.gr.keys())
+
     #
     def __init_weights__(
-        self, 
-        values: Union[float, dict] = 1., 
-        on_g: Optional[str] = None
+        self, values: Union[float, dict] = 1.0, on_g: Optional[str] = None
     ) -> None:
         """
         Initialize edge weights for the graph.
-        
+
         Sets the 'weight' attribute for all edges in the specified graph
         representation and updates all graph representations to maintain
         consistency.
-        
+
         Parameters
         ----------
         values : Union[float, dict], default 1.
@@ -933,58 +952,58 @@ class SignedGraphNX:
         on_g : str, optional
             The graph representation to initialize weights on. If None,
             uses the primary graph representation (self.on_g).
-            
+
         Notes
         -----
         After setting edge weights, this method calls `upd_GraphRepr_All`
         to ensure all graph representations remain synchronized.
         """
         on_g = on_g or self.on_g
-        nx.set_edge_attributes(self.gr[on_g], values, 'weight')  # type: ignore[call-overload]
+        nx.set_edge_attributes(self.gr[on_g], values, "weight")  # type: ignore[call-overload]
         self.upd_GraphRepr_All(on_g)
+
     #
     def __init_sgraph__(
-            self, 
-            init_weights_val: Union[float, dict] = 1.
+        self, init_weights_val: Union[float, dict] = 1.0
     ) -> None:
         """
         Initialize the signed graph structure and edge sets.
-        
-        Sets up edge sets (all edges, flipped/negative edges, and positive 
-        edges) based on whether the graph is loaded from file or newly 
-        created. For loaded graphs, determines edge signs from existing 
-        weights. For new graphs, randomly flips edges according to pflip 
+
+        Sets up edge sets (all edges, flipped/negative edges, and positive
+        edges) based on whether the graph is loaded from file or newly
+        created. For loaded graphs, determines edge signs from existing
+        weights. For new graphs, randomly flips edges according to pflip
         and optionally initializes weights.
-        
+
         Parameters
         ----------
         init_weights_val : Union[float, dict], default 1.
-            Initial weight value(s) for edges. Only used when creating a 
+            Initial weight value(s) for edges. Only used when creating a
             new graph without pre-existing weights. Can be either:
             - A single float value applied to all edges
             - A dictionary mapping edge tuples to weight values
-            
+
         Notes
         -----
         For loaded graphs (self.load_g=True):
         - Reads edge weights to identify negative edges (weight < 0)
         - Computes pflip from the ratio of negative to total edges
         - Populates fleset (negative edges) and lfeset (positive edges)
-        
+
         For new graphs (self.load_g=False):
         - Randomly selects Ne_flips edges to flip according to pflip
         - Only initializes edge weights if none exist on the graph
         - Uses __init_weights__() to set initial weight values
-        
+
         Always updates graph representations and matrices after initialization.
         """
         on_g = self.on_g
         self.eset[on_g] = set(list(self.gr[on_g].edges()))
         if self.load_g:
             edges_data = self.gr[on_g].edges(data=True)
-            self.fleset[on_g] = set([
-                (u, v) for u, v, _ in edges_data if _.get('weight', 1) < 0
-            ])
+            self.fleset[on_g] = set(
+                [(u, v) for u, v, _ in edges_data if _.get("weight", 1) < 0]
+            )
             self._pflip = self.Ne_n / self.Ne
             self.Ne_flips = int(self._pflip * self.Ne)
             self.lfeset[on_g] = self.eset[on_g].difference(self.fleset[on_g])
@@ -996,13 +1015,14 @@ class SignedGraphNX:
             )
             self.lfeset[on_g] = self.eset[on_g].difference(self.fleset[on_g])
             edges_with_weights = any(
-                'weight' in data 
+                "weight" in data
                 for _, _, data in self.gr[on_g].edges(data=True)
             )
             if not edges_with_weights:
                 self.__init_weights__(init_weights_val)
         self.upd_GraphRepr_All(on_g)
         self.upd_graph_matrices()
+
     #
     def get_central_edge(self, on_g: str = SG_REPR):
         """A central edge for the ``single*`` nwDict patterns.
@@ -1072,7 +1092,9 @@ class SignedGraphNX:
             return list(self.nwDict[support][on_g])
         return []
 
-    def _apply_disorder(self, d: "Disorder", on_g: Optional[str] = None) -> None:
+    def _apply_disorder(
+        self, d: "Disorder", on_g: Optional[str] = None
+    ) -> None:
         """Realize a :class:`Disorder` on the graph at construction.
 
         ``flip`` SETs the support edges to negative weight (``-|w|``,
@@ -1124,7 +1146,7 @@ class SignedGraphNX:
     def _resolve_edge_keys(self, d: "Disorder", on_g: str) -> set:
         """A component's support as canonical ``(min, max)`` int edge keys."""
         out = set()
-        for (u, v) in self._disorder_support_edges(d, on_g):
+        for u, v in self._disorder_support_edges(d, on_g):
             iu, iv = int(u), int(v)
             out.add((iu, iv) if iu <= iv else (iv, iu))
         return out
@@ -1146,21 +1168,22 @@ class SignedGraphNX:
         self.upd_edge_sets(on_g)
         self.upd_GraphRepr_All(on_g)
         self.upd_graph_matrices(on_g)
+
     #
     def __init_loaded_graph__(
         self,
-        path_data: Optional[Path] = None, 
+        path_data: Optional[Path] = None,
         path_plot: Optional[Path] = None,
-        on_g: str = SG_REPR
+        on_g: str = SG_REPR,
     ) -> None:
         """
         Initialize a SignedGraph from a previously saved/pickled graph object.
-        
+
         This method is used to reinitialize a loaded graph object, setting up
         necessary attributes and paths after unpickling. It ensures backward
         compatibility with older pickled objects and properly initializes the
         graph representation dictionary and related structures.
-        
+
         Parameters
         ----------
         path_data : Path, optional
@@ -1169,7 +1192,7 @@ class SignedGraphNX:
             The base path for plot storage. Defaults to the global PATHPLOT.
         on_g : str, default SG_REPR
             The primary graph representation to use.
-            
+
         Notes
         -----
         This method performs the following initialization steps:
@@ -1177,19 +1200,20 @@ class SignedGraphNX:
         2. Sets load_g flag to True (indicating a loaded graph)
         3. Ensures backward compatibility with older pickled objects
         4. Initializes graph representations, signed graph structures, and paths
-        
+
         This is typically called internally after unpickling a graph object.
         """
         self.graph_representation_dictionary = {}
         self.load_g = True
         self.on_g = on_g
-        
+
         # Ensure backward compatibility with older pickled objects
         self.__ensure_required_attributes__()
-        
+
         self.__init_reprdict__()
         self.__init_sgraph__()
         self.__init_paths__(path_data=path_data, path_plot=path_plot)
+
     #
     def _verify_pflip(self, pflip: float) -> None:
         """
@@ -1210,192 +1234,230 @@ class SignedGraphNX:
         else:
             self._pflip = pflip
             from ....config.funcs import peq_fstr
+
             self.peq_str = peq_fstr(pflip)
+
     #
     # load graph tools (imported from ._loaders)
     #
-    from ._loaders import __load_graph__
-    from ._loaders import _load_eigV
-    from ._loaders import load_eigV_all
-    #
-    # export graph tools (imported from ._exports)
-    #
-    from ._exports import __export_graph__
-    from ._exports import _export_edgel_bin
-    from ._exports import export_adj_bin
-    from ._exports import _export_eigV
-    from ._exports import export_eigV_all
-    from ._exports import export_ising_clust
-    #
-    # graph operations (imported from ._ongraph)
-    #
-    from ._ongraph import check_Ne_flips
-    from ._ongraph import flip_sel_edges
-    from ._ongraph import get_random_edges_from_set
-    from ._ongraph import flip_random_fract_edges
-    from ._ongraph import unflip_all
-    from ._ongraph import set_edges_random_normal
-    from ._ongraph import load_vec_on_nodes
-    from ._ongraph import load_eigV_on_graph
-    from ._ongraph import set_node_attributes
-    #
-    # graph representations (imported from ._representations)
-    #
-    from ._representations import upd_graph_matrices
-    from ._representations import upd_edge_sets
-    from ._representations import upd_Degree
-    from ._representations import zip_reprNodes
-    from ._representations import zip_reprEdges
-    from ._representations import upd_NodeMap
-    from ._representations import upd_EdgeMap
-    from ._representations import upd_GraphRelabel
-    from ._representations import upd_ReprMaps
-    from ._representations import upd_GraphRepr_All
-    #
-    # topology tools (imported from ._topology)
-    #
-    from ._topology import get_laplacian
-    from ._topology import get_signed_laplacian
-    from ._topology import get_signed_rw_laplacian
-    from ._topology import _laplacian_operator
-    from ._topology import get_signed_laplacian_embedding
-    from ._topology import make_rescaled_signed_laplacian
-    from ._topology import nodes_in
-    from ._topology import get_nodes_list
-    from ._topology import get_node_attributes
-    from ._topology import get_edge_data
-    from ._topology import get_edge_mapping
-    from ._topology import get_edge_color
-    from ._topology import get_graph_neighbors
-    from ._topology import get_adjacency_matrix
-    from ._topology import get_degree_matrix
-    from ._topology import get_abs_degree_matrix
-    from ._topology import get_adjacency_matrix_for
-    from ._topology import get_degree_matrix_for
-    from ._topology import get_signed_degree_matrix_for
-    from ._topology import get_laplacian_matrix_for
-    from ._topology import get_signed_laplacian_matrix_for
-    #
-    # spectral tools (imported from ._spectral)
-    #
-    from ._spectral import get_eigV
-    from ._spectral import get_eigV_check
-    from ._spectral import get_eigV_binarized
-    from ._spectral import get_eigV_bin_check
-    from ._spectral import get_eigV_bin_check_list
-    from ._spectral import get_sgspect_basis
-    from ._spectral import compute_laplacian_spectrum
-    from ._spectral import compute_laplacian_spectrum_weigV
-    from ._spectral import compute_k_eigvV
-    from ._spectral import compute_k_adj_eigvV
-    from ._spectral import compute_adjacency_spectrum_weigV
-    from ._spectral import make_eigV_transposed
-    from ._spectral import make_eigV_column_major
-    from ._spectral import make_adj_eigV_transposed
-    from ._spectral import make_adj_eigV_column_major
-    #
-    # quantum propagator methods (imported from ._spectral)
-    #
-    from ._spectral import compute_quantum_propagator
-    from ._spectral import quantum_walk_probabilities
-    from ._spectral import quantum_observables_time_series
-    #
-    # information theory tools (imported from ._infotheory)
-    #
-    from ._infotheory import compute_signed_laplacian_entropy
-    from ._infotheory import compute_renyi_entropy_profile
-    from ._infotheory import get_entropy
-    from ._infotheory import get_specific_heat
-    from ._infotheory import get_entropy_derivative  # DEPRECATED
-    from ._infotheory import get_renyi_results
-    #
-    # energy and dynamics tools (imported from ._dynamics)
-    #
-    from ._dynamics import compute_sksph_energy_eigV
-    from ._dynamics import compute_sksph_energy_eigV_all
-    from ._dynamics import get_sksph_energy_eigV
-    from ._dynamics import get_all_sksph_energy_eigV
-    from ._dynamics import compute_rbim_energy_eigV
-    from ._dynamics import compute_rbim_energy_eigV_all
-    from ._dynamics import get_rbim_energy_eigV
-    from ._dynamics import get_all_rbim_energy_eigV
-    #
-    # partitioning tools (imported from ._partitioning)
-    #
-    from ._partitioning import get_subgraph_from_nodes
-    from ._partitioning import get_nodes_subgraph_by_kv
-    from ._partitioning import get_eigV_cluster_sizes
-    from ._partitioning import get_cluster_distribution
-    from ._partitioning import get_ferroAntiferro_regions
-    from ._partitioning import make_graphYN
-    from ._partitioning import make_clustersYN
-    from ._partitioning import make_eigVclustersYN
-    from ._partitioning import make_connected_component_by_edge
-    from ._partitioning import handle_no_clust
     #
     # data cleaners and removers (imported from ._cleaners)
     #
-    from ._cleaners import remove_ising_clust_files
-    from ._cleaners import remove_edgl_file
-    from ._cleaners import remove_adj_file
-    from ._cleaners import remove_eigV_file
-    from ._cleaners import remove_exported_files
-    from ._cleaners import clean_gclutil
+    from ._cleaners import (
+        clean_gclutil,
+        remove_adj_file,
+        remove_edgl_file,
+        remove_eigV_file,
+        remove_exported_files,
+        remove_ising_clust_files,
+    )
+
+    #
+    # energy and dynamics tools (imported from ._dynamics)
+    #
+    from ._dynamics import (
+        compute_rbim_energy_eigV,
+        compute_rbim_energy_eigV_all,
+        compute_sksph_energy_eigV,
+        compute_sksph_energy_eigV_all,
+        get_all_rbim_energy_eigV,
+        get_all_sksph_energy_eigV,
+        get_rbim_energy_eigV,
+        get_sksph_energy_eigV,
+    )
+
+    #
+    # export graph tools (imported from ._exports)
+    #
+    from ._exports import (
+        __export_graph__,
+        _export_edgel_bin,
+        _export_eigV,
+        export_adj_bin,
+        export_eigV_all,
+        export_ising_clust,
+    )
+
+    #
+    # information theory tools (imported from ._infotheory)
+    #
+    from ._infotheory import get_entropy_derivative  # DEPRECATED
+    from ._infotheory import (
+        compute_renyi_entropy_profile,
+        compute_signed_laplacian_entropy,
+        get_entropy,
+        get_renyi_results,
+        get_specific_heat,
+    )
+    from ._loaders import __load_graph__, _load_eigV, load_eigV_all
+
+    #
+    # graph operations (imported from ._ongraph)
+    #
+    from ._ongraph import (
+        check_Ne_flips,
+        flip_random_fract_edges,
+        flip_sel_edges,
+        get_random_edges_from_set,
+        load_eigV_on_graph,
+        load_vec_on_nodes,
+        set_edges_random_normal,
+        set_node_attributes,
+        unflip_all,
+    )
+
     #
     # order-parameter helpers (moved to _ordparams)
-    from ._ordparams import compute_gap
-    from ._ordparams import get_gap
-    from ._ordparams import compute_pinf
-    from ._ordparams import compute_gap_between
+    from ._ordparams import (
+        compute_gap,
+        compute_gap_between,
+        compute_pinf,
+        get_gap,
+    )
+
+    #
+    # partitioning tools (imported from ._partitioning)
+    #
+    from ._partitioning import (
+        get_cluster_distribution,
+        get_eigV_cluster_sizes,
+        get_ferroAntiferro_regions,
+        get_nodes_subgraph_by_kv,
+        get_subgraph_from_nodes,
+        handle_no_clust,
+        make_clustersYN,
+        make_connected_component_by_edge,
+        make_eigVclustersYN,
+        make_graphYN,
+    )
+
+    #
+    # graph representations (imported from ._representations)
+    #
+    from ._representations import (
+        upd_Degree,
+        upd_edge_sets,
+        upd_EdgeMap,
+        upd_graph_matrices,
+        upd_GraphRelabel,
+        upd_GraphRepr_All,
+        upd_NodeMap,
+        upd_ReprMaps,
+        zip_reprEdges,
+        zip_reprNodes,
+    )
+
+    #
+    # quantum propagator methods (imported from ._spectral)
+    #
+    #
+    # spectral tools (imported from ._spectral)
+    #
+    from ._spectral import (
+        compute_adjacency_spectrum_weigV,
+        compute_k_adj_eigvV,
+        compute_k_eigvV,
+        compute_laplacian_spectrum,
+        compute_laplacian_spectrum_weigV,
+        compute_quantum_propagator,
+        get_eigV,
+        get_eigV_bin_check,
+        get_eigV_bin_check_list,
+        get_eigV_binarized,
+        get_eigV_check,
+        get_sgspect_basis,
+        make_adj_eigV_column_major,
+        make_adj_eigV_transposed,
+        make_eigV_column_major,
+        make_eigV_transposed,
+        quantum_observables_time_series,
+        quantum_walk_probabilities,
+    )
+
+    #
+    # topology tools (imported from ._topology)
+    #
+    from ._topology import (
+        _laplacian_operator,
+        get_abs_degree_matrix,
+        get_adjacency_matrix,
+        get_adjacency_matrix_for,
+        get_degree_matrix,
+        get_degree_matrix_for,
+        get_edge_color,
+        get_edge_data,
+        get_edge_mapping,
+        get_graph_neighbors,
+        get_laplacian,
+        get_laplacian_matrix_for,
+        get_node_attributes,
+        get_nodes_list,
+        get_signed_degree_matrix_for,
+        get_signed_laplacian,
+        get_signed_laplacian_embedding,
+        get_signed_laplacian_matrix_for,
+        get_signed_rw_laplacian,
+        make_rescaled_signed_laplacian,
+        nodes_in,
+    )
 
     #
     def get_p_fname(
-        self, 
-        who: str, 
-        out_suffix: str = '', 
-        ext: str = BIN, 
+        self,
+        who: str,
+        out_suffix: str = "",
+        ext: str = BIN,
     ) -> str | Path:
         """Get the file name for exporting or importing graph data."""
         return build_p_fname(who, self.pflip, out_suffix=out_suffix, ext=ext)
+
     #
     def get_expected_num_nodes(self) -> int:
         """Return the expected number of nodes without building the graph."""
         if hasattr(self, "syshape") and isinstance(self.syshape, int):
             return self.syshape
         raise NotImplementedError(
-            "Subclasses must implement `get_expected_num_nodes`." )
+            "Subclasses must implement `get_expected_num_nodes`."
+        )
+
     #
-    def get_random_links(self, n: int = 1, only_in: str = '',
-                         on_g: str = SG_REPR) -> list:
+    def get_random_links(
+        self, n: int = 1, only_in: str = "", on_g: str = SG_REPR
+    ) -> list:
         """
         Get random edges from the graph.
-        
+
         Parameters
         ----------
         n : int, default 1
             Number of random edges to return.
         only_in : str, default ''
-            Filter for edge type: '', 'all' (all edges), '+', 'positive', '+1', 
-            'plus' (positive edges only), or '-', 'negative', '-1', 'minus' 
+            Filter for edge type: '', 'all' (all edges), '+', 'positive', '+1',
+            'plus' (positive edges only), or '-', 'negative', '-1', 'minus'
             (negative edges only).
         on_g : str, default SG_REPR
             Graph representation to use.
-            
+
         Returns
         -------
         list
             List of randomly selected edges.
         """
         match only_in:
-            case ''|'all':
+            case "" | "all":
                 return self.get_random_edges_from_set(n, self.eset[on_g], on_g)
-            case '+'|'positive'|'+1'|'plus':
-                return self.get_random_edges_from_set(n, self.lfeset[on_g], on_g)
-            case '-'|'negative'|'-1'|'minus':
-                return self.get_random_edges_from_set(n, self.fleset[on_g], on_g)
+            case "+" | "positive" | "+1" | "plus":
+                return self.get_random_edges_from_set(
+                    n, self.lfeset[on_g], on_g
+                )
+            case "-" | "negative" | "-1" | "minus":
+                return self.get_random_edges_from_set(
+                    n, self.fleset[on_g], on_g
+                )
             case _:
                 # Default to all edges if unknown filter
                 return self.get_random_edges_from_set(n, self.eset[on_g], on_g)
+
     #
     # computations
     #
@@ -1405,20 +1467,20 @@ class SignedGraphNX:
     #
     # def compute_pinf(
     #         self,
-    #         which: int = 0, 
+    #         which: int = 0,
     #         val: ConditionalPartitioningInput = 1,
     #         on_g: str = SG_REPR
     # ) -> None:
     #     """
     #     Compute the infinite cluster probability for a given eigenvector.
-        
+
     #     Parameters
     #     ----------
     #     which : int, default 0
     #         Index of the eigenvector to analyze.
     #     val : Optional[ConditionalPartitioningInput], optional
-    #         Conditional partitioning specification for clustering. Can be a 
-    #         ConditionalPartitioning object, a number, a string (e.g., '>0'), 
+    #         Conditional partitioning specification for clustering. Can be a
+    #         ConditionalPartitioning object, a number, a string (e.g., '>0'),
     #         or a callable. If None, defaults to +1.
     #     on_g : str, default SG_REPR
     #         Graph representation to use.
@@ -1426,17 +1488,17 @@ class SignedGraphNX:
     #     # Default to +1 if no value provided
     #     if val is None:
     #         val = 1
-        
+
     #     clustd = np.array(self.get_eigV_cluster_sizes(which, True, val, on_g))
     #     self.Pinf = clustd[0] / self.N
-        
+
     #     # Avoid division by zero in variance calculation
     #     denominator = np.sum(clustd) - clustd[0]
     #     if denominator > 0:
     #         self.Pinf_var = np.sum(clustd@clustd - clustd[0]**2) / denominator
     #     else:
     #         self.Pinf_var = 0.0
-        
+
     #     if hasattr(self, "Pinf_dict"):
     #         self.Pinf_dict[which] = (self.Pinf, self.Pinf_var)
     #     else:
@@ -1451,7 +1513,9 @@ class SignedGraphNX:
     # ------------------------------------------------------------------
 
     def get_neighbors_with_weights(
-        self, node: int, on_g: str = SG_REPR,
+        self,
+        node: int,
+        on_g: str = SG_REPR,
     ) -> list[tuple[int, float]]:
         """Return neighbors of *node* with signed edge weights.
 
@@ -1471,7 +1535,8 @@ class SignedGraphNX:
         return [(nn, w.get("weight", 1.0)) for nn, w in nd.items()]
 
     def get_edges_with_weights(
-        self, on_g: str | None = None,
+        self,
+        on_g: str | None = None,
     ) -> list[tuple[int, int, float]]:
         """Return all edges with their signed weights.
 
@@ -1492,7 +1557,9 @@ class SignedGraphNX:
         ]
 
     def get_neighbor_indices(
-        self, node: int, on_g: str = SG_REPR,
+        self,
+        node: int,
+        on_g: str = SG_REPR,
     ) -> list[int]:
         """Return neighbor indices without weights.
 
@@ -1509,4 +1576,3 @@ class SignedGraphNX:
             Neighbor node indices.
         """
         return list(self.gr[on_g][node].keys())
-

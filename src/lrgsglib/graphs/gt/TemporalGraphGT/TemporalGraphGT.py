@@ -3,6 +3,7 @@ TemporalGraphGT - Falls back to NX implementation (no native GT implementation).
 """
 
 import warnings
+
 from ...nx.TemporalGraphNX import TemporalGraphNX
 
 warnings.warn(

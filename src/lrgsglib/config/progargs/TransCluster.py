@@ -1,13 +1,13 @@
-from .phelp.TransCluster import *
-from .defs.TransCluster import *
-from .Lattice2D import *
-from .Lattice3D import *
-from .SCSNN import *
-
 # Laplacian type selector (canonical source: config/const.py; help string reused
 # from the SlaplSpect program so the wording stays in one place).
 from ..const import SG_LAPL_DEFAULT_TYPE, SG_LAPL_TYPES
+from .defs.TransCluster import *
+from .Lattice2D import *
+from .Lattice3D import *
 from .phelp.SlaplSpect import phelp_laplacian_type
+from .phelp.TransCluster import *
+from .SCSNN import *
+
 
 def _transcluster_common_optional_args(
     *,
@@ -43,8 +43,8 @@ def _transcluster_common_optional_args(
     }
 
 
-L2D_TransCluster_progName = 'L2D_TransCluster'
-L2D_TransCluster_progNameShrt = 'L2DTC'
+L2D_TransCluster_progName = "L2D_TransCluster"
+L2D_TransCluster_progNameShrt = "L2DTC"
 L2D_TransCluster_description = f"""
     Phase Transition and cluster analysis utilities for 2D signed lattices:
     {L2D_TransCluster_progName}.py
@@ -153,8 +153,8 @@ L2D_TransCluster_srun_optional_args_dict = {
     **srun_opt_args,
 }
 #
-L3D_TransCluster_progName = 'L3D_TransCluster'
-L3D_TransCluster_progNameShrt = 'L3DTC'
+L3D_TransCluster_progName = "L3D_TransCluster"
+L3D_TransCluster_progNameShrt = "L3DTC"
 L3D_TransCluster_description = f"""
     Phase Transition and cluster analysis utilities for 3D signed lattices:
     {L3D_TransCluster_progName}.py
@@ -260,8 +260,8 @@ L3D_TransCluster_srun_optional_args_dict = {
     **srun_opt_args,
 }
 
-SCS_TransCluster_progName = 'SCS_TransCluster'
-SCS_TransCluster_progNameShrt = 'SCSTC'
+SCS_TransCluster_progName = "SCS_TransCluster"
+SCS_TransCluster_progNameShrt = "SCSTC"
 SCS_TransCluster_description = f"""
     Order parameter and clustering analysis for generalized SCS networks:
     {SCS_TransCluster_progName}.py
@@ -270,15 +270,15 @@ SCS_TransCluster_description = f"""
 SCS_TransCluster_args = {**SCSGeneralized_args}
 
 SCS_TransCluster_optional_args_dict = {
-    tuple(['--J0']): {
-        'help': phelp_scs_j0,
-        'type': float,
-        'default': DEFAULT_SCS_NN_J0,
+    tuple(["--J0"]): {
+        "help": phelp_scs_j0,
+        "type": float,
+        "default": DEFAULT_SCS_NN_J0,
     },
-    tuple(['-na', '--number_of_averages']): {
-        'help': phelp_navg,
-        'type': int,
-        'default': DEFAULT_SCS_NN_NAVG,
+    tuple(["-na", "--number_of_averages"]): {
+        "help": phelp_navg,
+        "type": int,
+        "default": DEFAULT_SCS_NN_NAVG,
     },
     **_transcluster_common_optional_args(
         mode_default=DEFAULT_SCS_NN_MODE,
@@ -288,15 +288,15 @@ SCS_TransCluster_optional_args_dict = {
         save_frequency_help=phelp_scs_save_frequency,
         float_type_help=phelp_scs_float_type,
     ),
-    tuple(['--backend']): {
-        'help': phelp_scs_backend,
-        'type': str,
-        'default': DEFAULT_SCS_NN_BACKEND,
+    tuple(["--backend"]): {
+        "help": phelp_scs_backend,
+        "type": str,
+        "default": DEFAULT_SCS_NN_BACKEND,
     },
-    tuple(['--partition-rule']): {
-        'help': phelp_scs_partition_rule,
-        'type': str,
-        'default': DEFAULT_SCS_NN_PARTITION_RULE,
+    tuple(["--partition-rule"]): {
+        "help": phelp_scs_partition_rule,
+        "type": str,
+        "default": DEFAULT_SCS_NN_PARTITION_RULE,
     },
 }
 

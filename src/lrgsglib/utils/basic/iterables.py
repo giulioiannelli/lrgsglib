@@ -3,23 +3,26 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
+
 #
 __all__ = [
-    'boolean_overlap_fraction',
-    'cProd_Iter',
-    'cProdSel_Iter',
-    'cProd_Iter_adj',
-    'extract_subdictionary',
-    'first_index_changing_condition',
-    'flatten',
-    'inf_array_regularization',
-    'sort_array_by_column',
-    'subsample',
-    'sum_tuples',
-    'uniques',
-    'unzip_dict_items',
-    'compose',
+    "boolean_overlap_fraction",
+    "cProd_Iter",
+    "cProdSel_Iter",
+    "cProd_Iter_adj",
+    "extract_subdictionary",
+    "first_index_changing_condition",
+    "flatten",
+    "inf_array_regularization",
+    "sort_array_by_column",
+    "subsample",
+    "sum_tuples",
+    "uniques",
+    "unzip_dict_items",
+    "compose",
 ]
+
+
 #
 def boolean_overlap_fraction(boolist1, boolist2):
     """
@@ -57,7 +60,9 @@ def boolean_overlap_fraction(boolist1, boolist2):
     # The result is 0.4, indicating 40% overlap of True values between the two lists.
 
     """
-    return sum(~(boolist1 ^ boolist2))/len(boolist1)
+    return sum(~(boolist1 ^ boolist2)) / len(boolist1)
+
+
 #
 def cProd_Iter(dim: Union[int, Tuple]) -> iter:
     """
@@ -105,8 +110,12 @@ def cProd_Iter(dim: Union[int, Tuple]) -> iter:
     itertools.product : Cartesian product of input iterables.
     """
     return product(*[range(d) for d in dim])
+
+
 #
-def cProdSel_Iter(dim: Union[int, Tuple], selected_indices: Union[List, Tuple]) -> iter:
+def cProdSel_Iter(
+    dim: Union[int, Tuple], selected_indices: Union[List, Tuple]
+) -> iter:
     """
     Generates the Cartesian product for selected dimensions in an n-dimensional space.
 
@@ -146,11 +155,14 @@ def cProdSel_Iter(dim: Union[int, Tuple], selected_indices: Union[List, Tuple]) 
     """
     # Generate ranges for selected dimensions
     ranges = [range(dim[i]) for i in selected_indices]
-    
+
     # Return Cartesian product of selected dimensions
     return product(*ranges)
 
-def cProd_Iter_adj(dim: Union[int, Tuple], range_adjustment: Union[int, List] = 0) -> iter:
+
+def cProd_Iter_adj(
+    dim: Union[int, Tuple], range_adjustment: Union[int, List] = 0
+) -> iter:
     """
     Generates the Cartesian product for an n-dimensional space with adjustable ranges.
 
@@ -192,11 +204,15 @@ def cProd_Iter_adj(dim: Union[int, Tuple], range_adjustment: Union[int, List] = 
     if isinstance(range_adjustment, int):
         adjusted_ranges = [range(d + range_adjustment) for d in dim]
     elif isinstance(range_adjustment, list):
-        adjusted_ranges = [range(d + adj) for d, adj in zip(dim, range_adjustment)]
+        adjusted_ranges = [
+            range(d + adj) for d, adj in zip(dim, range_adjustment)
+        ]
     else:
         raise ValueError("range_adjustment must be an int or a list of ints")
 
     return product(*adjusted_ranges)
+
+
 #
 def extract_subdictionary(dictionary: dict, subkeys: list) -> dict:
     """
@@ -231,6 +247,8 @@ def extract_subdictionary(dictionary: dict, subkeys: list) -> dict:
     """
     # Use dictionary comprehension to filter the input dictionary
     return {key: dictionary[key] for key in subkeys if key in dictionary}
+
+
 #
 def first_index_changing_condition(condition):
     """
@@ -260,6 +278,8 @@ def first_index_changing_condition(condition):
 
     """
     return np.where(condition[:-1] != condition[1:])[0][0]
+
+
 #
 def flatten(xs):
     """
@@ -293,6 +313,8 @@ def flatten(xs):
             yield from flatten(x)
         else:
             yield x
+
+
 #
 def inf_array_regularization(arrinfs: NDArray) -> NDArray:
     """
@@ -313,10 +335,13 @@ def inf_array_regularization(arrinfs: NDArray) -> NDArray:
     arrinfs_nnans = arrinfs[(arrinfs != np.inf) & (arrinfs != -np.inf)]
 
     # Regularizing infinite values in the array using nan_to_num function
-    arrinfs = np.nan_to_num(arrinfs, posinf=np.max(arrinfs_nnans),
-                            neginf=np.min(arrinfs_nnans))
+    arrinfs = np.nan_to_num(
+        arrinfs, posinf=np.max(arrinfs_nnans), neginf=np.min(arrinfs_nnans)
+    )
 
     return arrinfs
+
+
 #
 def sort_array_by_column(arr: NDArray, column_index: int) -> NDArray:
     """
@@ -335,6 +360,8 @@ def sort_array_by_column(arr: NDArray, column_index: int) -> NDArray:
         The sorted array.
     """
     return arr[arr[:, column_index].argsort()]
+
+
 #
 def subsample(seq, k: int) -> list:
     """
@@ -361,6 +388,8 @@ def subsample(seq, k: int) -> list:
     if n <= k:
         return list(seq)
     return [seq[i] for i in np.linspace(0, n - 1, k).astype(int)]
+
+
 #
 def sum_tuples(tuple1: tuple, tuple2: tuple) -> tuple:
     """
@@ -387,24 +416,26 @@ def sum_tuples(tuple1: tuple, tuple2: tuple) -> tuple:
     (5, 7, 9)
     """
     return tuple(a + b for a, b in zip(tuple1, tuple2))
+
+
 #
 def uniques(lst: List[Any]) -> List[Any]:
     """
-    Returns a list of unique elements from the input list. This function 
-    leverages Python's built-in `set` data structure to eliminate duplicate 
-    entries efficiently. Note that the original order of elements is not 
+    Returns a list of unique elements from the input list. This function
+    leverages Python's built-in `set` data structure to eliminate duplicate
+    entries efficiently. Note that the original order of elements is not
     preserved.
 
     Parameters
     ----------
     lst : List[Any]
-        The input list from which to extract unique elements. The list can 
+        The input list from which to extract unique elements. The list can
         contain elements of any data type that is hashable.
 
     Returns
     -------
     List[Any]
-        A new list containing only the unique elements from the input list, 
+        A new list containing only the unique elements from the input list,
         with duplicates removed.
 
     Examples
@@ -417,20 +448,21 @@ def uniques(lst: List[Any]) -> List[Any]:
 
     Notes
     -----
-    - **Order Preservation**: This function does **not** preserve the original 
-      order of elements. If maintaining order is essential, consider using 
+    - **Order Preservation**: This function does **not** preserve the original
+      order of elements. If maintaining order is essential, consider using
       alternative methods such as `dict.fromkeys` or `collections.OrderedDict`.
-    - **Hashable Elements**: All elements in the input list must be hashable. 
+    - **Hashable Elements**: All elements in the input list must be hashable.
       Unhashable elements (e.g., lists, dictionaries) will raise a `TypeError`.
 
     See Also
     --------
-    dict.fromkeys : Create a dictionary with keys from the input list, 
+    dict.fromkeys : Create a dictionary with keys from the input list,
         preserving order (Python 3.7+).
-    collections.OrderedDict : Ordered dictionary for maintaining element 
+    collections.OrderedDict : Ordered dictionary for maintaining element
         order (pre-Python 3.7).
     """
     return list(set(lst))
+
 
 def unzip_dict_items(input_dict: Dict[Any, Any]) -> Tuple[List[Any], List[Any]]:
     """
@@ -466,7 +498,7 @@ def compose(
     f: Callable[..., Any],
     g: Callable[..., Any],
     g_args: Tuple[Any, ...] = (),
-    g_kwargs: Optional[Dict[str, Any]] = None
+    g_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Callable[..., Any]:
     """
     Return a function that applies f to its arguments and then applies g to f's result.
@@ -496,4 +528,3 @@ def compose(
         return g(result, *g_args, **g_kwargs)
 
     return composed
-

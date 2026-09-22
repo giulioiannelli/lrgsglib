@@ -17,7 +17,6 @@ import networkx as nx
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
 
-
 # Constants
 PA_PHTABB = "pa"
 PA_SGPATH = ""
@@ -108,7 +107,7 @@ class HolmeKimNX(RandomGraphNX):
 
     def _generate_graph(self) -> nx.Graph:
         """Generate Holme-Kim graph."""
-        seed = getattr(self, '_rng_seed', None)
+        seed = getattr(self, "_rng_seed", None)
         return nx.powerlaw_cluster_graph(self.n, self.m, self.p, seed=seed)
 
     def _compute_syshapePth(self) -> str:

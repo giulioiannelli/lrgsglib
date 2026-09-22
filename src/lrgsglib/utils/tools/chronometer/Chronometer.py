@@ -1,6 +1,8 @@
 import time
-from .logger import logger
+
 from ...basic import generate_random_id
+from .logger import logger
+
 
 class Chronometer:
     """
@@ -26,10 +28,11 @@ class Chronometer:
     enabled : bool
         If True, chronometers are active and will log timings.
     """
+
     _data = {}
     enabled: bool = False
 
-    def __init__(self, name: str, auto_log: bool=False) -> None:
+    def __init__(self, name: str, auto_log: bool = False) -> None:
         self.name = name
         self.id = generate_random_id()
         self.start_time = time.perf_counter()
@@ -41,13 +44,17 @@ class Chronometer:
         if self.end_time is not None:
             if self.auto_log:
                 logger.warning(
-                    "Chronometer '%s' (ID=%s) already stopped.", self.name, self.id
+                    "Chronometer '%s' (ID=%s) already stopped.",
+                    self.name,
+                    self.id,
                 )
             return
 
         self.end_time = time.perf_counter()
         elapsed = self.get_elapsed_time()
-        entry = self._data.setdefault(self.name, {"total_time": 0.0, "count": 0})
+        entry = self._data.setdefault(
+            self.name, {"total_time": 0.0, "count": 0}
+        )
         entry["total_time"] += elapsed
         entry["count"] += 1
 
@@ -77,13 +84,13 @@ class Chronometer:
         rows.sort(key=lambda x: x[3], reverse=True)
         logger.info(
             "%-25s %-15s %-7s %-15s",
-            "Name", "Total Time (s)", "Calls", "Average (s)"
+            "Name",
+            "Total Time (s)",
+            "Calls",
+            "Average (s)",
         )
         for name, total, count, avg in rows:
-            logger.info(
-                "%-25s %-15.4g %-7d %-15.4g",
-                name, total, count, avg
-            )
+            logger.info("%-25s %-15.4g %-7d %-15.4g", name, total, count, avg)
 
     @classmethod
     def enable(cls) -> None:
@@ -128,7 +135,9 @@ class Chronometer:
         rows.sort(key=lambda x: x[3], reverse=True)
 
         for name, total, count, avg in rows:
-            formatted_line = f"{name:<25} {total:<20.4g} {count:<10} {avg:<20.4g}"
+            formatted_line = (
+                f"{name:<25} {total:<20.4g} {count:<10} {avg:<20.4g}"
+            )
             print(formatted_line)
 
 

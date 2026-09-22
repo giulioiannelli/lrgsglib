@@ -30,11 +30,12 @@ Canonical header (see ``.agents/rules/notebook-hygiene.md``)::
     seed  = None
     rng   = resolved_rng(seed)
 """
-from .session import *
+
 from .common import *
+from .dynamics import *
+from .session import *
 from .signed_graphs import *
 from .spectral import *
-from .dynamics import *
 
 # Side effects (must stay last: `use_lab_style` needs the cwd that
 # `move_to_rootf` establishes).

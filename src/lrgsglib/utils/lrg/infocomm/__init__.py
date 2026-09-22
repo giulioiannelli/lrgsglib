@@ -12,23 +12,23 @@ observables from graph Laplacian spectra:
 
 # Core classical approach
 from .classical import (
-    entropy,
     compute_entropy_observables_from_eigenvalues,
+    entropy,
     specific_heat_tau_window,
 )
-
-# Alternative computation methods
-from .slq import compute_entropy_observables_slq
-from .expm import compute_entropy_observables_expm_multiply
-
-# Generalized entropies
-from .renyi import compute_renyi_observables_from_eigenvalues, renyi_scan
 
 # Distance functions
 from .distances import (
     extract_ultrametric_matrix,
     lapl_dists,
 )
+from .expm import compute_entropy_observables_expm_multiply
+
+# Generalized entropies
+from .renyi import compute_renyi_observables_from_eigenvalues, renyi_scan
+
+# Alternative computation methods
+from .slq import compute_entropy_observables_slq
 
 __all__ = [
     # Classical

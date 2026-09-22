@@ -7,9 +7,10 @@ hierarchical levels.
 
 from __future__ import annotations
 
+from typing import Optional
+
 import networkx as nx
 import numpy as np
-from typing import Optional
 
 
 def hierarchical_modular_network(
@@ -71,7 +72,7 @@ def hierarchical_modular_network(
     """
     rng = np.random.default_rng(seed)
 
-    n_modules = branching ** levels
+    n_modules = branching**levels
     n_nodes = n_modules * leaf_nodes
 
     G = nx.Graph()
@@ -92,7 +93,7 @@ def hierarchical_modular_network(
         # Find first level where they share a parent
         for lvl in range(1, levels + 1):
             # At level lvl, modules are grouped in blocks of branching^lvl
-            block_size = branching ** lvl
+            block_size = branching**lvl
             if mod_i // block_size == mod_j // block_size:
                 return lvl
 
@@ -102,7 +103,7 @@ def hierarchical_modular_network(
     for i in range(n_nodes):
         for j in range(i + 1, n_nodes):
             dist = hierarchical_distance(i, j)
-            p_edge = p_intra * (p_ratio ** dist)
+            p_edge = p_intra * (p_ratio**dist)
             if rng.random() < p_edge:
                 G.add_edge(i, j, weight=1.0)
 

@@ -1,25 +1,29 @@
-import numpy as np
 from fractions import Fraction
+from typing import Any, List, Sequence, Type, Union
+
+import numpy as np
 from numpy.typing import NDArray
-from typing import Union, Sequence, Any, Type, List
+
 from ...config.const import *
+
 #
 __all__ = [
-    'elements_within_eta_numpy',
-    'dtype_numerical_precision',
-    'linspace',
-    'round_sigfig_n',
-    'symmetric_logarithm_unchecked',
-    'symmetric_logarithm',
-    'to_fraction',
-    'width_interval',
-    'is_int',
-    'is_positive_int',
+    "elements_within_eta_numpy",
+    "dtype_numerical_precision",
+    "linspace",
+    "round_sigfig_n",
+    "symmetric_logarithm_unchecked",
+    "symmetric_logarithm",
+    "to_fraction",
+    "width_interval",
+    "is_int",
+    "is_positive_int",
 ]
+
+
 #
 def elements_within_eta_numpy(
-    array: Union[np.ndarray, Sequence[float]], 
-    eta: float
+    array: Union[np.ndarray, Sequence[float]], eta: float
 ) -> np.ndarray:
     """
     Return elements that are within a threshold eta from the minimum value.
@@ -29,7 +33,7 @@ def elements_within_eta_numpy(
     array : array-like
         Input array of numerical values. It will be converted to a NumPy array.
     eta : float
-        Threshold value. Elements whose difference from the minimum value is 
+        Threshold value. Elements whose difference from the minimum value is
         less than or equal to eta are returned.
 
     Returns
@@ -42,31 +46,32 @@ def elements_within_eta_numpy(
     mask = (array - min_val) <= eta
     filtered_elements = array[mask]
     return filtered_elements
+
+
 #
 def dtype_numerical_precision(dtype: Type[np.floating] = float) -> float:
     """
-    Returns the smallest positive number that can be represented in 
+    Returns the smallest positive number that can be represented in
     floating-point arithmetic for the specified data type.
-    
-    This value, known as machine epsilon, provides a measure of the numerical 
-    precision or the difference between 1 and the smallest floating point 
+
+    This value, known as machine epsilon, provides a measure of the numerical
+    precision or the difference between 1 and the smallest floating point
     number greater than 1 for the given data type.
-    
+
     Args:
-        dtype (Type[np.floating]): The floating-point data type to get the 
+        dtype (Type[np.floating]): The floating-point data type to get the
                                  precision for (e.g., np.float32, np.float64).
                                  Defaults to float (typically np.float64).
-    
+
     Returns:
         float: The machine epsilon for the given data type.
     """
     return np.finfo(dtype).eps
+
+
 #
 def linspace(
-    start: float, 
-    stop: float, 
-    num: int = 50, 
-    endpoint: bool = True
+    start: float, stop: float, num: int = 50, endpoint: bool = True
 ) -> List[float]:
     """
     Generate `num` evenly spaced samples from `start` to `stop`.
@@ -80,7 +85,7 @@ def linspace(
     num : int, optional
         Number of samples to generate (default is 50). Must be >= 1.
     endpoint : bool, optional
-        If True, `stop` is the last sample; otherwise it is not included 
+        If True, `stop` is the last sample; otherwise it is not included
         (default True).
 
     Returns
@@ -107,16 +112,18 @@ def linspace(
     steps = num - 1 if endpoint else num
     delta = (stop - start) / steps
     return [start + i * delta for i in range(num)]
+
+
 #
 def round_sigfig_n(num, n: int = 1):
     """
-    Round a number or array of numbers to a specified number of significant 
+    Round a number or array of numbers to a specified number of significant
     figures.
 
     Parameters:
     -----------
     num : float or array-like
-        The number or array of numbers to be rounded to 'n' significant 
+        The number or array of numbers to be rounded to 'n' significant
         figures.
 
     n : int, optional
@@ -135,9 +142,9 @@ def round_sigfig_n(num, n: int = 1):
 
     Notes:
     ------
-    - The function calculates the exponent required to obtain 'n' significant 
+    - The function calculates the exponent required to obtain 'n' significant
       figures based on the absolute value of 'num'.
-    - It then applies the rounding operation to 'num' with the calculated 
+    - It then applies the rounding operation to 'num' with the calculated
       exponent to achieve the desired number of significant figures.
     - If 'num' is an array-like object, it processes each element separately.
 
@@ -154,19 +161,21 @@ def round_sigfig_n(num, n: int = 1):
     """
     if n not in range(1, DEFAULT_MAX_DIGITS_ROUND_SIGFIG):
         raise ValueError("Significant figures number not in [1, 15].")
-    expn = -np.floor(np.log10(np.abs(num))).astype('int')
+    expn = -np.floor(np.log10(np.abs(num))).astype("int")
     if hasattr(num, "__len__"):
-        rr = np.array([np.round(nn, ee+n-1) for nn,ee in zip(num, expn)])
+        rr = np.array([np.round(nn, ee + n - 1) for nn, ee in zip(num, expn)])
     else:
-        rr = np.round(num, expn+n-1)
+        rr = np.round(num, expn + n - 1)
     return rr
+
+
 #
 def symmetric_logarithm_unchecked(
     x: Union[NDArray[np.floating], float],
     a: float,
     b: float,
     c: float,
-    d: float
+    d: float,
 ) -> Union[NDArray[np.floating], float]:
     """
     Compute a symmetric logarithmic function without safety adjustments.
@@ -196,6 +205,8 @@ def symmetric_logarithm_unchecked(
         Result of the expression; may contain NaN or -inf where abs(x) ≤ d.
     """
     return a * np.log(b * (np.abs(x) - d)) + c
+
+
 #
 def symmetric_logarithm(
     x: Union[NDArray[np.floating], float],
@@ -203,7 +214,7 @@ def symmetric_logarithm(
     b: float,
     c: float,
     d: float,
-    tol: float = 1e-10
+    tol: float = 1e-10,
 ) -> Union[NDArray[np.floating], float]:
     """
     Compute a symmetric logarithmic function with safety tolerance.
@@ -234,6 +245,8 @@ def symmetric_logarithm(
     abs_x = np.abs(x)
     safe_val = np.where(abs_x > d + tol, abs_x, d + tol)
     return symmetric_logarithm_unchecked(safe_val, a, b, c, d)
+
+
 #
 def to_fraction(data: Any) -> Any:
     """
@@ -252,7 +265,7 @@ def to_fraction(data: Any) -> Any:
     Returns
     -------
     Fraction or list of Fraction or ndarray of object
-        Same structure as `data`, but all numeric elements converted to 
+        Same structure as `data`, but all numeric elements converted to
         `Fraction`.
     """
     # Handle NumPy arrays in one go
@@ -269,6 +282,8 @@ def to_fraction(data: Any) -> Any:
 
     # Fallback covers ints, Decimals, numpy scalars, strings, etc.
     return Fraction(data)
+
+
 #
 def width_interval(a, b):
     """
@@ -285,7 +300,7 @@ def width_interval(a, b):
     Returns:
     --------
     float or numeric
-        The width of the interval, which is the absolute difference between 
+        The width of the interval, which is the absolute difference between
         'a' and 'b'.
 
     Example:
@@ -296,6 +311,7 @@ def width_interval(a, b):
     # The result is 3, representing the width of the interval [5, 8].
     """
     return np.abs(a - b)
+
 
 def is_int(x: Any) -> bool:
     """
@@ -326,6 +342,7 @@ def is_int(x: Any) -> bool:
     True
     """
     return isinstance(x, GeneralInteger)
+
 
 def is_positive_int(x: Any) -> bool:
     """

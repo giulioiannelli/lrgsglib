@@ -3,6 +3,7 @@ HierarchicalModularNetworkGT - Falls back to NX implementation (no native GT imp
 """
 
 import warnings
+
 from ...nx.multispectral import HierarchicalModularNetworkNX
 
 warnings.warn(

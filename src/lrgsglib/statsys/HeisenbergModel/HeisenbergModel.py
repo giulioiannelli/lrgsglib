@@ -19,13 +19,13 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
+from ...utils.tools.chronometer import time_function_accumulate
 from .._c_backend import CBackendMixin
 from .._csr import build_graph_csr
 from .._solver import SolverBackend
 from .._solver_engine import get_solver
 from ..VecDynSys import VecDynSys
 from .defaults import HEISENBERG_SOLVER_NAME
-from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
     from ...graphs.nx import SignedGraphNX as SignedGraph
@@ -75,7 +75,7 @@ class HeisenbergModel(CBackendMixin, VecDynSys):
         save_observables: bool = False,
         **kw: Any,
     ) -> None:
-        dynpath = getattr(sg, 'path_data', None)
+        dynpath = getattr(sg, "path_data", None)
         if dynpath is not None:
             dynpath = Path(dynpath) / "heisenberg"
         super().__init__(
@@ -119,7 +119,9 @@ class HeisenbergModel(CBackendMixin, VecDynSys):
                     raise ValueError("Provide a custom state array.")
                 self.s = np.asarray(custom, dtype=np.float64).copy()
                 if self.s.shape != (self.N, 3):
-                    raise ValueError(f"Shape mismatch: {self.s.shape} != ({self.N}, 3)")
+                    raise ValueError(
+                        f"Shape mismatch: {self.s.shape} != ({self.N}, 3)"
+                    )
                 # Normalise
                 norms = np.linalg.norm(self.s, axis=1, keepdims=True)
                 self.s /= np.where(norms > 0, norms, 1.0)
@@ -175,15 +177,21 @@ class HeisenbergModel(CBackendMixin, VecDynSys):
         dE = 0.0
         for j in range(self.N):
             if A[nd, j] != 0:
-                dE += A[nd, j] * (np.dot(current, self.s[j]) - np.dot(proposal, self.s[j]))
+                dE += A[nd, j] * (
+                    np.dot(current, self.s[j]) - np.dot(proposal, self.s[j])
+                )
 
-        if dE <= 0 or (self.T > 0 and np.random.uniform() < np.exp(-dE / self.T)):
+        if dE <= 0 or (
+            self.T > 0 and np.random.uniform() < np.exp(-dE / self.T)
+        ):
             self.s[nd] = proposal
 
     # ------------------------------------------------------------------
     # Dynamics
     # ------------------------------------------------------------------
-    def init_heisenberg_dynamics(self, custom: Any = None, exName: str = "") -> None:
+    def init_heisenberg_dynamics(
+        self, custom: Any = None, exName: str = ""
+    ) -> None:
         self._check_c_backend_or_fallback()
         self.ene = []
         self.magn = []
@@ -230,9 +238,14 @@ class HeisenbergModel(CBackendMixin, VecDynSys):
         ni, nw, nptr = build_graph_csr(self.sg, self.N)
         s0 = np.ascontiguousarray(self.s, dtype=np.float64)
         s, ene, magn = _heisenberg_native.heisenberg_sampling(
-            s0, ni, nw, nptr,
-            float(self.T), float(self.delta),
-            int(self.steps), int(self.seed),
+            s0,
+            ni,
+            nw,
+            nptr,
+            float(self.T),
+            float(self.delta),
+            int(self.steps),
+            int(self.seed),
             bool(self.save_observables),
         )
         self.s = s
@@ -259,7 +272,7 @@ class HeisenbergModel(CBackendMixin, VecDynSys):
         ]
 
     def _get_cleanup_paths(self) -> list[Path | None]:
-        return [getattr(self, 'sfout', None)]
+        return [getattr(self, "sfout", None)]
 
     @time_function_accumulate(auto_log=False)
     def run(

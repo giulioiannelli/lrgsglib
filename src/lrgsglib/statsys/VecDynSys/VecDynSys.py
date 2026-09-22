@@ -131,11 +131,11 @@ class VecDynSys(DynSys):
     # ------------------------------------------------------------------
     def export_state(self) -> None:
         """Write state to a binary file for C backend."""
-        out_suffix = self.run_id or ''
-        fname = self.sg.get_p_fname('s', out_suffix=out_suffix)
+        out_suffix = self.run_id or ""
+        fname = self.sg.get_p_fname("s", out_suffix=out_suffix)
         self._ensure_dynpath_exists()
         self.sfout = self.dynpath / fname
-        self.s.astype(self._state_dtype).tofile(open(self.sfout, 'wb'))
+        self.s.astype(self._state_dtype).tofile(open(self.sfout, "wb"))
         self.s_0 = self.s.copy()
 
     # ------------------------------------------------------------------

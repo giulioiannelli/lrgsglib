@@ -106,7 +106,9 @@ def _slq_trace_estimates(
     trace_l_exp = np.zeros_like(time_grid, dtype=typf)
     trace_l2_exp = np.zeros_like(time_grid, dtype=typf)
 
-    matvec = laplacian.dot if hasattr(laplacian, "dot") else lambda x: laplacian @ x
+    matvec = (
+        laplacian.dot if hasattr(laplacian, "dot") else lambda x: laplacian @ x
+    )
 
     for _ in range(num_samples):
         r = rng.choice([-1.0, 1.0], size=n).astype(typf)
@@ -131,7 +133,11 @@ def _slq_trace_estimates(
         trace_l2_exp += norm_sq * w2
 
     inv_samples = typf(1.0 / num_samples)
-    return trace_exp * inv_samples, trace_l_exp * inv_samples, trace_l2_exp * inv_samples
+    return (
+        trace_exp * inv_samples,
+        trace_l_exp * inv_samples,
+        trace_l2_exp * inv_samples,
+    )
 
 
 def compute_entropy_observables_slq(
@@ -198,7 +204,9 @@ def compute_entropy_observables_slq(
     if laplacian.shape[0] != laplacian.shape[1]:
         raise ValueError("laplacian must be a square matrix.")
     if steps < 1:
-        raise ValueError("steps must be at least 1 to build the entropy profile.")
+        raise ValueError(
+            "steps must be at least 1 to build the entropy profile."
+        )
     if num_samples < 1:
         raise ValueError("num_samples must be at least 1.")
     if lanczos_steps < 2:
@@ -232,7 +240,9 @@ def compute_entropy_observables_slq(
             )
 
             # Find spectral gap (smallest non-zero eigenvalue)
-            threshold = 100 * np.finfo(typf).eps * np.max(np.abs(eigenvals_small))
+            threshold = (
+                100 * np.finfo(typf).eps * np.max(np.abs(eigenvals_small))
+            )
             lambda_min = np.min(eigenvals_small[eigenvals_small > threshold])
 
             # Set cutoff: diffusion time ~ 1/lambda_min
@@ -270,8 +280,12 @@ def compute_entropy_observables_slq(
         valid_stable = trace_exp > 0
         avg_stable = np.zeros_like(trace_exp, dtype=typf)
         avg2_stable = np.zeros_like(trace_exp, dtype=typf)
-        avg_stable[valid_stable] = trace_l_exp[valid_stable] / trace_exp[valid_stable]
-        avg2_stable[valid_stable] = trace_l2_exp[valid_stable] / trace_exp[valid_stable]
+        avg_stable[valid_stable] = (
+            trace_l_exp[valid_stable] / trace_exp[valid_stable]
+        )
+        avg2_stable[valid_stable] = (
+            trace_l2_exp[valid_stable] / trace_exp[valid_stable]
+        )
 
         with np.errstate(divide="ignore", invalid="ignore"):
             entropy_profile[stable_mask] = np.where(
@@ -291,7 +305,9 @@ def compute_entropy_observables_slq(
         entropy_profile[unstable_mask] = log_N / log_N  # = 1.0
         variance_profile[unstable_mask] = 0.0
 
-    normalized_entropy = _normalize_entropy_profile(entropy_profile, entropy_norm)
+    normalized_entropy = _normalize_entropy_profile(
+        entropy_profile, entropy_norm
+    )
 
     # Compute specific heat
     entropy_derivative = np.gradient(normalized_entropy, np.log(time_grid))

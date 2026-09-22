@@ -17,44 +17,44 @@ pattern keeps working::
     import lrgsglib.notebooks as _nb
     _nb.verbose_print_nb = True
 """
-import sys as _sys
+
 import logging as _logging
+import sys as _sys
 from pathlib import Path as _Path
+
 import numpy as _np
 
+# Most-used library defaults (symbolic, reusable).
+from ..config.const import (  # CHL-SF04 protein-TMD experiment grid.
+    CHL_SF04_CORPUS_SIZE,
+    CHL_SF04_LOG_MSE_FLOOR,
+    CHL_SF04_MASTER_SEED,
+    CHL_SF04_N_FEATURES,
+    CHL_SF04_RES_MAX,
+    CHL_SF04_RES_MIN,
+    DEFAULT_ENTROPY_HEXPONENT,
+    DEFAULT_ENTROPY_LEXPONENT,
+    K_FRAC_GALLERY,
+    K_FRAC_Q3,
+    L2D_GEO_SQR,
+    L2D_GEO_TRI,
+    L2D_P_C_DICT,
+    L2D_SIDE1,
+    LRGSG_SRC,
+    LRSG_ENTROPY_STEP,
+    N_SEEDS_PFLIP,
+    PATHDATA,
+    PATHPLOT,
+    PFLIP_SWEEP_GRID,
+    Q3_EMERGENCE_THRESHOLD,
+)
 from ..config.funcs import (
-    move_to_rootf,
-    peq_fstr,
     Teq_fstr,
     avgeq_parse,
     build_fname_or_pattern_direct,
     build_pT_fname,
-)
-
-# Most-used library defaults (symbolic, reusable).
-from ..config.const import (
-    PATHDATA,
-    PATHPLOT,
-    LRGSG_SRC,
-    LRSG_ENTROPY_STEP,
-    DEFAULT_ENTROPY_LEXPONENT,
-    DEFAULT_ENTROPY_HEXPONENT,
-    L2D_SIDE1,
-    L2D_GEO_SQR,
-    L2D_GEO_TRI,
-    L2D_P_C_DICT,
-    # CHL-SF04 protein-TMD experiment grid.
-    PFLIP_SWEEP_GRID,
-    K_FRAC_GALLERY,
-    K_FRAC_Q3,
-    N_SEEDS_PFLIP,
-    CHL_SF04_MASTER_SEED,
-    CHL_SF04_RES_MIN,
-    CHL_SF04_RES_MAX,
-    CHL_SF04_CORPUS_SIZE,
-    CHL_SF04_N_FEATURES,
-    CHL_SF04_LOG_MSE_FLOOR,
-    Q3_EMERGENCE_THRESHOLD,
+    move_to_rootf,
+    peq_fstr,
 )
 
 verbose_print_nb: bool = False
@@ -117,10 +117,10 @@ def make_lab_paths(code_id: str) -> dict:
     """
     root = _Path("data") / code_id
     out = {
-        "raw":     root / "raw",
+        "raw": root / "raw",
         "figures": root / "figures",
-        "cache":   root / "cache",
-        "cfg":     root / "cfg",
+        "cache": root / "cache",
+        "cfg": root / "cfg",
     }
     for p in out.values():
         p.mkdir(parents=True, exist_ok=True)
@@ -135,4 +135,5 @@ def use_lab_style() -> None:
     at package-import time).
     """
     import matplotlib.pyplot as _plt
+
     _plt.style.use("ipy/nb_plotsheet.mplstyle")

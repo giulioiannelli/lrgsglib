@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
-    from .protocols import SignedGraphProtocol
     from .nx.kRegularGraphNX import kRegularGraphNX
+    from .protocols import SignedGraphProtocol
 
 
 def _get_nx_impl():

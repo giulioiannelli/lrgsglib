@@ -33,6 +33,7 @@ __all__ = ["register_signed_rw_solvers"]
 
 # --- single-walker family (SignedWalker / Absorbing / Killing / Sticky) ---
 
+
 class _SrwWalkerPySolver:
     """Pure-Python reference walker kernel (all three rules)."""
 
@@ -66,10 +67,12 @@ class _SrwWalkerPbSolver:
 
     def is_available(self) -> bool:
         from .SignedWalker import _load_srw_native
+
         return _load_srw_native() is not None
 
 
 # --- spin-copy-with-sign dynamics (SignedSpinCopy / legacy SignedRW) -------
+
 
 class _SrwCopyPySolver:
     """Pure-Python spin-copy loop."""

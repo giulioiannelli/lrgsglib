@@ -4,6 +4,7 @@ from pathlib import Path
 
 import networkx as nx
 import numpy as np
+
 from ..FullyConnectedNX import FullyConnectedNX
 from .generators_scs import generate_scs_generalized_graph
 
@@ -40,12 +41,13 @@ class SCSGeneralizedNNNX(FullyConnectedNX):
         self.only_const_mode = only_const_mode
 
         # Extract seed from kwargs to create RNG before parent initialization
-        seed = kwargs.get('seed', None)
+        seed = kwargs.get("seed", None)
         self._rng = np.random.default_rng(seed)
 
         # Set sgpathn with intermediate folder (like Lattice2D does with L2D_PATH_DICT)
         # This ensures output goes to data/<workdir>/scs_nn/ instead of data/<workdir>/
-        from ....config.const import SCS_SGPATH, SCS_PHTABB, FC_SGPATH
+        from ....config.const import FC_SGPATH, SCS_PHTABB, SCS_SGPATH
+
         if sgpathn is None:
             sgpathn = SCS_SGPATH if SCS_SGPATH else FC_SGPATH
 
@@ -60,7 +62,7 @@ class SCSGeneralizedNNNX(FullyConnectedNX):
             sgpathn=_sgpathn,
             stdFnameSFFX=stdFnameSFFX if stdFnameSFFX is not None else "",
             only_const_mode=only_const_mode,
-            **kwargs
+            **kwargs,
         )
         # std_fname should only contain parameters not already in directory path
         # (scs_nn and N are already in the path: data/.../scs_nn/.../N=<N>/)

@@ -34,7 +34,9 @@ __all__ = [
 ]
 
 # model_name -> {backend -> Solver instance | zero-arg factory returning one}
-_solvers: dict[str, dict[SolverBackend, Union[Solver, Callable[[], Solver]]]] = {}
+_solvers: dict[
+    str, dict[SolverBackend, Union[Solver, Callable[[], Solver]]]
+] = {}
 # Cache of resolved (instantiated) solvers.
 _resolved: dict[str, dict[SolverBackend, Solver]] = {}
 
@@ -60,7 +62,9 @@ def _resolve_solver(model: str, backend: SolverBackend) -> Solver:
     if cached is not None:
         return cached
     obj = _solvers[model][backend]
-    if callable(obj):  # a class or factory — instantiate; instances are not callable
+    if callable(
+        obj
+    ):  # a class or factory — instantiate; instances are not callable
         obj = obj()
     _resolved.setdefault(model, {})[backend] = obj
     return obj
@@ -139,7 +143,9 @@ def get_backend_from_env() -> Optional[SolverBackend]:
     return None
 
 
-def is_backend_available(model: str, backend: Union[str, SolverBackend]) -> bool:
+def is_backend_available(
+    model: str, backend: Union[str, SolverBackend]
+) -> bool:
     """Whether ``(model, backend)`` is registered *and* its runtime is present.
 
     Delegates to the solver's optional ``is_available()`` (compiled module / C

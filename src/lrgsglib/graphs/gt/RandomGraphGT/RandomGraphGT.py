@@ -3,6 +3,7 @@ RandomGraphGT - Falls back to NX implementation (no native GT implementation).
 """
 
 import warnings
+
 from ...nx.random import RandomGraphNX
 
 warnings.warn(

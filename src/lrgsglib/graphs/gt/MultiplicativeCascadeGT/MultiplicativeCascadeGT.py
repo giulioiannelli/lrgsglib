@@ -16,27 +16,27 @@ try:
     import graph_tool as gt
     from graph_tool import Graph
     from graph_tool.topology import label_components
+
     GT_AVAILABLE = True
 except ImportError:
     GT_AVAILABLE = False
     Graph = object
 
-from ..MultispectralGraphGT import MultispectralGraphGT
 from ....config.const import (
+    DEFAULT_P_FSTR_FMT,
+    MC_SGPATH,
+    MC_STDFN,
+    MSG_FRACTION,
+    MSG_ITERATIONS,
     MSG_P1,
     MSG_P2,
     MSG_P3,
     MSG_P4,
-    MSG_FRACTION,
-    MSG_ITERATIONS,
-    MC_STDFN,
-    MC_SGPATH,
-    DEFAULT_P_FSTR_FMT,
 )
 from ...nx.MultispectralGraphNX.generators_msg import (
     multiplicative_cascade_probability_matrix,
 )
-
+from ..MultispectralGraphGT import MultispectralGraphGT
 
 __all__ = ["MultiplicativeCascadeGraphGT", "MultiplicativeCascadeGraph"]
 
@@ -143,7 +143,6 @@ class MultiplicativeCascadeGraphGT(MultispectralGraphGT):
         # Initialize base class with generated graph
         super().__init__(G=G, pflip=pflip, seed=seed, sgpathn=sgpathn, **kwargs)
 
-
     def _generate(self) -> "Graph":
         """Generate multiplicative cascade graph using native graph-tool operations.
 
@@ -164,7 +163,10 @@ class MultiplicativeCascadeGraphGT(MultispectralGraphGT):
         old_state = np.random.get_state()
         np.random.seed(self._rng.integers(0, 2**31))
         self.probability_matrix = multiplicative_cascade_probability_matrix(
-            self.p1, self.p2, self.p3, self.p4,
+            self.p1,
+            self.p2,
+            self.p3,
+            self.p4,
             iterations=self.iterations,
             stochastic=self.stochastic,
         )
@@ -194,6 +196,7 @@ class MultiplicativeCascadeGraphGT(MultispectralGraphGT):
 
         try:
             from .cpp import build_cascade_edges
+
             build_cascade_edges(
                 G,
                 selected_indices[:, 0].tolist(),
@@ -327,7 +330,7 @@ class MultiplicativeCascadeGraphGT(MultispectralGraphGT):
             Array of (i, j) coordinates for selected nodes
         """
         N = int(prob_matrix.shape[0])
-        k = int(round(float(fraction) * (N ** 2)))
+        k = int(round(float(fraction) * (N**2)))
         k = max(1, min(k, N * N))
 
         # Generate uniform random values
@@ -411,7 +414,7 @@ class MultiplicativeCascadeGraphGT(MultispectralGraphGT):
         if self.probability_matrix is None:
             return 0
         size = int(self.probability_matrix.shape[0])
-        return max(1, int(round(self.sample_fraction * (size ** 2))))
+        return max(1, int(round(self.sample_fraction * (size**2))))
 
     @property
     def N(self) -> int:
@@ -419,7 +422,9 @@ class MultiplicativeCascadeGraphGT(MultispectralGraphGT):
         return self.G.num_vertices()
 
     def __repr__(self) -> str:
-        return f"MultiplicativeCascadeGraphGT(N={self.N}, variant={self.variant})"
+        return (
+            f"MultiplicativeCascadeGraphGT(N={self.N}, variant={self.variant})"
+        )
 
 
 # Backward compatibility alias

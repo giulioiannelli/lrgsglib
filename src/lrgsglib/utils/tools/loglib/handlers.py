@@ -99,7 +99,9 @@ class SizeAwareNullHandler(logging.NullHandler):
         """Count suppressed records."""
         self.suppressed_count += 1
         level = record.levelno
-        self.suppressed_by_level[level] = self.suppressed_by_level.get(level, 0) + 1
+        self.suppressed_by_level[level] = (
+            self.suppressed_by_level.get(level, 0) + 1
+        )
         return super().handle(record)
 
     def reset_counts(self) -> None:

@@ -18,7 +18,6 @@ import numpy as np
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
 
-
 # Constants
 PA_PHTABB = "pa"
 PA_SGPATH = ""
@@ -119,7 +118,7 @@ class ExtendedBarabasiAlbertNX(RandomGraphNX):
                 G.add_edge(i, j)
 
         # Get seed for reproducibility
-        seed = getattr(self, '_rng_seed', None)
+        seed = getattr(self, "_rng_seed", None)
         rng = np.random.default_rng(seed)
 
         # Add remaining nodes
@@ -132,9 +131,7 @@ class ExtendedBarabasiAlbertNX(RandomGraphNX):
             probs = probs / probs.sum()
 
             # Select m nodes to attach to
-            targets = rng.choice(
-                new_node, size=self.m, replace=False, p=probs
-            )
+            targets = rng.choice(new_node, size=self.m, replace=False, p=probs)
 
             for target in targets:
                 G.add_edge(new_node, target)

@@ -206,10 +206,14 @@ def compute_entropy_observables_from_eigenvalues(
         and the sampled time grid.
     """
     if steps < 1:
-        raise ValueError("steps must be at least 1 to build the entropy profile.")
+        raise ValueError(
+            "steps must be at least 1 to build the entropy profile."
+        )
 
     eigvals = np.asarray(eigenvalues, dtype=typf)
-    eps = threshold if threshold is not None else dtype_numerical_precision(typf)
+    eps = (
+        threshold if threshold is not None else dtype_numerical_precision(typf)
+    )
     eigvals = np.where(np.abs(eigvals) > eps, eigvals, typf(0))
 
     time_grid = np.logspace(t1, t2, steps, dtype=typf)
@@ -227,7 +231,9 @@ def compute_entropy_observables_from_eigenvalues(
             rho = rhoTr / trace_rho
 
         with np.errstate(divide="ignore", invalid="ignore"):
-            entropy_profile[idx] = -np.nansum(rho * np.log(rho), dtype=typf) / log_N
+            entropy_profile[idx] = (
+                -np.nansum(rho * np.log(rho), dtype=typf) / log_N
+            )
 
         if trace_rho:
             avgrho = np.nansum(eigvals * rhoTr, dtype=typf) / trace_rho
@@ -237,7 +243,9 @@ def compute_entropy_observables_from_eigenvalues(
             av2rho = typf(0)
         variance_profile[idx] = av2rho - avgrho**2
 
-    normalized_entropy = _normalize_entropy_profile(entropy_profile, entropy_norm)
+    normalized_entropy = _normalize_entropy_profile(
+        entropy_profile, entropy_norm
+    )
 
     # Specific heat is always computed from the complement form (1 - S/logN)
     # so that C(τ) = d(1-S/logN)/d(logτ) stays positive at diffusion scales,

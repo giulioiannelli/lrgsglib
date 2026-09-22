@@ -20,6 +20,7 @@ Example
 ... )
 >>> print(f"Nodes: {bg2.N}, Mode: {bg2.mode}")
 """
+
 from __future__ import annotations
 
 from typing import Optional, Sequence, Set, Tuple
@@ -37,7 +38,6 @@ except ImportError:
     Graph = object
 
 from ..SignedGraphGT import SignedGraphGT
-
 
 __all__ = ["BipartiteGraphGT"]
 
@@ -161,8 +161,8 @@ class BipartiteGraphGT(SignedGraphGT):
 
         # --- Resolve build mode ---
         has_deg = top_degrees is not None and bottom_degrees is not None
-        has_partial_deg = (
-            (top_degrees is not None) != (bottom_degrees is not None)
+        has_partial_deg = (top_degrees is not None) != (
+            bottom_degrees is not None
         )
 
         if has_partial_deg:
@@ -175,9 +175,7 @@ class BipartiteGraphGT(SignedGraphGT):
             # Degree-sequence mode
             self.mode: str = "degree_sequence"
             self.top_degrees: Optional[list[int]] = list(top_degrees)
-            self.bottom_degrees: Optional[list[int]] = list(
-                bottom_degrees
-            )
+            self.bottom_degrees: Optional[list[int]] = list(bottom_degrees)
 
             if sum(self.top_degrees) != sum(self.bottom_degrees):
                 raise ValueError(
@@ -188,9 +186,7 @@ class BipartiteGraphGT(SignedGraphGT):
             if any(d < 0 for d in self.top_degrees):
                 raise ValueError("All top degrees must be non-negative")
             if any(d < 0 for d in self.bottom_degrees):
-                raise ValueError(
-                    "All bottom degrees must be non-negative"
-                )
+                raise ValueError("All bottom degrees must be non-negative")
 
             self.n1 = len(self.top_degrees)
             self.n2 = len(self.bottom_degrees)
@@ -215,17 +211,13 @@ class BipartiteGraphGT(SignedGraphGT):
                     f"n1 and n2 must be >= 1, got n1={n1}, n2={n2}"
                 )
             if not 0 <= self.p <= 1:
-                raise ValueError(
-                    f"p must be in [0, 1], got {self.p}"
-                )
+                raise ValueError(f"p must be in [0, 1], got {self.p}")
 
         # Store common parameters
         self.only_const_mode = only_const_mode
         self.syshape = (self.n1, self.n2)
         if self.mode == "random":
-            self.syshapePth = (
-                f"n1={self.n1}_n2={self.n2}_p={self.p:.3g}"
-            )
+            self.syshapePth = f"n1={self.n1}_n2={self.n2}_p={self.p:.3g}"
         else:
             self.syshapePth = f"n1={self.n1}_n2={self.n2}_deg"
 
@@ -252,7 +244,6 @@ class BipartiteGraphGT(SignedGraphGT):
 
         # Initialize base class with generated graph
         super().__init__(G=G, pflip=pflip, seed=seed, **kwargs)
-
 
     def _init_std_fname(self, suffix: str = "") -> None:
         """Initialize standard filename."""
@@ -285,10 +276,12 @@ class BipartiteGraphGT(SignedGraphGT):
 
         # Add bipartite partition property using numpy array
         bipartite_prop = G.new_vertex_property("int")
-        bp_array = np.concatenate([
-            np.zeros(self.n1, dtype=int),
-            np.ones(self.n2, dtype=int),
-        ])
+        bp_array = np.concatenate(
+            [
+                np.zeros(self.n1, dtype=int),
+                np.ones(self.n2, dtype=int),
+            ]
+        )
         bipartite_prop.a = bp_array
         G.vertex_properties["bipartite"] = bipartite_prop
 
@@ -305,9 +298,7 @@ class BipartiteGraphGT(SignedGraphGT):
             edge_indices = np.where(mask)[0]
             top_indices = edge_indices // self.n2
             bottom_indices = edge_indices % self.n2 + self.n1
-            edge_list = np.column_stack(
-                [top_indices, bottom_indices]
-            )
+            edge_list = np.column_stack([top_indices, bottom_indices])
             G.add_edge_list(edge_list)
 
         # Add sign property (all +1 initially)
@@ -423,9 +414,7 @@ class BipartiteGraphGT(SignedGraphGT):
                 "get_actual_top_degrees() is only available in "
                 "degree-sequence mode."
             )
-        return np.array([
-            self.G.vertex(v).out_degree() for v in range(self.n1)
-        ])
+        return np.array([self.G.vertex(v).out_degree() for v in range(self.n1)])
 
     def get_actual_bottom_degrees(self) -> NDArray[np.int_]:
         """
@@ -448,10 +437,12 @@ class BipartiteGraphGT(SignedGraphGT):
                 "get_actual_bottom_degrees() is only available in "
                 "degree-sequence mode."
             )
-        return np.array([
-            self.G.vertex(v).out_degree()
-            for v in range(self.n1, self.n1 + self.n2)
-        ])
+        return np.array(
+            [
+                self.G.vertex(v).out_degree()
+                for v in range(self.n1, self.n1 + self.n2)
+            ]
+        )
 
     def verify_degrees(self, tolerance: float = 0.1) -> bool:
         """
@@ -477,8 +468,7 @@ class BipartiteGraphGT(SignedGraphGT):
         """
         if self.mode != "degree_sequence":
             raise AttributeError(
-                "verify_degrees() is only available in "
-                "degree-sequence mode."
+                "verify_degrees() is only available in " "degree-sequence mode."
             )
         actual_top = self.get_actual_top_degrees()
         actual_bottom = self.get_actual_bottom_degrees()
@@ -486,8 +476,7 @@ class BipartiteGraphGT(SignedGraphGT):
         prescribed_bottom = np.array(self.bottom_degrees)
 
         top_diff = (
-            np.abs(actual_top - prescribed_top).sum()
-            / prescribed_top.sum()
+            np.abs(actual_top - prescribed_top).sum() / prescribed_top.sum()
         )
         bottom_diff = (
             np.abs(actual_bottom - prescribed_bottom).sum()
@@ -496,9 +485,7 @@ class BipartiteGraphGT(SignedGraphGT):
 
         return top_diff <= tolerance and bottom_diff <= tolerance
 
-    def get_biadjacency_matrix(
-        self, sparse: bool = False
-    ) -> NDArray[np.int_]:
+    def get_biadjacency_matrix(self, sparse: bool = False) -> NDArray[np.int_]:
         """
         Return the biadjacency matrix of the bipartite graph.
 
@@ -556,9 +543,7 @@ class BipartiteGraphGT(SignedGraphGT):
             adj = B.T @ B
             n = self.n2
         else:
-            raise ValueError(
-                f"which must be 'top' or 'bottom', got {which}"
-            )
+            raise ValueError(f"which must be 'top' or 'bottom', got {which}")
 
         G_proj = gt.Graph(directed=False)
         G_proj.add_vertex(n)

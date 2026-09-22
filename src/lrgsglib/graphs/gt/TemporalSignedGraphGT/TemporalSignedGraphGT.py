@@ -6,6 +6,7 @@ TemporalSignedGraph class is no longer needed.
 """
 
 import warnings
+
 from ...nx.TemporalGraphNX import TemporalGraphNX
 
 warnings.warn(

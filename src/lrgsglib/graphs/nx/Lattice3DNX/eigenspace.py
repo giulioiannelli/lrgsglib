@@ -1,25 +1,28 @@
 import pickle as pk
+from typing import Any, Tuple, Union
+
 #
 from numpy.random import randint
 from numpy.typing import NDArray
-from typing import Any, Union, Tuple
+
 #
 from ....config.funcs import peq_fstr
 from ..Lattice2DNX.eigenspace import _cache_has_payload
-from .Lattice3DNX import Lattice3DNX, L3D_ONREP
+from .Lattice3DNX import L3D_ONREP, Lattice3DNX
+
 #
-__all__ = [
-    "load_or_compute_Lattice3DNX"
-]
+__all__ = ["load_or_compute_Lattice3DNX"]
+
+
 #
 def load_or_compute_Lattice3DNX(
-        dim: Union[int, Tuple[int, int, int]], 
-        geo: str = 'sc', 
-        *,
-        cell_type: str = 'rand',
-        save: bool = True, 
-        compute: str = 'energy_cupy',
-        **kwargs: Any
+    dim: Union[int, Tuple[int, int, int]],
+    geo: str = "sc",
+    *,
+    cell_type: str = "rand",
+    save: bool = True,
+    compute: str = "energy_cupy",
+    **kwargs: Any,
 ) -> Lattice3DNX:
     """
     Load or compute a 3D lattice object, optionally saving it to a file.
@@ -59,30 +62,34 @@ def load_or_compute_Lattice3DNX(
     tmp_l = Lattice3DNX(dim, geo, only_const_mode=True, **kwargs)
     if not compute:
         return tmp_l
-    pflip = kwargs.get('pflip', .0)
-    if cell_type != 'rand':
-        kwargs.setdefault('init_nw_dict', True)
-    new_seed = kwargs.get('seed', randint(0, 2**31 - 1)) if (pflip > 0. and pflip < 1.) else None
-    seed_str = f'_seed{new_seed%2**16}' if new_seed is not None else ''
+    pflip = kwargs.get("pflip", 0.0)
+    if cell_type != "rand":
+        kwargs.setdefault("init_nw_dict", True)
+    new_seed = (
+        kwargs.get("seed", randint(0, 2**31 - 1))
+        if (pflip > 0.0 and pflip < 1.0)
+        else None
+    )
+    seed_str = f"_seed{new_seed%2**16}" if new_seed is not None else ""
     match compute:
-        case _ if compute.startswith('spectrum'):
-            basename = 'L3D_spe'
-        case _ if compute.startswith('energy'):
-            basename = 'L3D_ene'
-        case _ if compute.startswith('eigV'):
-            howmany = int(compute.split('_')[1]) if '_' in compute else 1
-            basename = 'L3D_eigV_' + str(howmany)
+        case _ if compute.startswith("spectrum"):
+            basename = "L3D_spe"
+        case _ if compute.startswith("energy"):
+            basename = "L3D_ene"
+        case _ if compute.startswith("eigV"):
+            howmany = int(compute.split("_")[1]) if "_" in compute else 1
+            basename = "L3D_eigV_" + str(howmany)
         case _:
             raise ValueError(f"Unknown compute option '{compute}'.")
-    fname = '_'.join([basename, peq_fstr(pflip)]) + seed_str
+    fname = "_".join([basename, peq_fstr(pflip)]) + seed_str
     #
-    pname = tmp_l.path_graph / (fname + '.pkl')
+    pname = tmp_l.path_graph / (fname + ".pkl")
     tmp_l.path_graph.mkdir(parents=True, exist_ok=True)
     #
     lattice = None
     if pname.exists():
-        lattice = pk.load(open(pname, 'rb'))
-        lattice.__init_loaded_graph__(path_data=kwargs.get('path_data', None))
+        lattice = pk.load(open(pname, "rb"))
+        lattice.__init_loaded_graph__(path_data=kwargs.get("path_data", None))
         if not _cache_has_payload(lattice, compute):
             # Cache written before the payload existed (e.g. by the lazy
             # compute_rbim_energy_eigV_all) — recompute and overwrite.
@@ -90,36 +97,39 @@ def load_or_compute_Lattice3DNX(
     if lattice is None:
         lattice = Lattice3DNX(dim, geo=geo, **kwargs)
         match cell_type:
-            case 'rand':
+            case "rand":
                 lattice.flip_random_fract_edges()
             case _:
                 try:
                     pattern = lattice.nwDict[cell_type][L3D_ONREP]
                 except KeyError:
-                    raise ValueError(f"Unknown cell_type '{cell_type}'.") from None
+                    raise ValueError(
+                        f"Unknown cell_type '{cell_type}'."
+                    ) from None
                 lattice.flip_sel_edges(pattern)
         try:
             import cupy as cp
+
             # Test if a GPU is available
             cp.cuda.runtime.getDeviceCount()
         except Exception as e:
-            compute = compute.replace('cupy', 'numpy')
+            compute = compute.replace("cupy", "numpy")
         match compute:
-            case _ if compute.startswith('spectrum'):
-                routine = compute.split('_')[-1] if '_' in compute else 'cupy'
+            case _ if compute.startswith("spectrum"):
+                routine = compute.split("_")[-1] if "_" in compute else "cupy"
                 lattice.compute_laplacian_spectrum_weigV(backend=routine)
-            case _ if compute.startswith('energy'):
-                routine = compute.split('_')[-1] if '_' in compute else 'cupy'
+            case _ if compute.startswith("energy"):
+                routine = compute.split("_")[-1] if "_" in compute else "cupy"
                 # compute_rbim_energy_eigV_all only walks already-cached
                 # modes (46425e1): materialize the full spectrum first.
                 lattice.compute_laplacian_spectrum_weigV(backend=routine)
                 lattice.compute_rbim_energy_eigV_all(backend=routine)
-            case _ if compute.startswith('eigV'):
-                routine = compute.split('_')[-1] if '_' in compute else 'cupy'
+            case _ if compute.startswith("eigV"):
+                routine = compute.split("_")[-1] if "_" in compute else "cupy"
                 lattice.compute_k_eigvV(k=howmany, backend=routine)
             case _:
                 raise ValueError(f"Unknown compute option '{compute}'.")
         if save:
-            with open(pname, 'wb') as f:
+            with open(pname, "wb") as f:
                 pk.dump(lattice, f)
     return lattice

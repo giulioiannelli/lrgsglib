@@ -5,8 +5,8 @@ This module provides the GraphOfGraphsNX class for creating generalized
 as base and fiber components.
 """
 
-from .GraphOfGraphsNX import GraphOfGraphsNX, GraphOfGraphs
 from ._policies import AnchorPolicy, get_anchor_index, resolve_anchor_indices
+from .GraphOfGraphsNX import GraphOfGraphs, GraphOfGraphsNX
 
 __all__ = [
     "GraphOfGraphsNX",

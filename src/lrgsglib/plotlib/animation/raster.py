@@ -9,6 +9,7 @@ the expensive 3D rendering is never repeated -- and the controls behave exactly
 like ``FuncAnimation.to_jshtml`` everywhere (classic Notebook, JupyterLab, VS
 Code), unlike a raw ``<script>`` player.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -38,20 +39,32 @@ def autocrop_frames(images, *, bg=(255, 255, 255), pad=4):
         b = ImageChops.difference(im.convert("RGB"), ref).getbbox()
         if b is None:
             continue
-        box = b if box is None else (
-            min(box[0], b[0]), min(box[1], b[1]),
-            max(box[2], b[2]), max(box[3], b[3]),
+        box = (
+            b
+            if box is None
+            else (
+                min(box[0], b[0]),
+                min(box[1], b[1]),
+                max(box[2], b[2]),
+                max(box[3], b[3]),
+            )
         )
     if box is None:
         return images
     w, h = images[0].size
     l, t, r, btm = box
-    crop = (max(0, l - pad), max(0, t - pad), min(w, r + pad), min(h, btm + pad))
+    crop = (
+        max(0, l - pad),
+        max(0, t - pad),
+        min(w, r + pad),
+        min(h, btm + pad),
+    )
     return [im.crop(crop) for im in images]
 
 
-def frames_to_player_html(images, *, fps=12, save=None, loop=0, disposal=2,
-                          optimize=True, crop=True):
+def frames_to_player_html(
+    images, *, fps=12, save=None, loop=0, disposal=2, optimize=True, crop=True
+):
     """Tight-crop the frames, optionally write a looping GIF, and return them as
     matplotlib's interactive JS player (play/pause, frame slider, loop) for
     inline display.
@@ -72,9 +85,9 @@ def frames_to_player_html(images, *, fps=12, save=None, loop=0, disposal=2,
     """
     import io
 
-    import numpy as np
-    import matplotlib.pyplot as plt
     import matplotlib.animation as manim
+    import matplotlib.pyplot as plt
+    import numpy as np
     from IPython.display import HTML
 
     images = autocrop_frames(images) if crop else list(images)
@@ -84,8 +97,13 @@ def frames_to_player_html(images, *, fps=12, save=None, loop=0, disposal=2,
     if save is not None:
         buf = io.BytesIO()
         images[0].save(
-            buf, format="gif", save_all=True, append_images=images[1:],
-            duration=max(1, round(1000 / fps)), loop=loop, disposal=disposal,
+            buf,
+            format="gif",
+            save_all=True,
+            append_images=images[1:],
+            duration=max(1, round(1000 / fps)),
+            loop=loop,
+            disposal=disposal,
             optimize=optimize,
         )
         path = Path(save)

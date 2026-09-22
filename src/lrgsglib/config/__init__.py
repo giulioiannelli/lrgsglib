@@ -1,9 +1,9 @@
+# Collect __all__ from submodules that define it, plus errwar exports
+import importlib as _importlib
+
 from .const import *
 from .errwar import *
 from .funcs import *
-
-# Collect __all__ from submodules that define it, plus errwar exports
-import importlib as _importlib
 
 _errwar_exports = [
     "Lattice2DError",
@@ -15,6 +15,7 @@ _errwar_exports = [
 
 # const has no __all__ but exports only UPPER_CASE constants (no leaked imports)
 from . import const as _const
+
 _const_exports = [n for n in dir(_const) if not n.startswith("_")]
 
 # funcs has __all__

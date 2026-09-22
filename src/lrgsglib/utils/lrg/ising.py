@@ -1,17 +1,20 @@
-import numpy as np
 #
 from pathlib import Path
-from typing import Sequence, Tuple, List, Optional
+from typing import List, Optional, Sequence, Tuple
+
+import numpy as np
+
 #
 from numpy.typing import NDArray
 
 try:
     import cupy as cp
+
     CUPY_AVAILABLE = True
 except ImportError:
     CUPY_AVAILABLE = False
 #
-from ..basic.linalg import compute_recon_ultra, compute_recon
+from ..basic.linalg import compute_recon, compute_recon_ultra
 
 __all__ = [
     "compose_product_ising_states",
@@ -28,7 +31,7 @@ __all__ = [
 
 
 def compose_product_ising_states(
-    states: Sequence[NDArray[np.int8]]
+    states: Sequence[NDArray[np.int8]],
 ) -> NDArray[np.int8]:
     """
     Compute the element-wise product of a sequence of Ising spin configurations.
@@ -70,9 +73,9 @@ def compose_product_ising_states(
 
     return result
 
+
 def compose_weighted_ising_state(
-    states: Sequence[NDArray[np.int8]],
-    weights: Sequence[float]
+    states: Sequence[NDArray[np.int8]], weights: Sequence[float]
 ) -> NDArray[np.int8]:
     """
     Compute a weighted sum of Ising states and project to ±1.
@@ -113,8 +116,9 @@ def compose_weighted_ising_state(
     sigma[sigma == 0] = 1
     return sigma
 
+
 def compose_xor_ising_state(
-    states: Sequence[NDArray[np.int8]]
+    states: Sequence[NDArray[np.int8]],
 ) -> NDArray[np.int8]:
     """
     Compute the bitwise XOR of a sequence of Ising spin configurations.
@@ -140,7 +144,7 @@ def compose_xor_ising_state(
     """
     if not states:
         raise ValueError("`states` must contain at least one array.")
-    
+
     base_shape = states[0].shape
     for idx, state in enumerate(states):
         if state.shape != base_shape:
@@ -158,10 +162,11 @@ def compose_xor_ising_state(
 
     return result
 
+
 def compute_ising_pairwise_energy(
     spins: NDArray[np.int8],
     edges: Sequence[Tuple[int, int, float]],
-    use_gpu: bool = False
+    use_gpu: bool = False,
 ) -> float:
     """
     Compute the negative weighted sum of pairwise energy for an Ising spin configuration.
@@ -176,7 +181,7 @@ def compute_ising_pairwise_energy(
     edges : Sequence[Tuple[int, int, float]] or Sequence[Tuple[int, int]]
         Sequence of edges, where each edge is either a 2-tuple (node_index_u, node_index_v)
         or a 3-tuple (node_index_u, node_index_v, weight). If 2-tuples are provided,
-        or if weight is None in 3-tuples, weights default to 1.0. `node_index_u` and 
+        or if weight is None in 3-tuples, weights default to 1.0. `node_index_u` and
         `node_index_v` must be valid indices into `spins`; `weight` is a float or None.
     use_gpu : bool, default False
         If True, use CuPy for GPU acceleration. Requires CuPy to be installed.
@@ -195,9 +200,11 @@ def compute_ising_pairwise_energy(
     """
     if spins.ndim != 1:
         raise ValueError(f"`spins` must be a 1D array, got shape {spins.shape}")
-    
+
     if use_gpu and not CUPY_AVAILABLE:
-        raise ValueError("CuPy is not available. Install CuPy or set use_gpu=False.")
+        raise ValueError(
+            "CuPy is not available. Install CuPy or set use_gpu=False."
+        )
 
     # Choose the appropriate library
     xp = cp if use_gpu else np
@@ -213,7 +220,9 @@ def compute_ising_pairwise_energy(
             ui, vi = zip(*edges)
             w = [1.0] * len(edges)  # Default weights to 1.0
         else:
-            raise ValueError("Each edge must be a 2-tuple (u, v) or 3-tuple (u, v, weight)")
+            raise ValueError(
+                "Each edge must be a 2-tuple (u, v) or 3-tuple (u, v, weight)"
+            )
     else:
         ui, vi, w = [], [], []
 
@@ -221,7 +230,7 @@ def compute_ising_pairwise_energy(
     ui_arr = xp.array(ui, dtype=int)
     vi_arr = xp.array(vi, dtype=int)
     w_arr = xp.array(w, dtype=float)
-    
+
     # Convert spins to GPU if using CuPy
     spins_xp = xp.asarray(spins) if use_gpu else spins
 
@@ -233,16 +242,19 @@ def compute_ising_pairwise_energy(
 
     # Compute energy
     energy = -xp.sum(w_arr * spins_xp[ui_arr] * spins_xp[vi_arr])
-    
+
     # Convert back to CPU if using GPU
     if use_gpu:
         energy = float(cp.asnumpy(energy))
     else:
         energy = float(energy)
-    
+
     return energy
 
-def spin_overlap(S1: np.ndarray, S2: np.ndarray, max_overlap: bool = True) -> float:
+
+def spin_overlap(
+    S1: np.ndarray, S2: np.ndarray, max_overlap: bool = True
+) -> float:
     """
     Compute the maximum overlap between two spin configurations.
 
@@ -279,8 +291,12 @@ def spin_overlap(S1: np.ndarray, S2: np.ndarray, max_overlap: bool = True) -> fl
         return max(direct_overlap, flipped_overlap)
     else:
         return direct_overlap
+
+
 #
-def spin_matching_fraction(S1: np.ndarray, S2: np.ndarray, *, z2: bool = True) -> float:
+def spin_matching_fraction(
+    S1: np.ndarray, S2: np.ndarray, *, z2: bool = True
+) -> float:
     """
     Fraction of matching spins between two ±1 configurations.
 
@@ -302,6 +318,8 @@ def spin_matching_fraction(S1: np.ndarray, S2: np.ndarray, *, z2: bool = True) -
         opposite = np.sum(S1 == -S2)
         same = max(same, opposite)
     return same / S1.size
+
+
 #
 def spin_matching_fraction_fromovp(
     S1: np.ndarray, S2: np.ndarray, *, max_overlap: bool = True
@@ -326,8 +344,12 @@ def spin_matching_fraction_fromovp(
     """
     q = spin_overlap(S1, S2, max_overlap=max_overlap)
     return (q + 1.0) / 2.0
+
+
 #
-def compute_spin_overlap_series(spin_vector: np.ndarray, basis: np.ndarray) -> np.ndarray:
+def compute_spin_overlap_series(
+    spin_vector: np.ndarray, basis: np.ndarray
+) -> np.ndarray:
     """
     Compute spin overlap between reconstructed and original states.
 
@@ -343,15 +365,19 @@ def compute_spin_overlap_series(spin_vector: np.ndarray, basis: np.ndarray) -> n
     np.ndarray
         Spin overlap series as a function of basis size.
     """
-    return np.array([
-        spin_overlap(np.sign(compute_recon(spin_vector, basis[:i + 1])), spin_vector)
-        for i in range(len(basis)-1)
-    ])
+    return np.array(
+        [
+            spin_overlap(
+                np.sign(compute_recon(spin_vector, basis[: i + 1])), spin_vector
+            )
+            for i in range(len(basis) - 1)
+        ]
+    )
 
-def compute_spin_match_series(spin_vector: np.ndarray,
-                              basis: np.ndarray,
-                              *,
-                              z2: bool = True) -> np.ndarray:
+
+def compute_spin_match_series(
+    spin_vector: np.ndarray, basis: np.ndarray, *, z2: bool = True
+) -> np.ndarray:
     """
     Series of matching fractions between reconstructed and original states.
 
@@ -370,14 +396,13 @@ def compute_spin_match_series(spin_vector: np.ndarray,
         Matching fraction for each truncation of the basis.
     """
     recon = compute_recon_ultra(spin_vector, basis)
-    return np.array([
-        spin_matching_fraction(
-            np.sign(recon[i]),
-            spin_vector,
-            z2=z2
-        )
-        for i in range(len(basis) - 1)
-    ])
+    return np.array(
+        [
+            spin_matching_fraction(np.sign(recon[i]), spin_vector, z2=z2)
+            for i in range(len(basis) - 1)
+        ]
+    )
+
 
 def ising_spinglass_pmJ_2D_Tcrit(L):
     return L ** (-1.0 / 2)

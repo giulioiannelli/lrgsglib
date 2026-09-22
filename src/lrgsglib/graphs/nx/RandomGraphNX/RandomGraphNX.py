@@ -14,13 +14,13 @@ Example
 # Returns number of nodes in giant component
 """
 
+import random
 from abc import abstractmethod
 from typing import Any, Optional, Sequence
-import random
 
 import networkx as nx
 
-from ....config.const import SG_GRAPHINT_REPR, COUNT_XERR_PATTERNS
+from ....config.const import COUNT_XERR_PATTERNS, SG_GRAPHINT_REPR
 from ..SignedGraphNX.SignedGraphNX import SignedGraphNX
 
 
@@ -187,13 +187,12 @@ class RandomNwContainerBase(dict):
         }
 
         # Initialize common patterns
-        self['rand'] = {g: list(self.sg.fleset[g]) for g in self.rd}
-        self['randXERR'] = {
-            g: self._get_rand_xerr_pattern(g)
-            for g in self.rd
-        }
+        self["rand"] = {g: list(self.sg.fleset[g]) for g in self.rd}
+        self["randXERR"] = {g: self._get_rand_xerr_pattern(g) for g in self.rd}
 
-    def get_links_XERR(self, node: Any, on_g: str = SG_GRAPHINT_REPR) -> list[tuple]:
+    def get_links_XERR(
+        self, node: Any, on_g: str = SG_GRAPHINT_REPR
+    ) -> list[tuple]:
         """
         Get star pattern: all edges incident to a node.
 
@@ -215,7 +214,8 @@ class RandomNwContainerBase(dict):
         """Get random XERR pattern avoiding fully negative neighborhoods."""
         if COUNT_XERR_PATTERNS:
             return [
-                k for i in self.rNodeFlip[on_g]
+                k
+                for i in self.rNodeFlip[on_g]
                 for k in self.get_links_XERR(i, on_g)
             ]
 
@@ -226,7 +226,7 @@ class RandomNwContainerBase(dict):
 
         while idx < len(tmplst):
             leval = [
-                all(nnn['weight'] == -1 for nnn in grph[nn].values())
+                all(nnn["weight"] == -1 for nnn in grph[nn].values())
                 for nn in grph.neighbors(tmplst[idx])
             ]
             if any(leval):

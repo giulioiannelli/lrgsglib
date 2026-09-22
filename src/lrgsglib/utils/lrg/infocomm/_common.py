@@ -3,7 +3,9 @@
 from numpy.typing import NDArray
 
 
-def _normalize_entropy_profile(entropy_profile: NDArray, entropy_norm: str) -> NDArray:
+def _normalize_entropy_profile(
+    entropy_profile: NDArray, entropy_norm: str
+) -> NDArray:
     """Normalize entropy profile according to specified mode.
 
     Parameters

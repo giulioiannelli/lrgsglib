@@ -125,7 +125,9 @@ def compute_entropy_observables_expm_multiply(
 
     N = L.shape[0]
     if N != num_nodes:
-        raise ValueError(f"L shape {L.shape} incompatible with num_nodes={num_nodes}")
+        raise ValueError(
+            f"L shape {L.shape} incompatible with num_nodes={num_nodes}"
+        )
 
     # Generate Rademacher probes (±1 random vectors)
     rng = np.random.default_rng(seed)
@@ -170,7 +172,9 @@ def compute_entropy_observables_expm_multiply(
 
         # Sanity check
         if not np.isfinite(trK) or trK <= 0:
-            logger.warning("Invalid partition function Z(tau=%.2e) = %.2e", tau, trK)
+            logger.warning(
+                "Invalid partition function Z(tau=%.2e) = %.2e", tau, trK
+            )
             entropy_profile[idx] = np.nan
             continue
 
@@ -180,7 +184,9 @@ def compute_entropy_observables_expm_multiply(
     # Normalize entropy
     log_N = np.log(typf(num_nodes)) if num_nodes > 0 else typf(1)
     entropy_profile = entropy_profile / log_N
-    normalized_entropy = _normalize_entropy_profile(entropy_profile, entropy_norm)
+    normalized_entropy = _normalize_entropy_profile(
+        entropy_profile, entropy_norm
+    )
 
     # Compute specific heat (entropy derivative with respect to log τ)
     specific_heat = np.gradient(normalized_entropy, np.log(time_grid))

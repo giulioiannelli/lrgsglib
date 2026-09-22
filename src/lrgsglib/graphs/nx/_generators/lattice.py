@@ -30,11 +30,11 @@ from networkx import Graph, grid_2d_graph
 
 # Import 2D generators from existing module
 from ..Lattice2D.generators_2d import (
-    triangular_lattice_graph_FastPatch,
     hexagonal_lattice_graph_FastPatch,
+    rhomb_octagonal_graph_FastPatch,
     squared_lattice_graph_FastPatch,
     squared_lattice_SW_graph_FastPatch,
-    rhomb_octagonal_graph_FastPatch,
+    triangular_lattice_graph_FastPatch,
 )
 
 # Import 3D generators from existing module
@@ -69,6 +69,7 @@ __all__ = [
 # 2D Lattice Generators (clean interface)
 # =============================================================================
 
+
 def squared_lattice_graph(
     m: int,
     n: int,
@@ -100,7 +101,9 @@ def squared_lattice_graph(
     >>> G.number_of_nodes()
     25
     """
-    return squared_lattice_graph_FastPatch(m, n, periodic=periodic, with_positions=with_positions)
+    return squared_lattice_graph_FastPatch(
+        m, n, periodic=periodic, with_positions=with_positions
+    )
 
 
 def triangular_lattice_graph(
@@ -128,7 +131,9 @@ def triangular_lattice_graph(
     Graph
         A NetworkX graph representing the triangular lattice.
     """
-    return triangular_lattice_graph_FastPatch(m, n, periodic=periodic, with_positions=with_positions)
+    return triangular_lattice_graph_FastPatch(
+        m, n, periodic=periodic, with_positions=with_positions
+    )
 
 
 def hexagonal_lattice_graph(
@@ -156,7 +161,9 @@ def hexagonal_lattice_graph(
     Graph
         A NetworkX graph representing the hexagonal lattice.
     """
-    return hexagonal_lattice_graph_FastPatch(m, n, periodic=periodic, with_positions=with_positions)
+    return hexagonal_lattice_graph_FastPatch(
+        m, n, periodic=periodic, with_positions=with_positions
+    )
 
 
 def squared_lattice_SW_graph(
@@ -187,7 +194,9 @@ def squared_lattice_SW_graph(
     Graph
         A NetworkX graph representing the small-world square lattice.
     """
-    return squared_lattice_SW_graph_FastPatch(m, n, p=p, periodic=periodic, with_positions=with_positions)
+    return squared_lattice_SW_graph_FastPatch(
+        m, n, p=p, periodic=periodic, with_positions=with_positions
+    )
 
 
 def rhomb_octagonal_graph(
@@ -215,12 +224,15 @@ def rhomb_octagonal_graph(
     Graph
         A NetworkX graph representing the rhomb-octagonal lattice.
     """
-    return rhomb_octagonal_graph_FastPatch(m, n, periodic=periodic, with_positions=with_positions)
+    return rhomb_octagonal_graph_FastPatch(
+        m, n, periodic=periodic, with_positions=with_positions
+    )
 
 
 # =============================================================================
 # 3D Lattice Generators (clean interface)
 # =============================================================================
+
 
 def simple_cubic_lattice(
     dim: tuple[int, int, int],
@@ -247,12 +259,17 @@ def simple_cubic_lattice(
     >>> G.number_of_nodes()
     27
     """
-    return grid_2d_graph(*dim[:2]) if len(dim) == 2 else _simple_cubic_impl(dim, periodic)
+    return (
+        grid_2d_graph(*dim[:2])
+        if len(dim) == 2
+        else _simple_cubic_impl(dim, periodic)
+    )
 
 
 def _simple_cubic_impl(dim: tuple[int, int, int], periodic: bool) -> Graph:
     """Internal implementation for simple cubic lattice."""
     from networkx import grid_graph
+
     if periodic:
         return grid_graph(dim=dim, periodic=True)
     return grid_graph(dim=dim, periodic=False)

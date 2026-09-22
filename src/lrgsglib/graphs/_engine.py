@@ -49,7 +49,9 @@ _default_engine: GraphEngine = GraphEngine.NETWORKX
 
 # Registry: graph_type -> {engine -> implementation_class_or_factory}
 # Values can be either a class or a callable that returns the class (lazy import)
-_implementations: dict[str, dict[GraphEngine, Union[Type, Callable[[], Type]]]] = {}
+_implementations: dict[
+    str, dict[GraphEngine, Union[Type, Callable[[], Type]]]
+] = {}
 
 # Cache for resolved lazy imports
 _resolved_implementations: dict[str, dict[GraphEngine, Type]] = {}

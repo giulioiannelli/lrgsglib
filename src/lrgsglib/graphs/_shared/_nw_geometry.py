@@ -24,6 +24,7 @@ Design notes
   nodes at *exactly* ``R`` hops (not the closed ball), which is what the NX
   ``get_links_rball`` consumes.
 """
+
 from __future__ import annotations
 
 import math
@@ -183,8 +184,12 @@ def _explore_for_cycles(sg, node: Any, on_g: str):
                         if L is None or cl < L:
                             L = cl
                     preds[w].append(u)
-                elif dist[w] == du and au is not None and arm[w] is not None \
-                        and arm[w] != au:
+                elif (
+                    dist[w] == du
+                    and au is not None
+                    and arm[w] is not None
+                    and arm[w] != au
+                ):
                     # same-layer chord between distinct arms → odd cycle 2*du+1.
                     cl = 2 * du + 1
                     if L is None or cl < L:

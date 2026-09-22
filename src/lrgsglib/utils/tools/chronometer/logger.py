@@ -9,7 +9,9 @@ logger.propagate = False  # ← do not pass messages up to root
 handler = logging.StreamHandler()
 handler.setLevel(logging.INFO)
 handler.setFormatter(
-    logging.Formatter("%(asctime)s %(name)s [%(levelname)s] %(message)s",
-                      datefmt="%Y-%m-%d %H:%M:%S")
+    logging.Formatter(
+        "%(asctime)s %(name)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 )
 logger.addHandler(handler)

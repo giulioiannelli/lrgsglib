@@ -1,7 +1,9 @@
 """Order parameters — gap from shared, compute_pinf NX-specific."""
 
+from typing import TYPE_CHECKING, Optional
+
 import numpy as np
-from typing import Optional, TYPE_CHECKING
+
 from ....config.const import SG_REPR
 
 # Gap methods from shared engine-agnostic location

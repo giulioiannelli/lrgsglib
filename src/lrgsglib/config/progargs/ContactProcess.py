@@ -1,85 +1,84 @@
 import argparse
 
 from .common import *
-from .Lattice2D import *
-
-from .phelp.ContactProcess import *
 from .defs.ContactProcess import *
+from .Lattice2D import *
+from .phelp.ContactProcess import *
 
 Contact_args = {
-    tuple(['-dy', '--dynamics']): {
-        'help': phelp_dynamics,
-        'type': str,
-        'choices': ["EI", "SIR"],
-        'default': DEFAULT_DYNAMICS,
+    tuple(["-dy", "--dynamics"]): {
+        "help": phelp_dynamics,
+        "type": str,
+        "choices": ["EI", "SIR"],
+        "default": DEFAULT_DYNAMICS,
     },
 }
 
 Contact_opt_args = {
-    tuple(['-mu', '--mu']): {
-        'help': phelp_mu,
-        'type': float,
-        'default': DEFAULT_MU,
+    tuple(["-mu", "--mu"]): {
+        "help": phelp_mu,
+        "type": float,
+        "default": DEFAULT_MU,
     },
-    tuple(['-ga', '--gamma']): {
-        'help': phelp_gamma,
-        'type': float,
-        'default': DEFAULT_GAMMA,
+    tuple(["-ga", "--gamma"]): {
+        "help": phelp_gamma,
+        "type": float,
+        "default": DEFAULT_GAMMA,
     },
-    tuple(['-ac', '--activation']): {
-        'help': phelp_activation,
-        'type': str,
-        'default': DEFAULT_ACTIVATION,
+    tuple(["-ac", "--activation"]): {
+        "help": phelp_activation,
+        "type": str,
+        "default": DEFAULT_ACTIVATION,
     },
-    tuple(['-st', '--state_type']): {
-        'help': phelp_state_type,
-        'type': str,
-        'default': DEFAULT_STATE_TYPE,
+    tuple(["-st", "--state_type"]): {
+        "help": phelp_state_type,
+        "type": str,
+        "default": DEFAULT_STATE_TYPE,
     },
-    tuple(['-ns', '--num_log_samples']): {
-        'help': phelp_num_log_samples,
-        'type': int,
-        'default': DEFAULT_NUM_LOG_SAMPLES,
+    tuple(["-ns", "--num_log_samples"]): {
+        "help": phelp_num_log_samples,
+        "type": int,
+        "default": DEFAULT_NUM_LOG_SAMPLES,
     },
-    tuple(['-sf', '--save_frequency']): {
-        'help': phelp_save_frequency,
-        'type': int,
-        'default': DEFAULT_SAVE_FREQUENCY,
+    tuple(["-sf", "--save_frequency"]): {
+        "help": phelp_save_frequency,
+        "type": int,
+        "default": DEFAULT_SAVE_FREQUENCY,
     },
-    tuple(['--steps', '-stp']): {
-        'help': phelp_steps,
-        'type': int,
-        'default': DEFAULT_STEPS,
+    tuple(["--steps", "-stp"]): {
+        "help": phelp_steps,
+        "type": int,
+        "default": DEFAULT_STEPS,
     },
-    tuple(['--simref', '-sp']): {
-        'help': phelp_simref,
-        'type': float,
-        'default': DEFAULT_SIMREF,
+    tuple(["--simref", "-sp"]): {
+        "help": phelp_simref,
+        "type": float,
+        "default": DEFAULT_SIMREF,
     },
-    tuple(['-ic', '--init_cond']): {
-        'help': phelp_ic_contact,
-        'type': str,
-        'default': DEFAULT_INIT_COND,
+    tuple(["-ic", "--init_cond"]): {
+        "help": phelp_ic_contact,
+        "type": str,
+        "default": DEFAULT_INIT_COND,
     },
-    tuple(['-rl', '--runlang']): {
-        'help': phelp_runlang_contact,
-        'type': str,
-        'default': DEFAULT_RUNLANG,
+    tuple(["-rl", "--runlang"]): {
+        "help": phelp_runlang_contact,
+        "type": str,
+        "default": DEFAULT_RUNLANG,
     },
-    tuple(['-os', '--out_suffix']): {
-        'help': phelp_outsuffix_contact,
-        'type': str,
-        'default': DEFAULT_OUTSFFX,
+    tuple(["-os", "--out_suffix"]): {
+        "help": phelp_outsuffix_contact,
+        "type": str,
+        "default": DEFAULT_OUTSFFX,
     },
-    tuple(['-rnds', '--randstr']): {
-        'help': phelp_randstr_contact,
-        'action': argparse.BooleanOptionalAction,
-        'default': DEFAULT_randstr,
+    tuple(["-rnds", "--randstr"]): {
+        "help": phelp_randstr_contact,
+        "action": argparse.BooleanOptionalAction,
+        "default": DEFAULT_randstr,
     },
-    tuple(['-esdt', '--early_stop_density_threshold']): {
-        'help': 'Early stopping density threshold. If the average of the last M timesteps (M=10%% of time series length) exceeds this value after 20 runs, stop the simulation.',
-        'type': float,
-        'default': None,
+    tuple(["-esdt", "--early_stop_density_threshold"]): {
+        "help": "Early stopping density threshold. If the average of the last M timesteps (M=10%% of time series length) exceeds this value after 20 runs, stop the simulation.",
+        "type": float,
+        "default": None,
     },
 }
 
@@ -94,9 +93,7 @@ L2D_CPROC_args = {**L2D_args, **Contact_args}
 L2D_CPROC_opt_args = {**L2D_opt_args, **Contact_opt_args}
 L2D_CPROC_action_args = {**action_args_dict}
 
-L2D_ContactProcess_srun_description = (
-    f"Serializer for {L2D_CPROC_progname}.py"
-)
+L2D_ContactProcess_srun_description = f"Serializer for {L2D_CPROC_progname}.py"
 
 L2D_ContactProcess_srun_optional_args_dict = {
     tuple(["-m", "--mode"]): {

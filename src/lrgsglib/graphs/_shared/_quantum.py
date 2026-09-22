@@ -1,6 +1,7 @@
 """Engine-agnostic quantum propagator mixin functions."""
 
 from typing import Union
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -74,9 +75,15 @@ def quantum_observables_time_series(
             "Eigendecomposition required. "
             "Call compute_laplacian_spectrum_weigV() first."
         )
-    from ...utils.lrg.quantum import compute_quantum_observables_from_eigenvalues
+    from ...utils.lrg.quantum import (
+        compute_quantum_observables_from_eigenvalues,
+    )
 
     return compute_quantum_observables_from_eigenvalues(
-        self.eigv, _eigV_column_major(self), self.N,
-        t_array, init_type, init_node
+        self.eigv,
+        _eigV_column_major(self),
+        self.N,
+        t_array,
+        init_type,
+        init_node,
     )

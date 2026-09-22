@@ -3,9 +3,9 @@ import warnings
 from networkx import Graph
 
 from .config import *
-from .utils import *
 from .graphs.nx import *
 from .statsys import *
+from .utils import *
 
 __all__ = [
     "SignedLaplacianAnalysis",
@@ -23,6 +23,7 @@ class SignedLaplacianAnalysis:
         - Spectral analysis: ``get_graph_lspectrum()`` + ``compute_entropy_observables_from_eigenvalues()``
         - Animation: ``lrgsglib.plotlib.animation.make_animation_fromFrames()``
     """
+
     Sm1 = None
     VarL = None
     Cspe = None
@@ -33,6 +34,7 @@ class SignedLaplacianAnalysis:
     eigv = None
     ACCERR_LAPL_DYN = 1e-10
     MAXVAL_LAPL_DYN = 200
+
     #
     def __init__(
         self,
@@ -45,7 +47,7 @@ class SignedLaplacianAnalysis:
         initCond: str = "gauss_1",
         t_steps=10,
         no_obs=1,
-        initspect: bool = True
+        initspect: bool = True,
     ) -> None:
         warnings.warn(
             "SignedLaplacianAnalysis is deprecated and will be removed in "
@@ -61,7 +63,7 @@ class SignedLaplacianAnalysis:
         self.taulex = taulex
         self.tauhex = tauhex
         self.tTsS = np.logspace(self.taulex, self.tauhex, self.taustep)
-        self.tTsC = .5 * (self.tTsS[1:] + self.tTsS[:-1])
+        self.tTsC = 0.5 * (self.tTsS[1:] + self.tTsS[:-1])
         self.maxThresh = maxThresh
         self.initCond = initCond
         #
@@ -69,12 +71,14 @@ class SignedLaplacianAnalysis:
         self.no_obs = no_obs
         if not hasattr(self.sg, "eigv") and self.initspect:
             self.__initSpectrum__()
+
     #
     def __initSpectrum__(self):
         self.sg.compute_k_eigvV(backend="numpy")
+
     #
     def computeS(self) -> None:
-        w =  self.sg.eigv
+        w = self.sg.eigv
         S = np.zeros(len(self.tTsS))
         VarL = np.zeros(len(self.tTsS))
         for i, tau in enumerate(self.tTsS):
@@ -87,11 +91,12 @@ class SignedLaplacianAnalysis:
             VarL[i] = av2rho - avgrho**2
         self.Sm1 = 1 - S
         self.VarL = VarL
+
     #
     def computeC(self) -> None:
         if self.Sm1 is None:
             self.computeS()
-        self.Cspe = np.log( self.sg.N) * dv(self.Sm1, np.log(self.tTsS))
+        self.Cspe = np.log(self.sg.N) * dv(self.Sm1, np.log(self.tTsS))
 
     #
     def compute_taumax_array(self, filter_gauss1d: int = 3) -> None:
@@ -99,7 +104,7 @@ class SignedLaplacianAnalysis:
             self.computeC()
         if filter_gauss1d:
             # if you dont do this sometimes the function is not enough sensible to detect the maxima
-            Cspe = gaussian_filter1d(self.Cspe, sigma=filter_gauss1d) 
+            Cspe = gaussian_filter1d(self.Cspe, sigma=filter_gauss1d)
         else:
             Cspe = self.Cspe
         maxIdx = argrelextrema(Cspe, np.greater)[0]
@@ -116,7 +121,7 @@ class SignedLaplacianAnalysis:
         window_shift_y=0,
         win_val=1,
     ):
-        N =  self.sg.N
+        N = self.sg.N
         #
         self.Deltat = 1.0 / self.t_steps
         self.simulationTime = N * t_stepsMultiplier
@@ -129,7 +134,7 @@ class SignedLaplacianAnalysis:
         if self.initCond.startswith("ground_state"):
             self.eigenModeInit = int(self.initCond.split("_")[-1])
             self.sg.compute_k_eigvV(k=self.eigenModeInit + 1)
-            self.field =  self.sg.eigV.T[self.eigenModeInit]
+            self.field = self.sg.eigV.T[self.eigenModeInit]
         elif self.initCond == "uniform_1":
             self.field = np.random.uniform(-1, 1, N)
         elif self.initCond == "delta_1":
@@ -141,7 +146,7 @@ class SignedLaplacianAnalysis:
             self.initVal = float(self.initCond.split("_")[-1])
             self.field = self.initVal * np.ones(N)
         elif self.initCond.startswith("window"):
-            s22 =  self.sg.side2 // 2
+            s22 = self.sg.side2 // 2
             wndwS = s22 - 1 if window_size > (s22 - 1) else window_size
             hS, hE = s22 - wndwS - 1, s22 + wndwS + 1
             initStatus = np.zeros(N)
@@ -150,7 +155,7 @@ class SignedLaplacianAnalysis:
                 self.nsquares = int(self.initCond.split("_")[-1])
                 wndwSa = np.array([wndwS, -wndwS])
                 sqTmp = np.random.randint(
-                    wndwS,  self.sg.side1 - wndwS, size=(self.nsquares, 2)
+                    wndwS, self.sg.side1 - wndwS, size=(self.nsquares, 2)
                 )
                 result = np.column_stack((sqTmp, sqTmp + wndwS))
                 result[:, [1, 2]] = result[:, [2, 1]]
@@ -159,10 +164,7 @@ class SignedLaplacianAnalysis:
                     [
                         np.concatenate(
                             [
-                                [
-                                    j + i *  self.sg.side1
-                                    for j in range(*iSq[0])
-                                ]
+                                [j + i * self.sg.side1 for j in range(*iSq[0])]
                                 for i in range(*iSq[1])
                             ]
                         )
@@ -180,7 +182,7 @@ class SignedLaplacianAnalysis:
                 shiftsY = [hS + window_shift_y, hE + window_shift_y]
                 sqIdx = np.concatenate(
                     [
-                        [j + i *  self.sg.side1 for j in range(*shiftsX)]
+                        [j + i * self.sg.side1 for j in range(*shiftsX)]
                         for i in range(*shiftsY)
                     ]
                 )
@@ -202,7 +204,7 @@ class SignedLaplacianAnalysis:
                     print("Error, no mode for init laplacian dynamic chosen.")
             self.field = initStatus
         #
-        if  self.sg.pbc is False:
+        if self.sg.pbc is False:
             L = int(np.sqrt(N))
             self.fixed_border_idxs = np.array(
                 sorted(
@@ -212,7 +214,7 @@ class SignedLaplacianAnalysis:
                     + [(i + 1) * L - 1 for i in range(1, L - 1)]
                 )
             )
-            self.field[self.fixed_border_idxs] =  self.sg.fbc_val
+            self.field[self.fixed_border_idxs] = self.sg.fbc_val
 
     #
     def run_laplacian_dynamics(self, rescaled=False, saveFrames=False):
@@ -223,38 +225,46 @@ class SignedLaplacianAnalysis:
         except AttributeError:
             self.laplacian_dynamics_init()
             x = self.field
+
         #
         def stop_conditions_lapdyn(self, x_tm1, xx):
-            ERRTOL = self.ACCERR_LAPL_DYN * np.ones( self.sg.N)
+            ERRTOL = self.ACCERR_LAPL_DYN * np.ones(self.sg.N)
             C1 = (np.abs(x_tm1 / x_tm1.max() - xx / xx.max()) < ERRTOL).all()
             C2 = np.abs(np.log10(np.max(np.abs(xx)))) > self.MAXVAL_LAPL_DYN
             return C1, C2
+
         #
         if rescaled:
             if rescaled == "dynamic":
-                lap = (
-                    lambda t: np.exp(- self.sg.eigv[0] * t) *  self.sg.slp
-                )
+                lap = lambda t: np.exp(-self.sg.eigv[0] * t) * self.sg.slp
             else:
                 self.sg.make_rescaled_signed_laplacian(rescaled)
-                lap = lambda _:  self.sg.resLp
+                lap = lambda _: self.sg.resLp
         else:
-            lap = lambda _:  self.sg.slp
+            lap = lambda _: self.sg.slp
         #
         if not self.sg.pbc:
+
             def set_bc():
                 x[self.fixed_border_idxs] = self.sg.fbc_val
+
         else:
+
             def set_bc():
                 pass
+
         #
         if saveFrames:
+
             def save_frames(self, x, t):
                 if t in self.sampling:
                     self.frames_dynsys.append(x)
+
         else:
+
             def save_frames(*_):
                 pass
+
         #
         print("Beginning Laplacian dynamics.")
         #
@@ -274,7 +284,7 @@ class SignedLaplacianAnalysis:
 
     #
     def rescaled_field_regularization(self):
-        status = self.field.reshape( self.sg.side1,  self.sg.side2)
+        status = self.field.reshape(self.sg.side1, self.sg.side2)
         restatus = np.log10(np.max(status) - status)
         nnans = restatus[(restatus != np.inf) & (restatus != -np.inf)]
         self.restatus = np.nan_to_num(
@@ -284,6 +294,7 @@ class SignedLaplacianAnalysis:
     #
     def make_animation_fromFrames(self, savename="output", fps=10, dpi=200):
         import matplotlib.animation as animation
+
         no_frames = len(self.frames_dynsys)
         print("# of frames: ", no_frames)
         #
@@ -598,14 +609,6 @@ class SignedLaplacianAnalysis:
 #     return lsp
 
 
-
-
-
-
-
-
-
-
 # def entropy(G, steps=600, is_signed=False, wTresh=1e-15, t1=-2, t2=5):
 #     N = G.number_of_nodes()
 
@@ -697,11 +700,6 @@ class SignedLaplacianAnalysis:
 #     return I_i
 
 
-
-
-
-
-
 #
 def flip_random_fract_edges(G: Graph, p: float):
     """Flips a fraction p of edges (+1 to -1) of a graph G.
@@ -728,4 +726,3 @@ def flip_random_fract_edges(G: Graph, p: float):
     #
     nx.set_edge_attributes(G, values=1, name="weight")
     nx.set_edge_attributes(G, values=neg_weights, name="weight")
-

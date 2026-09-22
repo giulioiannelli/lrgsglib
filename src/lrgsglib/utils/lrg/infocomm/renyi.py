@@ -88,12 +88,16 @@ def compute_renyi_observables_from_eigenvalues(
     if q <= 0:
         raise ValueError("q must be strictly positive.")
     if steps < 2:
-        raise ValueError("steps must be at least 2 to build the entropy profile.")
+        raise ValueError(
+            "steps must be at least 2 to build the entropy profile."
+        )
     if not (0 < tail_fraction <= 1):
         raise ValueError("tail_fraction must be in the interval (0, 1].")
 
     eigvals = np.asarray(eigenvalues, dtype=typf)
-    eps = threshold if threshold is not None else dtype_numerical_precision(typf)
+    eps = (
+        threshold if threshold is not None else dtype_numerical_precision(typf)
+    )
     eigvals = np.where(np.abs(eigvals) > eps, eigvals, typf(0))
     log_N = np.log(typf(num_nodes)) if num_nodes > 1 else typf(1)
 

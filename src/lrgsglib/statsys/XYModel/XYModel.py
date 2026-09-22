@@ -18,13 +18,13 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
+from ...utils.tools.chronometer import time_function_accumulate
 from .._c_backend import CBackendMixin
 from .._csr import build_graph_csr
 from .._solver import SolverBackend
 from .._solver_engine import get_solver
 from ..VecDynSys import VecDynSys
 from .defaults import XY_SOLVER_NAME
-from ...utils.tools.chronometer import time_function_accumulate
 
 if TYPE_CHECKING:
     from ...graphs.nx import SignedGraphNX as SignedGraph
@@ -74,7 +74,7 @@ class XYModel(CBackendMixin, VecDynSys):
         save_observables: bool = False,
         **kw: Any,
     ) -> None:
-        dynpath = getattr(sg, 'path_data', None)
+        dynpath = getattr(sg, "path_data", None)
         if dynpath is not None:
             dynpath = Path(dynpath) / "xy"
         super().__init__(
@@ -125,15 +125,21 @@ class XYModel(CBackendMixin, VecDynSys):
         """Single-node Metropolis update for XY model."""
         A = self._get_adj_matrix()
         current = self.s[nd]
-        proposal = (current + np.random.uniform(-self.delta, self.delta)) % (2.0 * np.pi)
+        proposal = (current + np.random.uniform(-self.delta, self.delta)) % (
+            2.0 * np.pi
+        )
 
         # Energy change
         dE = 0.0
         for j in range(self.N):
             if A[nd, j] != 0:
-                dE += A[nd, j] * (np.cos(current - self.s[j]) - np.cos(proposal - self.s[j]))
+                dE += A[nd, j] * (
+                    np.cos(current - self.s[j]) - np.cos(proposal - self.s[j])
+                )
 
-        if dE <= 0 or (self.T > 0 and np.random.uniform() < np.exp(-dE / self.T)):
+        if dE <= 0 or (
+            self.T > 0 and np.random.uniform() < np.exp(-dE / self.T)
+        ):
             self.s[nd] = proposal
 
     # ------------------------------------------------------------------
@@ -184,9 +190,14 @@ class XYModel(CBackendMixin, VecDynSys):
         ni, nw, nptr = build_graph_csr(self.sg, self.N)
         theta0 = np.ascontiguousarray(self.s, dtype=np.float64)
         theta, ene, magn = _xy_native.xy_sampling(
-            theta0, ni, nw, nptr,
-            float(self.T), float(self.delta),
-            int(self.steps), int(self.seed),
+            theta0,
+            ni,
+            nw,
+            nptr,
+            float(self.T),
+            float(self.delta),
+            int(self.steps),
+            int(self.seed),
             bool(self.save_observables),
         )
         self.s = theta
@@ -213,7 +224,7 @@ class XYModel(CBackendMixin, VecDynSys):
         ]
 
     def _get_cleanup_paths(self) -> list[Path | None]:
-        return [getattr(self, 'sfout', None)]
+        return [getattr(self, "sfout", None)]
 
     @time_function_accumulate(auto_log=False)
     def run(

@@ -69,7 +69,9 @@ class LogConfig:
             config.default_level = level_map[level_str]
 
         # Log directory from environment (prefer LRGSG_LOG if set)
-        log_dir = os.environ.get("LRGSGLIB_LOG_DIR") or os.environ.get("LRGSG_LOG")
+        log_dir = os.environ.get("LRGSGLIB_LOG_DIR") or os.environ.get(
+            "LRGSG_LOG"
+        )
         if log_dir:
             config.log_dir = Path(log_dir)
 
@@ -173,6 +175,7 @@ def enable_logging(
     # Generate session ID if not provided
     if session_id is None:
         from datetime import datetime
+
         session_id = f"default_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     # Get root logger
@@ -231,7 +234,9 @@ def disable_logging() -> None:
     _active_handlers.clear()
 
     # Ensure NullHandler is present
-    if not any(isinstance(h, logging.NullHandler) for h in root_logger.handlers):
+    if not any(
+        isinstance(h, logging.NullHandler) for h in root_logger.handlers
+    ):
         root_logger.addHandler(SizeAwareNullHandler())
 
     _logging_enabled = False

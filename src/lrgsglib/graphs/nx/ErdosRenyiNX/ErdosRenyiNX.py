@@ -41,6 +41,7 @@ class ErdosRenyiNX(SignedGraphNX):
     >>> er = ErdosRenyiNX(n=200, p=0.05, pflip=0.2, seed=1)
     >>> er.flip_random_fract_edges()  # apply sign flips
     """
+
     def __init__(
         self,
         n: int,

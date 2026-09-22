@@ -21,8 +21,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._io import (  # noqa: F401  (re-exported for back-compat)
-    atomic_write_bytes as _atomic_write_bytes,
+# atomic_write_bytes is re-exported for back-compat.
+from .._io import atomic_write_bytes as _atomic_write_bytes  # noqa: F401
+from .._io import (
     close_row_stream,
     load_array,
     load_histogram_series,
@@ -31,9 +32,9 @@ from .._io import (  # noqa: F401  (re-exported for back-compat)
     save_array,
     save_histogram_series,
     save_rows,
-    tmp_sibling as _tmp_sibling,
-    write_row,
 )
+from .._io import tmp_sibling as _tmp_sibling
+from .._io import write_row
 
 
 # -- magnetization series (float64) -----------------------------------------
@@ -100,12 +101,12 @@ def load_cldist_bin(path):
         return []
     nrec = int(raw[0])
     pos = 1
-    offsets = raw[pos:pos + nrec + 1]
+    offsets = raw[pos : pos + nrec + 1]
     pos += nrec + 1
     nent = int(offsets[-1])
-    sizes = raw[pos:pos + nent]
+    sizes = raw[pos : pos + nent]
     pos += nent
-    counts = raw[pos:pos + nent]
+    counts = raw[pos : pos + nent]
     out = []
     for r in range(nrec):
         a, b = int(offsets[r]), int(offsets[r + 1])

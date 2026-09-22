@@ -10,7 +10,6 @@ from typing import Optional, Sequence
 
 from ..BipartiteGraphGT.BipartiteGraphGT import BipartiteGraphGT
 
-
 __all__ = ["BipartiteFromDegreeSequenceGT"]
 
 

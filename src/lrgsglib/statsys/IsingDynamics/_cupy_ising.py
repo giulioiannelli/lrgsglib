@@ -167,9 +167,18 @@ def gpu_metropolis_sweep(
         grid = (nc + block - 1) // block
         randoms = rng.rand(nc).astype(cp.float64)
         met_kernel(
-            (grid,), (block,),
-            (spins_gpu, indices_gpu, weights_gpu, ptr_gpu,
-             cnodes_gpu, np.int32(nc), randoms, np.float64(inv_T)),
+            (grid,),
+            (block,),
+            (
+                spins_gpu,
+                indices_gpu,
+                weights_gpu,
+                ptr_gpu,
+                cnodes_gpu,
+                np.int32(nc),
+                randoms,
+                np.float64(inv_T),
+            ),
         )
 
 
@@ -186,7 +195,8 @@ def gpu_compute_energy(
     grid = (N + block - 1) // block
     energy_buf = cp.zeros(N, dtype=cp.float64)
     ene_kernel(
-        (grid,), (block,),
+        (grid,),
+        (block,),
         (spins_gpu, indices_gpu, weights_gpu, ptr_gpu, energy_buf, np.int32(N)),
     )
     return float(cp.sum(energy_buf))
@@ -200,6 +210,7 @@ def gpu_compute_magnetization(spins_gpu: "cp.ndarray", N: int) -> float:
 # -----------------------------------------------------------------------
 # High-level functions called from IsingDynamics
 # -----------------------------------------------------------------------
+
 
 def cupy_metropolis(
     spins: np.ndarray,
@@ -252,11 +263,19 @@ def cupy_metropolis(
 
     for _ in range(n_sweeps):
         gpu_metropolis_sweep(
-            spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, cc_gpu,
-            inv_T, met_kernel, rng,
+            spins_gpu,
+            idx_gpu,
+            wgt_gpu,
+            ptr_gpu,
+            cc_gpu,
+            inv_T,
+            met_kernel,
+            rng,
         )
         energy_trace.append(
-            gpu_compute_energy(spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel)
+            gpu_compute_energy(
+                spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel
+            )
         )
         magn_trace.append(gpu_compute_magnetization(spins_gpu, N))
 
@@ -309,11 +328,19 @@ def cupy_sa(
         inv_T = 1.0 / T if T > 0 else 1e12
         for _ in range(steps_per_T):
             gpu_metropolis_sweep(
-                spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, cc_gpu,
-                inv_T, met_kernel, rng,
+                spins_gpu,
+                idx_gpu,
+                wgt_gpu,
+                ptr_gpu,
+                cc_gpu,
+                inv_T,
+                met_kernel,
+                rng,
             )
             energy_trace.append(
-                gpu_compute_energy(spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel)
+                gpu_compute_energy(
+                    spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel
+                )
             )
             magn_trace.append(gpu_compute_magnetization(spins_gpu, N))
 
@@ -356,7 +383,9 @@ def cupy_pt(
     cc_gpu = [cp.asarray(c, dtype=cp.int32) for c in color_classes]
 
     # Create replicas (all start from same initial state)
-    replicas_gpu = [cp.asarray(spins.copy(), dtype=cp.int8) for _ in range(n_rep)]
+    replicas_gpu = [
+        cp.asarray(spins.copy(), dtype=cp.int8) for _ in range(n_rep)
+    ]
     rngs = [cp.random.RandomState(seed + i) for i in range(n_rep)]
 
     energy_2d = np.zeros((n_rep, n_exchanges), dtype=np.float64)
@@ -371,8 +400,14 @@ def cupy_pt(
             inv_T = 1.0 / T_ladder[r] if T_ladder[r] > 0 else 1e12
             for _ in range(steps_per_exchange):
                 gpu_metropolis_sweep(
-                    replicas_gpu[r], idx_gpu, wgt_gpu, ptr_gpu, cc_gpu,
-                    inv_T, met_kernel, rngs[r],
+                    replicas_gpu[r],
+                    idx_gpu,
+                    wgt_gpu,
+                    ptr_gpu,
+                    cc_gpu,
+                    inv_T,
+                    met_kernel,
+                    rngs[r],
                 )
 
         # Record observables
@@ -385,13 +420,14 @@ def cupy_pt(
         # Attempt exchanges (even/odd alternating)
         start = ex % 2
         for i in range(start, n_rep - 1, 2):
-            dBeta = (1.0 / T_ladder[i] - 1.0 / T_ladder[i + 1])
+            dBeta = 1.0 / T_ladder[i] - 1.0 / T_ladder[i + 1]
             dE = energy_2d[i, ex] - energy_2d[i + 1, ex]
             delta = dBeta * dE
             if delta <= 0 or cpu_rng.random() < np.exp(-delta):
                 # Swap replicas (just swap GPU array references)
                 replicas_gpu[i], replicas_gpu[i + 1] = (
-                    replicas_gpu[i + 1], replicas_gpu[i],
+                    replicas_gpu[i + 1],
+                    replicas_gpu[i],
                 )
                 rngs[i], rngs[i + 1] = rngs[i + 1], rngs[i]
                 exchanges[ex, i] = True
@@ -486,6 +522,7 @@ def _compile_sw_kernels():
 # Wolff cluster algorithm (hybrid CPU-BFS + GPU energy)
 # -----------------------------------------------------------------------
 
+
 def cupy_wolff(
     spins: np.ndarray,
     neigh_indices: np.ndarray,
@@ -528,7 +565,9 @@ def cupy_wolff(
         # Record observables on GPU
         spins_gpu = cp.asarray(cpu_spins, dtype=cp.int8)
         energy_trace.append(
-            gpu_compute_energy(spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel)
+            gpu_compute_energy(
+                spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel
+            )
         )
         magn_trace.append(gpu_compute_magnetization(spins_gpu, N))
 
@@ -551,7 +590,10 @@ def cupy_wolff(
                     if in_cluster[nb]:
                         continue
                     w = cpu_weights[j]
-                    if cpu_spins[node] * cpu_spins[nb] * (1 if w > 0 else -1) <= 0:
+                    if (
+                        cpu_spins[node] * cpu_spins[nb] * (1 if w > 0 else -1)
+                        <= 0
+                    ):
                         continue
                     p_add = 1.0 - np.exp(-2.0 * abs(w) * inv_T)
                     if rng.random() < p_add:
@@ -571,6 +613,7 @@ def cupy_wolff(
 # -----------------------------------------------------------------------
 # Swendsen-Wang cluster algorithm (GPU)
 # -----------------------------------------------------------------------
+
 
 def cupy_sw(
     spins: np.ndarray,
@@ -611,7 +654,9 @@ def cupy_sw(
     for _ in range(n_sweeps):
         # Record observables
         energy_trace.append(
-            gpu_compute_energy(spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel)
+            gpu_compute_energy(
+                spins_gpu, idx_gpu, wgt_gpu, ptr_gpu, N, ene_kernel
+            )
         )
         magn_trace.append(gpu_compute_magnetization(spins_gpu, N))
 
@@ -624,9 +669,18 @@ def cupy_sw(
         # Bond activation + union
         grid_n = (N + block - 1) // block
         bond_kernel(
-            (grid_n,), (block,),
-            (spins_gpu, idx_gpu, wgt_gpu, ptr_gpu,
-             parent_gpu, randoms_gpu, np.int32(N), np.float64(inv_T)),
+            (grid_n,),
+            (block,),
+            (
+                spins_gpu,
+                idx_gpu,
+                wgt_gpu,
+                ptr_gpu,
+                parent_gpu,
+                randoms_gpu,
+                np.int32(N),
+                np.float64(inv_T),
+            ),
         )
 
         # Phase 2: Compress union-find (multiple passes for convergence)
@@ -636,7 +690,8 @@ def cupy_sw(
         # Phase 3: Flip clusters
         flip_bits_gpu = (rng.rand(N) < 0.5).astype(cp.int8)
         flip_kernel(
-            (grid_n,), (block,),
+            (grid_n,),
+            (block,),
             (spins_gpu, parent_gpu, flip_bits_gpu, np.int32(N)),
         )
 

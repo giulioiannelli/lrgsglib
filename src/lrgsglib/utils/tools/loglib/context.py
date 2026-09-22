@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     import networkx as nx
@@ -132,13 +132,18 @@ def session_from_graph(
     # Extract common signed graph parameters
     param_attrs = [
         "pflip",  # SignedGraph frustration parameter
-        "p1", "p2", "p3", "p4",  # MultispectralGraph parameters
+        "p1",
+        "p2",
+        "p3",
+        "p4",  # MultispectralGraph parameters
         "fraction",  # MCG fraction
         "iterations",  # MCG iterations
         "geo",  # Lattice geometry
-        "side1", "side2",  # Lattice dimensions
+        "side1",
+        "side2",  # Lattice dimensions
         "dim",  # 3D lattice dimensions
-        "p", "k",  # ErdosRenyi parameters
+        "p",
+        "k",  # ErdosRenyi parameters
     ]
 
     for attr in param_attrs:
@@ -193,7 +198,8 @@ def session_from_dynamics(
     dynamics_attrs = [
         "T",  # Temperature (Ising)
         "steps",  # Simulation steps
-        "gamma", "mu",  # Contact process rates
+        "gamma",
+        "mu",  # Contact process rates
         "p0",  # Initial density
         "runlang",  # Backend
     ]

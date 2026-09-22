@@ -29,6 +29,7 @@ NumPy-array round-trip has been profiled as a bottleneck for that specific
 geometry. :func:`build` performs that dispatch. Most generators never need it —
 ``graph-tool``'s ``add_edge_list`` is already a vectorized C++ ingest.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -107,7 +108,9 @@ class GraphSpec:
 
     @classmethod
     def from_genresult(
-        cls, result: Tuple[int, Any, Optional[np.ndarray]], directed: bool = False
+        cls,
+        result: Tuple[int, Any, Optional[np.ndarray]],
+        directed: bool = False,
     ) -> "GraphSpec":
         """Build a spec from the legacy ``(n_nodes, edges, pos)`` generator tuple.
 
@@ -115,8 +118,12 @@ class GraphSpec:
         onto the shared contract without rewriting them.
         """
         n, edges, pos = result
-        return cls(n=int(n), edges=np.asarray(edges, dtype=np.int64),
-                   pos=pos, directed=directed)
+        return cls(
+            n=int(n),
+            edges=np.asarray(edges, dtype=np.int64),
+            pos=pos,
+            directed=directed,
+        )
 
 
 @runtime_checkable
@@ -178,13 +185,15 @@ def materialize_nx(spec: GraphSpec, with_positions: bool = True):
         data = np.ones(rows.shape[0], dtype=np.int8)
         adj = coo_matrix((data, (rows, cols)), shape=(spec.n, spec.n)).tocsr()
         G = nx.from_scipy_sparse_array(
-            adj, create_using=cls, edge_attribute=None)
+            adj, create_using=cls, edge_attribute=None
+        )
     else:
         G = cls()
         G.add_nodes_from(range(spec.n))
     if with_positions and spec.pos is not None:
         nx.set_node_attributes(
-            G, {i: tuple(spec.pos[i]) for i in range(spec.n)}, _POS_KEY)
+            G, {i: tuple(spec.pos[i]) for i in range(spec.n)}, _POS_KEY
+        )
     return G
 
 
@@ -217,8 +226,12 @@ def spec_from_gt(G) -> GraphSpec:
         vp = G.vertex_properties[_POS_KEY]
         d = len(vp[G.vertex(0)]) if G.num_vertices() else 2
         pos = vp.get_2d_array(range(d)).T
-    return GraphSpec(n=int(G.num_vertices()), edges=edges, pos=pos,
-                     directed=bool(G.is_directed()))
+    return GraphSpec(
+        n=int(G.num_vertices()),
+        edges=edges,
+        pos=pos,
+        directed=bool(G.is_directed()),
+    )
 
 
 def spec_from_nx(G) -> GraphSpec:
@@ -236,7 +249,8 @@ def spec_from_nx(G) -> GraphSpec:
     if nodes and (min(nodes) != 0 or max(nodes) != n - 1):
         raise ValueError(
             "spec_from_nx requires integer node labels 0..n-1; "
-            "relabel before extracting a spec")
+            "relabel before extracting a spec"
+        )
     adj = nx.to_scipy_sparse_array(G, nodelist=range(n), format="coo")
     if not G.is_directed():
         adj = triu(adj, k=1).tocoo()
@@ -245,17 +259,20 @@ def spec_from_nx(G) -> GraphSpec:
     pos_attr = nx.get_node_attributes(G, _POS_KEY)
     if pos_attr:
         pos = np.array([pos_attr[i] for i in range(n)], dtype=np.float64)
-    return GraphSpec(n=int(n), edges=edges, pos=pos,
-                     directed=bool(G.is_directed()))
+    return GraphSpec(
+        n=int(n), edges=edges, pos=pos, directed=bool(G.is_directed())
+    )
 
 
 def detect_engine(G) -> GraphEngine:
     """Return the :class:`GraphEngine` of a raw backend graph object."""
     import networkx as nx
+
     if isinstance(G, nx.Graph):
         return GraphEngine.NETWORKX
     try:
         import graph_tool.all as gt
+
         if isinstance(G, gt.Graph):
             return GraphEngine.GRAPHTOOL
     except ImportError:
@@ -266,8 +283,9 @@ def detect_engine(G) -> GraphEngine:
 def spec_from_graph(G) -> GraphSpec:
     """Extract a spec from a raw backend graph, auto-detecting the engine."""
     engine = detect_engine(G)
-    return (spec_from_nx(G) if engine is GraphEngine.NETWORKX
-            else spec_from_gt(G))
+    return (
+        spec_from_nx(G) if engine is GraphEngine.NETWORKX else spec_from_gt(G)
+    )
 
 
 # --------------------------------------------------------------------------- #

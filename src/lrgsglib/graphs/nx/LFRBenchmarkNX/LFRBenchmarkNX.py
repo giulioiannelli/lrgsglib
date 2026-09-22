@@ -20,7 +20,6 @@ import numpy as np
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
 
-
 # Constants
 LFR_PHTABB = "lfr"
 LFR_SGPATH = ""
@@ -136,7 +135,9 @@ class LFRBenchmarkNX(RandomGraphNX):
         # NetworkX requires exactly one of min_degree or average_degree
         # Prefer average_degree if provided, otherwise use min_degree
         if average_degree is not None and min_degree is not None:
-            raise ValueError("Provide only one of average_degree or min_degree, not both")
+            raise ValueError(
+                "Provide only one of average_degree or min_degree, not both"
+            )
 
         self.average_degree = average_degree
         self.min_degree = min_degree
@@ -174,31 +175,33 @@ class LFRBenchmarkNX(RandomGraphNX):
     def _generate_graph(self) -> nx.Graph:
         """Generate LFR benchmark graph."""
         # Get seed from kwargs if available
-        seed = getattr(self, '_rng_seed', None)
+        seed = getattr(self, "_rng_seed", None)
 
         # Build kwargs - only pass one of average_degree or min_degree
         kwargs = {
-            'n': self.n,
-            'tau1': self.tau1,
-            'tau2': self.tau2,
-            'mu': self.mu,
-            'max_degree': self.max_degree,
-            'min_community': self.min_community,
-            'max_community': self.max_community,
-            'seed': seed,
+            "n": self.n,
+            "tau1": self.tau1,
+            "tau2": self.tau2,
+            "mu": self.mu,
+            "max_degree": self.max_degree,
+            "min_community": self.min_community,
+            "max_community": self.max_community,
+            "seed": seed,
         }
 
         if self.average_degree is not None:
-            kwargs['average_degree'] = self.average_degree
+            kwargs["average_degree"] = self.average_degree
         else:
-            kwargs['min_degree'] = self.min_degree
+            kwargs["min_degree"] = self.min_degree
 
         G = nx.generators.community.LFR_benchmark_graph(**kwargs)
         return G
 
     def _compute_syshapePth(self) -> str:
         """Compute system shape path string."""
-        return f"N={self.n}_t1={self.tau1:.2f}_t2={self.tau2:.2f}_mu={self.mu:.2f}"
+        return (
+            f"N={self.n}_t1={self.tau1:.2f}_t2={self.tau2:.2f}_mu={self.mu:.2f}"
+        )
 
     def get_communities(self) -> list:
         """

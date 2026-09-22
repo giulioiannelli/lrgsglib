@@ -19,6 +19,7 @@ The reusable voxel *geometry* primitives live in :mod:`lrgsglib.plotlib.voxels`
 the lattice-aware orchestration. Only simple-cubic (``geo='sc'``) reshapes to a
 clean cube.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -31,7 +32,7 @@ from ._common import resolve_plot_path
 
 FrameLike = NDArray[np.integer] | NDArray[np.floating]
 
-VOX_FRAMES = 60   # default number of frames kept for a voxel movie
+VOX_FRAMES = 60  # default number of frames kept for a voxel movie
 
 
 def _state_cube(lattice, state) -> NDArray[np.floating]:
@@ -46,8 +47,18 @@ def _state_cube(lattice, state) -> NDArray[np.floating]:
     return np.asarray(state, dtype=float).reshape(*tuple(syshape))
 
 
-def show_voxels(lattice, state, *, ax=None, cmap="hot", vmin=-1.0, vmax=1.0,
-                alpha=VOX_ALPHA, alpha_sign=+1, title=None):
+def show_voxels(
+    lattice,
+    state,
+    *,
+    ax=None,
+    cmap="hot",
+    vmin=-1.0,
+    vmax=1.0,
+    alpha=VOX_ALPHA,
+    alpha_sign=+1,
+    title=None,
+):
     """Static voxel view of one configuration (3D analogue of ``imshow``).
 
     The cube is drawn as solid little cubes (full volume, not just the shell);
@@ -73,7 +84,9 @@ def show_voxels(lattice, state, *, ax=None, cmap="hot", vmin=-1.0, vmax=1.0,
     return ax
 
 
-def _render_frames_local(rgba_cubes, syshape, recolor_edges, figsize, elev, azim):
+def _render_frames_local(
+    rgba_cubes, syshape, recolor_edges, figsize, elev, azim
+):
     """Tessellate the full-cube geometry ONCE and recolour the per-voxel
     facecolours cube by cube (voxels can't blit), rasterising each to a PIL
     image. Shared verbatim by the serial path and by every parallel worker, so
@@ -105,14 +118,18 @@ def _render_frames_local(rgba_cubes, syshape, recolor_edges, figsize, elev, azim
     return images
 
 
-def _render_frames_worker(rgba_cubes, syshape, recolor_edges, figsize, elev, azim):
+def _render_frames_worker(
+    rgba_cubes, syshape, recolor_edges, figsize, elev, azim
+):
     """Spawned-process entry point: pin a non-interactive backend (the worker is
     a fresh process) then render locally. Module-level so ``loky`` can pickle it
     by reference."""
     import matplotlib
 
     matplotlib.use("Agg", force=False)
-    return _render_frames_local(rgba_cubes, syshape, recolor_edges, figsize, elev, azim)
+    return _render_frames_local(
+        rgba_cubes, syshape, recolor_edges, figsize, elev, azim
+    )
 
 
 def _resolve_n_jobs(n_jobs, n_frames):
@@ -127,8 +144,9 @@ def _resolve_n_jobs(n_jobs, n_frames):
     return workers if (workers > 1 and n_frames >= 2 * workers) else 1
 
 
-def _render_voxel_frames(rgba_cubes, syshape, *, recolor_edges, figsize, elev,
-                         azim, n_jobs):
+def _render_voxel_frames(
+    rgba_cubes, syshape, *, recolor_edges, figsize, elev, azim, n_jobs
+):
     """Render every coloured cube to an image, fanning the (independent,
     rasterisation-bound) frames across processes when it pays off and falling
     back to serial on any parallel failure. Round-robin chunks keep the load even
@@ -149,13 +167,26 @@ def _render_voxel_frames(rgba_cubes, syshape, *, recolor_edges, figsize, elev,
             for w, part in enumerate(parts):
                 images[w::workers] = part
             return images
-        except Exception:                       # spawn/joblib failure -> serial
+        except Exception:  # spawn/joblib failure -> serial
             pass
-    return _render_frames_local(rgba_cubes, syshape, recolor_edges, figsize, elev, azim)
+    return _render_frames_local(
+        rgba_cubes, syshape, recolor_edges, figsize, elev, azim
+    )
 
 
-def _voxel_movie(lattice, frames, color_of, *, fps, figsize, save,
-                 recolor_edges=False, elev=None, azim=None, n_jobs=None):
+def _voxel_movie(
+    lattice,
+    frames,
+    color_of,
+    *,
+    fps,
+    figsize,
+    save,
+    recolor_edges=False,
+    elev=None,
+    azim=None,
+    n_jobs=None,
+):
     """Efficient voxel movie: the (cheap) per-frame colours are computed serially
     via ``color_of(s) -> (nx, ny, nz, 4)`` RGBA, then the (expensive) 3D frame
     rasterisation is fanned out across processes (``n_jobs``: ``None`` auto, ``1``
@@ -165,16 +196,34 @@ def _voxel_movie(lattice, frames, color_of, *, fps, figsize, save,
     syshape = tuple(getattr(lattice, "syshape"))
     rgba_cubes = [color_of(s) for s in frames]
     images = _render_voxel_frames(
-        rgba_cubes, syshape, recolor_edges=recolor_edges, figsize=figsize,
-        elev=elev, azim=azim, n_jobs=n_jobs,
+        rgba_cubes,
+        syshape,
+        recolor_edges=recolor_edges,
+        figsize=figsize,
+        elev=elev,
+        azim=azim,
+        n_jobs=n_jobs,
     )
     return frames_to_player_html(images, fps=fps, save=save)
 
 
-def animate_voxels(lattice, states, *, n_frames=VOX_FRAMES, fps=12, cmap="hot",
-                   vmin=-1.0, vmax=1.0, figsize=(4, 4), save=None,
-                   alpha=VOX_ALPHA, alpha_sign=+1, n_jobs=None, model=None,
-                   subfolder=None):
+def animate_voxels(
+    lattice,
+    states,
+    *,
+    n_frames=VOX_FRAMES,
+    fps=12,
+    cmap="hot",
+    vmin=-1.0,
+    vmax=1.0,
+    figsize=(4, 4),
+    save=None,
+    alpha=VOX_ALPHA,
+    alpha_sign=+1,
+    n_jobs=None,
+    model=None,
+    subfolder=None,
+):
     """3D voxel analogue of ``lat.animate_states`` (colour = spin).
 
     The cube is drawn as solid little cubes -- every interior voxel, not just
@@ -201,16 +250,32 @@ def animate_voxels(lattice, states, *, n_frames=VOX_FRAMES, fps=12, cmap="hot",
         return rgba
 
     return _voxel_movie(
-        lattice, frames, color_of, fps=fps, figsize=figsize, n_jobs=n_jobs,
+        lattice,
+        frames,
+        color_of,
+        fps=fps,
+        figsize=figsize,
+        n_jobs=n_jobs,
         save=resolve_plot_path(lattice, save, model=model, subfolder=subfolder),
     )
 
 
-def animate_voxels_cluster(lattice, states, *, cluster_mode="rawspin",
-                           n_frames=VOX_FRAMES, fps=12, figsize=(4, 4), save=None,
-                           alpha=VOX_ALPHA, pos_color=(0.84, 0.19, 0.15),
-                           neg_color=(0.13, 0.40, 0.74), n_jobs=None, model=None,
-                           subfolder=None):
+def animate_voxels_cluster(
+    lattice,
+    states,
+    *,
+    cluster_mode="rawspin",
+    n_frames=VOX_FRAMES,
+    fps=12,
+    figsize=(4, 4),
+    save=None,
+    alpha=VOX_ALPHA,
+    pos_color=(0.84, 0.19, 0.15),
+    neg_color=(0.13, 0.40, 0.74),
+    n_jobs=None,
+    model=None,
+    subfolder=None,
+):
     """3D voxel analogue of ``lat.animate_largest_cluster``.
 
     Only the giant same-sign/satisfied domain is drawn, as solid little cubes
@@ -229,13 +294,22 @@ def animate_voxels_cluster(lattice, states, *, cluster_mode="rawspin",
         s = np.asarray(s, np.int8).ravel()
         label = cluster_components(s, idx, b)
         largest = label == np.bincount(label).argmax()
-        col = pos_color if (largest.any() and int(s[largest][0]) > 0) else neg_color
-        rgba = np.zeros((*syshape, 4))                      # alpha 0 => hidden
+        col = (
+            pos_color
+            if (largest.any() and int(s[largest][0]) > 0)
+            else neg_color
+        )
+        rgba = np.zeros((*syshape, 4))  # alpha 0 => hidden
         rgba[largest.reshape(*syshape)] = (*col, alpha)
         return rgba
 
     return _voxel_movie(
-        lattice, frames, color_of, fps=fps, figsize=figsize, n_jobs=n_jobs,
+        lattice,
+        frames,
+        color_of,
+        fps=fps,
+        figsize=figsize,
+        n_jobs=n_jobs,
         save=resolve_plot_path(lattice, save, model=model, subfolder=subfolder),
         recolor_edges=True,
     )
@@ -255,13 +329,21 @@ class _Lattice3DAnimate(_Accessor):
     def voxel(self, source, *, model=None, subfolder=None, **kw):
         frames, src_model = frames_and_model(source)
         return animate_voxels(
-            self._sg, frames, model=model or src_model, subfolder=subfolder, **kw
+            self._sg,
+            frames,
+            model=model or src_model,
+            subfolder=subfolder,
+            **kw,
         )
 
     def voxel_cluster(self, source, *, model=None, subfolder=None, **kw):
         frames, src_model = frames_and_model(source)
         return animate_voxels_cluster(
-            self._sg, frames, model=model or src_model, subfolder=subfolder, **kw
+            self._sg,
+            frames,
+            model=model or src_model,
+            subfolder=subfolder,
+            **kw,
         )
 
 

@@ -21,9 +21,7 @@ __all__ = [
 ]
 
 
-def get_kth_order_neighbours(
-    G: Graph, node: Any, order: int = 1
-) -> List[Any]:
+def get_kth_order_neighbours(G: Graph, node: Any, order: int = 1) -> List[Any]:
     """Return nodes exactly ``order`` steps away from ``node``."""
     if not isinstance(order, int) or order <= 0:
         raise ValueError("The `order` must be a positive integer.")

@@ -1,12 +1,11 @@
 import numpy as np
 from numpy.typing import NDArray
+
 #
-__all__ = [
-    "line",
-    "dv",
-    "model_1r"
-]
-# 
+__all__ = ["line", "dv", "model_1r"]
+
+
+#
 def line(x, a, b):
     """
     Calculate the values of a straight line equation for given 'x' values.
@@ -42,6 +41,7 @@ def line(x, a, b):
 
     """
     return a * x + b
+
 
 #
 def dv(f_x: NDArray, x: NDArray = None) -> NDArray:
@@ -81,6 +81,7 @@ def dv(f_x: NDArray, x: NDArray = None) -> NDArray:
         x = np.linspace(0, f_x.shape[-1], num=f_x.shape[-1])
     df_dx = np.diff(f_x, axis=-1) / np.diff(x)
     return df_dx
+
 
 #
 def model_1r(x, C_1, C_2):

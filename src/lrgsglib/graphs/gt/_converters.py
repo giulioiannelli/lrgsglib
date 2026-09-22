@@ -33,6 +33,7 @@ import numpy as np
 try:
     import graph_tool as gt
     from graph_tool import Graph
+
     GT_AVAILABLE = True
 except ImportError:
     GT_AVAILABLE = False

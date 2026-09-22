@@ -1,9 +1,8 @@
 from typing import Any
 
+
 def verbose_print(
-    message: Any,
-    verbose: bool = False,
-    **print_kwargs: Any
+    message: Any, verbose: bool = False, **print_kwargs: Any
 ) -> None:
     """
     Print a message only if verbose mode is enabled.

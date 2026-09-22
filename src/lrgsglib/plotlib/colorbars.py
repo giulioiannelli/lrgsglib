@@ -1,10 +1,14 @@
 from typing import Any, Tuple
+
 #
 from .const_plotlib import *
+
 #
 __all__ = [
-    'imshow_colorbar_caxdivider',
+    "imshow_colorbar_caxdivider",
 ]
+
+
 #
 def imshow_colorbar_caxdivider(
     mappable: Any,
@@ -14,10 +18,10 @@ def imshow_colorbar_caxdivider(
     pad: float = 0.05,
     orientation: str = "vertical",
     axis_dim: int = 2,
-    **kwargs
+    **kwargs,
 ) -> Tuple[AxesDivider, Axes, Any]:
     """
-    Display a colorbar in a specified position and orientation relative to a 
+    Display a colorbar in a specified position and orientation relative to a
     given axis. Supports both 2D and 3D axes.
 
     Parameters
@@ -29,10 +33,10 @@ def imshow_colorbar_caxdivider(
     position : {'left', 'right', 'top', 'bottom'}, optional
         Position of the colorbar relative to `ax`. Default is "right".
     size : str or float, optional
-        Size of the colorbar relative to `ax` (e.g., "5%") or in points. 
+        Size of the colorbar relative to `ax` (e.g., "5%") or in points.
         Default is "5%".
     pad : float, optional
-        Padding between `ax` and the colorbar in relative units. Default is 
+        Padding between `ax` and the colorbar in relative units. Default is
         0.05.
     orientation : {'vertical', 'horizontal'}, optional
         Orientation of the colorbar. Default is "vertical".
@@ -52,13 +56,13 @@ def imshow_colorbar_caxdivider(
 
     Notes
     -----
-    - This function uses `mpl_toolkits.axes_grid1.make_axes_locatable` to 
+    - This function uses `mpl_toolkits.axes_grid1.make_axes_locatable` to
       create a divider for the axis and append a new axis for the colorbar.
-    - The `size` parameter can be specified as a percentage (e.g., "5%") or 
+    - The `size` parameter can be specified as a percentage (e.g., "5%") or
       as an absolute size in points.
-    - The `pad` parameter controls the spacing between the axis and the 
+    - The `pad` parameter controls the spacing between the axis and the
       colorbar.
-    - For 3D axes, a 2D axis is appended to host the colorbar to avoid 
+    - For 3D axes, a 2D axis is appended to host the colorbar to avoid
       projection errors.
 
     Examples

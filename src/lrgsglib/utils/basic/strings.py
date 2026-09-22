@@ -2,9 +2,9 @@ import random
 import re
 import string
 
+
 def generate_random_id(
-    length: int = 10,
-    chars: str = string.ascii_letters + string.digits
+    length: int = 10, chars: str = string.ascii_letters + string.digits
 ) -> str:
     """
     Generate a random string of specified length from the given character set,
@@ -32,7 +32,9 @@ def generate_random_id(
     if not chars:
         raise ValueError("`chars` must be a non-empty string.")
 
-    return ''.join(random.choice(chars) for _ in range(length))
+    return "".join(random.choice(chars) for _ in range(length))
+
+
 #
 def get_first_int_in_str(s):
     """
@@ -49,8 +51,10 @@ def get_first_int_in_str(s):
     int or None
         The first integer found in the string, or None if no digits are found.
     """
-    match = re.search(r'\d+', s)
+    match = re.search(r"\d+", s)
     return int(match.group()) if match else None
+
+
 #
 def join_non_empty(separator: str, *parts: str) -> str:
     """

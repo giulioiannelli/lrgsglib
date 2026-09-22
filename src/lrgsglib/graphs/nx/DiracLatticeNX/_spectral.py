@@ -51,7 +51,7 @@ def compute_fiber_laplacian(self, typf: type = np.float64) -> np.ndarray:
 
 
 def compute_dirac_spectrum_separated(
-    self, typf: type = np.float64, backend: str = 'numpy'
+    self, typf: type = np.float64, backend: str = "numpy"
 ) -> np.ndarray:
     """Compute the full spectrum of a Dirac structure efficiently.
 
@@ -101,6 +101,6 @@ def get_base_fiber_dimensions(self) -> tuple[int, int]:
         (base_nodes, fiber_nodes)
     """
     return (
-        self.dirac_structure['base_nodes'],
-        self.dirac_structure['fiber_nodes']
+        self.dirac_structure["base_nodes"],
+        self.dirac_structure["fiber_nodes"],
     )

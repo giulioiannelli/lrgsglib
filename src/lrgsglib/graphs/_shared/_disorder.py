@@ -21,6 +21,7 @@ float attribute / GT ``sign`` edge property) since they are engine-specific.
 The shape mirrors the other ``_shared`` helpers (``_nw_container``, ``_spec``):
 one engine-neutral module imported by both backends.
 """
+
 from __future__ import annotations
 
 import math
@@ -76,6 +77,7 @@ def structured_build_flags(support: Optional[str]) -> tuple:
     ``none``), so callers can pass the result unconditionally.
     """
     return _SUPPORT_BUILD_FLAGS.get(support or "", (False, False))
+
 
 #: registry of distributional coupling laws: ``name -> (n, rng, **params) -> ndarray``.
 #: ``rng`` is duck-typed -- either ``np.random`` (NX, global seed) or a
@@ -151,7 +153,11 @@ class Disorder:
     support_params: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if isinstance(self.law, str) and self.law != FLIP and self.law not in _COUPLING_LAWS:
+        if (
+            isinstance(self.law, str)
+            and self.law != FLIP
+            and self.law not in _COUPLING_LAWS
+        ):
             raise ValueError(
                 f"unknown coupling law {self.law!r}; known: "
                 f"{[FLIP, *sorted(_COUPLING_LAWS)]} or a callable"
@@ -178,7 +184,9 @@ class Disorder:
         Not valid for ``'flip'`` (a negation, handled by the engine base).
         """
         if self.is_flip:
-            raise ValueError("Disorder.draw() is not defined for the 'flip' law")
+            raise ValueError(
+                "Disorder.draw() is not defined for the 'flip' law"
+            )
         fn = self.law if callable(self.law) else _COUPLING_LAWS[self.law]
         return np.asarray(fn(n, rng, **self.params), dtype=float)
 
@@ -186,7 +194,9 @@ class Disorder:
     @property
     def is_registered_support(self) -> bool:
         """True when ``support`` names a :func:`register_support` builder."""
-        return isinstance(self.support, str) and self.support in _SUPPORT_BUILDERS
+        return (
+            isinstance(self.support, str) and self.support in _SUPPORT_BUILDERS
+        )
 
     def build_support(self, sg, rng, on_g) -> list:
         """Resolve a registered support to its ``(u, v)`` edge tuples."""
@@ -304,10 +314,12 @@ def _hub_xerr(sg, pflip, rng, on_g, k: int = 1):
     def _deg(n):
         return len(list(sg.get_graph_neighbors(n, on_g)))
 
-    nodes = sorted(sg.get_nodes_list(on_g), key=lambda n: (_deg(n), str(n)), reverse=True)
+    nodes = sorted(
+        sg.get_nodes_list(on_g), key=lambda n: (_deg(n), str(n)), reverse=True
+    )
     keys = set()
     for hub in nodes[: max(1, int(k))]:
-        for (u, v) in star_edges(sg, hub, on_g):
+        for u, v in star_edges(sg, hub, on_g):
             iu, iv = int(u), int(v)
             keys.add((iu, iv) if iu <= iv else (iv, iu))
     return list(keys)
@@ -317,7 +329,9 @@ def _hub_xerr(sg, pflip, rng, on_g, k: int = 1):
 # Composition (§6.8): combine disorders — set-algebra, seed-mixtures, layering.
 # =====================================================================
 
-_SET_MODES = frozenset({"union", "intersection", "difference", "symmetric_difference"})
+_SET_MODES = frozenset(
+    {"union", "intersection", "difference", "symmetric_difference"}
+)
 #: composition modes understood by :class:`CompositeDisorder`.
 COMPOSITION_MODES = frozenset({"overlay", "mixture"} | set(_SET_MODES))
 
@@ -335,7 +349,8 @@ def _coerce_component(c: Any, pflip: float) -> "Disorder":
 
 def _mixture_with_budget(comps, weights, pflip):
     """A ``mixture`` composite whose total budget is the top-level ``pflip``
-    (so ``{'randXERR': .5, 'randZERR': .5}`` at ``pflip=0.1`` splits ~0.1·N seeds)."""
+    (so ``{'randXERR': .5, 'randZERR': .5}`` at ``pflip=0.1`` splits ~0.1·N seeds).
+    """
     comp = CompositeDisorder(comps, mode="mixture", weights=weights)
     if pflip and pflip > 0:
         comp._pflip = float(pflip)
@@ -368,7 +383,9 @@ def _largest_remainder(total: int, weights: List[float]) -> List[int]:
     raw = [total * w for w in weights]
     base = [int(math.floor(x)) for x in raw]
     rem = total - sum(base)
-    order = sorted(range(len(weights)), key=lambda i: raw[i] - base[i], reverse=True)
+    order = sorted(
+        range(len(weights)), key=lambda i: raw[i] - base[i], reverse=True
+    )
     for i in order[: max(0, rem)]:
         base[i] += 1
     return base
@@ -393,7 +410,9 @@ class CompositeDisorder:
 
     def __post_init__(self) -> None:
         self.components = [
-            c for c in self.components if isinstance(c, Disorder) and not c.is_none
+            c
+            for c in self.components
+            if isinstance(c, Disorder) and not c.is_none
         ]
         if not self.components:
             raise ValueError("CompositeDisorder needs a non-empty component")
@@ -403,7 +422,9 @@ class CompositeDisorder:
                 f"{sorted(COMPOSITION_MODES)}"
             )
         if self.mode == "difference" and len(self.components) != 2:
-            raise ValueError("'difference' is binary; give exactly 2 components")
+            raise ValueError(
+                "'difference' is binary; give exactly 2 components"
+            )
         if self.weights is not None:
             if len(self.weights) != len(self.components):
                 raise ValueError("weights length must match components")
@@ -464,7 +485,9 @@ class CompositeDisorder:
         return _compose(self, other, "overlay")
 
 
-def plan_composite_ops(comp: "CompositeDisorder", sg, on_g, resolve_keys) -> list:
+def plan_composite_ops(
+    comp: "CompositeDisorder", sg, on_g, resolve_keys
+) -> list:
     """Reduce a non-overlay composite to ``[(edge_key_set, law_disorder), ...]``.
 
     ``edge_key_set`` is a set of canonical ``(min, max)`` int edge tuples;
@@ -527,7 +550,7 @@ def _plan_mixture(comp: "CompositeDisorder", sg, on_g) -> list:
                 if c.support == "randXERR"
                 else sg.cell_edges(s, on_g)
             )
-            for (u, v) in pat:
+            for u, v in pat:
                 iu, iv = int(u), int(v)
                 keys.add((iu, iv) if iu <= iv else (iv, iu))
         if keys:

@@ -3,13 +3,13 @@ WattsStrogatzGT: graph-tool implementation of Watts-Strogatz small-world graphs.
 
 Mirrors the API of WattsStrogatzNX for easy switching between backends.
 """
+
 from __future__ import annotations
 
 from typing import Optional
 
-import numpy as np
-
 import graph_tool.all as gt
+import numpy as np
 
 from ..SignedGraphGT import SignedGraphGT
 
@@ -198,7 +198,7 @@ class WattsStrogatzGT(SignedGraphGT):
                 valid = dist.a[dist.a < self.N]  # Exclude unreachable
                 total += valid.sum()
                 count += len(valid) - 1  # Exclude self
-            return total / count if count > 0 else float('inf')
+            return total / count if count > 0 else float("inf")
         else:
             # Full computation for small graphs
             total = 0
@@ -208,7 +208,7 @@ class WattsStrogatzGT(SignedGraphGT):
                 valid = dist.a[dist.a < self.N]
                 total += valid.sum()
                 count += len(valid) - 1
-            return total / count if count > 0 else float('inf')
+            return total / count if count > 0 else float("inf")
 
     @property
     def syshapePth(self) -> str:
@@ -221,5 +221,6 @@ class WattsStrogatzGT(SignedGraphGT):
             f"WattsStrogatzGT(n={self.n}, k={self.k}, p={self.p}, "
             f"edges={self.num_edges}, negative={neg})"
         )
+
 
 __all__ = ["WattsStrogatzGT"]

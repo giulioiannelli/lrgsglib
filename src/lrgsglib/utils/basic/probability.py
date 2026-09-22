@@ -2,20 +2,23 @@ from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
+
 #
 __all__ = [
-    'binder_cumulant',
-    'coarsen_bins_with_padding',
-    'linear_binning_hist',
-    'create_symmetric_log_bins',
-    'log_binning',
-    'neglog_binning',
-    'symlog_binning',
-    'marchenko_pastur',
-    'update_mean_var',
-    'update_mean_m2',
-    'update_mean_var_chunk'
+    "binder_cumulant",
+    "coarsen_bins_with_padding",
+    "linear_binning_hist",
+    "create_symmetric_log_bins",
+    "log_binning",
+    "neglog_binning",
+    "symlog_binning",
+    "marchenko_pastur",
+    "update_mean_var",
+    "update_mean_m2",
+    "update_mean_var_chunk",
 ]
+
+
 #
 def binder_cumulant(data):
     """
@@ -33,11 +36,11 @@ def binder_cumulant(data):
 
     Notes:
     ------
-    The Binder cumulant is a statistical measure used in the analysis of 
-    phase transitions in statistical physics. It is defined as 
+    The Binder cumulant is a statistical measure used in the analysis of
+    phase transitions in statistical physics. It is defined as
     1 - (mean(m^4) / (3 * mean(m^2)^2)), where m is the order parameter.
-    The Binder cumulant is particularly useful in finite-size scaling 
-    analysis as it is dimensionless and often has a universal value at 
+    The Binder cumulant is particularly useful in finite-size scaling
+    analysis as it is dimensionless and often has a universal value at
     the critical point for systems within the same universality class.
 
     Examples:
@@ -52,8 +55,12 @@ def binder_cumulant(data):
     m4 = np.mean(data**4)
     U4 = 1 - m4 / (3 * m2**2)
     return U4
+
+
 #
-def coarsen_bins_with_padding(x: NDArray, y: NDArray, factor: int) -> Tuple[NDArray, NDArray]:
+def coarsen_bins_with_padding(
+    x: NDArray, y: NDArray, factor: int
+) -> Tuple[NDArray, NDArray]:
     """
     Coarsen binned data by a given factor with padding.
 
@@ -84,18 +91,17 @@ def coarsen_bins_with_padding(x: NDArray, y: NDArray, factor: int) -> Tuple[NDAr
     remainder = len(x) % factor
     if remainder != 0:
         pad_width = factor - remainder
-        x = np.pad(x, (0, pad_width), mode='edge')
-        y = np.pad(y, (0, pad_width), mode='constant', constant_values=0)
-    
+        x = np.pad(x, (0, pad_width), mode="edge")
+        y = np.pad(y, (0, pad_width), mode="constant", constant_values=0)
+
     new_x = x.reshape(-1, factor).mean(axis=1)
     new_y = y.reshape(-1, factor).sum(axis=1)
     return new_x, new_y
+
+
 #
 def linear_binning_hist(
-    data: NDArray,
-    bins_count: int = 20,
-    *,
-    include_counts: bool = False
+    data: NDArray, bins_count: int = 20, *, include_counts: bool = False
 ) -> Union[Tuple[NDArray, NDArray], Tuple[NDArray, NDArray, NDArray]]:
     """
     Create linearly spaced bins over the exact data range, compute centers—and
@@ -124,9 +130,14 @@ def linear_binning_hist(
         counts, _ = np.histogram(data, bins=bin_edges)
         return bin_edges, bin_centers, counts
     return bin_edges, bin_centers
+
+
 #
 
-def create_symmetric_log_bins(data: NDArray, num_bins: int, magnitude_increment: int = 2) -> Tuple[NDArray, NDArray]:
+
+def create_symmetric_log_bins(
+    data: NDArray, num_bins: int, magnitude_increment: int = 2
+) -> Tuple[NDArray, NDArray]:
     """
     Creates symmetric logarithmic bins based on the specified data, including bin centers.
 
@@ -151,17 +162,22 @@ def create_symmetric_log_bins(data: NDArray, num_bins: int, magnitude_increment:
     max_value = np.max(np.abs(data))
 
     # Creating positive and negative symmetric logarithmic bins
-    positive_bins = np.logspace(np.log10(min_value) - magnitude_increment, np.log10(max_value) + magnitude_increment, int(num_bins // 2) + 1)
+    positive_bins = np.logspace(
+        np.log10(min_value) - magnitude_increment,
+        np.log10(max_value) + magnitude_increment,
+        int(num_bins // 2) + 1,
+    )
     negative_bins = -np.flip(positive_bins[:-1])
-    
+
     bins = np.concatenate((negative_bins, [0], positive_bins))
     bin_centers = (bins[:-1] + bins[1:]) / 2
 
     return bins, bin_centers
+
+
 #
 def log_binning(
-    data: NDArray[np.floating],
-    bins_count: int = 20
+    data: NDArray[np.floating], bins_count: int = 20
 ) -> Tuple[NDArray[np.floating], NDArray[np.integer], NDArray[np.floating]]:
     """
     Compute a histogram with logarithmically spaced bins.
@@ -203,10 +219,11 @@ def log_binning(
     bin_widths = bin_edges[1:] - bin_edges[:-1]
 
     return bin_centers, counts, bin_widths
+
+
 #
 def neglog_binning(
-    data: Union[Sequence[float], NDArray[np.floating]],
-    bins_count: int = 20
+    data: Union[Sequence[float], NDArray[np.floating]], bins_count: int = 20
 ) -> Tuple[NDArray[np.floating], NDArray[np.integer], NDArray[np.floating]]:
     """
     Compute a histogram with bins equally spaced in the negative log10 scale.
@@ -238,7 +255,9 @@ def neglog_binning(
     if arr.size == 0:
         raise ValueError("`data` must not be empty.")
     if np.any(arr >= 0):
-        raise ValueError("All `data` values must be negative for negative log binning.")
+        raise ValueError(
+            "All `data` values must be negative for negative log binning."
+        )
 
     abs_data = np.abs(arr)
     log_min = np.floor(np.log10(abs_data.min()))
@@ -256,12 +275,16 @@ def neglog_binning(
 
     return bin_centers, counts, bin_widths
 
+
 def symlog_binning(
-    full_data: NDArray[np.floating],
-    bins_count: int = 20
+    full_data: NDArray[np.floating], bins_count: int = 20
 ) -> Tuple[
-    Optional[Tuple[NDArray[np.floating], NDArray[np.integer], NDArray[np.floating]]],
-    Optional[Tuple[NDArray[np.floating], NDArray[np.integer], NDArray[np.floating]]]
+    Optional[
+        Tuple[NDArray[np.floating], NDArray[np.integer], NDArray[np.floating]]
+    ],
+    Optional[
+        Tuple[NDArray[np.floating], NDArray[np.integer], NDArray[np.floating]]
+    ],
 ]:
     """
     Perform symmetric log-histogramming on positive and negative values separately.
@@ -300,6 +323,8 @@ def symlog_binning(
     neg_result = neglog_binning(neg, bins_count) if neg.size else None
 
     return pos_result, neg_result
+
+
 #
 def marchenko_pastur(l, g):
     """
@@ -325,24 +350,24 @@ def marchenko_pastur(l, g):
 
     Reference
     ---------
-    Marchenko, V. A. and Pastur, L. A. (1967). "Distribution of eigenvalues for some sets 
+    Marchenko, V. A. and Pastur, L. A. (1967). "Distribution of eigenvalues for some sets
     of random matrices." Mathematics of the USSR-Sbornik, 1(4), 457-483.
     """
+
     def m0(a):
         """Compute the element-wise maximum of the array `a` and 0."""
         return np.maximum(a, 0)
 
-    g_plus = (1 + np.sqrt(g))**2
-    g_minus = (1 - np.sqrt(g))**2
+    g_plus = (1 + np.sqrt(g)) ** 2
+    g_minus = (1 - np.sqrt(g)) ** 2
 
     density = np.sqrt(m0(g_plus - l) * m0(l - g_minus)) / (2 * np.pi * g * l)
     return density
+
+
 #
 def update_mean_var(
-    mean: NDArray,
-    var: NDArray,
-    count: int,
-    sample: NDArray
+    mean: NDArray, var: NDArray, count: int, sample: NDArray
 ) -> Tuple[NDArray, NDArray, int]:
     """
     Online update of mean and variance (Welford's algorithm, vectorized).
@@ -370,29 +395,30 @@ def update_mean_var(
     # update population variance
     new_var = (var * count + delta * (sample - new_mean)) / new_count
     return new_mean, new_var, new_count
+
+
 #
 def update_mean_m2(
     mean: NDArray[np.float64],
-    M2:   NDArray[np.float64],
+    M2: NDArray[np.float64],
     count: int,
-    sample: NDArray[np.float64]
+    sample: NDArray[np.float64],
 ) -> Tuple[NDArray[np.float64], NDArray[np.float64], int]:
     """
     Welford’s online update, vectorized.
     mean_new, M2_new, count_new = update_mean_m2(mean, M2, count, sample)
     """
     count += 1
-    delta  = sample - mean
-    mean  += delta / count
+    delta = sample - mean
+    mean += delta / count
     delta2 = sample - mean
-    M2    += delta * delta2
+    M2 += delta * delta2
     return mean, M2, count
+
+
 #
 def update_mean_var_chunk(
-    mean: NDArray,
-    var: NDArray,
-    count: int,
-    chunk: NDArray
+    mean: NDArray, var: NDArray, count: int, chunk: NDArray
 ) -> Tuple[NDArray, NDArray, int]:
     """
     Update mean and variance with a batch of samples.

@@ -4,15 +4,13 @@ Re-exports bipartite graph classes from BipartiteGraphNX and
 BipartiteFromDegreeSequenceNX packages for cleaner imports.
 """
 
-from .BipartiteGraphNX import (
-    BipartiteGraphNX,
-    # Backward compatibility alias
-    BipartiteGraph,
-)
-from .BipartiteFromDegreeSequenceNX import (
-    BipartiteFromDegreeSequenceNX,
-    # Backward compatibility alias
+from .BipartiteFromDegreeSequenceNX import (  # Backward compatibility alias
     BipartiteFromDegreeSequence,
+    BipartiteFromDegreeSequenceNX,
+)
+from .BipartiteGraphNX import (  # Backward compatibility alias
+    BipartiteGraph,
+    BipartiteGraphNX,
 )
 
 __all__ = [

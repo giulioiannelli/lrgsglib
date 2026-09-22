@@ -13,7 +13,9 @@ import numpy as np
 __all__ = ["pad_protein_coordinates"]
 
 
-def pad_protein_coordinates(coords: np.ndarray, target_residues: int) -> np.ndarray:
+def pad_protein_coordinates(
+    coords: np.ndarray, target_residues: int
+) -> np.ndarray:
     """Pad or truncate an ``(n, 3)`` coordinate array to exactly ``target_residues`` rows.
 
     Padding rows are filled with the centroid of ``coords`` so that the

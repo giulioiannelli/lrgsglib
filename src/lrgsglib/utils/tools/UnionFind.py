@@ -1,14 +1,14 @@
 class UnionFind:
     """
     A Union-Find or Disjoint Set Union (DSU) data structure with path compression and union by rank.
-    
-    It provides an efficient way to manage a partition of a set into disjoint subsets and is useful 
+
+    It provides an efficient way to manage a partition of a set into disjoint subsets and is useful
     for dealing with connectivity queries, particularly in graph algorithms.
 
     Attributes:
     -----------
     parent (List[int]): Stores the parent of each element. Initially, each element is its own parent.
-    rank (List[int]): Represents the rank of each element, used to keep the tree flat by attaching 
+    rank (List[int]): Represents the rank of each element, used to keep the tree flat by attaching
                        the root of the smaller tree under the root of the larger tree.
     """
 
@@ -19,7 +19,7 @@ class UnionFind:
         Parameters:
         -----------
         n (int): The number of elements in the Union-Find structure.
-        
+
         Returns:
         --------
         None
@@ -36,7 +36,7 @@ class UnionFind:
         Parameters:
         -----------
         p (int): The element whose set representative is to be found.
-        
+
         Returns:
         --------
         int: The representative of the set containing 'p'.
@@ -55,7 +55,7 @@ class UnionFind:
         -----------
         p (int): An element of the first set.
         q (int): An element of the second set.
-        
+
         Returns:
         --------
         None

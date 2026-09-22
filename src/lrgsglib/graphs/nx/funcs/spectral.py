@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from typing import List
+
 import numpy as np
 from networkx import Graph, NetworkXError, to_numpy_array, to_scipy_sparse_array
 from networkx.drawing.layout import _process_params, rescale_layout
 from networkx.utils.backends import _dispatchable, _registered_algorithms
-from scipy.sparse import csr_array, spdiags, identity as sp_identity
+from scipy.sparse import csr_array
+from scipy.sparse import identity as sp_identity
+from scipy.sparse import spdiags
 from scipy.sparse.linalg import eigsh
-from typing import List
 
 __all__ = [
     "signed_laplacian_matrix",
@@ -26,13 +29,18 @@ def _signed_adj_and_absdeg(G, nodelist=None, weight="weight"):
     Laplacians.
     """
     nodelist = nodelist or list(G)
-    adj = to_scipy_sparse_array(G, nodelist=nodelist, weight=weight, format="csr")
+    adj = to_scipy_sparse_array(
+        G, nodelist=nodelist, weight=weight, format="csr"
+    )
     deg = np.asarray(abs(adj).sum(axis=1)).ravel()
     return adj, deg
 
+
 if "signed_laplacian_matrix" in _registered_algorithms:
+
     def _dispatchable_signed(func):
         return func
+
 else:
     _dispatchable_signed = _dispatchable(edge_attrs="weight")
 
@@ -43,7 +51,9 @@ def signed_laplacian_matrix(
 ) -> csr_array:
     """Return the signed Laplacian matrix of ``G``."""
     nodelist = nodelist or list(G)
-    adj = to_scipy_sparse_array(G, nodelist=nodelist, weight=weight, format="csr")
+    adj = to_scipy_sparse_array(
+        G, nodelist=nodelist, weight=weight, format="csr"
+    )
     deg = csr_array(spdiags(abs(adj).sum(axis=1), 0, *adj.shape, format="csr"))
     return deg - adj
 
@@ -88,7 +98,11 @@ def signed_rw_laplacian_matrix(
 
 
 def signed_spectral_layout(
-    G: Graph, weight: str = "weight", scale: float = 1, center=None, dim: int = 2
+    G: Graph,
+    weight: str = "weight",
+    scale: float = 1,
+    center=None,
+    dim: int = 2,
 ):
     """Position nodes using eigenvectors of the signed Laplacian."""
     G, center = _process_params(G, center, dim)

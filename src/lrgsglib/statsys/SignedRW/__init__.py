@@ -11,6 +11,8 @@ Public API
 * :mod:`_overlap` — offline overlap kernels between visit-count fields.
 """
 
+from . import _solvers  # noqa: F401  (registers the SignedRW solvers at import)
+from . import _overlap
 from .SignedSpinCopy import SignedSpinCopy
 from .SignedWalker import (
     AbsorbingWalker,
@@ -18,8 +20,6 @@ from .SignedWalker import (
     SignedWalker,
     StickyWalker,
 )
-from . import _overlap
-from . import _solvers  # noqa: F401  (registers the SignedRW solvers at import)
 
 # Backward-compatible alias: this model was formerly named `SignedRW`.
 SignedRW = SignedSpinCopy

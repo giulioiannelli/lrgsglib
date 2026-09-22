@@ -15,12 +15,12 @@ from numpy.typing import NDArray
 
 try:
     import graph_tool as gt
+
     GT_AVAILABLE = True
 except ImportError:
     GT_AVAILABLE = False
 
 from ..SignedGraphGT import SignedGraphGT
-
 
 __all__ = ["MultispectralGraphGT"]
 

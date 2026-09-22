@@ -118,9 +118,7 @@ class DynSys(ABC):
         self.savedyn = savedyn
         self.rndStr = rndStr
         self.run_id = join_non_empty(
-            '_',
-            id_string,
-            self.rand_str if rndStr else ''
+            "_", id_string, self.rand_str if rndStr else ""
         )
         self.out_suffix = out_suffix
         self.pflip_id = peq_fstr(self.sg.pflip)
@@ -312,8 +310,8 @@ class DynSys(ABC):
 
     def export_hfield(self) -> None:
         """Write the external field to a binary file."""
-        out_suffix = self.run_id or ''
-        fname = self.sg.get_p_fname('h', out_suffix=out_suffix)
+        out_suffix = self.run_id or ""
+        fname = self.sg.get_p_fname("h", out_suffix=out_suffix)
         self._ensure_dynpath_exists()
         self.hfout = self.dynpath / fname
-        self.field.astype('float64').tofile(open(self.hfout, 'wb'))
+        self.field.astype("float64").tofile(open(self.hfout, "wb"))

@@ -7,6 +7,7 @@ concrete implementation accepts it (NX does, GT ignores it).
 """
 
 import numpy as np
+
 from ...utils.lrg import compute_ising_pairwise_energy
 
 

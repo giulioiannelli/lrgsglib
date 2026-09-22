@@ -14,8 +14,9 @@ Example
 >>> sg = tg.get_signed_snapshot(time=1.5)
 """
 
-from typing import Optional, Union, Sequence, Iterator
 from collections import defaultdict
+from typing import Iterator, Optional, Sequence, Union
+
 import networkx as nx
 import numpy as np
 
@@ -129,7 +130,9 @@ class TemporalGraphNX(SignedGraphNX):
         self._times: set[float] = set()
 
         # Node set for temporal tracking (can grow if n_nodes is None)
-        self._temporal_nodes: set[int] = set(range(n_nodes)) if n_nodes else set()
+        self._temporal_nodes: set[int] = (
+            set(range(n_nodes)) if n_nodes else set()
+        )
 
         # RNG for sign flipping
         self._temporal_rng = np.random.default_rng(seed)
@@ -237,8 +240,13 @@ class TemporalGraphNX(SignedGraphNX):
     ) -> int:
         """Alias for ``add_temporal_edge()`` (backward compatibility)."""
         return self.add_temporal_edge(
-            u, v, t_start=t_start, t_end=t_end,
-            sign=sign, weight=weight, **attrs,
+            u,
+            v,
+            t_start=t_start,
+            t_end=t_end,
+            sign=sign,
+            weight=weight,
+            **attrs,
         )
 
     def remove_edge(self, u: int, v: int, time: float) -> bool:
@@ -257,8 +265,12 @@ class TemporalGraphNX(SignedGraphNX):
         bool
             True if edge was found and removed.
         """
-        for idx, (eu, ev, t_start, t_end, attrs) in enumerate(self._temporal_edges):
-            if (eu == u and ev == v) or (not self.directed and eu == v and ev == u):
+        for idx, (eu, ev, t_start, t_end, attrs) in enumerate(
+            self._temporal_edges
+        ):
+            if (eu == u and ev == v) or (
+                not self.directed and eu == v and ev == u
+            ):
                 if t_start <= time < t_end:
                     self._temporal_edges[idx] = (eu, ev, t_start, time, attrs)
                     self._times.add(time)
@@ -356,8 +368,9 @@ class TemporalGraphNX(SignedGraphNX):
                 G[u][v]["sign"] = new_sign
                 G[u][v]["weight"] = new_sign
 
-        return SignedGraphNX(G, pflip=self.pflip, seed=self.seed,
-                             make_dir_tree=False)
+        return SignedGraphNX(
+            G, pflip=self.pflip, seed=self.seed, make_dir_tree=False
+        )
 
     def get_aggregated_graph(
         self,
@@ -426,8 +439,9 @@ class TemporalGraphNX(SignedGraphNX):
                     if G.has_edge(u, v):
                         G[u][v]["weight"] += weight
                     else:
-                        G.add_edge(u, v, weight=weight,
-                                   sign=attrs.get("sign", 1))
+                        G.add_edge(
+                            u, v, weight=weight, sign=attrs.get("sign", 1)
+                        )
 
         return G
 
@@ -483,7 +497,9 @@ class TemporalGraphNX(SignedGraphNX):
         """
         intervals = []
         for eu, ev, ts, te, _ in self._temporal_edges:
-            if (eu == u and ev == v) or (not self.directed and eu == v and ev == u):
+            if (eu == u and ev == v) or (
+                not self.directed and eu == v and ev == u
+            ):
                 intervals.append((ts, te))
         return sorted(intervals)
 
@@ -654,7 +670,11 @@ class TemporalGraphNX(SignedGraphNX):
                 durations.append(te - ts)
 
         if not durations:
-            return {"burstiness": 0.0, "avg_duration": float("inf"), "turnover": 0.0}
+            return {
+                "burstiness": 0.0,
+                "avg_duration": float("inf"),
+                "turnover": 0.0,
+            }
 
         durations = np.array(durations)
         avg = np.mean(durations)
@@ -692,7 +712,9 @@ class TemporalGraphNX(SignedGraphNX):
 
     def _invalidate_temporal_cache(self, t_start: float, t_end: float) -> None:
         """Invalidate cached snapshots in a time range."""
-        to_remove = [t for t in self._temporal_snapshots if t_start <= t < t_end]
+        to_remove = [
+            t for t in self._temporal_snapshots if t_start <= t < t_end
+        ]
         for t in to_remove:
             del self._temporal_snapshots[t]
 

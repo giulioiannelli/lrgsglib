@@ -28,11 +28,12 @@ Interference effects arise from cross-terms between eigenmodes::
              Classical (incoherent)     Quantum interference (coherent)
 """
 
+from typing import Callable, Dict, Optional, Tuple, Union
+
 import numpy as np
-from typing import Tuple, Optional, Callable, Union, Dict
 from numpy.typing import NDArray
 from scipy.linalg import expm
-from scipy.sparse import csr_matrix, csr_array
+from scipy.sparse import csr_array, csr_matrix
 from scipy.sparse.linalg import expm as sparse_expm
 
 from ..basic import dtype_numerical_precision
@@ -57,7 +58,7 @@ def compute_quantum_propagator_spectral(
     eigenvalues: NDArray,
     eigenvectors: NDArray,
     t: float,
-    full_matrix: bool = False
+    full_matrix: bool = False,
 ) -> Union[Tuple[NDArray, NDArray], NDArray]:
     """
     Compute quantum propagator U(t) = exp(-i*t*L) using spectral decomposition.
@@ -239,7 +240,9 @@ def quantum_density_matrix_evolution(
             rho0[init_node, init_node] = 1.0
         elif init_type == "thermal":
             # Use classical thermal state as initial condition
-            tau_init = 1.0 / np.max(eigenvalues) if np.max(eigenvalues) > 0 else 1.0
+            tau_init = (
+                1.0 / np.max(eigenvalues) if np.max(eigenvalues) > 0 else 1.0
+            )
             thermal_probs = np.exp(-tau_init * eigenvalues)
             thermal_probs /= np.sum(thermal_probs)
             rho0 = eigenvectors @ np.diag(thermal_probs) @ eigenvectors.T
@@ -314,7 +317,9 @@ def quantum_probability_distribution(
     # eigenvectors[:, n] is the n-th eigenvector
     amplitudes = np.zeros(N, dtype=complex)
     for n in range(N):
-        amplitudes += phases[n] * eigenvectors[:, n] * eigenvectors[init_node, n]
+        amplitudes += (
+            phases[n] * eigenvectors[:, n] * eigenvectors[init_node, n]
+        )
 
     # Probability is modulus squared
     probabilities = np.abs(amplitudes) ** 2
@@ -415,13 +420,14 @@ def von_neumann_entropy(
 
     # Diagonalize density matrix (backend-selectable Hermitian eigensolver)
     from ...graphs._shared._backend import BackendManager
+
     eigenvals = BackendManager.get_backend(backend).eigvalsh(rho_t)
 
     # Filter small eigenvalues
     eigenvals = eigenvals[eigenvals > numerical_threshold]
 
     # Compute entropy: -∑ λ log(λ)
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide="ignore", invalid="ignore"):
         entropy = -np.sum(eigenvals * np.log(eigenvals))
 
     return entropy
@@ -484,8 +490,7 @@ def quantum_classical_divergence(
 
     # Compute quantum density matrix
     rho_quantum = quantum_density_matrix_evolution(
-        eigenvalues, eigenvectors, t, init_type="localized",
-        init_node=init_node
+        eigenvalues, eigenvectors, t, init_type="localized", init_node=init_node
     )
 
     # Compute classical density matrix (thermal)
@@ -504,7 +509,7 @@ def quantum_classical_divergence(
     diff = rho_quantum - rho_classical
 
     if metric == "frobenius":
-        divergence = np.linalg.norm(diff, 'fro')
+        divergence = np.linalg.norm(diff, "fro")
     elif metric == "trace":
         divergence = np.trace(np.abs(diff)).real
     elif metric == "max":
@@ -657,8 +662,11 @@ def compute_quantum_observables_from_eigenvalues(
     for idx, t in enumerate(t_array):
         # Evolve density matrix
         rho_t = quantum_density_matrix_evolution(
-            eigenvalues, eigenvectors, t,
-            init_type=init_type, init_node=init_node
+            eigenvalues,
+            eigenvectors,
+            t,
+            init_type=init_type,
+            init_node=init_node,
         )
 
         # Compute observables
@@ -673,7 +681,7 @@ def compute_quantum_observables_from_eigenvalues(
 
         # Participation ratio: 1 / ∑_i P_i²
         probs = prob_distributions[idx, :]
-        participation_ratio[idx] = 1.0 / np.sum(probs ** 2)
+        participation_ratio[idx] = 1.0 / np.sum(probs**2)
 
     observables = {
         "time": t_array.copy(),
@@ -752,7 +760,7 @@ def compute_quantum_distance_matrix(
 
     if method == "overlap":
         # V2[i, k] = |v_k(i)|^2  (column-major input)
-        V2 = eigenvectors ** 2  # shape (N, N)
+        V2 = eigenvectors**2  # shape (N, N)
         # Overlap matrix: O_ij = sum_k V2[i,k] * V2[j,k] = V2 @ V2.T
         overlap = V2 @ V2.T  # shape (N, N)
         # Distance: d = -log(overlap), handle zeros
@@ -877,13 +885,11 @@ def compute_ldos_entropy(
     Z_global = np.sum(boltz)
     p_global = boltz / Z_global
     mask_g = p_global > 1e-30
-    S_global = (
-        -np.sum(p_global[mask_g] * np.log(p_global[mask_g])) / log_N
-    )
+    S_global = -np.sum(p_global[mask_g] * np.log(p_global[mask_g])) / log_N
 
     # --- Local entropy per node ---
     # eigenvectors is column-major: eigenvectors[i, k] = v_k(i)
-    V2 = eigenvectors ** 2  # V2[i, k] = |v_k(i)|^2
+    V2 = eigenvectors**2  # V2[i, k] = |v_k(i)|^2
 
     # Unnormalized weights: W[i, k] = |v_k(i)|^2 * exp(-tau|lambda_k|)
     W = V2 * boltz[np.newaxis, :]  # broadcast (N, N)
@@ -967,8 +973,6 @@ def compute_ldos_specific_heat(
     # Per-node specific heat
     C_local_grid = np.zeros_like(S_local_grid)
     for j in range(N):
-        C_local_grid[:, j] = np.gradient(
-            1 - S_local_grid[:, j], log_tau
-        )
+        C_local_grid[:, j] = np.gradient(1 - S_local_grid[:, j], log_tau)
 
     return S_local_grid, S_global_grid, C_local_grid, C_global_grid
