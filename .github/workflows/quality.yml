@@ -67,7 +67,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev]" --config-settings=build-dir=build/ci
+
+      # An editable install keeps the CMake-built C simulators in
+      # site-packages, while each model resolves its binaries relative to
+      # its own source file. Mirror the local `make` layout under src/.
+      - name: Install compiled simulators into the source tree
+        run: cmake --install build/ci --prefix "$PWD/src"
 
       - name: Run tests
         run: pytest test/ --quick -q -k "not test_ising_c_ground_state"
