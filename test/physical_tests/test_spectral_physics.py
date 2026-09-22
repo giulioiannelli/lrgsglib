@@ -8,6 +8,8 @@ The signed Laplacian is constructed to have non-negative eigenvalues.
 import pytest
 import numpy as np
 
+from lrgsglib.config.const import SG_LAPL_RW_IMAG_TOL
+
 
 # ===================================================================
 # Laplacian invariants
@@ -19,7 +21,11 @@ def test_eigenvalues_are_real(small_lattice_sqr):
     """All Laplacian eigenvalues must be real."""
     from lrgsglib.utils.lrg.spectral import get_graph_lspectrum
     _, eigvals = get_graph_lspectrum(small_lattice_sqr.gr["G"], library="numpy")
-    assert np.all(np.isreal(eigvals)), "Eigenvalues must be real"
+    # The general eigensolver may leave O(1e-16) imaginary round-off on a
+    # symmetric matrix (LAPACK-dependent); only a physical Im part fails.
+    assert np.all(np.abs(np.imag(eigvals)) < SG_LAPL_RW_IMAG_TOL), (
+        "Eigenvalues must be real"
+    )
 
 
 @pytest.mark.physical
@@ -87,6 +93,7 @@ def test_numpy_scipy_consistency(small_lattice_sqr):
     _, eigvals_sp = get_graph_lspectrum(G, library="scipy")
     np.testing.assert_allclose(
         np.sort(eigvals_np), np.sort(eigvals_sp), rtol=1e-8,
+        atol=SG_LAPL_RW_IMAG_TOL,  # the zero mode has no relative scale
         err_msg="numpy and scipy eigenvalues differ"
     )
 
