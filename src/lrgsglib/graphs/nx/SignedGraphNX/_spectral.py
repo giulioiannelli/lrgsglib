@@ -1442,3 +1442,86 @@ from ..._shared._quantum import (  # noqa: F401
     quantum_walk_probabilities,
     quantum_observables_time_series,
 )
+
+
+# ---------------------------------------------------------------------------
+# Signed heat kernel K_τ = exp(−τ L̄): propagator of the signed consensus
+# dynamics ẋ = −L̄ x (Altafini-type; Shi, Altafini & Baras, SIAM Rev. 2019).
+# ---------------------------------------------------------------------------
+def _eigvecs_rows(self: "SignedGraphNX") -> NDArray:
+    """Full eigenbasis as rows (ψ_k = V[k]), computing it if missing."""
+    if getattr(self, "_sparse_spectrum", False) or getattr(self, "eigV", None) is None \
+            or np.shape(self.eigV) != (self.N, self.N):
+        self.compute_laplacian_spectrum_weigV()
+    if getattr(self, "_sparse_spectrum", False):
+        raise ValueError("heat-kernel methods need the full dense spectrum")
+    return self.eigV if getattr(self, "_eigV_is_transposed", True) else self.eigV.T
+
+
+def get_kernel_embedding(
+        self: "SignedGraphNX",
+        tau: float,
+        n_modes: Optional[int] = None,
+        shift: bool = True,
+) -> NDArray:
+    """
+    Diffusion embedding at scale τ: rows ``y_i = (e^{−τ(λ_k−λ_0)/2} ψ_k(i))_k``.
+
+    ``K_τ = Y Yᵀ`` (see :func:`get_heat_kernel`). ``shift`` subtracts λ_0 so the
+    overall decay ``e^{−τλ_0}`` of an unbalanced graph does not underflow; it
+    rescales every entry by the same factor and changes no sign or correlation.
+
+    Parameters
+    ----------
+    tau : float
+        Diffusion time (scale).
+    n_modes : int, optional
+        Keep only the ``n_modes`` lowest modes (all by default).
+    shift : bool, default True
+        Subtract λ_0 from the spectrum before exponentiating.
+
+    Returns
+    -------
+    NDArray, shape (N, n_modes)
+    """
+    V = _eigvecs_rows(self)
+    lam = np.asarray(self.eigv, dtype=float)
+    if shift:
+        lam = lam - lam[0]
+    m = self.N if n_modes is None else int(n_modes)
+    return V[:m].T * np.exp(-0.5 * tau * lam[:m])
+
+
+def get_heat_kernel(
+        self: "SignedGraphNX",
+        tau: float,
+        n_modes: Optional[int] = None,
+        shift: bool = True,
+) -> NDArray:
+    """
+    Signed heat kernel ``K_τ = Σ_k e^{−τ(λ_k−λ_0)} ψ_k ψ_kᵀ`` (dense, N × N).
+
+    Row ``s`` is the state after time τ of the signed consensus dynamics
+    started from a unit kick at node ``s``: ``sign(K_τ[s, i])`` says whether
+    ``i`` is in phase (+) or anti-phase (−) with ``s``, ``|K_τ[s, i]|`` how
+    strongly it is synchronized. Same ``shift`` convention as
+    :func:`get_kernel_embedding`.
+    """
+    Y = self.get_kernel_embedding(tau, n_modes=n_modes, shift=shift)
+    return Y @ Y.T
+
+
+def get_kernel_correlation(
+        self: "SignedGraphNX",
+        tau: float,
+        n_modes: Optional[int] = None,
+) -> NDArray:
+    """
+    Signed synchronization correlation ``ρ_ij = K_ij / sqrt(K_ii K_jj)`` ∈ [−1, 1].
+
+    +1: in phase, −1: anti-phase, 0: desynchronized at scale τ. Independent of
+    the overall decay (so of ``shift``).
+    """
+    K = self.get_heat_kernel(tau, n_modes=n_modes, shift=True)
+    d = np.sqrt(np.clip(np.diag(K), np.finfo(float).tiny, None))
+    return K / np.outer(d, d)

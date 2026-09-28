@@ -20,6 +20,7 @@ import networkx as nx
 import numpy as np
 
 from ..RandomGraphNX.RandomGraphNX import RandomGraphNX
+from ....config.const import SG_REPR
 
 
 # Constants for StochasticBlockModel
@@ -144,8 +145,10 @@ class StochasticBlockModelNX(RandomGraphNX):
         self.std_fname = SBM_PHTABB + suffix
 
     def _generate_graph(self) -> nx.Graph:
-        """Generate stochastic block model graph."""
-        return nx.stochastic_block_model(self.sizes, self.p_matrix)
+        """Generate stochastic block model graph (seeded via ``_rng_seed``)."""
+        return nx.stochastic_block_model(
+            self.sizes, self.p_matrix, seed=self._rng_seed
+        )
 
     def _compute_syshapePth(self) -> str:
         """Compute path string for SBM parameters."""
@@ -171,6 +174,29 @@ class StochasticBlockModelNX(RandomGraphNX):
                 if node_idx < self.G.number_of_nodes():
                     self.community_labels[node_idx] = comm_idx
                 node_idx += 1
+
+    def get_planted_labels(self) -> np.ndarray:
+        """
+        Planted block of every node, in the node order of ``self.gr['G']``.
+
+        Reads the ``block`` node attribute set by ``nx.stochastic_block_model``
+        (it survives giant-component extraction and relabelling, unlike the
+        index-based ``community_labels``); falls back to ``community_labels``.
+        """
+        G = self.gr[SG_REPR]
+        blocks = nx.get_node_attributes(G, "block")
+        if len(blocks) == G.number_of_nodes():
+            return np.array([blocks[u] for u in G.nodes()], dtype=int)
+        return np.array([self.community_labels[u] for u in G.nodes()], dtype=int)
+
+    def flip_inter_block_edges(self) -> None:
+        """
+        Balanced signed block model: every edge between two planted blocks
+        becomes negative, edges inside a block stay positive. Add sign noise
+        afterwards with ``flip_sel_edges(get_random_edges_from_set(n))`` and
+        resync the edge sets with ``upd_edge_sets()``.
+        """
+        self.flip_edges_between_labels(self.get_planted_labels())
 
     def get_community_sizes(self) -> list[int]:
         """

@@ -266,3 +266,17 @@ def get_renyi_results(self, q: float) -> dict:
     ):
         compute_renyi_entropy_profile(self, q=q)
     return self.renyi_results[q]
+
+
+def get_tau_peaks(self, min_prominence: float = 0.0) -> NDArray:
+    """
+    Diffusion times of the specific-heat peaks (LRG scales; Villegas et al.
+    2023), from ``compute_signed_laplacian_entropy`` (called with defaults if
+    missing), sorted by decreasing prominence. Empty if C(τ) has no peak.
+    """
+    from scipy.signal import find_peaks
+    C = np.asarray(self.get_specific_heat(), dtype=float)
+    tau = np.asarray(self.tauscale, dtype=float)
+    idx, props = find_peaks(C, prominence=min_prominence)
+    order = np.argsort(props["prominences"])[::-1] if len(idx) else []
+    return tau[idx[order]] if len(idx) else np.empty(0)

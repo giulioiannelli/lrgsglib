@@ -364,3 +364,158 @@ def handle_no_clust(self: "SignedGraphNX", NoClust: int) -> int | None:
             return None
     return NoClust
 
+
+
+# ---------------------------------------------------------------------------
+# k-way partitions: signed spectral clustering (Kunegis et al. 2010) and the
+# heat-kernel / synchronization partitions at a diffusion scale τ.
+# ---------------------------------------------------------------------------
+def partition_from_features(
+        self: "SignedGraphNX",
+        F: np.ndarray,
+        n_clusters: int,
+        method: str = "kmeans",
+        seed: Optional[int] = None,
+        linkage_method: str = "ward",
+) -> np.ndarray:
+    """
+    Label the nodes from a node-feature matrix ``F`` (one row per node):
+    ``'kmeans'`` on the rows, or ``'linkage'``: Ward linkage on the rows
+    (Euclidean, same geometry as k-means) when ``linkage_method='ward'``,
+    otherwise ``linkage_method`` linkage on the distance ``1 − F`` (for a
+    square similarity ``F`` in [−1, 1]). Used by ``get_spectral_partition``
+    / ``get_kernel_partition``; call it directly for any other embedding
+    (e.g. a SPONGE or adjacency basis).
+
+    Returns
+    -------
+    np.ndarray, shape (N,) of int labels
+    """
+    if method == "kmeans":
+        import warnings
+        from sklearn.cluster import KMeans
+        from sklearn.exceptions import ConvergenceWarning
+        km = KMeans(n_clusters=n_clusters, n_init=10, random_state=seed)
+        with warnings.catch_warnings():
+            # collapsed features (e.g. a kernel at τ → ∞) give fewer distinct
+            # points than clusters; the degenerate labels are the answer.
+            warnings.simplefilter("ignore", ConvergenceWarning)
+            return km.fit_predict(F)
+    if method == "linkage":
+        from scipy.cluster.hierarchy import fcluster, linkage
+        from scipy.spatial.distance import squareform
+        if linkage_method == "ward":
+            Z = linkage(F, method="ward")
+        else:
+            D = 1.0 - F
+            D = 0.5 * (D + D.T)
+            np.fill_diagonal(D, 0.0)
+            Z = linkage(squareform(D, checks=False), method=linkage_method)
+        return fcluster(Z, n_clusters, criterion="maxclust") - 1
+    raise ValueError(f"method must be 'kmeans' or 'linkage', got {method!r}")
+
+
+def get_spectral_partition(
+        self: "SignedGraphNX",
+        n_clusters: int,
+        n_modes: Optional[int] = None,
+        laplacian_type: str = "sym",
+        seed: Optional[int] = None,
+) -> np.ndarray:
+    """
+    Signed spectral clustering: ``n_modes`` smallest eigenvectors of the signed
+    Laplacian (``'signed'``: L̄ = D̄ − A; ``'sym'``: L̄_sym, Kunegis et al. SDM
+    2010 §3) as node features, then k-means into ``n_clusters``.
+
+    Computed locally: the object's cached full spectrum is left untouched.
+
+    Returns
+    -------
+    np.ndarray, shape (N,) of int labels
+    """
+    from scipy.linalg import eigh
+    M, _ = self._laplacian_operator(laplacian_type)
+    M = M.toarray() if hasattr(M, "toarray") else np.asarray(M)
+    m = n_clusters if n_modes is None else int(n_modes)
+    _, V = eigh(M, subset_by_index=[0, m - 1])
+    return self.partition_from_features(V, n_clusters, "kmeans", seed)
+
+
+def get_kernel_partition(
+        self: "SignedGraphNX",
+        tau: float,
+        n_clusters: int,
+        method: str = "kmeans",
+        mod_sign: bool = False,
+        n_modes: Optional[int] = None,
+        seed: Optional[int] = None,
+        linkage_method: str = "ward",
+) -> np.ndarray:
+    """
+    Partition at diffusion scale τ from the synchronization correlation
+    ``ρ = K_τ / sqrt(diag ⊗ diag)`` (see ``get_kernel_correlation``).
+
+    Two notions of community:
+      * ``mod_sign=False`` — phase groups: nodes with the same signed profile
+        ``ρ_i·`` (in phase with the same nodes, anti-phase with the same nodes);
+      * ``mod_sign=True``  — synchronization groups: same ``|ρ_i·|`` profile,
+        the sign relation between groups being read off afterwards.
+
+    ``method='kmeans'`` clusters the rows of ρ (or |ρ|); ``method='linkage'``
+    builds ``linkage_method`` linkage on the distance ``1 − ρ`` (or ``1 − |ρ|``)
+    and cuts it into ``n_clusters``.
+
+    Returns
+    -------
+    np.ndarray, shape (N,) of int labels
+    """
+    F = self.get_kernel_correlation(tau, n_modes=n_modes)
+    if mod_sign:
+        F = np.abs(F)
+    return self.partition_from_features(F, n_clusters, method, seed, linkage_method)
+
+
+def get_coarse_signed_adjacency(
+        self: "SignedGraphNX",
+        labels: np.ndarray,
+        on_g: str = SG_REPR,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Positive and negative edge counts between the groups of ``labels``.
+
+    Returns ``(W_plus, W_minus)``, each ``(n_groups, n_groups)``; the diagonal
+    counts edges inside a group. Their difference is the coarse signed graph,
+    the sign relation between communities.
+    """
+    labels = np.asarray(labels)
+    groups = np.unique(labels)
+    idx = {g: i for i, g in enumerate(groups)}
+    Wp = np.zeros((len(groups), len(groups)))
+    Wm = np.zeros_like(Wp)
+    nodes = list(self.gr[on_g].nodes())
+    pos = {u: k for k, u in enumerate(nodes)}
+    for u, v, w in self.gr[on_g].edges(data="weight", default=1.0):
+        a, b = idx[labels[pos[u]]], idx[labels[pos[v]]]
+        W = Wp if w > 0 else Wm
+        W[a, b] += 1
+        if a != b:
+            W[b, a] += 1
+    return Wp, Wm
+
+
+def score_partition(
+        self: "SignedGraphNX",
+        labels: np.ndarray,
+        truth: Optional[np.ndarray] = None,
+) -> dict:
+    """
+    Agreement of ``labels`` with ``truth`` (planted labels by default, from
+    ``get_planted_labels`` when the graph has them): ``{'nmi', 'ari'}``.
+    """
+    from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+    if truth is None:
+        if not hasattr(self, "get_planted_labels"):
+            raise ValueError("no planted labels on this graph: pass truth=")
+        truth = self.get_planted_labels()
+    return dict(nmi=normalized_mutual_info_score(truth, labels),
+                ari=adjusted_rand_score(truth, labels))

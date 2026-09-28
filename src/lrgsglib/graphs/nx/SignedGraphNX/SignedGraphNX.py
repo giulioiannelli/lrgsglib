@@ -1231,6 +1231,7 @@ class SignedGraphNX:
     #
     from ._ongraph import check_Ne_flips
     from ._ongraph import flip_sel_edges
+    from ._ongraph import flip_edges_between_labels
     from ._ongraph import get_random_edges_from_set
     from ._ongraph import flip_random_fract_edges
     from ._ongraph import unflip_all
@@ -1293,6 +1294,9 @@ class SignedGraphNX:
     from ._spectral import make_eigV_column_major
     from ._spectral import make_adj_eigV_transposed
     from ._spectral import make_adj_eigV_column_major
+    from ._spectral import get_kernel_embedding
+    from ._spectral import get_heat_kernel
+    from ._spectral import get_kernel_correlation
     #
     # quantum propagator methods (imported from ._spectral)
     #
@@ -1308,6 +1312,7 @@ class SignedGraphNX:
     from ._infotheory import get_specific_heat
     from ._infotheory import get_entropy_derivative  # DEPRECATED
     from ._infotheory import get_renyi_results
+    from ._infotheory import get_tau_peaks
     #
     # energy and dynamics tools (imported from ._dynamics)
     #
@@ -1332,6 +1337,11 @@ class SignedGraphNX:
     from ._partitioning import make_eigVclustersYN
     from ._partitioning import make_connected_component_by_edge
     from ._partitioning import handle_no_clust
+    from ._partitioning import partition_from_features
+    from ._partitioning import get_spectral_partition
+    from ._partitioning import get_kernel_partition
+    from ._partitioning import get_coarse_signed_adjacency
+    from ._partitioning import score_partition
     #
     # data cleaners and removers (imported from ._cleaners)
     #

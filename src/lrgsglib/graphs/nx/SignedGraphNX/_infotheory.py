@@ -10,4 +10,5 @@ from ..._shared._infotheory import (  # noqa: F401
     get_specific_heat,
     get_entropy_derivative,
     get_renyi_results,
+    get_tau_peaks,
 )

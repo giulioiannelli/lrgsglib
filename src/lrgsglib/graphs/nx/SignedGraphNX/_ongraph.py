@@ -225,3 +225,24 @@ def set_node_attributes(
         on_g: str = SG_REPR
 ):
     nx.set_node_attributes(self.gr[on_g], values, attribute_name)
+
+
+def flip_edges_between_labels(
+        self: "SignedGraphNX",
+        labels: Any,
+        on_g: str = SG_REPR,
+) -> None:
+    """
+    Make every edge whose endpoints carry different ``labels`` negative
+    (edges inside a label stay as they are). ``labels`` is indexed like the
+    node order of ``self.gr[on_g]``. With planted block labels this builds
+    the balanced signed block model (+ inside blocks, − between).
+    """
+    nodes = list(self.gr[on_g].nodes())
+    pos = {u: k for k, u in enumerate(nodes)}
+    labels = np.asarray(labels)
+    inter = [(u, v) for u, v in self.eset[on_g] if labels[pos[u]] != labels[pos[v]]
+             and self.get_edge_data(u, v, on_g=on_g) > 0]
+    if inter:
+        self.flip_sel_edges(inter, on_g=on_g)
+    self.upd_edge_sets(on_g)
