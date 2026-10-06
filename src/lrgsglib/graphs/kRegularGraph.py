@@ -6,12 +6,15 @@ Example
 >>> from lrgsglib.graphs import kRegularGraph
 >>>
 >>> krg = kRegularGraph(n=100, k=4, engine='nx')
+>>> # exact uniform sampler: the same graph on both engines for one seed
+>>> krg = kRegularGraph(n=100, k=3, seed=7, method='pairing', engine='gt')
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional, Union
 
+from ..config.const import KREG_METHOD
 from ._engine import GraphEngine, get_implementation, register_implementation
 
 if TYPE_CHECKING:
@@ -61,6 +64,10 @@ class kRegularGraph:
         Random seed for reproducibility.
     engine : str or GraphEngine, optional
         Graph engine to use ('nx' or 'gt').
+    method : {'native', 'pairing'}, default 'native'
+        Topology sampler: the engine's own generator, or the exact uniform
+        pairing sampler, which gives the same graph on both engines for the
+        same seed.
     **kwargs
         Additional engine-specific parameters.
 
@@ -82,6 +89,7 @@ class kRegularGraph:
         pflip: Any = 0.0,
         seed: Any = None,
         engine: Any = None,
+        method: Any = KREG_METHOD,
         **kwargs: Any,
     ) -> "kRegularGraphNX":
         if engine is not None and isinstance(engine, str):
@@ -96,6 +104,7 @@ class kRegularGraph:
                 "k": k,
                 "pflip": pflip,
                 "seed": seed,
+                "method": method,
             }
             for key in _NX_SPECIFIC_PARAMS:
                 if key in kwargs:
@@ -108,6 +117,7 @@ class kRegularGraph:
                 "k": k,
                 "pflip": pflip,
                 "seed": seed,
+                "method": method,
             }
             for key in _NX_SPECIFIC_PARAMS:
                 kwargs.pop(key, None)
@@ -119,6 +129,7 @@ class kRegularGraph:
                 "k": k,
                 "pflip": pflip,
                 "seed": seed,
+                "method": method,
                 **kwargs,
             }
 

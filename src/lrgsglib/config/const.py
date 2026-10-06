@@ -173,6 +173,21 @@ DGM_PHTABB = "dgm"
 DGM_ONREP = "G"
 DGM_STDFN = ""
 DGM_SGPATH = ""
+# k-regular graph default values
+# method='native' uses the engine's generator (NX random_regular_graph, GT
+# configuration model + rewiring); method='pairing' uses the exact uniform
+# pairing sampler (graphs/_shared/_regular_pairing.py), with the same graph for
+# the same seed on both engines. Pairing rejects whole draws until simple;
+# measured mean draws per graph: 7.3 (k=3), 44.7 (k=4).
+KREG_PHTABB = "kreg"
+KREG_METHOD_NATIVE = "native"
+KREG_METHOD_PAIRING = "pairing"
+KREG_METHODS = (KREG_METHOD_NATIVE, KREG_METHOD_PAIRING)
+KREG_METHOD = KREG_METHOD_NATIVE
+KREG_PAIRING_MAX_ATTEMPTS = 100_000
+# The pairing draw uses SeedSequence(seed, spawn_key=(KREG_PAIRING_STREAM,)),
+# apart from the graph's flip RNG, which takes the bare seed.
+KREG_PAIRING_STREAM = 1
 # 2D Lattice default values
 L2D_BEND_POS = False
 L2D_FBCV = 1.0
