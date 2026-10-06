@@ -74,9 +74,12 @@ def make_transcluster_lattice(
     """Instantiate a :class:`Lattice3D` tailored for transient cluster runs."""
 
     kwargs = initialize_l3d_dict_args(args)
+    # disorder=None: the TransCluster driver realizes the disorder itself
+    # (flip_sel_edges(nwDict[cell]) or Gaussian couplings), exactly once.
     kwargs.update({
         "init_nw_dict": init_nw_dict,
         "with_positions": with_positions,
+        "disorder": None,
     })
     if only_const_mode is not None:
         kwargs["only_const_mode"] = only_const_mode

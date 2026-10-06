@@ -70,6 +70,9 @@ def create_lattice_with_eigenspace(
     # Ensure that predefined structures load their network definitions
     if disorder_struct != "random":
         kwargs.setdefault("init_nw_dict", True)
+    # This function realizes the disorder itself (below), so the
+    # construction-time auto-flip is deferred: signs are applied once.
+    kwargs.setdefault("disorder", None)
 
     # Initialize lattice
     lattice = Lattice2DNX(side, **kwargs)
@@ -146,6 +149,9 @@ def load_or_compute_Lattice2DNX(
       flipping probability (`pflip`).
     - The eigenvalues and energy are computed using the `cupy` backend.
     """
+    # This function realizes the disorder itself (below), so the
+    # construction-time auto-flip is deferred: signs are applied once.
+    kwargs.setdefault("disorder", None)
     tmp_l = Lattice2DNX(side1, geo, only_const_mode=True, **kwargs)
     if not compute:
         return tmp_l

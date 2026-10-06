@@ -30,14 +30,18 @@ def initialize_l2d_dict_args(args: Any) -> dict:
     Notes:
     ------
     The function determines whether to include the `init_nw_dict` key based on the `cell_type` attribute of `args`. If `cell_type` is 'rand', the dictionary excludes `init_nw_dict`. Otherwise, it includes `init_nw_dict` set to `True`.
+
+    ``disorder=None`` defers the construction-time auto-flip: every caller
+    realizes the disorder itself (``flip_random_fract_edges`` or
+    ``flip_sel_edges(nwDict[cell])``), so the signs are applied exactly once.
     """
     match args.cell_type:
         case 'rand':
             return dict(side1=args.L, geo=args.geometry, sgpathn=args.workdir,
-                    pflip=args.p)
+                    pflip=args.p, disorder=None)
         case _:
             return dict(side1=args.L, geo=args.geometry, sgpathn=args.workdir,
-                    pflip=args.p, init_nw_dict=True)
+                    pflip=args.p, init_nw_dict=True, disorder=None)
 
 def prepare_lattice(args: Any, **kwargs) -> Any:
     """
@@ -64,9 +68,8 @@ def prepare_lattice(args: Any, **kwargs) -> Any:
         geo = args.geometry
         _GEO_ALIASES = {"squared": "sqr", "triangular": "tri", "hexagonal": "hex"}
         geo = _GEO_ALIASES.get(geo, geo)
-        l2d_kwargs = dict(
-            side1=args.L, geo=geo, pflip=args.p, seed=42,
-        )
+        # No fixed seed: every call must draw an independent realization.
+        l2d_kwargs = dict(side1=args.L, geo=geo, pflip=args.p)
         lattice = Cls(**l2d_kwargs, **kwargs)
         lattice.flip_random_fract_edges()
         return lattice

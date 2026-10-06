@@ -9,7 +9,9 @@ and the run dirname is built here from the model's resolved parameters.
 Rules (locked with the user, 2026-07-07):
 
 - ``key=value`` for EVERY token — numbers and categoricals alike
-  (``rule=glau_move=wolff_upd=gill``), floats ``%.3g``, integer
+  (``rule=glau_move=wolff_upd=gill``), floats ``%.12g``
+  (``EXACT_FLOAT_FMT``; was ``%.3g`` until 2026-09-30, which merged
+  grid points such as 0.1025 and 0.103 into one directory), integer
   sequences joined with ``'-'`` (heterogeneous q: ``q=2-5``).
 - Token order is the model's canonical schema: numeric parameters first
   in order of fundamentality (disorder ``p=``, then model physics, then
@@ -32,9 +34,11 @@ run directory is the reproducibility ground truth.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+
+from ..config.const import EXACT_FLOAT_FMT
+from ._io import atomic_write_bytes
 
 __all__ = [
     "ALWAYS",
@@ -99,12 +103,12 @@ VOCAB: dict[str, str] = {
 
 
 def format_value(value: Any) -> str:
-    """Render one token value: floats ``%.3g``, sequences ``'-'``-joined,
-    categorical strings shortened through ``VOCAB``."""
+    """Render one token value: floats ``EXACT_FLOAT_FMT``, sequences
+    ``'-'``-joined, categorical strings shortened through ``VOCAB``."""
     if isinstance(value, bool):
         return str(int(value))
     if isinstance(value, float):
-        return f"{value:.3g}"
+        return f"{value:{EXACT_FLOAT_FMT}}"
     if isinstance(value, (tuple, list)):
         return "-".join(format_value(v) for v in value)
     if isinstance(value, str):
@@ -175,13 +179,12 @@ def write_cfg_sidecar(
     realization seed — ``p`` names the ensemble, the seed pins the
     realization), ``model`` (every constructor argument, elided defaults
     included), ``run`` (steps, observables, backend, dynamics seed,
-    library version, timestamp). Atomic write (temp + rename).
+    library version, timestamp). Atomic write through a uniquely named
+    temp sibling, so concurrent writers of the same sidecar never collide.
     """
     payload = {"graph": graph, "model": model, "run": run}
-    path = Path(rundir) / "cfg.json"
-    tmp = path.with_suffix(".json.tmp")
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, indent=2, sort_keys=True, default=_json_default)
-        fh.write("\n")
-    os.replace(tmp, path)
-    return path
+    text = json.dumps(payload, indent=2, sort_keys=True, default=_json_default)
+    data = (text + "\n").encode("utf-8")
+    return atomic_write_bytes(
+        Path(rundir) / "cfg.json", lambda fh: fh.write(data)
+    )
