@@ -47,6 +47,11 @@ def _handle_stop_signal(signum, frame):  # noqa: ARG001
 from lrgsglib.graphs import Lattice2D
 from lrgsglib.statsys.SignedRW._kernel import _kill_masks, signed_lattice_tables
 from lrgsglib.statsys.SignedRW.SignedWalker import _load_srw_native
+from parsers.shared import (
+    GraphArgumentParser,
+    add_graph_engine_arg,
+    refuse_gt_ignored_options,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +63,7 @@ def _parse_float_list(s: str) -> list[float]:
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p = GraphArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--side", "-s", type=int, required=True)
     p.add_argument("--pflip-list", required=True, type=_parse_float_list)
     p.add_argument("--geo", default="sqr")
@@ -78,8 +83,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--time-budget", type=float, default=600.0,
                    help="Wall-clock budget per p value, seconds; 0 disables.")
     p.add_argument("--workdir", "-wd", default="ttt")
+    add_graph_engine_arg(p)
     p.add_argument("--tag", default="")
     p.add_argument("--verbose", "-v", action="store_true")
+    refuse_gt_ignored_options(p)
     return p.parse_args(argv)
 
 
@@ -147,7 +154,8 @@ def run_sweep(args: argparse.Namespace) -> Path:
     done_mask = np.zeros((n_p, n_d), dtype=bool)
 
     proto = Lattice2D(side, geo=args.geo, pbc=args.pbc, pflip=0.0,
-                      seed=args.seed_disorder, sgpathn=args.workdir)
+                      seed=args.seed_disorder, sgpathn=args.workdir,
+                      engine=args.graph_engine)
     out_path = _output_path(proto, args.n_max, n_t, args.tag)
 
     # Resume if compatible pickle exists (handle both old (n_p,) and new (n_p, n_d)
@@ -219,7 +227,8 @@ def run_sweep(args: argparse.Namespace) -> Path:
             t0 = perf_counter()
             lat = Lattice2D(side, geo=args.geo, pbc=args.pbc, pflip=p,
                             seed=args.seed_disorder + 1000 * d,
-                            sgpathn=args.workdir)
+                            sgpathn=args.workdir,
+                            engine=args.graph_engine)
             if p > 0:
                 lat.flip_random_fract_edges()
             csr = _csr_masks(lat, args.x_node)

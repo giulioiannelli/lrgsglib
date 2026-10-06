@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Callable, Iterable, Sequence
+import shlex
+from typing import Callable, Iterable, Mapping, Sequence
 
 import numpy as np
 
 from lrgsglib.config.const import EXACT_FLOAT_FMT
+from lrgsglib.config.progargs.defs.generic import SBATCH_FORBIDDEN_CHARS
 
 __all__ = [
     "build_memory_function",
@@ -21,6 +23,10 @@ __all__ = [
     "render_sbatch_array_script",
     "estimate_mcg_laplacian_memory_mb",
     "auto_select_gpu_type",
+    "split_arrays",
+    "format_array_spec",
+    "check_sbatch_value",
+    "render_sbatch_tiles_script",
 ]
 
 def build_memory_function(min_mb: int, max_mb: int, values: Sequence[int]) -> Callable[[int], int]:
@@ -464,3 +470,124 @@ def auto_select_gpu_type(
         print(f"Auto-selecting GPU: {gpu_type} ({reason})")
 
     return gpu_type
+
+
+# ---------------------------------------------------------------------------
+# SLURM arrays of tiles (tile-based programs, e.g. RRG_TransCluster.py)
+# ---------------------------------------------------------------------------
+def split_arrays(
+    tile_ids: Iterable[int], array_max: int
+) -> list[tuple[int, list[int]]]:
+    """Group tile ids into SLURM arrays whose indices stay below ``array_max``.
+
+    Returns ``(offset, indices)`` pairs: array index ``i`` runs tile
+    ``offset + i``. Offsets are multiples of ``array_max``, because SLURM's
+    ``MaxArraySize`` bounds the largest index, not the number of tasks.
+    """
+    if array_max < 1:
+        raise ValueError("array_max must be >= 1")
+    blocks: dict[int, list[int]] = {}
+    for tile_id in sorted(set(tile_ids)):
+        if tile_id < 0:
+            raise ValueError(f"tile ids must be >= 0, got {tile_id}")
+        block, index = divmod(tile_id, array_max)
+        blocks.setdefault(block * array_max, []).append(index)
+    return list(blocks.items())
+
+
+def format_array_spec(indices: Sequence[int], concurrent: int) -> str:
+    """``#SBATCH --array`` value: compressed ranges plus the ``%K`` throttle,
+    e.g. ``0-9,17,42-43%5`` (K = min(concurrent, number of tasks))."""
+    ids = sorted(set(indices))
+    if not ids or ids[0] < 0 or concurrent < 1:
+        raise ValueError("need >= 1 index, all >= 0, and concurrent >= 1")
+    runs = [[ids[0], ids[0]]]
+    for index in ids[1:]:
+        if index == runs[-1][1] + 1:
+            runs[-1][1] = index
+        else:
+            runs.append([index, index])
+    body = ",".join(f"{a}" if a == b else f"{a}-{b}" for a, b in runs)
+    return f"{body}%{min(concurrent, len(ids))}"
+
+
+def check_sbatch_value(name: str, value: str, *, required: bool = True) -> None:
+    """Refuse a value that an ``#SBATCH`` line would not pass on verbatim.
+
+    These lines are not shell-quoted: sbatch splits them at whitespace, ends
+    them at ``#``, and strips quotes and backslashes.
+    """
+    if required and not value:
+        raise ValueError(f"{name} must be non-empty")
+    if any(c.isspace() or c in SBATCH_FORBIDDEN_CHARS for c in value):
+        chars = " ".join(SBATCH_FORBIDDEN_CHARS)
+        raise ValueError(
+            f"{name} {value!r} goes into an #SBATCH line: no whitespace "
+            f"and none of {chars}"
+        )
+
+
+def render_sbatch_tiles_script(
+    *,
+    jobname: str,
+    chdir: str,
+    array: str,
+    mem_mb: int,
+    cpus: int,
+    time: str,
+    partition: str,
+    signal: str,
+    env: Mapping[str, str],
+    command: Sequence[str],
+    index_flag: str,
+    tile_offset: int,
+    log_dir: str,
+) -> str:
+    """Self-contained sbatch script of one array of tiles.
+
+    Every task runs ``command`` plus ``index_flag <offset + array index>``
+    through ``exec``, so the ``--signal`` reaches the program itself (it
+    checkpoints and exits). The words of the task are shell-quoted; the
+    values of ``#SBATCH`` lines are checked instead (``check_sbatch_value``).
+    Empty ``time`` / ``partition`` use the cluster default.
+
+    The script is meant for ``subprocess.run(["sbatch", "--parsable"],
+    input=script, text=True)``.
+    """
+    directives = {
+        "jobname": jobname,
+        "chdir": chdir,
+        "log_dir": log_dir,
+        "array": array,
+        "signal": signal,
+    }
+    for name, value in directives.items():
+        check_sbatch_value(name, value)
+    for name, value in (("time", time), ("partition", partition)):
+        check_sbatch_value(name, value, required=False)
+    lines = [
+        "#!/bin/bash",
+        f"#SBATCH --job-name={jobname}",
+        f"#SBATCH --chdir={chdir}",
+        f"#SBATCH --output={log_dir}/%x_%A_%a.out",
+        f"#SBATCH --error={log_dir}/%x_%A_%a.err",
+        "#SBATCH --open-mode=append",
+        f"#SBATCH --array={array}",
+        f"#SBATCH --mem={mem_mb}M",
+        f"#SBATCH --cpus-per-task={cpus}",
+    ]
+    if time:
+        lines.append(f"#SBATCH --time={time}")
+    if partition:
+        lines.append(f"#SBATCH --partition={partition}")
+    exports = " ".join(f"{k}={shlex.quote(v)}" for k, v in env.items())
+    task = f'"$((SLURM_ARRAY_TASK_ID + {tile_offset}))"'
+    lines += [
+        f"#SBATCH --signal={signal}",
+        "",
+        "set -euo pipefail",
+        f"export {exports}",
+        f"exec {shlex.join(command)} {index_flag} {task}",
+        "",
+    ]
+    return "\n".join(lines)

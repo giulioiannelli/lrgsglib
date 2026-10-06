@@ -28,6 +28,7 @@ import numpy as np
 from L2D_SignedRW_Bubbles import run_sweep
 
 from lrgsglib.config.const import PATHDATA
+from parsers.shared import GraphArgumentParser, add_graph_engine_arg
 
 
 DEFAULT_P_SWEEP = [
@@ -40,7 +41,7 @@ DEFAULT_P_SWEEP = [
 def _build_args(L: int, n_walkers: int, n_trials: int,
                 nw_label: str, p_list: list[float],
                 workdir: str, n_disorder: int,
-                verbose: bool) -> Namespace:
+                verbose: bool, graph_engine: str | None) -> Namespace:
     """Assemble an argparse.Namespace matching L2D_SignedRW_Bubbles._parse_args."""
     tag = f"L{L}_nw{nw_label}_nt{n_trials}"
     return Namespace(
@@ -58,14 +59,16 @@ def _build_args(L: int, n_walkers: int, n_trials: int,
         seed_a=42,
         seed_b=43,
         seed_disorder=42,
+        time_budget=0.0,
         workdir=workdir,
+        graph_engine=graph_engine,
         tag=tag,
         verbose=verbose,
     )
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+def _parse_args(argv: list[str] | None = None) -> Namespace:
+    p = GraphArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--sides", type=int, nargs="+", default=[16, 32, 64])
     p.add_argument("--n-walker-mults", type=int, nargs="+", default=[1, 2, 10],
                    help="Multipliers M so that n_walkers = M * N (N = L**2).")
@@ -73,6 +76,7 @@ def main() -> None:
     p.add_argument("--n-disorder", type=int, default=2)
     p.add_argument("--workdir", default="bubble_scan",
                    help="Subpath under PATHDATA for the pickle outputs.")
+    add_graph_engine_arg(p)
     p.add_argument("--pflip-list", type=lambda s: [float(x) for x in s.split(",") if x],
                    default=DEFAULT_P_SWEEP)
     p.add_argument("--verbose", "-v", action=argparse.BooleanOptionalAction,
@@ -81,7 +85,14 @@ def main() -> None:
                    default=True,
                    help="Skip configurations whose pickle already exists with "
                         "every p value marked done (checkpointed).")
-    args = p.parse_args()
+    # graph-tool path not ported yet
+    p.refuse_engine("gt", "graph-tool output ignores --workdir and "
+                         "--skip-existing looks for the NetworkX layout")
+    return p.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = _parse_args(argv)
 
     configs: list[Namespace] = []
     for L in args.sides:
@@ -97,6 +108,7 @@ def main() -> None:
                     workdir=args.workdir,
                     n_disorder=args.n_disorder,
                     verbose=args.verbose,
+                    graph_engine=args.graph_engine,
                 ))
 
     def _expected_pickle(cfg: Namespace) -> Path:

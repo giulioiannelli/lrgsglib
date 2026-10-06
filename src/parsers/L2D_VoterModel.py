@@ -1,5 +1,6 @@
 from lrgsglib.core import *
 from lrgsglib.config.progargs import *
+from parsers.shared import GraphArgumentParser, refuse_gt_ignored_options
 from parsers.shared import parse_arguments as _parse_arguments
 
 optionalaction_args_dict = {
@@ -8,7 +9,7 @@ optionalaction_args_dict = {
     **L2D_VOTER_action_args,
 }
 
-parser = argparse.ArgumentParser(
+parser = GraphArgumentParser(
     description=L2D_VOTER_description,
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
@@ -21,6 +22,8 @@ for k, v in L2D_VOTER_args.items():
 
 for k, v in optionalaction_args_dict.items():
     parser.add_argument(*k, **v)
+# graph-tool: refuse the options its prepare kernels would drop
+refuse_gt_ignored_options(parser)
 
 
 def _validate_voter_args(args: argparse.Namespace) -> argparse.Namespace:
@@ -43,5 +46,9 @@ def _validate_voter_args(args: argparse.Namespace) -> argparse.Namespace:
 def parse_arguments(
     parser: argparse.ArgumentParser, argv: list[str] | None = None
 ) -> argparse.Namespace:
-    args = _parse_arguments(parser) if argv is None else parser.parse_args(args=argv)
+    args = (
+        _parse_arguments(parser)
+        if argv is None
+        else parser.parse_args(args=argv)
+    )
     return _validate_voter_args(args)

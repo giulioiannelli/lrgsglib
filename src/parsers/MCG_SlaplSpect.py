@@ -1,5 +1,5 @@
 from lrgsglib.config.progargs import *
-from parsers.shared import parse_arguments
+from parsers.shared import GraphArgumentParser, parse_arguments
 
 # Build combined argument dictionary
 # Note: Exclude verbose from action_args_dict to avoid conflict with -v for variant
@@ -21,7 +21,7 @@ optionalaction_args_dict = {
 }
 
 # Create parser
-parser = argparse.ArgumentParser(
+parser = GraphArgumentParser(
     description=MCG_SlaplSpect_description,
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
 )
@@ -33,3 +33,6 @@ for k, v in MCG_SlaplSpect_args.items():
 # Add optional/flag arguments
 for k, v in optionalaction_args_dict.items():
     parser.add_argument(*k, **v)
+# graph-tool eigenvectors are stored node-major (N, k); eigvec_dist reads rows
+parser.refuse_engine("gt", "-m eigvec_dist reads NetworkX-layout eigenvectors",
+                     when=lambda a: a.mode == "eigvec_dist")
