@@ -6,6 +6,8 @@ from typing import Callable, Iterable, Sequence
 
 import numpy as np
 
+from lrgsglib.config.const import EXACT_FLOAT_FMT
+
 __all__ = [
     "build_memory_function",
     "build_jobname",
@@ -312,7 +314,7 @@ def render_sbatch_array_script(
     if time:
         lines.append(f"#SBATCH --time={time}")
     python_cmd = (
-        f"python {exec_path} {L} -p {p:.3g} -qid \"$QID\" "
+        f"python {exec_path} {L} -p {p:{EXACT_FLOAT_FMT}} -qid \"$QID\" "
         + " ".join(passthrough)
     ).rstrip()
     lines += [

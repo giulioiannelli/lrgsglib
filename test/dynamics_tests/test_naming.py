@@ -1,8 +1,9 @@
 """The shared run-dirname builder (_naming.py) — Phase C naming contract.
 
 Pins the exact folder names approved in the 2026-07-07 interview:
-key=value for every token, floats %.3g, defaults elided (seed/backend
-always written), inapplicable axes absent, heterogeneous q joined '-'.
+key=value for every token, floats %.12g (%.3g until 2026-09-30),
+defaults elided (seed/backend always written), inapplicable axes absent,
+heterogeneous q joined '-'.
 """
 
 from __future__ import annotations
@@ -121,8 +122,12 @@ def test_heterogeneous_q_joined_with_dashes():
     assert name == "p=0.1_k=2_q=2-5_T=1_ns=3000_lang=py_s=31"
 
 
-def test_float_formatting_is_3g():
-    assert format_value(2.269185) == "2.27"
+def test_float_formatting_is_exact():
+    # %.12g keeps distinct grid points distinct (%.3g merged 0.1025/0.103)
+    # and hides float noise (0.1 + 0.2 -> "0.3").
+    assert format_value(2.269185) == "2.269185"
+    assert format_value(0.1025) != format_value(0.103)
+    assert format_value(0.1 + 0.2) == "0.3"
     assert format_value(1.0) == "1"
     assert format_value(0.001) == "0.001"
     assert format_value(1e-05) == "1e-05"
