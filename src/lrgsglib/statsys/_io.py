@@ -37,6 +37,8 @@ from numpy.typing import DTypeLike
 __all__ = [
     "tmp_sibling",
     "atomic_write_bytes",
+    "create_once",
+    "publish_once",
     "save_array",
     "load_array",
     "open_row_stream",
@@ -60,15 +62,24 @@ def tmp_sibling(path: Path) -> Path:
     return path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
 
 
+def _write_synced(tmp: Path, write_fn) -> None:
+    """Run ``write_fn(file_handle)`` on ``tmp`` and fsync it, so a rename or
+    link published afterwards never exposes data still in a write-back cache
+    (a node crash could otherwise leave an empty or truncated file)."""
+    with open(tmp, "wb") as fh:
+        write_fn(fh)
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
 def atomic_write_bytes(path, write_fn) -> Path:
-    """Run ``write_fn(file_handle)`` on a temp file, then atomically rename it
-    onto ``path``. The temp file is removed on any failure."""
+    """Run ``write_fn(file_handle)`` on a temp file, fsync it, then atomically
+    rename it onto ``path``. The temp file is removed on any failure."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = tmp_sibling(path)
     try:
-        with open(tmp, "wb") as fh:
-            write_fn(fh)
+        _write_synced(tmp, write_fn)
         os.replace(tmp, path)
     finally:
         if tmp.exists():
@@ -77,6 +88,43 @@ def atomic_write_bytes(path, write_fn) -> Path:
             except OSError:
                 pass
     return path
+
+
+def create_once(path, data: bytes) -> bool:
+    """Create ``path`` holding ``data``; an existing ``path`` is left as is.
+
+    The bytes go to a temp sibling that is fsynced and then hard-linked onto
+    ``path``. The link either creates the complete file or fails, so readers
+    never see a partial file and concurrent writers never overwrite each
+    other. Returns True if this call created the file. The temp file is
+    always removed. The filesystem must support POSIX hard links.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = tmp_sibling(path)
+    try:
+        _write_synced(tmp, lambda fh: fh.write(data))
+        try:
+            os.link(tmp, path)
+        except FileExistsError:
+            return False
+        return True
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def publish_once(path, data: bytes) -> bool:
+    """Create ``path`` holding ``data`` (``create_once``), unless it exists.
+
+    Returns True if this call created the file and False if an identical
+    file was already there. Raises ``FileExistsError`` if the existing file
+    differs.
+    """
+    if create_once(path, data):
+        return True
+    if Path(path).read_bytes() != data:
+        raise FileExistsError(f"{path} exists with different content")
+    return False
 
 
 # ---------------------------------------------------------------------------

@@ -40,6 +40,7 @@ SCSGeneralized_optional_args_dict = {
         "type": int,
         "default": None,
     },
+    **graph_engine_opt_args,
 }
 
 SCSGeneralized_action_args_dict = {**action_args_dict}

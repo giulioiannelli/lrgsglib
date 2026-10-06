@@ -38,6 +38,7 @@ dependencies = [
     "python-dotenv>=1.0.0",   # config.const: load_dotenv (imported at package import)
     "plotly>=5.0.0",          # plotlib.plot3d (imported in the core import chain)
     "requests>=2.25.0",       # utils.recon.protein.io (imported in the core import chain)
+    "threadpoolctl>=3.0.0",   # src/RRG_TransCluster.py: BLAS/OpenMP thread caps
 ]
 
 [project.optional-dependencies]

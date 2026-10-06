@@ -76,67 +76,129 @@ def parse_multiple_linspace(value):
 
 
 # ---------------------------------------------------------------------------
-# Graph engine resolution
+# Graph engine: the -ge flag, class resolution, refusals
 # ---------------------------------------------------------------------------
-_VALID_GRAPH_ENGINES = {"nx", "gt"}
+# progargs imports this module while it loads, so the functions below import
+# the progargs names they need at call time.
 
-# Mapping: (graph_type, engine) -> import path
-_GRAPH_CLASS_MAP = {
-    ("Lattice2D", "nx"):        "lrgsglib.graphs.nx.Lattice2DNX.Lattice2DNX",
-    ("Lattice2D", "gt"):        "lrgsglib.graphs.gt.Lattice2DGT.Lattice2DGT",
-    ("Lattice3D", "nx"):        "lrgsglib.graphs.nx.Lattice3DNX.Lattice3DNX",
-    ("Lattice3D", "gt"):        "lrgsglib.graphs.gt.Lattice3DGT.Lattice3DGT",
-    ("ErdosRenyi", "nx"):       "lrgsglib.graphs.nx.ErdosRenyiNX.ErdosRenyiNX",
-    ("ErdosRenyi", "gt"):       "lrgsglib.graphs.gt.ErdosRenyiGT.ErdosRenyiGT",
-    ("BarabasiAlbert", "nx"):   "lrgsglib.graphs.nx.BarabasiAlbertNX.BarabasiAlbertNX",
-    ("BarabasiAlbert", "gt"):   "lrgsglib.graphs.gt.BarabasiAlbertGT.BarabasiAlbertGT",
-    ("WattsStrogatz", "nx"):    "lrgsglib.graphs.nx.WattsStrogatzNX.WattsStrogatzNX",
-    ("WattsStrogatz", "gt"):    "lrgsglib.graphs.gt.WattsStrogatzGT.WattsStrogatzGT",
-    ("MultiplicativeCascade", "nx"): "lrgsglib.graphs.nx.MultiplicativeCascadeNX.MultiplicativeCascadeNX.MultiplicativeCascadeGraphNX",
-    ("MultiplicativeCascade", "gt"): "lrgsglib.graphs.gt.MultiplicativeCascadeGT.MultiplicativeCascadeGT.MultiplicativeCascadeGraphGT",
-}
+# The only cell the graph-tool branches of the prepare kernels realize
+_GT_CELL = "rand"
 
 
-def resolve_graph_class(graph_type: str, engine: str = "nx"):
-    """Resolve a graph class by type and engine.
+def add_graph_engine_arg(parser, default=None):
+    """Add ``-ge/--graph_engine`` to a parser built outside progargs.
 
-    Parameters
-    ----------
-    graph_type : str
-        Graph type name (e.g. ``"Lattice2D"``, ``"ErdosRenyi"``).
-    engine : str
-        Graph engine: ``"nx"`` (NetworkX) or ``"gt"`` (graph-tool).
+    ``default=None`` leaves the engine to the graph factories: the
+    ``LRGSG_GRAPH_ENGINE`` variable, else NetworkX.
+    """
+    from lrgsglib.config.progargs.common import graph_engine_opt_args
+    from lrgsglib.config.progargs.phelp.generic import phelp_graph_engine_env
 
-    Returns
-    -------
-    type
-        The resolved graph class.
+    for flags, spec in graph_engine_opt_args.items():
+        help_ = phelp_graph_engine_env if default is None else spec["help"]
+        parser.add_argument(*flags, **{**spec, "default": default, "help": help_})
+
+
+def effective_engine(engine):
+    """``engine``, or the graph factories' default engine when it is None."""
+    if engine is not None:
+        return engine
+    from lrgsglib.graphs._engine import get_default_engine_from_env
+
+    return get_default_engine_from_env().value
+
+
+def get_graph_engine(args) -> str:
+    """The parsed ``-ge`` value; a program without the flag gets the default."""
+    from lrgsglib.config.progargs.defs.generic import DEFAULT_GRAPH_ENGINE
+
+    return getattr(args, "graph_engine", DEFAULT_GRAPH_ENGINE)
+
+
+def graph_engine_suffix(args) -> str:
+    """``_ge=<engine>`` for a non-default engine, else ``''``.
+
+    For output names whose directory does not depend on the engine, so runs
+    on different engines never overwrite each other's files.
+    """
+    from lrgsglib.config.progargs.defs.generic import DEFAULT_GRAPH_ENGINE
+
+    engine = get_graph_engine(args)
+    return "" if engine == DEFAULT_GRAPH_ENGINE else f"_ge={engine}"
+
+
+def resolve_graph_class(graph_type: str, engine: str):
+    """The class registered for ``graph_type`` on ``engine``, never another engine's.
 
     Raises
     ------
     ValueError
-        If engine is invalid or the graph type has no GT implementation.
+        Unknown engine or graph type, or a ``gt`` request that the registry
+        answers with a NetworkX class (an NX alias under ``graphs/gt``).
     """
+    import lrgsglib.graphs  # noqa: F401  (importing the facades registers the classes)
+    from lrgsglib.config.progargs.defs.generic import GRAPH_ENGINE_CHOICES
+    from lrgsglib.graphs._engine import get_implementation
+
+    if not isinstance(engine, str) or engine.lower() not in GRAPH_ENGINE_CHOICES:
+        raise ValueError(
+            f"unknown graph engine {engine!r}; choose from {GRAPH_ENGINE_CHOICES}"
+        )
     engine = engine.lower()
-    if engine not in _VALID_GRAPH_ENGINES:
-        raise ValueError(
-            f"Unknown graph engine '{engine}'. Valid: {_VALID_GRAPH_ENGINES}"
+    cls = get_implementation(graph_type, engine, fallback=False)
+    if engine == "gt":
+        from lrgsglib.graphs.gt.SignedGraphGT.SignedGraphGT import SignedGraphGT
+
+        if not issubclass(cls, SignedGraphGT):
+            raise ValueError(
+                f"{graph_type} has no graph-tool class: gt resolves to {cls.__name__}"
+            )
+    return cls
+
+
+class GraphArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser that refuses the graph engines a program cannot run on yet.
+
+    ``refuse_engine`` registers a refusal. Every parse (``parse_args``,
+    ``parse_known_args``) then ends in ``self.error`` (exit 2) when the
+    effective engine is the refused one and ``when(args)`` holds, so the
+    program stops before it builds anything.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.engine_refusals = []
+
+    def refuse_engine(self, engine, reason, when=None):
+        """Refuse ``engine``, only when ``when(args)`` holds if ``when`` is given."""
+        self.engine_refusals.append((engine, reason, when))
+
+    def parse_known_args(self, args=None, namespace=None):
+        parsed, extras = super().parse_known_args(args, namespace)
+        if not self.engine_refusals:
+            return parsed, extras
+        engine = effective_engine(getattr(parsed, "graph_engine", None))
+        for refused, reason, when in self.engine_refusals:
+            if engine == refused and (when is None or when(parsed)):
+                self.error(f"-ge {engine} is not supported here yet: {reason}")
+        return parsed, extras
+
+
+def refuse_gt_ignored_options(parser):
+    """Refuse ``-ge gt`` together with the options that graph-tool graphs drop
+    without a word: a cell other than ``rand`` (the only one the prepare
+    kernels realize on graph-tool) and any workdir (graph-tool graphs keep
+    their own data path)."""
+    dests = {action.dest for action in parser._actions}
+    if "cell_type" in dests:
+        parser.refuse_engine(
+            "gt",
+            f"graph-tool graphs realize only -c {_GT_CELL}",
+            when=lambda a: a.cell_type != _GT_CELL,
         )
-
-    key = (graph_type, engine)
-    if key not in _GRAPH_CLASS_MAP:
-        available = [k for k, e in _GRAPH_CLASS_MAP if k == graph_type]
-        raise ValueError(
-            f"No {engine} implementation for '{graph_type}'. "
-            f"Available engines: {available}"
+    if "workdir" in dests:
+        parser.refuse_engine(
+            "gt",
+            "graph-tool graphs ignore -wd and keep their own data path (pass -wd '')",
+            when=lambda a: bool(a.workdir),
         )
-
-    import importlib
-    module_path, class_name = _GRAPH_CLASS_MAP[key].rsplit(".", 1)
-    mod = importlib.import_module(module_path)
-    return getattr(mod, class_name)
-
-
-def get_graph_engine(args) -> str:
-    """Extract graph engine from parsed args, defaulting to 'nx'."""
-    return getattr(args, "graph_engine", "nx")

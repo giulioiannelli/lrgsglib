@@ -23,7 +23,9 @@ All programs share a set of common flags:
      - Description
    * - ``--graph_engine``
      - ``-ge``
-     - Graph backend: ``nx`` (NetworkX, default) or ``gt`` (graph-tool)
+     - Graph backend: ``nx`` (NetworkX, default) or ``gt`` (graph-tool).
+       Where the graph-tool path is not ported, ``gt`` exits with code 2
+       and says why (see :ref:`cli-engine-compat`)
    * - ``--number_of_averages``
      - ``-na``
      - Number of disorder realizations to average over
@@ -152,9 +154,6 @@ Compute transient cluster distributions and order parameters on 2D lattices.
    # Order parameter mode
    python src/L2D_TransCluster.py 16 -p 0.3 --mode ordParam -na 10 -g sqr -c rand
 
-   # GT engine
-   python src/L2D_TransCluster.py 16 -p 0.3 --mode pCluster -na 5 -ge gt
-
 **Modes:** ``pCluster`` (cluster size distribution), ``ordParam`` (Pinf, gap)
 
 L3D_TransCluster.py
@@ -178,12 +177,8 @@ Reconstruct Laplacian eigenmodes from Ising dynamics spin configurations.
 
 .. warning::
 
-   ``L2D_Recon.py`` and ``L3D_Recon.py`` currently fail at parser-build time
-   with ``argparse.ArgumentError: argument -sf/--save_frequency: conflicting
-   option string: --save_frequency`` (the Recon-specific ``-sFQ/--save_frequency``
-   binding collides with the Ising-dynamics ``-sf/--save_frequency`` binding).
-   The commands below are the intended invocation once the option-string
-   collision is resolved.
+   ``L3D_Recon.py`` currently stops with a ``TypeError``: the kernel passes
+   ``compute`` to the 3D lattice constructor. ``L2D_Recon.py`` runs as shown.
 
 .. code-block:: bash
 
@@ -193,11 +188,16 @@ Reconstruct Laplacian eigenmodes from Ising dynamics spin configurations.
    # 3D lattice reconstruction
    python src/L3D_Recon.py 8 -p 0.0 -T 0.1 -rl C1b -na 3
 
-   # GT engine (uses pybind11 automatically)
-   python src/L2D_Recon.py 16 -p 0.0 -T 0.1 -rl pb_met -na 3 -ge gt
+.. _cli-engine-compat:
 
 Graph Engine Compatibility
 --------------------------
+
+``-ge gt`` exits with code 2 and a one-line reason wherever a graph-tool run
+would drop an option or is not ported yet. The SignedRW bubble and
+time-to-touch programs leave ``-ge`` unset by default and then follow
+``LRGSG_GRAPH_ENGINE`` (else ``nx``), as the graph factories do. The other
+programs default to ``nx``, and ``RRG_TransCluster`` to ``gt``.
 
 .. list-table::
    :header-rows: 1
@@ -210,40 +210,61 @@ Graph Engine Compatibility
    * - L2D_SlaplSpect
      - Yes
      - Yes
-     - Full spectral support
+     - GT refuses ``-m eigvec_dist``, the default mode, so pass ``-m``.
+       GT file names carry ``_ge=gt``
    * - MCG_SlaplSpect
      - Yes
      - Yes
-     - Via MultispectralGraphGT
+     - GT refuses ``-m eigvec_dist``. GT file names carry ``_ge=gt``
    * - L2D_IsingDynamics
      - Yes
      - Yes
-     - GT: py/pb/cu/cluster backends only
+     - GT: py/pb/cu/cluster backends only; refuses a cell other than
+       ``rand``, ``-wd`` and ``--save-results``
+   * - L3D_IsingDynamics
+     - Yes
+     - Yes
+     - GT: as L2D_IsingDynamics, and refuses ``--pdil``
    * - ER_IsingDynamics
      - Yes
      - Yes
-     - GT: py/pb/cu backends only
+     - GT: py/pb/cu backends only (C runlangs are refused); refuses a cell
+       other than ``rand`` and ``-wd``
    * - L2D_ContactProcess
      - Yes
      - Yes
-     - GT: Python backend only
+     - GT: Python backend only; refuses a cell other than ``rand`` and ``-wd``
+   * - L2D_VoterModel, L2D_SignedRW
+     - Yes
+     - Yes
+     - GT refuses a cell other than ``rand`` and ``-wd``
+   * - L2D_SignedRW_Bubbles, L2D_SignedRW_BubblesRand,
+       L2D_SignedRW_TimeToTouch
+     - Yes
+     - Yes
+     - GT refuses ``-wd``, so pass ``-wd ''`` (BubblesRand and
+       TimeToTouch set one by default)
+   * - RRG_TransCluster
+     - Yes
+     - Yes
+     - Defaults to ``gt``
    * - L2D_TransCluster
      - Yes
-     - Yes
-     - GT: ``cell=rand`` only
+     - No
+     - Refused: graph-tool eigenvectors lack the majority flip
    * - L3D_TransCluster
      - Yes
      - No
      - NX only (complex edge weight models)
-   * - SCS_TransCluster
+   * - SCS_TransCluster, SCS_TransCluster_sweep
      - Yes
      - No
      - SCS networks are NX-only
-   * - L2D_Recon
+   * - L2D_Recon, L3D_Recon
      - Yes
+     - No
+     - Refused: the kernel passes NetworkX-only options to the lattice
+   * - L2D_SignedRW_Bubbles_Scan
      - Yes
-     - GT: requires pb/py backend
-   * - L3D_Recon
-     - Yes
-     - Yes
-     - GT: requires pb/py backend
+     - No
+     - Refused: ``--skip-existing`` looks for the NetworkX output layout

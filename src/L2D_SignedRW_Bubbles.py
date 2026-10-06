@@ -55,6 +55,11 @@ from lrgsglib.statsys.SignedRW._kernel import (
     signed_lattice_tables,
 )
 from lrgsglib.statsys.SignedRW.SignedWalker import _load_srw_native
+from parsers.shared import (
+    GraphArgumentParser,
+    add_graph_engine_arg,
+    refuse_gt_ignored_options,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +71,7 @@ def _parse_float_list(s: str) -> list[float]:
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p = GraphArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--side", "-s", type=int, required=True,
                    help="Square-lattice side length.")
     p.add_argument("--pflip-list", required=True, type=_parse_float_list,
@@ -97,9 +102,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="Wall-clock budget per p value, seconds (0=disabled).")
     p.add_argument("--workdir", "-wd", default="",
                    help="Subpath under PATHDATA (e.g. 'bubble_L=64').")
+    add_graph_engine_arg(p)
     p.add_argument("--tag", default="",
                    help="Extra suffix on the output filename stem.")
     p.add_argument("--verbose", "-v", action="store_true")
+    refuse_gt_ignored_options(p)
     return p.parse_args(argv)
 
 
@@ -186,7 +193,8 @@ def run_sweep(args: argparse.Namespace) -> Path:
     # Build one lattice to discover path_srw; the per-p loop rebuilds with
     # the right pflip.
     proto = Lattice2D(args.side, geo=args.geo, pbc=args.pbc, pflip=0.0,
-                      seed=args.seed_disorder, sgpathn=args.workdir)
+                      seed=args.seed_disorder, sgpathn=args.workdir,
+                      engine=args.graph_engine)
     node_a = args.node_a
     node_b = (args.node_b if args.node_b >= 0
               else (args.side // 2) * (args.side + 1))
@@ -260,7 +268,8 @@ def run_sweep(args: argparse.Namespace) -> Path:
             t0 = perf_counter()
             lat = Lattice2D(args.side, geo=args.geo, pbc=args.pbc, pflip=p,
                             seed=args.seed_disorder + 1000 * d,
-                            sgpathn=args.workdir)
+                            sgpathn=args.workdir,
+                            engine=args.graph_engine)
             if p > 0:
                 lat.flip_random_fract_edges()
             csr = _csr_masks(lat, args.x_node)

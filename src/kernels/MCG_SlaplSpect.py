@@ -29,7 +29,11 @@ from .SlaplSpect import (
     save_with_na,
     cleanup_intermediate_files,
 )
-from parsers.shared import get_graph_engine, resolve_graph_class
+from parsers.shared import (
+    get_graph_engine,
+    graph_engine_suffix,
+    resolve_graph_class,
+)
 
 # ============================================================================
 # Helper functions for MultiplicativeCascadeGraph spectral analysis
@@ -440,6 +444,8 @@ def perform_spectral_calculations(args):
     # Laplacian type selector ('signed' default keeps existing filenames byte-identical)
     lap_type = getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE)
     lap_suffix = '' if lap_type == SG_LAPL_DEFAULT_TYPE else f"_lap={lap_type}"
+    # Both engines write to one directory, so a non-default engine is named
+    name_suffix = lap_suffix + graph_engine_suffix(args)
 
     if args.mode.endswith("dist"):
         if args.mode == "eigvec_dist":
@@ -456,7 +462,7 @@ def perform_spectral_calculations(args):
         # Append out_suffix to fname_base if provided
         if out_suffix:
             fname_base = f"{fname_base}_{out_suffix}"
-        fname_base = f"{fname_base}{lap_suffix}"
+        fname_base = f"{fname_base}{name_suffix}"
 
         # Process distribution using generic framework
         process_eigen_distribution(
@@ -485,9 +491,9 @@ def perform_spectral_calculations(args):
         # Build filename base (without na suffix)
         # Include out_suffix in filename if provided
         if out_suffix:
-            fname_base = f"mc_eigvals_{pflip_str}_{out_suffix}{lap_suffix}"
+            fname_base = f"mc_eigvals_{pflip_str}_{out_suffix}{name_suffix}"
         else:
-            fname_base = f"mc_eigvals_{pflip_str}{lap_suffix}"
+            fname_base = f"mc_eigvals_{pflip_str}{name_suffix}"
 
         # Get working path
         working_path = get_mc_spectrum_path(args)
@@ -605,9 +611,9 @@ def perform_spectral_calculations(args):
 
         # Build filename base with out_suffix if provided
         if out_suffix:
-            fname_base = f"mc_entropy_{pflip_str}_{out_suffix}{lap_suffix}"
+            fname_base = f"mc_entropy_{pflip_str}_{out_suffix}{name_suffix}"
         else:
-            fname_base = f"mc_entropy_{pflip_str}{lap_suffix}"
+            fname_base = f"mc_entropy_{pflip_str}{name_suffix}"
 
         # Get entropy-specific parameters from args
         entropy_steps = getattr(args, 'entropy_steps', 600)

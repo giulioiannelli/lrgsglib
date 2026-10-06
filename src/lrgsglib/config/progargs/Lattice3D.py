@@ -45,10 +45,5 @@ L3D_opt_args = {
         "default": DEFAULT_L3D_EDGE_WEIGHT,
     },
     **SG_opt_args,
-    tuple(["-ge", "--graph_engine"]): {
-        "help": phelp_graph_engine,
-        "type": str,
-        "default": DEFAULT_GRAPH_ENGINE,
-        "choices": ["nx", "gt"],
-    },
+    **graph_engine_opt_args,
 }
