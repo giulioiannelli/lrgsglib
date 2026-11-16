@@ -22,8 +22,10 @@ from kernels.Serializer import (
 )
 from lrgsglib import *
 from lrgsglib.config.progargs.defs.IsingDynamics import *
+from lrgsglib.config.progargs.defs.generic import DEFAULT_GRAPH_ENGINE
 from parsers.L3D_IsingDynamics import L3D_ISDYN_progname, L3D_ISDYN_progname_shrt
 from parsers.L3D_IsingDynamics_Serializer import parser
+from parsers.shared import get_graph_engine
 
 
 def _apply_overrides(flags: list[str], overrides: dict[str, str] | None) -> list[str]:
@@ -63,8 +65,8 @@ def _build_passthrough_flags(
     flags: list[str] = []
 
     # Graph engine
-    ge = getattr(args, "graph_engine", "nx")
-    if ge != "nx":
+    ge = get_graph_engine(args)
+    if ge != DEFAULT_GRAPH_ENGINE:
         flags.extend(["-ge", ge])
 
     # Geometry

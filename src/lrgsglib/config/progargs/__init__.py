@@ -8,6 +8,7 @@ from .IsingDynamics import *
 #
 from .Lattice2D import *
 from .Lattice3D import *
+from .RandomRegular import *
 from .Recon import *
 from .SCSNN import *
 from .SignedRW import *

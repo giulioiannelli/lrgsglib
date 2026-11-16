@@ -38,19 +38,25 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 from ..config.const import EXACT_FLOAT_FMT
-from ._io import atomic_write_bytes
+from ._io import atomic_write_bytes, publish_once
 
 __all__ = [
     "ALWAYS",
+    "CFG_SIDECAR_NAME",
     "VOCAB",
+    "cfg_sidecar_bytes",
     "format_value",
     "run_dirname",
     "parse_run_dirname",
+    "publish_cfg_sidecar",
     "write_cfg_sidecar",
 ]
 
 #: Sentinel default: a token declared with ``ALWAYS`` is never elided.
 ALWAYS: Any = object()
+
+#: File name of the reproducibility sidecar in every run directory.
+CFG_SIDECAR_NAME = "cfg.json"
 
 #: Canonical short forms for categorical token values. Values not listed
 #: here pass through unchanged (e.g. ``wolff``, ``sw``, ``sync``).
@@ -188,3 +194,38 @@ def write_cfg_sidecar(
     return atomic_write_bytes(
         Path(rundir) / "cfg.json", lambda fh: fh.write(data)
     )
+
+
+def cfg_sidecar_bytes(
+    graph: dict[str, Any], model: dict[str, Any], run: dict[str, Any]
+) -> bytes:
+    """Canonical bytes of a ``cfg.json`` sidecar (sorted keys, indent 2).
+
+    Strict JSON: a NaN or infinite value raises ``ValueError``.
+    """
+    payload = {"graph": graph, "model": model, "run": run}
+    text = json.dumps(
+        payload,
+        indent=2,
+        sort_keys=True,
+        allow_nan=False,
+        default=_json_default,
+    )
+    return (text + "\n").encode("utf-8")
+
+
+def publish_cfg_sidecar(
+    rundir: Path,
+    graph: dict[str, Any],
+    model: dict[str, Any],
+    run: dict[str, Any],
+) -> bool:
+    """Publish-once ``cfg.json`` for a run directory shared by many tasks.
+
+    For sweep-level run directories, where every task of an array writes the
+    same identity. Returns True if this call created the sidecar and False
+    if an identical one was already there. Raises ``FileExistsError`` if the
+    directory holds a different sidecar (another run's).
+    """
+    data = cfg_sidecar_bytes(graph, model, run)
+    return publish_once(Path(rundir) / CFG_SIDECAR_NAME, data)

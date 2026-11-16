@@ -29,6 +29,7 @@ from kernels.Serializer import (
     render_sbatch_array_script,
 )
 from lrgsglib.config.progargs import L2D_VOTER_progname, L2D_VOTER_progname_shrt
+from lrgsglib.config.progargs.defs.generic import DEFAULT_GRAPH_ENGINE
 from lrgsglib.statsys.VoterModel.defaults import (
     DEFAULT_ABSORBING_EVERY,
     DEFAULT_SOUT_EVERY,
@@ -36,6 +37,7 @@ from lrgsglib.statsys.VoterModel.defaults import (
     LINK_ONLY_RULES,
 )
 from parsers.L2D_VoterModel_Serializer import parser
+from parsers.shared import get_graph_engine
 
 
 def _axis(args, list_attr, scalar_attr, linsp_attr=None):
@@ -124,8 +126,8 @@ def _build_passthrough_flags(args, combo) -> list[str]:
     flags: list[str] = []
 
     # Graph engine / geometry / disorder cell
-    ge = getattr(args, "graph_engine", "nx")
-    if ge != "nx":
+    ge = get_graph_engine(args)
+    if ge != DEFAULT_GRAPH_ENGINE:
         flags += ["-ge", ge]
     flags += ["-g", str(args.geometry)]
     cell = getattr(args, "cell_type", "rand")

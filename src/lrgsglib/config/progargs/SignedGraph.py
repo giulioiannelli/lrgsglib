@@ -26,4 +26,5 @@ SG_opt_args = {
         "type": str,
         "default": DEFAULT_WORKDIR,
     },
+    **graph_engine_opt_args,
 }

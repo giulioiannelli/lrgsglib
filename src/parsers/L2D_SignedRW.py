@@ -9,6 +9,7 @@ import argparse
 
 from lrgsglib.core import *  # noqa: F401,F403
 from lrgsglib.config.progargs import *  # noqa: F401,F403
+from parsers.shared import GraphArgumentParser, refuse_gt_ignored_options
 from parsers.shared import parse_arguments as _parse_arguments
 
 
@@ -17,7 +18,7 @@ optionalaction_args_dict = {
     **L2D_SRW_action_args,  # noqa: F405
 }
 
-parser = argparse.ArgumentParser(
+parser = GraphArgumentParser(
     description=L2D_SRW_description,  # noqa: F405
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
@@ -30,6 +31,8 @@ for k, v in L2D_SRW_args.items():  # noqa: F405
 
 for k, v in optionalaction_args_dict.items():
     parser.add_argument(*k, **v)
+# graph-tool: refuse the options its prepare kernels would drop
+refuse_gt_ignored_options(parser)
 
 
 def _validate_srw_args(args: argparse.Namespace) -> argparse.Namespace:

@@ -9,6 +9,15 @@ from .phelp.generic import *
 ## argparse tools
 from .tools import *
 
+# Graph engine flag: one spec, splatted into every graph program's dicts
+graph_engine_opt_args = {
+    tuple(["-ge", "--graph_engine"]): {
+        "help": phelp_graph_engine,
+        "type": str,
+        "default": DEFAULT_GRAPH_ENGINE,
+        "choices": list(GRAPH_ENGINE_CHOICES),
+    },
+}
 # Common optional arguments (apply to all programs)
 common_opt_args = {
     tuple(["-os", "--out_suffix"]): {
@@ -21,12 +30,7 @@ common_opt_args = {
         "type": str,
         "default": DEFAULT_WORKDIR,
     },
-    tuple(["-ge", "--graph_engine"]): {
-        "help": phelp_graph_engine,
-        "type": str,
-        "default": DEFAULT_GRAPH_ENGINE,
-        "choices": ["nx", "gt"],
-    },
+    **graph_engine_opt_args,
 }
 # Program arguments (action flags)
 action_args_dict = {

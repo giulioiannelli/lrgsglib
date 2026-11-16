@@ -385,6 +385,29 @@ backend support, and facade import path.
 All types accept ``pflip=`` (float, 0.0–1.0), ``seed=`` (int), and
 ``engine=`` (str, ``'nx'``/``'gt'``).
 
+Random k-Regular Graphs: Two Samplers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``kRegularGraph`` takes ``method=``:
+
+- ``'native'`` (default): the engine's own generator,
+  ``networkx.random_regular_graph`` or graph-tool's configuration model;
+- ``'pairing'``: an exact uniform sampler of the simple k-regular graphs. It
+  draws a uniform matching of the ``n*k`` edge stubs and redraws until the
+  result has no self-loop and no multi-edge. The draw is pure numpy, so one
+  ``seed`` gives the same graph on both engines.
+
+.. code-block:: python
+
+   from lrgsglib.graphs import kRegularGraph
+
+   a = kRegularGraph(n=1000, k=3, seed=7, engine="nx", method="pairing")
+   b = kRegularGraph(n=1000, k=3, seed=7, engine="gt", method="pairing")
+   # a and b have the same edges
+
+A pairing draw is accepted less often as ``k`` grows (measured: about 7 draws
+per graph at ``k=3``, 45 at ``k=4``), so ``'pairing'`` suits small ``k``.
+
 
 LatticeND: Unified Lattice Dispatcher
 --------------------------------------

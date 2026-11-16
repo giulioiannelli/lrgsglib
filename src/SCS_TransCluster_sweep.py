@@ -28,8 +28,10 @@ from kernels.SCS_TransCluster import (
     _read_prev_partial,
 )
 from kernels.generic import resolve_backend, resolve_float_type, find_existing_averages
+from lrgsglib.config.progargs.defs.generic import DEFAULT_GRAPH_ENGINE
 from lrgsglib.utils.basic.paths import remove_if_exists
 from lrgsglib.utils.tools import ConditionalPartitioning
+from parsers.shared import GraphArgumentParser, add_graph_engine_arg
 
 
 def _single_average_worker(task: tuple[dict, str, type, str, int | None, bool]) -> np.ndarray:
@@ -245,8 +247,8 @@ def run_batch(
         pbar.close()
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = GraphArgumentParser(
         description="Sweep J0, g, and N for SCS order parameters (TSB-RB01 style).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -373,7 +375,10 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable the outer sweep progress bar.",
     )
-    return parser.parse_args()
+    add_graph_engine_arg(parser, default=DEFAULT_GRAPH_ENGINE)
+    # graph-tool path not ported yet
+    parser.refuse_engine("gt", "the SCS kernels build NetworkX graphs only")
+    return parser.parse_args(argv)
 
 
 def main() -> None:

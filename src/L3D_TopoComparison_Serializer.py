@@ -32,8 +32,10 @@ from kernels.Serializer import (
 )
 from lrgsglib import *
 from lrgsglib.config.progargs.defs.IsingDynamics import DEFAULT_INIT_COND
+from lrgsglib.config.progargs.defs.generic import DEFAULT_GRAPH_ENGINE
 from parsers.L3D_IsingDynamics import L3D_ISDYN_progname, L3D_ISDYN_progname_shrt
 from parsers.L3D_TopoComparison_Serializer import parser
+from parsers.shared import get_graph_engine
 
 # Methods to compare: (runlang, needs_sa_mode, short_label)
 _METHODS = [
@@ -50,8 +52,8 @@ def _build_method_flags(
     flags: list[str] = []
 
     # Graph engine
-    ge = getattr(args, "graph_engine", "nx")
-    if ge != "nx":
+    ge = get_graph_engine(args)
+    if ge != DEFAULT_GRAPH_ENGINE:
         flags.extend(["-ge", ge])
 
     # Geometry

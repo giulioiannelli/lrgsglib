@@ -19,7 +19,7 @@ from .SlaplSpect import (
     build_eigval_fname_base,
     build_eigvec_fname_base,
 )
-from parsers.shared import get_graph_engine
+from parsers.shared import get_graph_engine, graph_engine_suffix
 
 
 def get_lattice2d_path(args):
@@ -66,19 +66,21 @@ def perform_spectral_calculations(args):
     # Laplacian type selector ('signed' default keeps existing filenames byte-identical)
     lap_type = getattr(args, 'laplacian_type', SG_LAPL_DEFAULT_TYPE)
     lap_suffix = '' if lap_type == SG_LAPL_DEFAULT_TYPE else f"_lap={lap_type}"
+    # Both engines write to one directory, so a non-default engine is named
+    name_suffix = lap_suffix + graph_engine_suffix(args)
 
     # Determine the filename base and processing functions based on the mode
     if args.mode.endswith("dist"):
         if args.mode == "eigvec_dist":
             fname_base = build_eigvec_fname_base(
                 "", args.howmany, args.p, args.eigen_mode
-            ) + lap_suffix
+            ) + name_suffix
             initial_fn = eigvec_initial_data
             update_fn = eigvec_update_data
         elif args.mode == "eigval_dist":
             fname_base = build_eigval_fname_base(
                 "", args.p, args.cell_type
-            ) + lap_suffix
+            ) + name_suffix
             initial_fn = eigval_initial_data
             update_fn = eigval_update_data
 
@@ -97,7 +99,7 @@ def perform_spectral_calculations(args):
         # eigenvalues requested) only when a partial spectrum is asked for;
         # full-spectrum runs omit the k token for backward-compatible names.
         k_token = f"k={args.howmany}_" if args.howmany > 0 else ""
-        fname_base = f"eigvals_{k_token}{args.p:.3g}_{args.cell_type}{lap_suffix}"
+        fname_base = f"eigvals_{k_token}{args.p:.3g}_{args.cell_type}{name_suffix}"
 
         engine = get_graph_engine(args)
         eigvlist = []

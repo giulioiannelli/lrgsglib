@@ -1,8 +1,15 @@
 from lrgsglib.proglib import *
+from parsers.shared import GraphArgumentParser
 #
 optional_args_dict_tmp = L3D_ISDYN_opt_args.copy()
-optional_args_dict_tmp[tuple(['-rl', '--runlang'])]['default'] = 'C0ES'
+optional_args_dict_tmp[tuple(['-rl', '--runlang'])] = {
+    **optional_args_dict_tmp[tuple(['-rl', '--runlang'])], 'default': 'C0ES'
+}
 
+# The Ising checkpoint flag (-sf) shares the long option --save_frequency with
+# the reconstruction batching flag (-sFQ, recon_opt_args_dict); argparse rejects
+# duplicate option strings, so the Ising one is dropped from this parser.
+optional_args_dict_tmp.pop(tuple(['-sf', '--save_frequency']), None)
 optionalaction_args_dict = {
     **L3D_opt_args,
     **L3D_Recon_optional_args_dict,
@@ -11,7 +18,7 @@ optionalaction_args_dict = {
     **L3D_ISDYN_action_args
 }
 
-parser = argparse.ArgumentParser(
+parser = GraphArgumentParser(
     description=L3D_Recon_description,
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 #
@@ -19,3 +26,5 @@ for k, v in L3D_Recon_args.items():
     parser.add_argument(k, **v)
 for k,v in optionalaction_args_dict.items():
     parser.add_argument(*k, **v)
+# graph-tool path not ported yet
+parser.refuse_engine("gt", "the reconstruction kernel passes NetworkX-only options to the lattice")

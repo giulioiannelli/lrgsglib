@@ -1,3 +1,5 @@
+import argparse
+
 from lrgsglib.core import *
 #
 ER_IsingDynamics_progName = "ER_IsingDynamics"
