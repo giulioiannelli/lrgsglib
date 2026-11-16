@@ -66,12 +66,13 @@ def _make_lattice(args, engine: str, init_nw_dict: bool = True, **extra_kwargs):
         lattice.flip_random_fract_edges()
         return lattice
 
-    # NX path
+    # NX path. disorder=None: the caller flips nwDict[cell] exactly once.
     lattice = Lattice2D(
         args.L,
         pflip=args.p,
         geo=args.geometry,
         init_nw_dict=init_nw_dict,
+        disorder=None,
         **extra_kwargs,
     )
     return lattice
@@ -207,6 +208,7 @@ def run_ordparam_mode(
                 geo=args.geometry,
                 with_positions=True,
                 init_nw_dict=True,
+                disorder=None,
                 sgpathn=args.workdir,
             )
             lattice.flip_sel_edges(geometry_func(lattice))

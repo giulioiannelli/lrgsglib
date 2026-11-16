@@ -27,13 +27,12 @@ from __future__ import annotations
 
 import io
 import os
+import uuid
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import numpy as np
 from numpy.typing import DTypeLike
-
-from ..utils.basic.strings import generate_random_id
 
 __all__ = [
     "tmp_sibling",
@@ -52,9 +51,13 @@ __all__ = [
 
 def tmp_sibling(path: Path) -> Path:
     """Hidden, randomly-suffixed temp path in the same directory as ``path``
-    (same filesystem -> ``os.replace`` is atomic)."""
+    (same filesystem -> ``os.replace`` is atomic).
+
+    The suffix comes from ``uuid4`` (OS entropy), not the stdlib ``random``
+    stream: graph constructors reseed that stream, so processes building the
+    same seeded graph would otherwise draw identical temp names."""
     path = Path(path)
-    return path.with_name(f".{path.name}.{generate_random_id()}.tmp")
+    return path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
 
 
 def atomic_write_bytes(path, write_fn) -> Path:

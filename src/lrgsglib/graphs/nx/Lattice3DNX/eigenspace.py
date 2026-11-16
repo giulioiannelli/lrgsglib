@@ -59,6 +59,9 @@ def load_or_compute_Lattice3DNX(
       flipping probability (`pflip`).
     - The eigenvalues and energy are computed using the `cupy` backend.
     """
+    # This function realizes the disorder itself (below), so the
+    # construction-time auto-flip is deferred: signs are applied once.
+    kwargs.setdefault("disorder", None)
     tmp_l = Lattice3DNX(dim, geo, only_const_mode=True, **kwargs)
     if not compute:
         return tmp_l

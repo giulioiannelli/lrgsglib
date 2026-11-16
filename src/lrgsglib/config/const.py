@@ -373,6 +373,10 @@ DEFAULT_MAX_THRESHOLD = 2 * DEFAULT_SPIKE_THRESHOLD
 
 DEFAULT_LOG_DIR = LRGSG_LOG
 DEFAULT_P_FSTR_FMT = ".3g"
+# Float format for values that identify a run or travel on a command line
+# (run dirnames, sbatch argv): 12 significant digits keep every grid point
+# distinct (0.1025 != 0.103) and hide float noise (0.30000000000000004 -> 0.3).
+EXACT_FLOAT_FMT = ".12g"
 
 # Logging configuration constants
 import logging as _logging

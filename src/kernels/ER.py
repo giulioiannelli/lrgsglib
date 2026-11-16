@@ -22,7 +22,8 @@ def initialize_er_dict_args(args: Any) -> dict[str, Any]:
     -------
     dict[str, Any]
         Dictionary of arguments for ErdosRenyi initialization, including
-        init_nw_dict=True for network dictionary initialization.
+        init_nw_dict=True for network dictionary initialization and
+        disorder=None: callers realize the disorder themselves (one flip).
 
     Examples
     --------
@@ -41,7 +42,8 @@ def initialize_er_dict_args(args: Any) -> dict[str, Any]:
         p=args.p,
         sgpathn=args.workdir,
         pflip=args.pflip,
-        init_nw_dict=True
+        init_nw_dict=True,
+        disorder=None,
     )
 
 
@@ -71,8 +73,9 @@ def prepare_erdos_renyi(args: Any, cell_type: str | None = None, **kwargs: Any) 
 
     if engine == "gt":
         Cls = resolve_graph_class("ErdosRenyi", "gt")
+        # No fixed seed: every call must draw an independent realization.
         er = Cls(n=args.N, p=args.p, pflip=getattr(args, 'pflip', 0.0),
-                 seed=42, **kwargs)
+                 **kwargs)
         er.flip_random_fract_edges()
         return er
 
