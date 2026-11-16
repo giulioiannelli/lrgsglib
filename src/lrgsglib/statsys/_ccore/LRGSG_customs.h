@@ -13,7 +13,7 @@
 #define BINX ".bin"
 #define TXTX ".txt"
 /*basic string formatters*/
-#define __ " "
+#define _SP " "
 #define _C ","
 #define _E "="
 #define _H "-"
@@ -24,11 +24,11 @@
 #define _V "|"
 #define _W "!"
 /* composite string formatter */
-#define __V __ _V     /*                                                 " |" */
-#define _N_ _N __     /*                                               "\\n " */
+#define _SV _SP _V     /*                                                 " |" */
+#define _N_ _N _SP     /*                                               "\\n " */
 #define _NN _N _N     /*                                             "\\n\\n" */
 #define _NT _N _T     /*                                             "\\n\\t" */
-#define _T_ _T __     /*                                               "\\t " */
+#define _T_ _T _SP     /*                                               "\\t " */
 #define _TT _T _T     /*                                             "\\t\\t" */
 #define _TV _T _V     /*                                               "\\t|" */
 #define _VT _V _T     /*                                               "|\\t" */
@@ -37,8 +37,8 @@
 #define _N_W _N_ _W   /*                                              "\\n |" */
 #define _N_VT _N_ _VT /*                                           "\\n |\\t" */
 #define _N_WT _N_ _WT /*                                      "\\n !\\t |\\t" */
-#define _NT_V _NT __V /*                                           "\\n\\t |" */
-#define _NT_V_ _NT __V __ /*                                      "\\n\\t | " */
+#define _NT_V _NT _SV /*                                           "\\n\\t |" */
+#define _NT_V_ _NT _SV _SP /*                                      "\\n\\t | " */
 /* log file formatters */
 #define _HLIFI "{+}"
 #define _LLPFI "[?]"

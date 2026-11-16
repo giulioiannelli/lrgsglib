@@ -27,7 +27,6 @@ efficient simulations on large networks.
         :octicon:`rocket;3em;sd-text-primary`
 
         **Getting started**
-        ^^^
         New to lrgsglib? Install it, build your first signed graph and run a
         simulation in a handful of lines.
 
@@ -39,7 +38,6 @@ efficient simulations on large networks.
         :octicon:`book;3em;sd-text-primary`
 
         **User guide**
-        ^^^
         In-depth tutorials on graphs, lattices, spectral analysis, dynamics
         and plotting, with worked examples.
 
@@ -51,7 +49,6 @@ efficient simulations on large networks.
         :octicon:`code-square;3em;sd-text-primary`
 
         **API reference**
-        ^^^
         Detailed description of every module, class and function: graphs,
         statsys dynamics, spectral utilities and bindings.
 
@@ -63,7 +60,6 @@ efficient simulations on large networks.
         :octicon:`tools;3em;sd-text-primary`
 
         **Developer guide**
-        ^^^
         Architecture, the build system, C/C++ extensions, testing and the
         contribution conventions.
 
